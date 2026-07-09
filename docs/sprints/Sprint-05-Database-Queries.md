@@ -1,8 +1,9 @@
-# Sprint 05 - Database Queries Specification
+# Sprint 05 - Database Queries Specification (V2)
 
-- **Status**: Proposed
+- **Status**: Revised & Proposed
 - **Role**: Lead Software Architect
 - **Sprint**: Sprint 5 - Reporting & Analytics
+- **Revision Note**: Restricts the notification logging queries to the 'efrro' document type while preserving passport and visa document tracking stats.
 
 ---
 
@@ -12,7 +13,7 @@
 Queries executed by the statistics service engine.
 
 ```sql
--- 1. Compliance Percentage Calculations
+-- 1. Compliance Percentage Calculations (Applies to all three documents)
 SELECT 
   ROUND(
     (COUNT(CASE WHEN passport_status = 'COMPLIANT' AND visa_status = 'COMPLIANT' AND efrro_status = 'COMPLIANT' THEN 1 END)::NUMERIC / 
@@ -21,16 +22,18 @@ SELECT
   COUNT(*) as total_students
 FROM public.student_snapshot;
 
--- 2. Average Document Verification Audit Time
+-- 2. Notification Audit Log Query (Restricted to eFRRO type)
 SELECT 
-  AVG(updated_at - created_at) as avg_verification_duration
-FROM (
-  SELECT updated_at, created_at FROM public.passport_versions WHERE verification_status = 'verified'
-  UNION ALL
-  SELECT updated_at, created_at FROM public.visa_versions WHERE verification_status = 'verified'
-  UNION ALL
-  SELECT updated_at, created_at FROM public.efrro_versions WHERE verification_status = 'verified'
-) as all_verifications;
+  id,
+  student_id,
+  channel,
+  status,
+  retry_count,
+  scheduled_for,
+  trigger_source
+FROM public.notifications
+WHERE document_type = 'efrro'
+ORDER BY scheduled_for DESC;
 ```
 
 ---
@@ -59,12 +62,6 @@ WHERE
   -- Reusable dynamic filters
   AND (:schoolFilter IS NULL OR sp.school = :schoolFilter)
   AND (:countryFilter IS NULL OR sp.nationality_name = :countryFilter)
-  AND (:statusFilter IS NULL OR 
-        (CASE 
-           WHEN :statusFilter = 'expired' THEN snap.days_until_expiry <= 0
-           WHEN :statusFilter = 'expiring_soon' THEN snap.days_until_expiry > 0 AND snap.days_until_expiry <= 30
-           ELSE TRUE
-         END))
 ORDER BY sp.full_name ASC
 LIMIT :limitOffset OFFSET :pageOffset;
 ```
@@ -84,4 +81,7 @@ CREATE INDEX IF NOT EXISTS idx_student_snapshot_expiry ON public.student_snapsho
 
 -- Composite index to support sorting by registration and status
 CREATE INDEX IF NOT EXISTS idx_students_reg_num ON public.students (registration_number);
+
+-- Index notifications filtering by efrro type
+CREATE INDEX IF NOT EXISTS idx_notifications_efrro ON public.notifications (document_type) WHERE document_type = 'efrro';
 ```

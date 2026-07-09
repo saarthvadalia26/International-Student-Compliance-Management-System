@@ -1,8 +1,9 @@
-# Sprint 05 - Reporting & Analytics Architecture Specification
+# Sprint 05 - Reporting & Analytics Architecture Specification (V2)
 
-- **Status**: Proposed
+- **Status**: Revised & Proposed
 - **Role**: Lead Software Architect
 - **Sprint**: Sprint 5 - Reporting & Analytics
+- **Revision Note**: Conforms to the refined business rules (Automated reminders apply ONLY to `efrro` documents; Passport and Visa remain compliance-only documents with no notifications).
 
 ---
 
@@ -51,6 +52,6 @@ $$\text{Compliance } \% = \left( \frac{\text{Students with Passport, Visa, and e
 Measures the duration from initial student registration to full document verification:
 $$\text{Average Time} = \frac{\sum (\text{Verification Timestamp} - \text{Registration Timestamp})}{\text{Total Verified Students}}$$
 
-### C. Monthly Expiry Trends
-Calculates a rolling 12-month timeline grouping document expirations:
-*   Uses PostgreSQL query grouping by `date_trunc('month', expiry_date)` with indices.
+### C. Expiry Trends & Reminder Rules (eFRRO Only)
+*   **eFRRO Alert Pipeline**: Evaluates upcoming expirations ONLY for `document_type = 'efrro'`. Automated reminders, notification queue entries, and retry schedulers operate exclusively on eFRRO dates.
+*   **Passport and Visa**: Logged on the administrator dashboard, compliance tables, and analytics reports. Expirations display warnings, but do not trigger automated reminders or enter the notification delivery queue.
