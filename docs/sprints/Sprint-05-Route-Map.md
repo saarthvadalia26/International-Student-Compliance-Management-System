@@ -1,33 +1,37 @@
-# Sprint 05 - Route Map Specification
+# Sprint 05 - Route Map Specification (V3)
 
-- **Status**: Proposed
+- **Status**: Production-Ready / Final Revision
 - **Role**: Lead Software Architect
 - **Sprint**: Sprint 5 - Reporting & Analytics
 
 ---
 
-## 1. Route Map Declarations
+## 1. Landing Page & Reports Navigation Map
 
-All reporting pages are grouped under the `(app)` router segment to share layout headers:
+The landing page of the application (after authentication) transitions from `/reports` to `/dashboard`. 
 
-| Route Path | View Type | Description |
+| Route Path | Scope / Content | Specific Route Permissions |
 | :--- | :--- | :--- |
-| `/reports` | Dashboard Dashboard | General Analytics Dashboard displaying high-level compliance percentages, monthly expiry trend charts, and notification health indicators. |
-| `/reports/students` | Detailed Table | Tabular report showing student metrics. Filterable by School, Country, and Academic Year. |
-| `/reports/documents` | Detailed Table | Focuses on Passport, Visa, and eFRRO details. Enables sorting by expiry ranges and filtering by compliance state (Expired, Expiring Soon, Missing). |
-| `/reports/notifications` | Detailed Table | Lists notification histories, trigger sources, delivery channels, and gateway retry records. |
+| `/dashboard` | Landing page. Displays metrics overview widgets, Recharts analysis trends, and compliance highlights. | Verified admin or compliance officer |
+| `/reports` | Main reports directory index panel. | Verified admin or compliance officer |
+| `/reports/students` | Detailed tabular report with search capabilities by student name, registration number, nationality, etc. | Verified admin or compliance officer |
+| `/reports/passports`| Dedicated Passport verification lists and expiration logs. | Verified admin or compliance officer |
+| `/reports/visas` | Dedicated Visa verification lists and status audits. | Verified admin or compliance officer |
+| `/reports/efrro` | eFRRO verification items and registration checklists. | Verified admin or compliance officer |
+| `/reports/compliance`| Aggregated status matrix mapping Expired, Expiring, Compliant, or Missing states. | Verified admin or compliance officer |
+| `/reports/notifications` | Alert dispatches logging panel tracking delivery and retry status logs. | Verified admin or compliance officer |
+| `/reports/audit` | Compliance verification actions, comments, and export audits history. | Admin scope only |
 
 ---
 
-## 2. Query Parameters Strategy
+## 2. Dynamic Route Configurations & Query Parameters
 
-To ensure report state (search queries, active filters, page index, and sort order) is fully shareable, we will manage all list states via the Next.js search parameters pipeline. This allows bookmarking specific search views:
+Every sub-report route independently manages its search parameters. For example:
 
-*   `page`: Page index offset number (Default: `1`)
-*   `limit`: Page size parameter (Default: `50`)
-*   `search`: Query text filtering by student name, registration number, or passport number.
-*   `school`: Academic department filter key.
-*   `country`: Country code filter matching nationalities.
-*   `status`: Compliance standing status matching snap results.
-*   `sortBy`: Columns target (e.g. `days_until_expiry`, `full_name`).
-*   `sortOrder`: Sort direction (`asc`, `desc`).
+*   **`/reports/passports`**:
+    *   `passportStatus`: Filters by `expired`, `valid`, or `missing`.
+    *   `sortBy`: e.g. `passport_expiry_date`.
+*   **`/reports/notifications`**:
+    *   `notificationStatus`: Filters by `sent`, `failed`, `pending_retry`.
+    *   `sortBy`: e.g. `scheduled_for`.
+*   **Common parameters**: `page`, `limit`, `search`, `school`, `country`, `academicYear`.

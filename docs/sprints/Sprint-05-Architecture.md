@@ -1,57 +1,67 @@
-# Sprint 05 - Reporting & Analytics Architecture Specification (V2)
+# Sprint 05 - Reporting & Analytics Architecture Specification (V3)
 
-- **Status**: Revised & Proposed
+- **Status**: Production-Ready / Final Revision
 - **Role**: Lead Software Architect
 - **Sprint**: Sprint 5 - Reporting & Analytics
-- **Revision Note**: Conforms to the refined business rules (Automated reminders apply ONLY to `efrro` documents; Passport and Visa remain compliance-only documents with no notifications).
 
 ---
 
-## 1. System Architecture
+## 1. Modular Boundaries
 
-The Reporting & Analytics module will follow the established clean architecture boundaries:
+To preserve strict SOLID and clean architecture guidelines:
+*   **UI Views**: Rendered exclusively under `/src/app/(app)/dashboard` and `/src/app/(app)/reports`. Contains no SQL, Supabase clients, or raw query logic.
+*   **Feature Modules**:
+    *   `src/features/dashboard/`: Contains Recharts wrappers, dashboard widgets, and dashboard metrics hooks.
+    *   `src/features/reports/`: Contains report-specific filters, tables, paginated controllers, and export actions.
+*   **Domain Layers**:
+    *   `src/domain/reports/`: Organized into:
+        *   `dto/`: Data Transfer Objects for reports query inputs and outputs.
+        *   `mappers/`: Transforms database row entities into domain reports interfaces.
+        *   `repositories/`: `IReportRepository` contracts and Supabase client implementations.
+        *   `services/`: Calculations logic for summaries and trends.
+        *   `types/`: Types definition schemas.
+        *   `validators/`: Zod filters validation checks.
 
-```mermaid
-graph TD
-    UI[Frontend Component Feature Views] -->|Consumes| Service[Reporting Service Layer]
-    Service -->|Uses| Repo[Reporting Repository Layer]
-    Service -->|Uses| Export[Export Engine Service]
-    Repo -->|Queries| DB[(Supabase PostgreSQL)]
+---
+
+## 2. Recharts Standard Specification
+
+To prevent charts fragmentation across views, we establish a standardized charts framework using **Recharts**:
+
+```typescript
+// Shared Recharts configuration and styling constants
+export const CHART_COLORS = {
+  primary: 'oklch(0.205 0 0)',       // Dark dominant color
+  success: 'oklch(0.627 0.265 150)', // Compliant green
+  warning: 'oklch(0.795 0.184 65)',  // Expiring yellow/orange
+  danger: 'oklch(0.577 0.245 27)',   // Expired red
+  muted: 'oklch(0.708 0 0)',         // Grid line borders
+  accent: 'oklch(0.97 0 0)'          // Tooltip backgrounds
+};
 ```
 
-### A. Domain Layer (`src/domain/reports/`)
-Defines canonical models for report generation:
-*   `ReportMetadata`: Standard parameters like UUID, title, author, configuration variables, and creation logs.
-*   `StudentReportItem`: Extends `StudentSnapshot` with nationality, course, school, and active warning flags.
-*   `ComplianceMetrics`: Computed indicators including success rates, average resolution times, and trend metrics.
-
-### B. Repository Layer (`INotificationRepository` / `IReportRepository`)
-Encapsulates database access. Leverages optimized PostgreSQL queries to handle 50,000+ student records:
-*   `getComplianceMetrics(): Promise<ComplianceMetrics>`
-*   `queryStudentReport(filters: ReportFilters, pagination: PaginationParams): Promise<PaginatedResult<StudentReportItem>>`
-
-### C. Service Layer (`ReportingService`)
-Calculates analytics and implements search/filtering strategies:
-*   `generateSummaryDashboard(): Promise<DashboardSummary>`
-*   `getReportStream(filters: ReportFilters): ReadableStream` (For handling high-volume queries)
-
-### D. Export Layer (`ExportEngine`)
-Translates domain models into target formats:
-*   `IExporter`: Interface containing the `export(data: unknown[], config: ExportConfig): Promise<Buffer>` method.
-*   `CsvExporter`, `ExcelExporter` (using `exceljs` library), `PdfExporter` (using serverless streams).
+*   **ResponsiveContainer**: Standardized height of `350px` (`h-96`) with full width behavior.
+*   **Shared Tooltip**: Styled to support dark-mode colors using absolute positioning, customized labels formatting, and HTML overlay structures.
+*   **A11y**: Every chart requires an SVG `title` element and `role="img"` to ensure screen readers can read chart labels.
 
 ---
 
-## 2. Analytics & Statistics Calculation Engine
+## 3. Notification Scope
 
-### A. Compliance Percentage
-Calculated on demand or cached in the `student_snapshot` materialized view:
-$$\text{Compliance } \% = \left( \frac{\text{Students with Passport, Visa, and eFRRO verified}}{\text{Total registered international students}} \right) \times 100$$
+*   **eFRRO**: Operates all notification alerting mechanisms (Automatic pre-expiry warning reminders, WhatsApp/Email alert scheduling, delivery queue tracking, retry backoff engines).
+*   **Passport / Visa**: Retains compliance status logic, dashboard counters, and report tables, but **never** schedules alerts or runs notification templates.
 
-### B. Average Compliance Time
-Measures the duration from initial student registration to full document verification:
-$$\text{Average Time} = \frac{\sum (\text{Verification Timestamp} - \text{Registration Timestamp})}{\text{Total Verified Students}}$$
+---
 
-### C. Expiry Trends & Reminder Rules (eFRRO Only)
-*   **eFRRO Alert Pipeline**: Evaluates upcoming expirations ONLY for `document_type = 'efrro'`. Automated reminders, notification queue entries, and retry schedulers operate exclusively on eFRRO dates.
-*   **Passport and Visa**: Logged on the administrator dashboard, compliance tables, and analytics reports. Expirations display warnings, but do not trigger automated reminders or enter the notification delivery queue.
+## 4. Operational Dashboard Widgets
+
+The operational `/dashboard` overview (landing page after logging in) includes:
+
+1.  **Total International Students**: Active students count.
+2.  **Fully Compliant**: Verification complete for Passport, Visa, and eFRRO.
+3.  **eFRRO Expiring (30 Days)**: Warnings count.
+4.  **eFRRO Expiring (15 Days)**: Critical warnings count.
+5.  **eFRRO Expired**: Number of expired records.
+6.  **Missing eFRRO**: Registered students without an uploaded eFRRO document.
+7.  **Notifications Sent Today**: Successful message transmissions.
+8.  **Failed Notifications**: Errors logging count.

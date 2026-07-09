@@ -1,32 +1,17 @@
-# Sprint 05 - Security Specification
+# Sprint 05 - Security Specification (V3)
 
-- **Status**: Proposed
+- **Status**: Production-Ready / Final Revision
 - **Role**: Lead Software Architect
 - **Sprint**: Sprint 5 - Reporting & Analytics
 
 ---
 
-## 1. Authorization & Row Level Security (RLS)
+## 1. Export Security Boundary
 
-All database operations are mediated by Supabase PostgreSQL Row Level Security configurations.
-
-### A. Reporting Admin Policy
-Only authorized university compliance officers can run aggregated analytics queries.
-```sql
--- Policies for student_snapshot reporting
-CREATE POLICY select_reporting_snapshot ON public.student_snapshot
-    FOR SELECT
-    TO authenticated
-    USING (
-      -- Check role validation in user metadata
-      (auth.jwt() -> 'user_metadata' ->> 'role') IN ('admin', 'compliance_officer')
-    );
-```
-
-### B. Export Access Controls
-Export operations generate high network load and parse large PII collections.
-*   **Security Boundary**: Exporters are run inside Server Actions that re-evaluate user authentication and roles prior to pulling data records.
-*   **Audit Logging**: Every export request writes a record to the `audit_log` database table detailing:
+Export operations parse large volumes of Personally Identifiable Information (PII). To prevent data leaks:
+*   **Server-Only Execution**: Exporters (`CsvExporter`, `ExcelExporter`) run exclusively within Server Actions on the server. Data payloads never touch the client DOM before being compiled into binary blobs.
+*   **Active Authorization**: The Server Action re-validates the user session and metadata claims before querying database interfaces.
+*   **Audit Logging**: Every report download writes a persistent record to the `audit_log` database table:
     *   Administrator UID
     *   Timestamp
     *   Report Type
@@ -35,8 +20,8 @@ Export operations generate high network load and parse large PII collections.
 
 ---
 
-## 2. PII Data Masking Policy
+## 2. PII Masking Policies
 
-To comply with privacy standards, report tables mask highly sensitive fields by default:
-*   Passport numbers, visa IDs, and eFRRO reference keys display only the last 4 digits (e.g. `******AB12`), unless the administrator explicitly requests decryption/unmasking (which triggers an audit trace).
-*   Document PDF downloads generate short-lived, signed URLs (expiring in 5 minutes) to ensure that URLs cannot be leaked or shared.
+To comply with international privacy regulations, report lists and search results mask document identifiers by default:
+*   **Identifier Masking**: Passport numbers, visa IDs, and eFRRO reference numbers are masked (e.g., `******AB12`), displaying only the last 4 characters, unless the compliance officer has explicitly requested unmasking.
+*   **Signed Storage Linkages**: Documents links shown on tables do not expose actual Supabase Storage bucket URLs. Instead, they fetch short-lived signed URLs (valid for 5 minutes).

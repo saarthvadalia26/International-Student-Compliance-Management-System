@@ -1,87 +1,88 @@
-# Sprint 05 - Database Queries Specification (V2)
+# Sprint 05 - Database Queries Specification (V3)
 
-- **Status**: Revised & Proposed
+- **Status**: Production-Ready / Final Revision
 - **Role**: Lead Software Architect
 - **Sprint**: Sprint 5 - Reporting & Analytics
-- **Revision Note**: Restricts the notification logging queries to the 'efrro' document type while preserving passport and visa document tracking stats.
 
 ---
 
 ## 1. SQL Query Definitions
 
-### A. General Metrics Calculations
-Queries executed by the statistics service engine.
+### A. Dashboard Metrics Queries
+Aggregated query evaluations for dashboard widgets:
 
 ```sql
--- 1. Compliance Percentage Calculations (Applies to all three documents)
-SELECT 
-  ROUND(
-    (COUNT(CASE WHEN passport_status = 'COMPLIANT' AND visa_status = 'COMPLIANT' AND efrro_status = 'COMPLIANT' THEN 1 END)::NUMERIC / 
-     NULLIF(COUNT(*), 0)) * 100, 2
-  ) as compliance_percentage,
-  COUNT(*) as total_students
+-- 1. General Compliance & Expirations (eFRRO Only Alerts)
+SELECT
+  -- Total registered international students
+  COUNT(*) as total_students,
+  -- Fully compliant counts
+  COUNT(CASE WHEN passport_status = 'COMPLIANT' AND visa_status = 'COMPLIANT' AND efrro_status = 'COMPLIANT' THEN 1 END) as fully_compliant,
+  -- eFRRO Expiring (30 Days)
+  COUNT(CASE WHEN efrro_status = 'EXPIRING' AND days_until_efrro_expiry > 15 AND days_until_efrro_expiry <= 30 THEN 1 END) as efrro_expiring_30,
+  -- eFRRO Expiring (15 Days)
+  COUNT(CASE WHEN efrro_status = 'EXPIRING' AND days_until_efrro_expiry <= 15 THEN 1 END) as efrro_expiring_15,
+  -- eFRRO Expired
+  COUNT(CASE WHEN efrro_status = 'EXPIRED' THEN 1 END) as efrro_expired,
+  -- Missing eFRRO
+  COUNT(CASE WHEN efrro_status = 'MISSING' THEN 1 END) as missing_efrro
 FROM public.student_snapshot;
 
--- 2. Notification Audit Log Query (Restricted to eFRRO type)
+-- 2. Daily Notification Activity Logs (eFRRO ONLY)
 SELECT 
-  id,
-  student_id,
-  channel,
-  status,
-  retry_count,
-  scheduled_for,
-  trigger_source
+  COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent_today,
+  COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_today
 FROM public.notifications
-WHERE document_type = 'efrro'
-ORDER BY scheduled_for DESC;
+WHERE 
+  document_type = 'efrro'
+  AND created_at >= CURRENT_DATE;
 ```
 
 ---
 
-### B. Scalable Filtering & Search Query
-Executes reports pagination and keyword search operations.
+### B. Global Search & Decryption
+Global query matching multiple document identifiers, optimized to run within sub-second thresholds:
 
 ```sql
 SELECT 
   s.id,
   sp.full_name,
   s.registration_number,
-  snap.passport_status,
-  snap.visa_status,
-  snap.efrro_status,
-  snap.days_until_expiry,
-  sp.nationality_name,
-  sp.program_name,
-  sp.school
+  s.email,
+  s.mobile_number,
+  snap.passport_number,
+  snap.visa_number,
+  snap.efrro_number
 FROM public.students s
 JOIN public.student_personal sp ON s.id = sp.student_id
 JOIN public.student_snapshot snap ON s.id = snap.student_id
 WHERE 
-  -- Search Keyword matching index limits
-  (sp.full_name ILIKE :searchQuery OR s.registration_number ILIKE :searchQuery)
-  -- Reusable dynamic filters
-  AND (:schoolFilter IS NULL OR sp.school = :schoolFilter)
-  AND (:countryFilter IS NULL OR sp.nationality_name = :countryFilter)
-ORDER BY sp.full_name ASC
-LIMIT :limitOffset OFFSET :pageOffset;
+  s.registration_number ILIKE :searchQuery
+  OR sp.full_name ILIKE :searchQuery
+  OR snap.passport_number ILIKE :searchQuery
+  OR snap.visa_number ILIKE :searchQuery
+  OR snap.efrro_number ILIKE :searchQuery
+  OR s.email ILIKE :searchQuery
+  OR s.mobile_number ILIKE :searchQuery
+LIMIT 10;
 ```
 
 ---
 
 ## 2. Optimized Indexes Layout
 
-To scale performance to 50,000+ students and prevent table scans:
+To scale performance to 50,000+ students and prevent full table scans on search queries:
 
 ```sql
--- Index student details for quick search lookup queries
-CREATE INDEX IF NOT EXISTS idx_student_personal_search ON public.student_personal (full_name, school);
-
--- Index snapshot status and expiration days offsets
-CREATE INDEX IF NOT EXISTS idx_student_snapshot_expiry ON public.student_snapshot (days_until_expiry, passport_status, visa_status, efrro_status);
-
--- Composite index to support sorting by registration and status
+-- Search identifiers indices on students core table
 CREATE INDEX IF NOT EXISTS idx_students_reg_num ON public.students (registration_number);
+CREATE INDEX IF NOT EXISTS idx_students_email ON public.students (email);
 
--- Index notifications filtering by efrro type
-CREATE INDEX IF NOT EXISTS idx_notifications_efrro ON public.notifications (document_type) WHERE document_type = 'efrro';
+-- Search identifiers indices on snapshot table
+CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_passport_num ON public.student_snapshot (passport_number);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_visa_num ON public.student_snapshot (visa_number);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_snapshot_efrro_num ON public.student_snapshot (efrro_number);
+
+-- Expiration indexing (eFRRO Alerts Only)
+CREATE INDEX IF NOT EXISTS idx_snapshot_efrro_expiry ON public.student_snapshot (days_until_efrro_expiry);
 ```

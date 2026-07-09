@@ -1,47 +1,53 @@
-# Sprint 05 - Folder Structure Specification
+# Sprint 05 - Folder Structure Specification (V3)
 
-- **Status**: Proposed
+- **Status**: Production-Ready / Final Revision
 - **Role**: Lead Software Architect
 - **Sprint**: Sprint 5 - Reporting & Analytics
 
 ---
 
-## 1. Directory Tree Configuration
+## 1. Directory Tree Configurations
 
-The Reporting feature follows the project's standard modular directory layout:
+The directories configuration integrates the dashboard feature module and the refined domain layout:
 
 ```
 src/
 ├── app/
 │   └── (app)/
-│       ├── reports/
-│       │   ├── page.tsx               # Analytics dashboard entry page
-│       │   ├── students/
-│       │   │   └── page.tsx           # Student general compliance report route
-│       │   ├── documents/
-│       │   │   └── page.tsx           # Expiries, passport, visa, & eFRRO reports
-│       │   └── notifications/
-│       │       └── page.tsx           # Alerts & delivery metrics reports
-│       └── ...
+│       ├── dashboard/
+│       │   └── page.tsx               # landing page after authentication
+│       └── reports/
+│           ├── page.tsx               # Main Reports directory index listing
+│           ├── students/
+│           │   └── page.tsx           # Student General Report Page
+│           ├── passports/
+│           │   └── page.tsx           # Passport Expiry and Verification Report Page
+│           ├── visas/
+│           │   └── page.tsx           # Visa Expiry and Verification Report Page
+│           ├── efrro/
+│           │   └── page.tsx           # eFRRO Compliance Report Page
+│           ├── compliance/
+│           │   └── page.tsx           # Aggregated Compliance Matrix Report Page
+│           ├── notifications/
+│           │   └── page.tsx           # eFRRO Alerts & Delivery Logs Report Page
+│           └── audit/
+│               └── page.tsx           # Admin verification actions audit trail
 ├── domain/
 │   └── reports/
-│       ├── types/
-│       │   └── index.ts               # Core model contracts & filter definitions
-│       ├── repositories/
-│       │   └── report.repository.ts   # IReportRepository interface & Supabase impl
-│       └── services/
-│           ├── report.service.ts      # ReportingService core business calculations
-│           └── export.service.ts      # ExportEngine service with formatting handlers
-└── features/
-    └── reports/
-        ├── components/
-        │   ├── analytics-charts.tsx   # Dashboard charts (Country distribution, expiries)
-        │   ├── metrics-grid.tsx       # Stats metrics cards panel
-        │   ├── report-filters.tsx     # Reusable filters drawer & input elements
-        │   ├── report-table.tsx       # Paginated reports display table
-        │   └── export-button.tsx      # Export download triggers
-        ├── constants/
-        │   └── index.ts               # Filtering metadata selections config list
-        └── hooks/
-            └── useReportData.ts       # React hooks fetching backend summaries
+│       ├── dto/                       # Data Transfer Objects
+│       ├── mappers/                   # DB rows to Domain Mapper helpers
+│       ├── repositories/              # Repository interfaces
+│       ├── services/                  # Business calculations services
+│       ├── types/                     # Shared types and filters schemas
+│       └── validators/                # Zod filters validation checkers
+├── features/
+│   ├── dashboard/                     # Dedicated Feature Module
+│   │   ├── charts/                    # Recharts wrapper components
+│   │   ├── metrics/                   # Overview metrics grid panels
+│   │   ├── constants/                 # Dashboard status items
+│   │   └── hooks/                     # Dashboard statistics fetchers
+│   └── reports/
+│       ├── components/                # Shared reporting controls (filters, tables)
+│       ├── constants/                 # Filter configurations definitions
+│       └── hooks/                     # Fetch hooks mapping search parameters
 ```
