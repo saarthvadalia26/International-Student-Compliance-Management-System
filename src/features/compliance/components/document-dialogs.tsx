@@ -1,0 +1,169 @@
+"use client";
+
+import * as React from "react";
+import { Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { DocumentConfig } from "../constants/constants";
+
+interface UploadDialogProps {
+  config: DocumentConfig;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { docNumber: string; issueDate: string; expiryDate: string; file: File | null }) => void;
+}
+
+export function DocumentUploadDialog({ config, isOpen, onOpenChange, onSubmit }: UploadDialogProps): React.JSX.Element {
+  const [docNumber, setDocNumber] = React.useState("");
+  const [issueDate, setIssueDate] = React.useState("");
+  const [expiryDate, setExpiryDate] = React.useState("");
+  const [file, setFile] = React.useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isDirty, setIsDirty] = React.useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const selected = e.target.files[0];
+      if (selected.type !== "application/pdf") {
+        toast.error("File Type Blocked", { description: "Only PDF documents are allowed." });
+        return;
+      }
+      if (selected.size > 2 * 1024 * 1024) {
+        toast.error("File Size Exceeded", { description: "PDF file size must not exceed 2MB." });
+        return;
+      }
+      setFile(selected);
+      setIsDirty(true);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docNumber.trim() || !issueDate || !expiryDate || !file) {
+      toast.error("Required fields missing", { description: "Please populate all fields and select a PDF file." });
+      return;
+    }
+    
+    if (new Date(expiryDate) <= new Date(issueDate)) {
+      toast.error("Validation Error", { description: "Expiry date must be after the issue date." });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setTimeout(() => {
+      onSubmit({ docNumber, issueDate, expiryDate, file });
+      setIsSubmitting(false);
+      onOpenChange(false);
+      // Reset form
+      setDocNumber("");
+      setIssueDate("");
+      setExpiryDate("");
+      setFile(null);
+      setIsDirty(false);
+    }, 1200);
+  };
+
+  const handleClose = (open: boolean) => {
+    if (!open && isDirty) {
+      const confirmDiscard = window.confirm("You have unsaved changes. Discard file upload details?");
+      if (!confirmDiscard) return;
+    }
+    onOpenChange(open);
+    setIsDirty(false);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md w-full">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold">Upload {config.title}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 py-1 text-xs">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground" htmlFor="docNumber">{config.fieldLabel}</label>
+            <Input id="docNumber" value={docNumber} onChange={(e) => { setDocNumber(e.target.value); setIsDirty(true); }} className="h-9 text-sm" placeholder="e.g. A-12345678" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="issueDate">Issue Date</label>
+              <Input id="issueDate" type="date" value={issueDate} onChange={(e) => { setIssueDate(e.target.value); setIsDirty(true); }} className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="expiryDate">Expiry Date</label>
+              <Input id="expiryDate" type="date" value={expiryDate} onChange={(e) => { setExpiryDate(e.target.value); setIsDirty(true); }} className="h-9 text-sm" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground" htmlFor="pdfFile">Select PDF Document</label>
+            <Input id="pdfFile" type="file" accept=".pdf" onChange={handleFileChange} className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-primary/10 file:text-primary file:hover:bg-primary/20" />
+            <p className="text-[10px] text-muted-foreground">PDF formats only. Max file size 2MB.</p>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => handleClose(false)}>Cancel</Button>
+            <Button type="submit" size="sm" disabled={isSubmitting}>
+              {isSubmitting ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Uploading...</> : "Submit Version"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface VerificationPanelProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onVerify: (data: { status: "verified" | "rejected"; reason: string }) => void;
+}
+
+export function VerificationPanel({ isOpen, onOpenChange, onVerify }: VerificationPanelProps): React.JSX.Element {
+  const [rejectionReason, setRejectionReason] = React.useState("");
+
+  const handleAction = (status: "verified" | "rejected") => {
+    if (status === "rejected" && !rejectionReason.trim()) {
+      toast.error("Rejection Reason Required", { description: "Please explain the reason for document rejection." });
+      return;
+    }
+    onVerify({ status, reason: status === "rejected" ? rejectionReason : "" });
+    setRejectionReason("");
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md w-full">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-semibold">Document Audit Verification</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2 text-xs">
+          <p className="text-muted-foreground font-caption">
+            Review the uploaded PDF file. Inspect document identifier spelling, signature presence, and dates alignment.
+          </p>
+          
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground" htmlFor="rejectionReason">Rejection Remarks (Required if rejecting)</label>
+            <Textarea 
+              id="rejectionReason" 
+              placeholder="Explain why this document was rejected (e.g. blurred text, wrong document type, expired details)..."
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              className="min-h-16 text-sm"
+            />
+          </div>
+
+          <DialogFooter className="pt-2 gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="destructive" size="sm" onClick={() => handleAction("rejected")}>Reject Version</Button>
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => handleAction("verified")}>Verify & Approve</Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
