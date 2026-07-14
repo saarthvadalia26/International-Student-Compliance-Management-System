@@ -19,12 +19,16 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { NationalitySelector } from "@/components/ui/nationality-selector";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { RegisterStudentValidationSchema } from "@/services/validation/student-validation";
 
 export default function StudentRegistrationPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"personal" | "academic" | "contact" | "documents">("personal");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [submittingSuccess, setSubmittingSuccess] = React.useState(false);
+  const [submittingError, setSubmittingError] = React.useState(false);
 
   // Form State
   const [formData, setFormData] = React.useState({
@@ -99,14 +103,25 @@ export default function StudentRegistrationPage() {
     }
 
     setIsSubmitting(true);
+    setSubmittingSuccess(false);
+    setSubmittingError(false);
 
     // Mock insertion delay
     setTimeout(() => {
-      setIsSubmitting(false);
-      toast.success("Student registration complete", {
-        description: `${formData.fullName} has been registered successfully.`,
-      });
-      router.push("/students");
+      try {
+        setIsSubmitting(false);
+        setSubmittingSuccess(true);
+        toast.success("Profile updated successfully.", {
+          description: `${formData.fullName} has been registered successfully.`,
+        });
+        setTimeout(() => {
+          router.push("/students");
+        }, 1500);
+      } catch (err) {
+        setIsSubmitting(false);
+        setSubmittingError(true);
+        toast.error("Unable to save changes. Please try again.");
+      }
     }, 1500);
   };
 
@@ -215,19 +230,10 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground" htmlFor="nationality">
                       Nationality <span className="text-rose-500">*</span>
                     </label>
-                    <Select value={formData.nationality} onValueChange={(v) => handleSelectChange("nationality", v || "")}>
-                      <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder="Select Nationality" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="RUS">Russia</SelectItem>
-                        <SelectItem value="NGA">Nigeria</SelectItem>
-                        <SelectItem value="JPN">Japan</SelectItem>
-                        <SelectItem value="SGP">Singapore</SelectItem>
-                        <SelectItem value="ARE">United Arab Emirates</SelectItem>
-                        <SelectItem value="USA">United States</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <NationalitySelector 
+                      value={formData.nationality} 
+                      onChange={(v) => handleSelectChange("nationality", v)} 
+                    />
                   </div>
 
                   <div className="space-y-1.5">
@@ -518,18 +524,18 @@ export default function StudentRegistrationPage() {
                     Next Section
                   </Button>
                 ) : (
-                  <Button type="submit" size="sm" className="h-9 text-xs" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving Student...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" /> Save & Register
-                      </>
-                    )}
-                  </Button>
+                  <AsyncActionButton
+                    type="submit"
+                    size="sm"
+                    className="h-9 text-xs"
+                    isLoading={isSubmitting}
+                    isSuccess={submittingSuccess}
+                    isError={submittingError}
+                    idleText="Save & Register"
+                    loadingText="Saving Student..."
+                    successText="Changes saved"
+                    errorText="Try Again"
+                  />
                 )}
               </div>
             </CardFooter>

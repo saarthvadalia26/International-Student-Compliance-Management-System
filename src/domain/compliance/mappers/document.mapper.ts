@@ -25,13 +25,17 @@ export interface ISnapshotDbRow {
   student_id: string;
   passport_status: string;
   passport_expiry: string | null;
+  passport_number?: string | null;
   visa_status: string;
   visa_expiry: string | null;
+  visa_number?: string | null;
   efrro_status: string;
   efrro_expiry: string | null;
+  efrro_number?: string | null;
   compliance_score: number;
   compliance_status: string;
   days_until_expiry: number | null;
+  days_until_efrro_expiry?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,13 +92,17 @@ export class DocumentMapper {
       studentId: row.student_id,
       passportStatus: row.passport_status as ComplianceStatus,
       passportExpiry: row.passport_expiry ? new Date(row.passport_expiry) : null,
+      passportNumber: row.passport_number || null,
       visaStatus: row.visa_status as ComplianceStatus,
       visaExpiry: row.visa_expiry ? new Date(row.visa_expiry) : null,
+      visaNumber: row.visa_number || null,
       efrroStatus: row.efrro_status as ComplianceStatus,
       efrroExpiry: row.efrro_expiry ? new Date(row.efrro_expiry) : null,
+      efrroNumber: row.efrro_number || null,
       complianceScore: row.compliance_score,
       complianceStatus: row.compliance_status as ComplianceStatus,
       daysUntilExpiry: row.days_until_expiry,
+      daysUntilEfrroExpiry: row.days_until_efrro_expiry || null,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     };
@@ -105,13 +113,17 @@ export class DocumentMapper {
       student_id: snap.studentId,
       passport_status: snap.passportStatus,
       passport_expiry: snap.passportExpiry ? snap.passportExpiry.toISOString().split("T")[0] : null,
+      passport_number: snap.passportNumber || null,
       visa_status: snap.visaStatus,
       visa_expiry: snap.visaExpiry ? snap.visaExpiry.toISOString().split("T")[0] : null,
+      visa_number: snap.visaNumber || null,
       efrro_status: snap.efrroStatus,
       efrro_expiry: snap.efrroExpiry ? snap.efrroExpiry.toISOString().split("T")[0] : null,
+      efrro_number: snap.efrroNumber || null,
       compliance_score: snap.complianceScore,
       compliance_status: snap.complianceStatus,
       days_until_expiry: snap.daysUntilExpiry,
+      days_until_efrro_expiry: snap.daysUntilEfrroExpiry || null,
       created_at: snap.createdAt.toISOString(),
       updated_at: snap.updatedAt.toISOString()
     };

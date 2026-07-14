@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { toast } from "sonner";
 import { DocumentConfig } from "../constants/constants";
 
@@ -22,6 +22,8 @@ export function DocumentUploadDialog({ config, isOpen, onOpenChange, onSubmit }:
   const [expiryDate, setExpiryDate] = React.useState("");
   const [file, setFile] = React.useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [uploadSuccess, setUploadSuccess] = React.useState(false);
+  const [uploadError, setUploadError] = React.useState(false);
   const [isDirty, setIsDirty] = React.useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,17 +55,32 @@ export function DocumentUploadDialog({ config, isOpen, onOpenChange, onSubmit }:
     }
 
     setIsSubmitting(true);
+    setUploadSuccess(false);
+    setUploadError(false);
+
     setTimeout(() => {
-      onSubmit({ docNumber, issueDate, expiryDate, file });
-      setIsSubmitting(false);
-      onOpenChange(false);
-      // Reset form
-      setDocNumber("");
-      setIssueDate("");
-      setExpiryDate("");
-      setFile(null);
-      setIsDirty(false);
-    }, 1200);
+      try {
+        onSubmit({ docNumber, issueDate, expiryDate, file });
+        setIsSubmitting(false);
+        setUploadSuccess(true);
+        
+        setTimeout(() => {
+          onOpenChange(false);
+          // Reset form
+          setDocNumber("");
+          setIssueDate("");
+          setExpiryDate("");
+          setFile(null);
+          setIsDirty(false);
+        }, 800);
+
+        toast.success("Profile updated successfully.");
+      } catch (err) {
+        setIsSubmitting(false);
+        setUploadError(true);
+        toast.error("Unable to save changes. Please try again.");
+      }
+    }, 800);
   };
 
   const handleClose = (open: boolean) => {
@@ -106,9 +123,17 @@ export function DocumentUploadDialog({ config, isOpen, onOpenChange, onSubmit }:
 
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" size="sm" onClick={() => handleClose(false)}>Cancel</Button>
-            <Button type="submit" size="sm" disabled={isSubmitting}>
-              {isSubmitting ? <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Uploading...</> : "Submit Version"}
-            </Button>
+            <AsyncActionButton
+              type="submit"
+              size="sm"
+              isLoading={isSubmitting}
+              isSuccess={uploadSuccess}
+              isError={uploadError}
+              idleText="Submit Version"
+              loadingText="Uploading..."
+              successText="Changes saved"
+              errorText="Try Again"
+            />
           </DialogFooter>
         </form>
       </DialogContent>
@@ -124,15 +149,39 @@ interface VerificationPanelProps {
 
 export function VerificationPanel({ isOpen, onOpenChange, onVerify }: VerificationPanelProps): React.JSX.Element {
   const [rejectionReason, setRejectionReason] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState<"approve" | "reject" | null>(null);
+  const [actionSuccess, setActionSuccess] = React.useState(false);
+  const [actionError, setActionError] = React.useState(false);
 
-  const handleAction = (status: "verified" | "rejected") => {
+  const handleAction = async (status: "verified" | "rejected") => {
     if (status === "rejected" && !rejectionReason.trim()) {
       toast.error("Rejection Reason Required", { description: "Please explain the reason for document rejection." });
       return;
     }
-    onVerify({ status, reason: status === "rejected" ? rejectionReason : "" });
-    setRejectionReason("");
-    onOpenChange(false);
+
+    setIsSubmitting(status === "verified" ? "approve" : "reject");
+    setActionSuccess(false);
+    setActionError(false);
+
+    // Simulate saving latency
+    setTimeout(() => {
+      try {
+        onVerify({ status, reason: status === "rejected" ? rejectionReason : "" });
+        setActionSuccess(true);
+        
+        toast.success("Profile updated successfully.");
+        
+        setTimeout(() => {
+          setRejectionReason("");
+          onOpenChange(false);
+        }, 800);
+      } catch (err) {
+        setActionError(true);
+        toast.error("Unable to save changes. Please try again.");
+      } finally {
+        setIsSubmitting(null);
+      }
+    }, 800);
   };
 
   return (
@@ -159,8 +208,30 @@ export function VerificationPanel({ isOpen, onOpenChange, onVerify }: Verificati
 
           <DialogFooter className="pt-2 gap-2 sm:gap-0">
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button variant="destructive" size="sm" onClick={() => handleAction("rejected")}>Reject Version</Button>
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white border-0" onClick={() => handleAction("verified")}>Verify & Approve</Button>
+            <AsyncActionButton
+              variant="destructive"
+              size="sm"
+              onClick={() => handleAction("rejected")}
+              isLoading={isSubmitting === "reject"}
+              isSuccess={actionSuccess && isSubmitting === "reject"}
+              isError={actionError && isSubmitting === "reject"}
+              idleText="Reject Version"
+              loadingText="Processing..."
+              successText="Changes saved"
+              errorText="Try Again"
+            />
+            <AsyncActionButton
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+              onClick={() => handleAction("verified")}
+              isLoading={isSubmitting === "approve"}
+              isSuccess={actionSuccess && isSubmitting === "approve"}
+              isError={actionError && isSubmitting === "approve"}
+              idleText="Verify & Approve"
+              loadingText="Processing..."
+              successText="Changes saved"
+              errorText="Try Again"
+            />
           </DialogFooter>
         </div>
       </DialogContent>

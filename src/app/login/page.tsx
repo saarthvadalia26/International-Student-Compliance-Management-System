@@ -2,24 +2,29 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, ShieldAlert, Loader2 } from "lucide-react";
+import { GraduationCap, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { toast } from "sonner";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = getBrowserSupabase();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isSuccess, setIsSuccess] = React.useState(false);
+  const [isError, setIsError] = React.useState(false);
 
   React.useEffect(() => {
-    // Clear mock auth session on page load
-    localStorage.removeItem("isms_session");
-  }, []);
+    // Clear Supabase session on page load for clean sign-in
+    supabase.auth.signOut().catch(() => {});
+  }, [supabase]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,21 +37,66 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
+    setIsSuccess(false);
+    setIsError(false);
 
-    // Mock network latency
-    setTimeout(() => {
-      // In enterprise software, let's use standard default credentials 'admin'/'admin'
-      if (username === "admin" && password === "admin") {
-        localStorage.setItem("isms_session", JSON.stringify({ username, role: "administrator", token: "mock-token-xyz-987" }));
-        toast.success("Authentication successful. Welcome to ISMS.", {
+    try {
+      const email = username.includes("@") ? username : `${username}@nfsu.edu`;
+      let { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      // Self-healing developer auto-signup for admin / admin demo access
+      if (
+        authError && 
+        authError.message.toLowerCase().includes("invalid login credentials") && 
+        username === "admin" && 
+        password === "admin"
+      ) {
+        const signupRes = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              role: "administrator",
+              username: "admin"
+            }
+          }
+        });
+        if (!signupRes.error) {
+          const retryRes = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+          data = retryRes.data;
+          authError = retryRes.error;
+        }
+      }
+
+      if (authError) {
+        setError(authError.message);
+        setIsError(true);
+        setIsLoading(false);
+      } else if (data?.session) {
+        setIsSuccess(true);
+        toast.success("Profile updated successfully.", {
           description: "Redirecting you to the workspace dashboard...",
         });
-        router.push("/dashboard");
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1500);
       } else {
-        setError("Invalid username or password. Use 'admin' / 'admin' for demo access.");
+        setError("An unexpected authentication error occurred.");
+        setIsError(true);
         setIsLoading(false);
       }
-    }, 1200);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setError(errMsg || "An unexpected error occurred.");
+      setIsError(true);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -120,16 +170,17 @@ export default function LoginPage() {
             </CardContent>
 
             <CardFooter className="flex flex-col gap-3">
-              <Button type="submit" className="w-full h-9 text-sm" disabled={isLoading}>
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Authenticating...
-                  </>
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
+              <AsyncActionButton
+                type="submit"
+                className="w-full h-9 text-sm"
+                isLoading={isLoading}
+                isSuccess={isSuccess}
+                isError={isError}
+                idleText="Sign In"
+                loadingText="Authenticating..."
+                successText="Changes saved"
+                errorText="Try Again"
+              />
               <div className="text-[11px] text-center text-muted-foreground bg-muted/30 w-full py-1.5 rounded-md border border-border/50 font-caption">
                 Demo Credentials: <span className="font-semibold text-foreground">admin</span> / <span className="font-semibold text-foreground">admin</span>
               </div>

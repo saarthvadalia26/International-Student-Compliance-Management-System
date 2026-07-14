@@ -26,13 +26,17 @@ export interface StudentSnapshot {
   studentId: string;
   passportStatus: ComplianceStatus;
   passportExpiry: Date | null;
+  passportNumber?: string | null;
   visaStatus: ComplianceStatus;
   visaExpiry: Date | null;
+  visaNumber?: string | null;
   efrroStatus: ComplianceStatus;
   efrroExpiry: Date | null;
+  efrroNumber?: string | null;
   complianceScore: number;
   complianceStatus: ComplianceStatus;
   daysUntilExpiry: number | null;
+  daysUntilEfrroExpiry?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }

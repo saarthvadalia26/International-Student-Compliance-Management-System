@@ -6,6 +6,7 @@ import {
   IWhatsAppProvider 
 } from "./provider.service";
 import { getAdminSupabase } from "@/lib/supabase";
+import { StudentPortalService } from "@/domain/student-portal/services/student-portal.service";
 
 export class NotificationPreferencesService {
   constructor(private repository: INotificationRepository) {}
@@ -42,7 +43,7 @@ export class ReminderEngine {
       // Load student profile details to resolve contact email/phone references
       const { data: student, error: sError } = await supabase
         .from("student_personal")
-        .select("full_name")
+        .select("full_name, preferred_language")
         .eq("student_id", studentId)
         .single();
         
@@ -58,7 +59,6 @@ export class ReminderEngine {
       for (const rule of rules) {
         let expiryDate: string | null = null;
         let documentStatus: string | null = null;
-
         if (rule.documentType === "passport") {
           expiryDate = snap.passport_expiry;
           documentStatus = snap.passport_status;
@@ -77,7 +77,11 @@ export class ReminderEngine {
         
         // Match alert rule triggers
         if (daysLeft === rule.alertThresholdDays) {
-          const template = await this.repository.getActiveTemplate("EXPIRY_ALERT", "en");
+          const prefLang = student.preferred_language || "en";
+          let template = await this.repository.getActiveTemplate("EXPIRY_ALERT", prefLang);
+          if (!template && prefLang !== "en") {
+            template = await this.repository.getActiveTemplate("EXPIRY_ALERT", "en");
+          }
           if (!template) continue;
 
           // Check communication channel details
@@ -86,6 +90,19 @@ export class ReminderEngine {
           
           // Enforce idempotency key mapping to prevent duplicates: studentId:docType:thresholdDays:channel
           const key = `${studentId}:${rule.documentType}:${rule.alertThresholdDays}:${channel}`;
+
+          // Generate secure upload token for eFRRO reminder alerts
+          let secureUploadLink = "";
+          if (rule.documentType === "efrro") {
+            try {
+              const portalService = new StudentPortalService();
+              const token = await portalService.generateUploadToken(studentId, "UPLOAD");
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+              secureUploadLink = `${baseUrl}/student/upload/${token}`;
+            } catch (err) {
+              console.error("[REMINDER_ENGINE_ERROR] Failed generating secure upload token:", err);
+            }
+          }
 
           try {
             await this.repository.queueNotification({
@@ -101,7 +118,8 @@ export class ReminderEngine {
                 student_name: student.full_name,
                 document_type: rule.documentType,
                 days_left: String(daysLeft),
-                expiry_date: expiryDate
+                expiry_date: expiryDate,
+                secure_upload_link: secureUploadLink
               }
             });
           } catch (e) {

@@ -3,18 +3,27 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 export default function RootPage() {
   const router = useRouter();
+  const supabase = getBrowserSupabase();
 
   React.useEffect(() => {
-    const session = localStorage.getItem("isms_session");
-    if (session) {
-      router.replace("/dashboard");
-    } else {
-      router.replace("/login");
+    async function checkAuth() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          router.replace("/dashboard");
+        } else {
+          router.replace("/login");
+        }
+      } catch {
+        router.replace("/login");
+      }
     }
-  }, [router]);
+    checkAuth();
+  }, [router, supabase]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-zinc-950">

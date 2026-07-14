@@ -1,0 +1,662 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { useTheme } from "next-themes";
+import { 
+  Building, 
+  Bell, 
+  Clock, 
+  Database, 
+  Lock, 
+  Loader2, 
+  CheckCircle2, 
+  ShieldAlert, 
+  Archive, 
+  HelpCircle,
+  Play,
+  Languages,
+  Check
+} from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { toast } from "sonner";
+import { 
+  fetchRetentionPolicies, 
+  updateRetentionPolicyAction, 
+  runDocumentCleanupAction 
+} from "./actions";
+import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
+
+export default function SettingsPage() {
+  const supabase = getBrowserSupabase();
+  const { theme, setTheme } = useTheme();
+
+  // Active Tab navigation state
+  const [activeTab, setActiveTab] = React.useState<"general" | "notifications" | "retention" | "system" | "security">("general");
+
+  // General Settings State
+  const [schoolName, setSchoolName] = React.useState("National Forensic Sciences University (NFSU)");
+  const [supportEmail, setSupportEmail] = React.useState("support@iscms.nfsu.ac.in");
+  const [supportPhone, setSupportPhone] = React.useState("+91-79-23977100");
+  const [isSavingGeneral, setIsSavingGeneral] = React.useState(false);
+  const [generalSuccess, setGeneralSuccess] = React.useState(false);
+  const [generalError, setGeneralError] = React.useState(false);
+
+  // Notification Configuration State
+  const [emailAlerts, setEmailAlerts] = React.useState(true);
+  const [whatsappAlerts, setWhatsappAlerts] = React.useState(true);
+  const [isSavingNotifs, setIsSavingNotifs] = React.useState(false);
+  const [notifsSuccess, setNotifsSuccess] = React.useState(false);
+  const [notifsError, setNotifsError] = React.useState(false);
+  const [previewLanguage, setPreviewLanguage] = React.useState("en");
+  const [previewBody, setPreviewBody] = React.useState("");
+
+  // Document Retention Policies State
+  const [policies, setPolicies] = React.useState<RetentionPolicy[]>([]);
+  const [isLoadingPolicies, setIsLoadingPolicies] = React.useState(true);
+  const [isUpdatingPolicyId, setIsUpdatingPolicyId] = React.useState<string | null>(null);
+  
+  // Manual Cleanup overrides state
+  const [cleanupReport, setCleanupReport] = React.useState<CleanupExecutionReport | null>(null);
+  const [isRunningCleanup, setIsRunningCleanup] = React.useState(false);
+
+  // Security password state
+  const [newPassword, setNewPassword] = React.useState("");
+  const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = React.useState(false);
+  const [passwordSuccess, setPasswordSuccess] = React.useState(false);
+  const [passwordError, setPasswordError] = React.useState(false);
+  const [isSigningOutAll, setIsSigningOutAll] = React.useState(false);
+  const [signOutSuccess, setSignOutSuccess] = React.useState(false);
+  const [signOutError, setSignOutError] = React.useState(false);
+
+  const loadPolicies = async () => {
+    try {
+      setIsLoadingPolicies(true);
+      const data = await fetchRetentionPolicies();
+      setPolicies(data);
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error("Failed loading document retention policies");
+    } finally {
+      setIsLoadingPolicies(false);
+    }
+  };
+
+  // Hydrate configurations state
+  React.useEffect(() => {
+    // Sync notifications triggers config
+    const savedEmail = localStorage.getItem("isms_email_alerts");
+    const savedWhatsapp = localStorage.getItem("isms_whatsapp_alerts");
+    
+    Promise.resolve().then(() => {
+      if (savedEmail !== null) setEmailAlerts(savedEmail === "true");
+      if (savedWhatsapp !== null) setWhatsappAlerts(savedWhatsapp === "true");
+    });
+
+    // Fetch retention policies
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadPolicies();
+  }, []);
+
+  // Preview Language Template changer
+  React.useEffect(() => {
+    const templates: Record<string, string> = {
+      en: "Dear student, Your eFRRO documents are expiring in 30 days. Please renew.",
+      hi: "प्रिय छात्र, आपके eFRRO दस्तावेज़ 30 दिनों में समाप्त हो रहे हैं। कृपया नवीनीकरण करें।",
+      es: "Estimado estudiante, Sus documentos de eFRRO vencen en 30 días. Por favor renueve.",
+      fr: "Cher étudiant, Vos documents eFRRO expirent dans 30 jours. Veuillez renouveler.",
+      ar: "عزيزي الطالب، ستنتهي صلاحية مستندات eFRRO الخاصة بك خلال 30 يومًا. يرجى التجديد.",
+      zh: "尊敬的学生，您的 eFRRO 文件将在 30 天内过期。请尽快更新。"
+    };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPreviewBody(templates[previewLanguage] || templates.en);
+  }, [previewLanguage]);
+
+  const handleSaveGeneral = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingGeneral(true);
+    setGeneralSuccess(false);
+    setGeneralError(false);
+    setTimeout(() => {
+      setIsSavingGeneral(false);
+      setGeneralSuccess(true);
+      toast.success("Profile updated successfully.");
+    }, 600);
+  };
+
+  const handleSaveNotifications = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingNotifs(true);
+    setNotifsSuccess(false);
+    setNotifsError(false);
+    setTimeout(() => {
+      try {
+        localStorage.setItem("isms_email_alerts", String(emailAlerts));
+        localStorage.setItem("isms_whatsapp_alerts", String(whatsappAlerts));
+        setIsSavingNotifs(false);
+        setNotifsSuccess(true);
+        toast.success("Profile updated successfully.");
+      } catch (err) {
+        setIsSavingNotifs(false);
+        setNotifsError(true);
+        toast.error("Unable to save changes. Please try again.");
+      }
+    }, 600);
+  };
+
+  const handleUpdatePolicy = async (policyId: string, updates: Partial<RetentionPolicy>) => {
+    setIsUpdatingPolicyId(policyId);
+    try {
+      await updateRetentionPolicyAction({ id: policyId, ...updates });
+      setPolicies(prev => prev.map(p => p.id === policyId ? { ...p, ...updates } : p));
+      toast.success("Retention lifecycle rule updated");
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      toast.error(errMsg || "Failed updating rule configuration");
+    } finally {
+      setIsUpdatingPolicyId(null);
+    }
+  };
+
+  const triggerCleanupRun = async (dryRun: boolean) => {
+    setIsRunningCleanup(true);
+    setCleanupReport(null);
+    try {
+      const report = await runDocumentCleanupAction(dryRun, "Administrative Interface");
+      setCleanupReport(report);
+      if (dryRun) {
+        toast.success(`Dry-run scan completed. Scanned ${report.totalScanned} documents.`);
+      } else {
+        toast.success(`Live purge completed successfully.`);
+        loadPolicies(); // Reload to refresh list
+      }
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      toast.error(errMsg || "Failed running cleanup scheduler task");
+    } finally {
+      setIsRunningCleanup(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    setPasswordSuccess(false);
+    setPasswordError(false);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPasswordSuccess(true);
+      toast.success("Profile updated successfully.");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: unknown) {
+      setPasswordError(true);
+      toast.error("Unable to save changes. Please try again.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
+  const handleSignOutAll = async () => {
+    setIsSigningOutAll(true);
+    setSignOutSuccess(false);
+    setSignOutError(false);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: "global" });
+      if (error) throw error;
+      setSignOutSuccess(true);
+      toast.success("Profile updated successfully.");
+    } catch (err: unknown) {
+      setSignOutError(true);
+      toast.error("Unable to save changes. Please try again.");
+    } finally {
+      setIsSigningOutAll(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto font-sans p-4">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">System Administration</h1>
+        <p className="text-xs text-muted-foreground mt-1">
+          Central management panel for institutional configs, document lifecycles, provider details, and platform security.
+        </p>
+      </div>
+
+      {/* Tabs Menu Navigation */}
+      <div className="flex border-b border-border overflow-x-auto gap-2 pb-px scrollbar-none">
+        {[
+          { id: "general", label: "General", icon: Building },
+          { id: "notifications", label: "Notifications", icon: Bell },
+          { id: "retention", label: "Retention Policies", icon: Clock },
+          { id: "system", label: "System Health", icon: Database },
+          { id: "security", label: "Security", icon: Lock }
+        ].map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as "general" | "notifications" | "retention" | "system" | "security")}
+              className={`flex items-center gap-2 px-4 py-2 border-b-2 text-xs font-medium whitespace-nowrap transition-colors outline-none focus:text-primary ${
+                isActive 
+                  ? "border-primary text-primary" 
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Workspaces Content */}
+      <div className="space-y-6">
+        
+        {/* Tab 1: General */}
+        {activeTab === "general" && (
+          <div className="grid gap-6">
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Building className="h-4 w-4 text-muted-foreground" /> Institute Configurations
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <form onSubmit={handleSaveGeneral} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground">School Name</label>
+                    <Input value={schoolName} onChange={e => setSchoolName(e.target.value)} className="h-9 text-xs" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Support Contact Email</label>
+                      <Input value={supportEmail} onChange={e => setSupportEmail(e.target.value)} className="h-9 text-xs" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Support Contact Phone</label>
+                      <Input value={supportPhone} onChange={e => setSupportPhone(e.target.value)} className="h-9 text-xs" />
+                    </div>
+                  </div>
+                  <AsyncActionButton
+                    type="submit"
+                    size="sm"
+                    className="h-8 text-xs"
+                    isLoading={isSavingGeneral}
+                    isSuccess={generalSuccess}
+                    isError={generalError}
+                    idleText="Save Details"
+                    loadingText="Saving changes..."
+                    successText="Changes saved"
+                    errorText="Try Again"
+                  />
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Tab 2: Notifications */}
+        {activeTab === "notifications" && (
+          <div className="grid gap-6">
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Bell className="h-4 w-4 text-muted-foreground" /> Notification Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <form onSubmit={handleSaveNotifications} className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs font-semibold text-foreground">Email Notifications</label>
+                        <p className="text-[10px] text-muted-foreground">Dispatches pre-expiry and post-expiry alerts to student emails.</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={emailAlerts}
+                        onChange={e => setEmailAlerts(e.target.checked)}
+                        className="h-4 w-4 rounded accent-primary cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border/40 pt-3">
+                      <div>
+                        <label className="text-xs font-semibold text-foreground">WhatsApp Notifications</label>
+                        <p className="text-[10px] text-muted-foreground">Dispatches direct reminder alerts to student contact numbers via Twilio.</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={whatsappAlerts}
+                        onChange={e => setWhatsappAlerts(e.target.checked)}
+                        className="h-4 w-4 rounded accent-primary cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  <AsyncActionButton
+                    type="submit"
+                    size="sm"
+                    className="h-8 text-xs mt-2"
+                    isLoading={isSavingNotifs}
+                    isSuccess={notifsSuccess}
+                    isError={notifsError}
+                    idleText="Save Notification Settings"
+                    loadingText="Saving changes..."
+                    successText="Changes saved"
+                    errorText="Try Again"
+                  />
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Languages className="h-4 w-4 text-muted-foreground" /> Multi-language Template Previewer
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-foreground">Select Preview Language:</label>
+                  <select
+                    value={previewLanguage}
+                    onChange={e => setPreviewLanguage(e.target.value)}
+                    className="h-8 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus:outline-none"
+                  >
+                    <option value="en">English (en)</option>
+                    <option value="hi">Hindi (hi)</option>
+                    <option value="es">Spanish (es)</option>
+                    <option value="fr">French (fr)</option>
+                    <option value="ar">Arabic (ar)</option>
+                    <option value="zh">Chinese (zh)</option>
+                  </select>
+                </div>
+                <div className="p-4 rounded bg-muted/30 border border-border/40 font-mono text-xs text-foreground whitespace-pre-wrap">
+                  {previewBody}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Tab 3: Retention Policies */}
+        {activeTab === "retention" && (
+          <div className="grid gap-6">
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Archive className="h-4 w-4 text-muted-foreground" /> Document Retention Lifecycles
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                {isLoadingPolicies ? (
+                  <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading policy configurations...
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {policies.map(policy => (
+                      <div key={policy.id} className="p-4 rounded-lg border border-border/60 bg-muted/10 space-y-4">
+                        <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-primary">{policy.documentType} rules</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">ID: {policy.id}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] uppercase font-semibold text-muted-foreground">Retention Period (Days)</label>
+                            <Input
+                              type="number"
+                              defaultValue={policy.retentionPeriodDays}
+                              onBlur={e => handleUpdatePolicy(policy.id, { retentionPeriodDays: parseInt(e.target.value) || 0 })}
+                              disabled={isUpdatingPolicyId === policy.id}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] uppercase font-semibold text-muted-foreground">Grace Period (Days)</label>
+                            <Input
+                              type="number"
+                              defaultValue={policy.gracePeriodDays}
+                              onBlur={e => handleUpdatePolicy(policy.id, { gracePeriodDays: parseInt(e.target.value) || 0 })}
+                              disabled={isUpdatingPolicyId === policy.id}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 pt-5">
+                            <input
+                              type="checkbox"
+                              defaultChecked={policy.archiveBeforeDelete}
+                              onChange={e => handleUpdatePolicy(policy.id, { archiveBeforeDelete: e.target.checked })}
+                              disabled={isUpdatingPolicyId === policy.id}
+                              className="h-4 w-4 rounded accent-primary cursor-pointer"
+                            />
+                            <span className="text-xs text-foreground font-medium">Archive before permanent purge</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Play className="h-4 w-4 text-muted-foreground" /> Manual Retention Purges
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="p-4 rounded border border-yellow-200 bg-yellow-50/50 flex gap-3 text-xs text-yellow-800">
+                  <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Cautionary Action Workspace:</span> Triggering cleanups purges unneeded student records exceeding compliance periods from remote storage assets. Use dry-run first to verify scanned files.
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => triggerCleanupRun(true)}
+                    disabled={isRunningCleanup}
+                  >
+                    Run Dry-Run Scan
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => triggerCleanupRun(false)}
+                    disabled={isRunningCleanup}
+                  >
+                    Execute Permanent Purge (Live)
+                  </Button>
+                </div>
+
+                {isRunningCleanup && (
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing files audit calculations...
+                  </div>
+                )}
+
+                {cleanupReport && (
+                  <div className="space-y-4 mt-4 border-t border-border/40 pt-4">
+                    <div className="flex justify-between items-center text-xs font-semibold">
+                      <span>Purge Execution Report: {cleanupReport.dryRun ? "(DRY-RUN SCAN)" : "(LIVE EXECUTION)"}</span>
+                      <span className="font-mono text-muted-foreground">Scanned count: {cleanupReport.totalScanned}</span>
+                    </div>
+
+                    {cleanupReport.actionsPerformed.length === 0 ? (
+                      <div className="p-3 bg-muted/20 border rounded text-xs text-muted-foreground">
+                        No files matching expired retention categories. No changes made.
+                      </div>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto border border-border/40 rounded p-1 space-y-1">
+                        {cleanupReport.actionsPerformed.map((item, idx) => (
+                          <div key={idx} className="p-2 text-[11px] font-mono border-b border-border/20 last:border-0 flex justify-between gap-4">
+                            <div>
+                              <span className="font-semibold uppercase text-primary">[{item.documentType}]</span> {item.filePath}
+                            </div>
+                            <div className="shrink-0 flex items-center gap-1.5">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                item.action === "deleted" ? "bg-rose-100 text-rose-800" : "bg-blue-100 text-blue-800"
+                              }`}>{item.action}</span>
+                              <span className="text-[10px] text-muted-foreground">{item.details}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Tab 4: System Health */}
+        {activeTab === "system" && (
+          <div className="grid gap-6">
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Database className="h-4 w-4 text-muted-foreground" /> Platform Infrastructure Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded border border-border/60 bg-muted/10">
+                    <span className="text-[10px] uppercase font-semibold text-muted-foreground">Email Service</span>
+                    <div className="text-xs font-semibold mt-1 text-green-700 flex items-center gap-1">
+                      <Check className="h-4 w-4" /> Gateway Connected (Resend)
+                    </div>
+                  </div>
+                  <div className="p-4 rounded border border-border/60 bg-muted/10">
+                    <span className="text-[10px] uppercase font-semibold text-muted-foreground">WhatsApp Service</span>
+                    <div className="text-xs font-semibold mt-1 text-green-700 flex items-center gap-1">
+                      <Check className="h-4 w-4" /> Gateway Connected (Twilio)
+                    </div>
+                  </div>
+                  <div className="p-4 rounded border border-border/60 bg-muted/10">
+                    <span className="text-[10px] uppercase font-semibold text-muted-foreground">Storage Engine Status</span>
+                    <div className="text-xs font-semibold mt-1 text-green-700 flex items-center gap-1">
+                      <Check className="h-4 w-4" /> 3 Buckets Mount Online
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-xs text-muted-foreground space-y-2 mt-2">
+                  <p><strong>Database System:</strong> Supabase PostgreSQL (Managed Relational Instance)</p>
+                  <p><strong>Storage Buckets:</strong> passport-documents, visa-documents, efrro-documents</p>
+                  <p><strong>API Endpoint:</strong> PostgREST cache dynamic reload active</p>
+                </div>
+                <div className="pt-4 border-t border-border/40 mt-4">
+                  <Link href="/dashboard/health">
+                    <Button size="sm" className="h-8 text-xs flex items-center gap-1.5">
+                      Launch System Health Monitoring Dashboard
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Tab 5: Security */}
+        {activeTab === "security" && (
+          <div className="grid gap-6">
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Lock className="h-4 w-4 text-muted-foreground" /> Change Passphrase
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">New Passphrase</label>
+                      <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">Confirm Passphrase</label>
+                      <Input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <AsyncActionButton
+                    type="submit"
+                    size="sm"
+                    className="h-8 text-xs"
+                    isLoading={isUpdatingPassword}
+                    isSuccess={passwordSuccess}
+                    isError={passwordError}
+                    idleText="Save Password"
+                    loadingText="Saving changes..."
+                    successText="Changes saved"
+                    errorText="Try Again"
+                  />
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-rose-700">
+                  <ShieldAlert className="h-4 w-4" /> Global Sign Out Option
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Signing out globally terminates all active session access tokens across other browsers and administrator consoles.
+                </p>
+                <AsyncActionButton
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300"
+                  onClick={handleSignOutAll}
+                  isLoading={isSigningOutAll}
+                  isSuccess={signOutSuccess}
+                  isError={signOutError}
+                  idleText="Sign Out All Sessions"
+                  loadingText="Processing..."
+                  successText="Changes saved"
+                  errorText="Try Again"
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}

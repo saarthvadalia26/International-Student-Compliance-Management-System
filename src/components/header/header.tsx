@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Menu, Bell, User, GraduationCap } from "lucide-react";
+import { Menu, Bell, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
+import { AccountMenu } from "./account-menu";
 
 interface HeaderProps {
   onMenuOpen: () => void;
@@ -54,10 +55,8 @@ export function Header({ onMenuOpen }: HeaderProps) {
           <Bell className="h-5 w-5" />
         </Button>
 
-        {/* Profile Placeholder */}
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-accent text-accent-foreground" aria-label="Profile">
-          <User className="h-5 w-5" />
-        </Button>
+        {/* Account Dropdown Menu */}
+        <AccountMenu />
       </div>
     </header>
   );

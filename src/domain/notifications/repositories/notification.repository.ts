@@ -7,6 +7,7 @@ import {
   ReminderRule 
 } from "../types/notification.types";
 import { getAdminSupabase } from "@/lib/supabase";
+import { NOTIFICATION_TABLE_NAME } from "../config";
 
 export interface INotificationRepository {
   queueNotification(notification: Partial<Notification>): Promise<Notification>;
@@ -109,7 +110,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
 
     console.log(`[DB_REPOSITORY] Queuing notification for student: ${notification.studentId}`);
     const { data, error } = await supabase
-      .from("notifications")
+      .from(NOTIFICATION_TABLE_NAME)
       .insert(dbRow)
       .select("*")
       .single();
@@ -127,7 +128,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     console.log(`[DB_REPOSITORY] Pulling pending notifications batch (limit ${batchSize})...`);
     // Batch select locking using skip locked simulation query. Supabase SELECT supports it
     const { data, error } = await supabase
-      .from("notifications")
+      .from(NOTIFICATION_TABLE_NAME)
       .select("*")
       .eq("status", "queued")
       .lte("scheduled_for", new Date().toISOString())
@@ -153,7 +154,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
 
     console.log(`[DB_REPOSITORY] Updating status for notification ${id} to: ${status}`);
     const { error } = await supabase
-      .from("notifications")
+      .from(NOTIFICATION_TABLE_NAME)
       .update(updatePayload)
       .eq("id", id);
 
@@ -188,7 +189,7 @@ export class SupabaseNotificationRepository implements INotificationRepository {
 
     console.log(`[DB_REPOSITORY] Cancelling scheduled notifications for student ${studentId} type: ${docType}`);
     const { error } = await supabase
-      .from("notifications")
+      .from(NOTIFICATION_TABLE_NAME)
       .update({ status: "cancelled", updated_at: new Date().toISOString() })
       .eq("student_id", studentId)
       .eq("document_type", docType)

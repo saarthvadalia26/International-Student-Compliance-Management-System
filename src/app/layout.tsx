@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { ThemeProvider, QueryProvider } from "@/providers";
 import { Toaster } from "@/components/ui/sonner";
 import { initializeStartup } from "@/config/startup";
@@ -7,9 +8,10 @@ import "./globals.css";
 // Run environment config validation at application startup
 initializeStartup();
 
-const geistSans = {
-  variable: "--font-geist-sans",
-};
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
 const geistMono = {
   variable: "--font-geist-mono",
@@ -29,7 +31,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider

@@ -108,25 +108,33 @@ export class SnapshotService {
     const partialSnap: Partial<StudentSnapshot> = {
       passportStatus: pStatus,
       passportExpiry: passport ? passport.expiryDate : null,
+      passportNumber: passport ? passport.documentNumber : null,
       visaStatus: vStatus,
       visaExpiry: visa ? visa.expiryDate : null,
+      visaNumber: visa ? visa.documentNumber : null,
       efrroStatus: eStatus,
-      efrroExpiry: efrro ? efrro.expiryDate : null
+      efrroExpiry: efrro ? efrro.expiryDate : null,
+      efrroNumber: efrro ? efrro.documentNumber : null
     };
 
     const calculated = ComplianceStatusService.calculateScoreAndStatus(partialSnap);
+    const efrroDaysLeft = ExpiryCalculationService.getDaysUntilExpiry(efrro ? efrro.expiryDate : null);
 
     const newSnapshot: StudentSnapshot = {
       studentId,
       passportStatus: pStatus,
       passportExpiry: passport ? passport.expiryDate : null,
+      passportNumber: passport ? passport.documentNumber : null,
       visaStatus: vStatus,
       visaExpiry: visa ? visa.expiryDate : null,
+      visaNumber: visa ? visa.documentNumber : null,
       efrroStatus: eStatus,
       efrroExpiry: efrro ? efrro.expiryDate : null,
+      efrroNumber: efrro ? efrro.documentNumber : null,
       complianceScore: calculated.score,
       complianceStatus: calculated.status,
       daysUntilExpiry: calculated.daysLeft,
+      daysUntilEfrroExpiry: efrroDaysLeft,
       createdAt: new Date(),
       updatedAt: new Date()
     };

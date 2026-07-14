@@ -22,6 +22,7 @@ import { mockStudents, MockStudent, MockDocument } from "@/lib/mock-data";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -89,30 +90,78 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setIsDirty(true);
   };
 
+  // AsyncActionButton states for edit profile save action
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveSuccess, setSaveSuccess] = React.useState(false);
+  const [saveError, setSaveError] = React.useState(false);
+
+  // States and handler for manual warning alert sending
+  const [isSendingAlert, setIsSendingAlert] = React.useState(false);
+  const [sendAlertSuccess, setSendAlertSuccess] = React.useState(false);
+  const [sendAlertError, setSendAlertError] = React.useState(false);
+
+  const handleSendWarningAlert = () => {
+    setIsSendingAlert(true);
+    setSendAlertSuccess(false);
+    setSendAlertError(false);
+
+    setTimeout(() => {
+      try {
+        setSendAlertSuccess(true);
+        toast.success("Profile updated successfully.", { description: "Email and WhatsApp warning alerts dispatched to student." });
+      } catch (err) {
+        setSendAlertError(true);
+        toast.error("Unable to save changes. Please try again.");
+      } finally {
+        setIsSendingAlert(false);
+      }
+    }, 800);
+  };
+
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editForm.fullName.trim() || !editForm.email.trim()) {
       toast.error("Validation Error", { description: "Full Name and Email fields are required." });
       return;
     }
-    setStudent(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        fullName: editForm.fullName,
-        email: editForm.email,
-        phoneHome: editForm.phoneHome,
-        phoneLocal: editForm.phoneLocal,
-        permanentAddress: editForm.permanentAddress,
-        localAddress: editForm.localAddress,
-        currentSemester: Number(editForm.currentSemester),
-        academicStatus: editForm.academicStatus,
-        status: editForm.status
-      };
-    });
-    setIsDirty(false);
-    setIsEditDialogOpen(false);
-    toast.success("Profile Updated", { description: "Student coordinates and profile saved successfully." });
+
+    setIsSaving(true);
+    setSaveSuccess(false);
+    setSaveError(false);
+
+    // Mock API saving latency
+    setTimeout(() => {
+      try {
+        setStudent(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            fullName: editForm.fullName,
+            email: editForm.email,
+            phoneHome: editForm.phoneHome,
+            phoneLocal: editForm.phoneLocal,
+            permanentAddress: editForm.permanentAddress,
+            localAddress: editForm.localAddress,
+            currentSemester: Number(editForm.currentSemester),
+            academicStatus: editForm.academicStatus,
+            status: editForm.status
+          };
+        });
+        setIsDirty(false);
+        setSaveSuccess(true);
+        
+        setTimeout(() => {
+          setIsEditDialogOpen(false);
+        }, 800);
+
+        toast.success("Profile updated successfully.", { description: "Student coordinates and profile saved successfully." });
+      } catch (err) {
+        setSaveError(true);
+        toast.error("Unable to save changes. Please try again.");
+      } finally {
+        setIsSaving(false);
+      }
+    }, 800);
   };
 
   const handleCloseDialog = (open: boolean) => {
@@ -301,13 +350,18 @@ export default function StudentDetailsPage({ params }: PageProps) {
               >
                 Sync compliance
               </Button>
-              <Button 
-                size="sm" 
+              <AsyncActionButton
+                size="sm"
                 className="h-9 text-xs"
-                onClick={() => toast.success("Reminders sent", { description: "Email and WhatsApp warning alerts dispatched to student." })}
-              >
-                <Send className="mr-2 h-3.5 w-3.5" /> Send warning alert
-              </Button>
+                onClick={handleSendWarningAlert}
+                isLoading={isSendingAlert}
+                isSuccess={sendAlertSuccess}
+                isError={sendAlertError}
+                idleText={<><Send className="mr-2 h-3.5 w-3.5 inline" /> Send warning alert</>}
+                loadingText="Sending..."
+                successText="Changes saved"
+                errorText="Try Again"
+              />
             </div>
           </div>
         </CardContent>
@@ -809,7 +863,17 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" size="sm" onClick={() => handleCloseDialog(false)}>Cancel</Button>
-              <Button type="submit" size="sm">Save Details</Button>
+              <AsyncActionButton
+                type="submit"
+                size="sm"
+                isLoading={isSaving}
+                isSuccess={saveSuccess}
+                isError={saveError}
+                idleText="Save Details"
+                loadingText="Saving changes..."
+                successText="Changes saved"
+                errorText="Try Again"
+              />
             </DialogFooter>
           </form>
         </DialogContent>

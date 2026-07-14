@@ -4,6 +4,7 @@ import * as React from "react";
 import { Edit2, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -49,6 +50,11 @@ export function TemplateManager(): React.JSX.Element {
   const [lang, setLang] = React.useState(selectedTemplate?.languageCode || "en");
   const [version, setVersion] = React.useState(selectedTemplate?.version || 1);
 
+  // States for save template action button
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveSuccess, setSaveSuccess] = React.useState(false);
+  const [saveError, setSaveError] = React.useState(false);
+
   const handleSelectTemplate = (id: string) => {
     const t = templates.find(item => item.id === id);
     if (t) {
@@ -63,23 +69,37 @@ export function TemplateManager(): React.JSX.Element {
   const handleSave = () => {
     if (!selectedTemplate) return;
     
-    // Save locally or execute API mutations
-    setTemplates(prev => prev.map(t => {
-      if (t.id === selectedTemplate.id) {
-        return {
-          ...t,
-          subjectTemplate: subject,
-          bodyTemplate: body,
-          languageCode: lang,
-          version: version
-        };
-      }
-      return t;
-    }));
+    setIsSaving(true);
+    setSaveSuccess(false);
+    setSaveError(false);
 
-    toast.success("Notification Template successfully updated", { 
-      description: `Saved as version ${version} translation for language code: ${lang.toUpperCase()}`
-    });
+    // Simulate saving latency
+    setTimeout(() => {
+      try {
+        setTemplates(prev => prev.map(t => {
+          if (t.id === selectedTemplate.id) {
+            return {
+              ...t,
+              subjectTemplate: subject,
+              bodyTemplate: body,
+              languageCode: lang,
+              version: version
+            };
+          }
+          return t;
+        }));
+
+        setSaveSuccess(true);
+        toast.success("Profile updated successfully.", { 
+          description: `Saved as version ${version} translation for language code: ${lang.toUpperCase()}`
+        });
+      } catch (err) {
+        setSaveError(true);
+        toast.error("Unable to save changes. Please try again.");
+      } finally {
+        setIsSaving(false);
+      }
+    }, 800);
   };
 
   return (
@@ -168,9 +188,18 @@ export function TemplateManager(): React.JSX.Element {
                   <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-caption">
                     <HelpCircle className="h-3.5 w-3.5" /> Token variables: use double curly brackets, e.g. <code>{"{{student_name}}"}</code>, <code>{"{{document_type}}"}</code>
                   </div>
-                  <Button size="sm" className="h-8 text-xs font-semibold" onClick={handleSave}>
-                    <Edit2 className="mr-1.5 h-3.5 w-3.5" /> Update Template
-                  </Button>
+                  <AsyncActionButton
+                    size="sm"
+                    className="h-8 text-xs font-semibold"
+                    onClick={handleSave}
+                    isLoading={isSaving}
+                    isSuccess={saveSuccess}
+                    isError={saveError}
+                    idleText={<><Edit2 className="mr-1.5 h-3.5 w-3.5 inline" /> Update Template</>}
+                    loadingText="Updating..."
+                    successText="Changes saved"
+                    errorText="Try Again"
+                  />
                 </div>
               </CardContent>
             </Card>

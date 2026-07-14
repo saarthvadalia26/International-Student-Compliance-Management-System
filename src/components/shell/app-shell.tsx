@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { MobileSidebar } from "@/components/sidebar/mobile-sidebar";
 import { Header } from "@/components/header/header";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -13,20 +14,56 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
+  const supabase = getBrowserSupabase();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
 
   React.useEffect(() => {
-    const session = localStorage.getItem("isms_session");
-    if (!session) {
-      router.replace("/login");
-    } else {
-      Promise.resolve().then(() => {
-        setIsAuthenticated(true);
-      });
+    let mounted = true;
+
+    async function checkSession() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          if (mounted) {
+            setIsAuthenticated(false);
+            router.replace("/login");
+          }
+        } else {
+          if (mounted) {
+            setIsAuthenticated(true);
+          }
+        }
+      } catch (e) {
+        console.error("Session verification error:", e);
+        if (mounted) {
+          setIsAuthenticated(false);
+          router.replace("/login");
+        }
+      }
     }
-  }, [router]);
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        if (mounted) {
+          setIsAuthenticated(false);
+          router.replace("/login");
+        }
+      } else if (session) {
+        if (mounted) {
+          setIsAuthenticated(true);
+        }
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router, supabase]);
 
   if (isAuthenticated === null) {
     return (

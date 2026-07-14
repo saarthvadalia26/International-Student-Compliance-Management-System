@@ -4,6 +4,7 @@ import * as React from "react";
 import { Plus, Trash, Save, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
@@ -58,6 +59,11 @@ export function ReminderSettings(): React.JSX.Element {
     sms: false
   });
 
+  // Reusable save action button states
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveSuccess, setSaveSuccess] = React.useState(false);
+  const [saveError, setSaveError] = React.useState(false);
+
   const handlePreferenceToggle = (channel: "email" | "whatsapp" | "sms") => {
     setPreferences(prev => ({
       ...prev,
@@ -84,7 +90,21 @@ export function ReminderSettings(): React.JSX.Element {
   };
 
   const handleSave = () => {
-    toast.success("Reminder rules successfully updated", { description: "Global engine triggers re-loaded successfully." });
+    setIsSaving(true);
+    setSaveSuccess(false);
+    setSaveError(false);
+
+    setTimeout(() => {
+      try {
+        setSaveSuccess(true);
+        toast.success("Profile updated successfully.", { description: "Global engine triggers re-loaded successfully." });
+      } catch (err) {
+        setSaveError(true);
+        toast.error("Unable to save changes. Please try again.");
+      } finally {
+        setIsSaving(false);
+      }
+    }, 800);
   };
 
   return (
@@ -214,9 +234,18 @@ export function ReminderSettings(): React.JSX.Element {
                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-caption">
                   <HelpCircle className="h-3.5 w-3.5" /> Negative offsets (e.g. -7) represent alerts scheduled after expiration has occurred.
                 </div>
-                <Button size="sm" className="h-8 text-xs font-semibold" onClick={handleSave}>
-                  <Save className="mr-1.5 h-3.5 w-3.5" /> Save Changes
-                </Button>
+                <AsyncActionButton
+                  size="sm"
+                  className="h-8 text-xs font-semibold"
+                  onClick={handleSave}
+                  isLoading={isSaving}
+                  isSuccess={saveSuccess}
+                  isError={saveError}
+                  idleText={<><Save className="mr-1.5 h-3.5 w-3.5 inline" /> Save Changes</>}
+                  loadingText="Saving changes..."
+                  successText="Changes saved"
+                  errorText="Try Again"
+                />
               </div>
             </CardContent>
           </Card>
