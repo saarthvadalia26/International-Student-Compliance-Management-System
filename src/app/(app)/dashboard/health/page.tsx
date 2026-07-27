@@ -123,7 +123,104 @@ export default async function SystemHealthDashboardPage() {
       {/* Sub-matrices for Dispatch Metrics and Infrastructure */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
         
-        {/* 1. Gateway Delivery Today */}
+        {/* 1. System Infrastructure & Environment */}
+        <Card className="border border-border/60 shadow-sm">
+          <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+              System Infrastructure & Environment
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Application Version</span>
+              <span className="text-xs font-semibold font-mono text-foreground">{metrics.applicationVersion}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Environment Mode</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary font-mono">{metrics.environment}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Database Status</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${metrics.databaseStatus === "Online" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                {metrics.databaseStatus}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Storage Status</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${metrics.storageStatus === "Online" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                {metrics.storageStatus}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Email Provider</span>
+              <div className="text-right">
+                <span className="text-xs font-semibold text-foreground font-mono">{metrics.emailProviderName}</span>
+                <span className={`text-[10px] ml-2 font-bold px-1.5 py-0.5 rounded ${metrics.emailProviderStatus === "healthy" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                  {metrics.emailProviderStatus}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-2 last:border-b-0">
+              <span className="text-xs text-muted-foreground font-medium">WhatsApp Provider</span>
+              <div className="text-right">
+                <span className="text-xs font-semibold text-foreground font-mono">{metrics.whatsappProviderName}</span>
+                <span className={`text-[10px] ml-2 font-bold px-1.5 py-0.5 rounded ${metrics.whatsappProviderStatus === "healthy" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                  {metrics.whatsappProviderStatus}
+                </span>
+              </div>
+            </div>
+
+          </CardContent>
+        </Card>
+
+        {/* 2. Scheduler Monitoring */}
+        <Card className="border border-border/60 shadow-sm">
+          <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
+              Compliance Reminder Scheduler
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Last Scheduler Run</span>
+              <span className="text-xs font-semibold text-foreground font-mono">{metrics.lastSchedulerRun}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Next Scheduled execution</span>
+              <span className="text-xs font-semibold text-foreground font-mono">{metrics.nextSchedulerRun}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Jobs Processed (Recent)</span>
+              <span className="text-xs font-bold font-mono text-emerald-600">{metrics.jobsProcessedCount} jobs</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Failed executions (Recent)</span>
+              <span className="text-xs font-bold font-mono text-rose-600">{metrics.jobsFailedCount} failures</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 last:border-b-0">
+              <span className="text-xs text-muted-foreground font-medium">Avg Execution Latency</span>
+              <span className="text-xs font-semibold font-mono text-foreground">{metrics.averageProcessingTimeMs} ms</span>
+            </div>
+
+          </CardContent>
+        </Card>
+
+      </div>
+
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        
+        {/* 3. Gateway Delivery Today */}
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
             <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
@@ -159,7 +256,7 @@ export default async function SystemHealthDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* 2. Storage & System Health */}
+        {/* 4. Storage & System Health */}
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
             <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">

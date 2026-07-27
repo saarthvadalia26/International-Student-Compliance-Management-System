@@ -51,8 +51,8 @@ export function initializeStartup(): void {
     }
     console.error("=========================================================================");
     
-    // Only throw the error during development mode to prevent halting production compilation builds
-    if (process.env.NODE_ENV === "development") {
+    // Fail startup by throwing the error, but bypass during Next.js build compilation phase to prevent breaking build runners
+    if (process.env.NEXT_PHASE !== "phase-production-build") {
       throw error;
     }
   }
