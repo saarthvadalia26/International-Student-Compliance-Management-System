@@ -10,6 +10,7 @@ import { Dialog, DialogPortal, DialogOverlay, DialogTitle, DialogDescription } f
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Button } from "@/components/ui/button";
 import { mockStudents } from "@/lib/mock-data";
+import { Branding } from "@/config/branding";
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -69,7 +70,10 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
           className="fixed top-0 left-0 bottom-0 z-50 flex h-full w-72 max-w-xs flex-col border-r border-border bg-card text-card-foreground shadow-lg duration-200 outline-none data-open:animate-in data-open:slide-in-from-left-full data-closed:animate-out data-closed:slide-out-to-left-full"
         >
           <div className="flex h-16 items-center justify-between border-b border-border px-6">
-            <span className="font-display text-lg font-semibold text-primary">ISMS Mobile</span>
+            <div className="flex items-center gap-2">
+              <img src={Branding.logoPaths.logo} alt={Branding.shortName} className="h-6 w-6 object-contain" />
+              <span className="font-display text-sm font-semibold text-primary">{Branding.appShortName} Mobile</span>
+            </div>
             <DialogPrimitive.Close render={<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" />}>
               <Icons.XIcon className="h-4 w-4" />
               <span className="sr-only">Close menu</span>

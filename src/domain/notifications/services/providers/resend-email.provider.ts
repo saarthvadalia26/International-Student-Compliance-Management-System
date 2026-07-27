@@ -1,3 +1,4 @@
+import { Branding } from "@/config/branding";
 import { 
   INotificationProvider, 
   ProviderResponse, 
@@ -29,7 +30,7 @@ export class ResendEmailProvider implements INotificationProvider {
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          from: "ISCMS NFSU <compliance@nfsu.edu.in>",
+          from: `${Branding.appShortName} ${Branding.shortName} <${process.env.RESEND_FROM_EMAIL || 'compliance@nfsu.edu.in'}>`,
           to,
           subject,
           html: body

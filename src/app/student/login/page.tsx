@@ -10,6 +10,8 @@ import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 
+import { Branding } from "@/config/branding";
+
 export default function StudentLoginPage() {
   const supabase = getBrowserSupabase();
   
@@ -63,15 +65,13 @@ export default function StudentLoginPage() {
       {/* Subtle background radial layout */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-blue-100/30 via-transparent to-transparent dark:from-blue-950/10 -z-10" />
 
-      <div className="w-full max-w-[400px] space-y-6">
+      <div className="w-full max-w-[420px] space-y-6">
         {/* Portal Branding */}
-        <div className="flex flex-col items-center text-center space-y-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            <GraduationCap className="h-7 w-7" />
-          </div>
+        <div className="flex flex-col items-center text-center space-y-3">
+          <img src={Branding.logoPaths.logo} alt={Branding.universityName} className="h-16 w-16 object-contain" />
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground">ISMS Student Portal</h1>
-            <p className="text-xs text-muted-foreground">National Forensic Science University (NFSU)</p>
+            <h1 className="text-lg font-display font-bold tracking-tight text-foreground">{Branding.universityName}</h1>
+            <p className="text-xs font-caption text-muted-foreground mt-0.5">{Branding.appName}</p>
           </div>
         </div>
 
@@ -137,7 +137,7 @@ export default function StudentLoginPage() {
         </Card>
         
         <p className="text-[11px] text-center text-muted-foreground/80">
-          Only registered NFSU international students can authenticate.
+          Only registered {Branding.shortName} international students can authenticate.
         </p>
       </div>
     </div>

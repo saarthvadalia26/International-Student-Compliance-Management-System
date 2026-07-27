@@ -31,6 +31,8 @@ import {
 } from "./actions";
 import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
 
+import { Branding } from "@/config/branding";
+
 export default function SettingsPage() {
   const supabase = getBrowserSupabase();
   const { theme, setTheme } = useTheme();
@@ -39,9 +41,9 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = React.useState<"general" | "notifications" | "retention" | "system" | "security">("general");
 
   // General Settings State
-  const [schoolName, setSchoolName] = React.useState("National Forensic Sciences University (NFSU)");
-  const [supportEmail, setSupportEmail] = React.useState("support@iscms.nfsu.ac.in");
-  const [supportPhone, setSupportPhone] = React.useState("+91-79-23977100");
+  const [schoolName, setSchoolName] = React.useState(`${Branding.universityName} (${Branding.shortName})`);
+  const [supportEmail, setSupportEmail] = React.useState(Branding.supportEmail);
+  const [supportPhone, setSupportPhone] = React.useState(Branding.supportPhone);
   const [isSavingGeneral, setIsSavingGeneral] = React.useState(false);
   const [generalSuccess, setGeneralSuccess] = React.useState(false);
   const [generalError, setGeneralError] = React.useState(false);

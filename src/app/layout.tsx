@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { initializeStartup } from "@/config/startup";
 import "./globals.css";
 
+import { Branding } from "@/config/branding";
+
 // Run environment config validation at application startup
 initializeStartup();
 
@@ -18,8 +20,44 @@ const geistMono = {
 };
 
 export const metadata: Metadata = {
-  title: "International Student Management System (ISMS)",
-  description: "Enterprise management and tracking of international student records.",
+  title: {
+    default: `${Branding.appName} | ${Branding.shortName}`,
+    template: `%s | ${Branding.shortName}`
+  },
+  description: `Official ${Branding.appName} of the ${Branding.universityName}.`,
+  icons: {
+    icon: [
+      { url: Branding.faviconPaths.ico },
+      { url: Branding.faviconPaths.png16, sizes: "16x16", type: "image/png" },
+      { url: Branding.faviconPaths.png32, sizes: "32x32", type: "image/png" }
+    ],
+    apple: [
+      { url: Branding.faviconPaths.appleTouch, sizes: "180x180", type: "image/png" }
+    ]
+  },
+  manifest: "/site.webmanifest",
+  openGraph: {
+    title: Branding.appName,
+    description: `Official portal for the ${Branding.universityName}.`,
+    url: Branding.officialWebsite,
+    siteName: Branding.universityName,
+    images: [
+      {
+        url: Branding.logoPaths.logo,
+        width: 512,
+        height: 512,
+        alt: Branding.universityName
+      }
+    ],
+    locale: "en_US",
+    type: "website"
+  },
+  twitter: {
+    card: "summary",
+    title: Branding.appName,
+    description: `Official portal for the ${Branding.universityName}.`,
+    images: [Branding.logoPaths.logo]
+  }
 };
 
 export default function RootLayout({

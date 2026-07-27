@@ -5,6 +5,7 @@ import { SupabaseReportRepository } from "@/domain/reports/repositories/report.r
 import { ReportingService } from "@/domain/reports/services/report.service";
 import { ReportFilters, ReportPagination } from "@/domain/reports/types";
 import { headers as getHeaders } from "next/headers";
+import { Branding } from "@/config/branding";
 
 const reportRepo = new SupabaseReportRepository();
 const reportService = new ReportingService(reportRepo);
@@ -67,7 +68,7 @@ export async function exportReport(
 ) {
   const { ip, userAgent } = await getRequestMetadata();
   const actorId = "c1010101-1010-1010-1010-101010101010"; // System placeholder admin UUID
-  const actorEmail = "compliance.officer@nfsu.edu.in";
+  const actorEmail = Branding.supportEmail;
 
   switch (type) {
     case "student":
@@ -95,7 +96,7 @@ export async function unmaskIdentifier(
   const { ip, userAgent } = await getRequestMetadata();
   
   const actorId = "c1010101-1010-1010-1010-101010101010";
-  const actorEmail = "compliance.officer@nfsu.edu.in";
+  const actorEmail = Branding.supportEmail;
 
   console.log(`[SECURITY] Unmask request for student: ${studentId} document: ${documentType}`);
 

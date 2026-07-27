@@ -3,6 +3,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { SupabaseStudentPortalRepository } from "../repositories/student-portal.repository";
 import { SupabaseNotificationRepository } from "@/domain/notifications/repositories/notification.repository";
 import { UploadToken } from "../types";
+import { Branding } from "@/config/branding";
 
 export class StudentPortalService {
   private portalRepo = new SupabaseStudentPortalRepository();
@@ -239,7 +240,7 @@ export class StudentPortalService {
       // 11. Notify staff: Immediate compliance notification queued for administrators review
       const profile = await this.portalRepo.getStudentProfile(studentId);
       if (profile) {
-        const adminEmail = "compliance@nfsu.edu";
+        const adminEmail = Branding.supportEmail;
         const reviewLink = `/reports/efrro`; // direct review page
         
         await this.notifRepo.queueNotification({

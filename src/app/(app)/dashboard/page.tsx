@@ -4,6 +4,7 @@ import { fetchDashboardMetrics, fetchAnalyticsCharts } from "./actions";
 import { DashboardMetricsGrid, DashboardQuickActions } from "@/features/dashboard/metrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardCharts } from "./dashboard-charts";
+import { Branding } from "@/config/branding";
 
 export const revalidate = 0; // Disable static rendering caching for real-time dashboard
 
@@ -20,7 +21,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="font-h1 tracking-tight text-foreground text-2xl font-bold">Operational Compliance Dashboard</h1>
         <p className="font-caption text-xs text-muted-foreground mt-1">
-          NFSU International Student Cell administrative tracking overview. eFRRO alert thresholds and document verifications.
+          {Branding.shortName} International Student Cell administrative tracking overview. eFRRO alert thresholds and document verifications.
         </p>
       </div>
 

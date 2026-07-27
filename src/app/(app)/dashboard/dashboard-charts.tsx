@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Branding } from "@/config/branding";
 
 const StandardBarChart = dynamic(
   () => import("@/features/dashboard/charts").then((mod) => mod.StandardBarChart),
@@ -49,7 +50,7 @@ export function DashboardCharts({ chartsData }: DashboardChartsProps) {
 
       <ChartWrapper 
         title="Students by School" 
-        description="Enrollments across NFSU academic schools"
+        description={`Enrollments across ${Branding.shortName} academic schools`}
         isEmpty={chartsData.studentsBySchool.length === 0}
       >
         <StandardBarChart data={chartsData.studentsBySchool} />

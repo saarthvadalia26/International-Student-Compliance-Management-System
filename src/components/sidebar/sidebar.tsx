@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { desktopNavigation, NavItem } from "@/config/navigation";
 import { Button } from "@/components/ui/button";
 import { mockStudents } from "@/lib/mock-data";
+import { Branding } from "@/config/branding";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed: boolean;
@@ -72,7 +73,13 @@ export function Sidebar({ isCollapsed, setIsCollapsed, className, ...props }: Si
       <div className="flex h-16 items-center justify-between px-4 border-b border-border">
         {!isCollapsed && (
           <div className="flex items-center gap-2 font-semibold">
-            <span className="text-primary font-display text-lg">ISMS Workspace</span>
+            <img src={Branding.logoPaths.logo} alt={Branding.shortName} className="h-6 w-6 object-contain" />
+            <span className="text-primary font-display text-sm tracking-tight">{Branding.appShortName} Workspace</span>
+          </div>
+        )}
+        {isCollapsed && (
+          <div className="flex mx-auto items-center justify-center">
+            <img src={Branding.logoPaths.logo} alt={Branding.shortName} className="h-6 w-6 object-contain" />
           </div>
         )}
         <Button

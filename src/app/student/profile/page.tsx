@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentProfile } from "../actions";
 import { StudentPortalProfile } from "@/domain/student-portal/types";
+import { Branding } from "@/config/branding";
 
 export default function StudentProfilePage() {
   const supabase = getBrowserSupabase();
@@ -91,7 +92,7 @@ export default function StudentProfilePage() {
             <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
               <User className="h-4 w-4 text-muted-foreground" /> Personal Details
             </CardTitle>
-            <CardDescription className="text-xs">Your personal biographical credentials registered with NFSU.</CardDescription>
+            <CardDescription className="text-xs">Your personal biographical credentials registered with {Branding.shortName}.</CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">

@@ -2,29 +2,24 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { GraduationCap, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { toast } from "sonner";
-import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { getAdminSupabase } from "@/lib/supabase/admin";
+import { Branding } from "@/config/branding";
 
 export default function LoginPage() {
   const router = useRouter();
-  const supabase = getBrowserSupabase();
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [isError, setIsError] = React.useState(false);
-
-  React.useEffect(() => {
-    // Clear Supabase session on page load for clean sign-in
-    supabase.auth.signOut().catch(() => {});
-  }, [supabase]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,38 +36,12 @@ export default function LoginPage() {
     setIsError(false);
 
     try {
-      const email = username.includes("@") ? username : `${username}@nfsu.edu`;
-      let { data, error: authError } = await supabase.auth.signInWithPassword({
+      const supabase = getAdminSupabase();
+      const email = `${username}@nfsu-staff.in`;
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
       });
-
-      // Self-healing developer auto-signup for admin / admin demo access
-      if (
-        authError && 
-        authError.message.toLowerCase().includes("invalid login credentials") && 
-        username === "admin" && 
-        password === "admin"
-      ) {
-        const signupRes = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              role: "administrator",
-              username: "admin"
-            }
-          }
-        });
-        if (!signupRes.error) {
-          const retryRes = await supabase.auth.signInWithPassword({
-            email,
-            password
-          });
-          data = retryRes.data;
-          authError = retryRes.error;
-        }
-      }
 
       if (authError) {
         setError(authError.message);
@@ -104,15 +73,13 @@ export default function LoginPage() {
       {/* Subtle Background Radial Gradient */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-blue-100/30 via-transparent to-transparent dark:from-blue-950/10 -z-10" />
 
-      <div className="w-full max-w-[400px] space-y-6">
+      <div className="w-full max-w-[420px] space-y-6">
         {/* Portal Branding */}
-        <div className="flex flex-col items-center text-center space-y-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
-            <GraduationCap className="h-7 w-7" />
-          </div>
+        <div className="flex flex-col items-center text-center space-y-3">
+          <img src={Branding.logoPaths.logo} alt={Branding.universityName} className="h-16 w-16 object-contain" />
           <div>
-            <h1 className="text-xl font-display font-bold tracking-tight text-foreground">ISMS Admin Portal</h1>
-            <p className="text-sm font-caption text-muted-foreground">International Student Compliance Management System</p>
+            <h1 className="text-lg font-display font-bold tracking-tight text-foreground">{Branding.universityName}</h1>
+            <p className="text-xs font-caption text-muted-foreground mt-0.5">{Branding.appName}</p>
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { verifyTokenAndGetRedirect } from "./actions";
+import { Branding } from "@/config/branding";
 
 interface TokenParams {
   token: string;
@@ -66,7 +67,7 @@ export default function UploadTokenLandingPage({ params }: { params: Promise<Tok
             </div>
             <CardTitle className="text-lg font-semibold">Secure Link Verification</CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
-              ISCMS Security Gate: Authenticating international student credentials.
+              {Branding.appShortName} Security Gate: Authenticating international student credentials.
             </CardDescription>
           </CardHeader>
 

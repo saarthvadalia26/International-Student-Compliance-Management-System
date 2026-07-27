@@ -4,6 +4,7 @@ import * as React from "react";
 import { HelpCircle, Phone, Mail, Building, Info, FileText, ExternalLink } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Branding } from "@/config/branding";
 
 export default function HelpPage() {
   const faqs = [
@@ -101,9 +102,9 @@ export default function HelpPage() {
               <div className="flex items-start gap-2.5">
                 <Building className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                 <div>
-                  <h4 className="text-xs font-semibold text-foreground">NFSU Institution</h4>
+                  <h4 className="text-xs font-semibold text-foreground">{Branding.shortName} Institution</h4>
                   <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
-                    National Forensic Science University (NFSU), International Student Cell
+                    {Branding.universityName}, International Student Cell
                   </p>
                 </div>
               </div>
@@ -124,7 +125,7 @@ export default function HelpPage() {
                 <Mail className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                 <div>
                   <h4 className="text-xs font-semibold text-foreground">Email Coordinate</h4>
-                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5">support@iscms.nfsu.ac.in</p>
+                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{Branding.supportEmail}</p>
                 </div>
               </div>
 
@@ -134,7 +135,7 @@ export default function HelpPage() {
                 <Phone className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                 <div>
                   <h4 className="text-xs font-semibold text-foreground">Phone Coordinate</h4>
-                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5">+91-79-23977100</p>
+                  <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{Branding.supportPhone}</p>
                 </div>
               </div>
             </CardContent>

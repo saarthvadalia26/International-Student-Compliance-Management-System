@@ -18,6 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { uploadEfrro, fetchStudentProfile } from "../actions";
+import { Branding } from "@/config/branding";
 import { StudentPortalProfile } from "@/domain/student-portal/types";
 
 export default function EfrroUploadPage() {
@@ -221,7 +222,7 @@ export default function EfrroUploadPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">eFRRO Document Renewal</h1>
         <p className="text-xs text-muted-foreground mt-1">
-          Submit your newly issued or extended eFRRO document to the NFSU Compliance Cell.
+          Submit your newly issued or extended eFRRO document to the {Branding.shortName} Compliance Cell.
         </p>
       </div>
 

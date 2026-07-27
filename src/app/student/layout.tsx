@@ -7,6 +7,7 @@ import { GraduationCap, LayoutDashboard, User, UploadCloud, History, LogOut, Loa
 import { Button } from "@/components/ui/button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { toast } from "sonner";
+import { Branding } from "@/config/branding";
 
 interface StudentLayoutProps {
   children: React.ReactNode;
@@ -115,11 +116,9 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-md px-4 md:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <GraduationCap className="h-5 w-5" />
-            </div>
+            <img src={Branding.logoPaths.logo} alt={Branding.shortName} className="h-8 w-8 object-contain" />
             <span className="font-semibold tracking-tight text-foreground text-sm">
-              ISMS Student Portal
+              {Branding.appShortName} Student Portal
             </span>
           </div>
 

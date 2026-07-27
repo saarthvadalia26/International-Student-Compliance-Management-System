@@ -5,6 +5,7 @@ import { Menu, Bell, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { AccountMenu } from "./account-menu";
+import { Branding } from "@/config/branding";
 
 interface HeaderProps {
   onMenuOpen: () => void;
@@ -27,11 +28,9 @@ export function Header({ onMenuOpen }: HeaderProps) {
 
         {/* Logo and App Title */}
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <GraduationCap className="h-5 w-5" />
-          </div>
+          <img src={Branding.logoPaths.logo} alt={Branding.shortName} className="h-8 w-8 object-contain" />
           <span className="hidden font-display text-sm font-semibold tracking-tight text-foreground sm:block">
-            ISMS Portal
+            {Branding.appShortName} Portal
           </span>
         </div>
 
