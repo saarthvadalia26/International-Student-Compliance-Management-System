@@ -83,11 +83,12 @@ export class SupabaseRetentionRepository implements IRetentionRepository {
 
     const tableName = `${documentType}_versions`;
     
-    // Select non-active document versions older than the retention threshold
+    // Select versions older than the retention threshold that are not pending and not already purged
     const { data, error } = await supabase
       .from(tableName)
       .select("id, student_id, file_path, created_at, is_active")
-      .eq("is_active", false)
+      .neq("verification_status", "pending")
+      .neq("file_path", "[PURGED]")
       .lte("created_at", dateStr);
 
     if (error) {
@@ -101,14 +102,14 @@ export class SupabaseRetentionRepository implements IRetentionRepository {
     const supabase = getAdminSupabase();
     const tableName = `${documentType}_versions`;
 
-    // Perform a hard delete on the expired version
+    // Update the expired version's file path to [PURGED] to preserve metadata
     const { error } = await supabase
       .from(tableName)
-      .delete()
+      .update({ file_path: "[PURGED]", updated_at: new Date().toISOString() })
       .eq("id", versionId);
 
     if (error) {
-      throw new Error(`[DB_DELETE_FAILED] Failed removing expired ${documentType} version row: ${error.message}`);
+      throw new Error(`[DB_UPDATE_FAILED] Failed marking expired ${documentType} version file as purged: ${error.message}`);
     }
   }
 }
