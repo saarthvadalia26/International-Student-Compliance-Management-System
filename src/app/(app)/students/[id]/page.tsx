@@ -19,6 +19,7 @@ import {
   Building
 } from "lucide-react";
 import { mockStudents, MockStudent, MockDocument } from "@/lib/mock-data";
+import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -319,8 +320,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 </p>
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1.5 font-small">
-                  <span className="flex items-center gap-1.5">
-                    <Globe className="h-3.5 w-3.5 text-muted-foreground/80" /> {student.nationalityName}
+                  <span className="flex items-center gap-1.5 font-medium text-foreground">
+                    <CountryFlag countryCode={student.nationalityCode} size="md" /> {student.nationalityName} ({student.nationalityCode})
                   </span>
                   <span className="flex items-center gap-1.5">
                     <GraduationCap className="h-3.5 w-3.5 text-muted-foreground/80" /> {student.programName}

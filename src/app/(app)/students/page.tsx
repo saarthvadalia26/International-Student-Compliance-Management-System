@@ -6,13 +6,13 @@ import {
   Search, 
   UserPlus, 
   X, 
-  Globe,
   MoreHorizontal,
   Eye,
   Trash2,
   AlertCircle
 } from "lucide-react";
 import { mockStudents, MockStudent } from "@/lib/mock-data";
+import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -266,7 +266,7 @@ export default function StudentListPage() {
                     {/* Nationality */}
                     <TableCell className="py-3.5 text-xs text-foreground">
                       <div className="flex items-center gap-1.5 font-small">
-                        <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                        <CountryFlag countryCode={student.nationalityCode} size="md" />
                         <span>{student.nationalityName}</span>
                       </div>
                     </TableCell>

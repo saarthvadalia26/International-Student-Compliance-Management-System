@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { User, Mail, Phone, Loader2, ShieldAlert, GraduationCap, Globe } from "lucide-react";
+import { User, Mail, Phone, Loader2, ShieldAlert, GraduationCap } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentProfile } from "../actions";
 import { StudentPortalProfile } from "@/domain/student-portal/types";
 import { Branding } from "@/config/branding";
+import { CountryFlag } from "@/components/ui/country-flag";
+import { getCountryByCode } from "@/utils/countries";
 
 export default function StudentProfilePage() {
   const supabase = getBrowserSupabase();
@@ -106,8 +108,12 @@ export default function StudentProfilePage() {
               </div>
               <div className="space-y-0.5">
                 <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Nationality / Country</span>
-                <p className="text-sm font-semibold text-foreground flex items-center gap-1">
-                  <Globe className="h-3.5 w-3.5 text-muted-foreground" /> {profile.nationality}
+                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                  <CountryFlag countryCode={profile.nationality} size="md" /> 
+                  <span>{getCountryByCode(profile.nationality)?.name || profile.nationality}</span>
+                  {getCountryByCode(profile.nationality) && (
+                    <span className="text-[10px] text-muted-foreground font-mono">({getCountryByCode(profile.nationality)?.code})</span>
+                  )}
                 </p>
               </div>
             </div>
