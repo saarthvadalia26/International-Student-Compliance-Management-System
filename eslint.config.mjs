@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone tooling scripts (Node.js, uses require())
+    "scripts/**",
   ]),
 ]);
 

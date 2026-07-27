@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- NFSU Shield Mask Icon for Safari Pinned Tabs -->
+  <!-- Simplified monochrome silhouette of the NFSU shield -->
+  <path d="M128 48 L384 48 L384 96 L400 96 L400 48 L416 48 L416 96 L432 96 L432 48 
+           L448 48 L448 128 L448 384 L384 448 L256 480 L128 448 L64 384 L64 128 L64 48 
+           L80 48 L80 96 L96 96 L96 48 L112 48 L112 96 L128 96 Z" 
+        fill="black"/>
+  <!-- Shield quadrants -->
+  <rect x="112" y="160" width="144" height="128" rx="4" fill="black" opacity="0.8"/>
+  <rect x="256" y="160" width="144" height="128" rx="4" fill="black" opacity="0.8"/>
+  <rect x="112" y="288" width="144" height="128" rx="4" fill="black" opacity="0.8"/>
+  <rect x="256" y="288" width="144" height="128" rx="4" fill="black" opacity="0.8"/>
+</svg>

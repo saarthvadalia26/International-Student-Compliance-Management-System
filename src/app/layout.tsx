@@ -20,6 +20,7 @@ const geistMono = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(Branding.officialWebsite),
   title: {
     default: `${Branding.appName} | ${Branding.shortName}`,
     template: `%s | ${Branding.shortName}`
@@ -29,13 +30,23 @@ export const metadata: Metadata = {
     icon: [
       { url: Branding.faviconPaths.ico },
       { url: Branding.faviconPaths.png16, sizes: "16x16", type: "image/png" },
-      { url: Branding.faviconPaths.png32, sizes: "32x32", type: "image/png" }
+      { url: Branding.faviconPaths.png32, sizes: "32x32", type: "image/png" },
+      { url: Branding.faviconPaths.png48, sizes: "48x48", type: "image/png" },
+      { url: Branding.faviconPaths.png64, sizes: "64x64", type: "image/png" },
+      { url: Branding.faviconPaths.png128, sizes: "128x128", type: "image/png" }
     ],
     apple: [
       { url: Branding.faviconPaths.appleTouch, sizes: "180x180", type: "image/png" }
+    ],
+    other: [
+      { rel: "mask-icon", url: Branding.faviconPaths.maskIcon, color: Branding.themeColors.primary }
     ]
   },
   manifest: "/site.webmanifest",
+  other: {
+    "msapplication-TileImage": Branding.faviconPaths.mstile,
+    "msapplication-TileColor": Branding.themeColors.primary
+  },
   openGraph: {
     title: Branding.appName,
     description: `Official portal for the ${Branding.universityName}.`,
@@ -43,9 +54,9 @@ export const metadata: Metadata = {
     siteName: Branding.universityName,
     images: [
       {
-        url: Branding.logoPaths.logo,
-        width: 512,
-        height: 512,
+        url: Branding.faviconPaths.ogImage,
+        width: 1200,
+        height: 630,
         alt: Branding.universityName
       }
     ],
@@ -53,10 +64,10 @@ export const metadata: Metadata = {
     type: "website"
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: Branding.appName,
     description: `Official portal for the ${Branding.universityName}.`,
-    images: [Branding.logoPaths.logo]
+    images: [Branding.faviconPaths.ogImage]
   }
 };
 

@@ -1,7 +1,13 @@
 {
   "name": "National Forensic Sciences University - ISCMS",
   "short_name": "NFSU-ISCMS",
+  "description": "International Student Compliance Management System for National Forensic Sciences University",
   "icons": [
+    {
+      "src": "/favicon-48.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
     {
       "src": "/android-chrome-192.png",
       "sizes": "192x192",
@@ -11,10 +17,18 @@
       "src": "/android-chrome-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "theme_color": "#0b3c5d",
-  "background_color": "#ffffff",
+  "background_color": "#0b3c5d",
   "display": "standalone",
-  "start_url": "/"
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait-primary"
 }
