@@ -27,7 +27,7 @@ export interface INotificationDbRow {
   student_id: string;
   template_id: string | null;
   document_type: "passport" | "visa" | "efrro";
-  status: "queued" | "sending" | "sent" | "failed" | "cancelled";
+  status: "queued" | "processing" | "sending" | "sent" | "delivered" | "read" | "failed" | "expired" | "cancelled";
   channel: string;
   recipient_address: string;
   retry_count: number;
@@ -171,7 +171,10 @@ export class SupabaseNotificationRepository implements INotificationRepository {
       attempt_number: log.attemptNumber,
       status: log.status,
       gateway_response: log.gatewayResponse || {},
-      error_message: log.errorMessage || null
+      error_message: log.errorMessage || null,
+      latency_ms: log.latencyMs ?? null,
+      provider_name: log.providerName ?? null,
+      correlation_id: log.correlationId ?? null
     };
 
     console.log(`[DB_REPOSITORY] Logging delivery attempt for notification: ${log.notificationId}`);

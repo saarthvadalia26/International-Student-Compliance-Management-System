@@ -3,7 +3,7 @@ export interface Notification {
   studentId: string;
   templateId: string | null;
   documentType: "passport" | "visa" | "efrro";
-  status: "queued" | "sending" | "sent" | "failed" | "cancelled";
+  status: "queued" | "processing" | "sending" | "sent" | "delivered" | "read" | "failed" | "expired" | "cancelled";
   channel: string;
   recipientAddress: string;
   retryCount: number;
@@ -45,6 +45,9 @@ export interface DeliveryLog {
   status: string;
   gatewayResponse: Record<string, unknown> | null;
   errorMessage: string | null;
+  latencyMs?: number | null;
+  providerName?: string | null;
+  correlationId?: string | null;
   createdAt: Date;
 }
 

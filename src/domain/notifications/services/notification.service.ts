@@ -2,11 +2,12 @@ import {
   INotificationRepository 
 } from "../repositories/notification.repository";
 import { 
-  IEmailProvider, 
-  IWhatsAppProvider 
-} from "./provider.service";
+  INotificationProvider,
+  ProviderResponse
+} from "../types/provider.types";
 import { getAdminSupabase } from "@/lib/supabase";
 import { StudentPortalService } from "@/domain/student-portal/services/student-portal.service";
+import crypto from "crypto";
 
 export class NotificationPreferencesService {
   constructor(private repository: INotificationRepository) {}
@@ -138,8 +139,8 @@ export class QueueProcessor {
 
   constructor(
     private repository: INotificationRepository,
-    private emailProvider: IEmailProvider,
-    private whatsappProvider: IWhatsAppProvider
+    private emailProvider: INotificationProvider,
+    private whatsappProvider: INotificationProvider
   ) {
     this.prefsService = new NotificationPreferencesService(repository);
   }
@@ -161,6 +162,11 @@ export class QueueProcessor {
     let failures = 0;
 
     for (const alert of pending) {
+      const correlationId = crypto.randomUUID();
+      const startTime = Date.now();
+      let activeProvider: INotificationProvider | null = null;
+      const activeChannel = alert.channel.toLowerCase();
+
       try {
         // 1. Verify Preferences
         const enabled = await this.prefsService.isChannelEnabled(alert.studentId, alert.channel);
@@ -170,15 +176,14 @@ export class QueueProcessor {
           continue;
         }
 
-        // 2. Lock notification state to sending
-        await this.repository.updateNotificationStatus(alert.id, "sending");
+        // 2. Lock notification state to processing
+        await this.repository.updateNotificationStatus(alert.id, "processing");
 
         // 3. Resolve active templates
         let body = alert.idempotencyKey;
         let subject = "ISCMS Compliance Reminder Alert";
         
         if (alert.templateId) {
-          // Mock resolve template from cache or DB repository
           const supabase = getAdminSupabase();
           const { data: tData } = await supabase
             .from("notification_templates")
@@ -193,13 +198,17 @@ export class QueueProcessor {
         }
 
         // 4. Submit to Gateway adapters
-        let result: { success: boolean; gatewayId?: string; error?: string } = { success: false };
+        let result: ProviderResponse = { success: false };
         
-        if (alert.channel.toLowerCase() === "email" || alert.channel.toLowerCase() === "both") {
+        if (activeChannel === "email" || activeChannel === "both") {
+          activeProvider = this.emailProvider;
           result = await this.emailProvider.sendEmail(alert.recipientAddress, subject, body);
         } else {
+          activeProvider = this.whatsappProvider;
           result = await this.whatsappProvider.sendWhatsApp(alert.recipientAddress, body);
         }
+
+        const latencyMs = result.latencyMs || (Date.now() - startTime);
 
         // 5. Update outcome log
         if (result.success) {
@@ -208,8 +217,11 @@ export class QueueProcessor {
             notificationId: alert.id,
             attemptNumber: alert.retryCount + 1,
             status: "sent",
-            gatewayResponse: { gateway_id: result.gatewayId || "mock-gate-id" },
-            errorMessage: null
+            gatewayResponse: (result.rawResponse as Record<string, unknown>) || { gateway_id: result.gatewayId || "mock-gate-id" },
+            errorMessage: null,
+            latencyMs,
+            providerName: activeProvider?.name || "unknown",
+            correlationId
           });
           processed++;
         } else {
@@ -220,6 +232,7 @@ export class QueueProcessor {
         failures++;
         const nextAttempt = alert.retryCount + 1;
         const errMsg = error instanceof Error ? error.message : String(error);
+        const latencyMs = Date.now() - startTime;
         
         console.error(`[QUEUE_PROCESSOR_ERROR] Failed sending notification ${alert.id}: ${errMsg}`);
         
@@ -227,8 +240,11 @@ export class QueueProcessor {
           notificationId: alert.id,
           attemptNumber: nextAttempt,
           status: "failed",
-          gatewayResponse: {},
-          errorMessage: errMsg
+          gatewayResponse: { error_details: errMsg },
+          errorMessage: errMsg,
+          latencyMs,
+          providerName: activeProvider?.name || "unknown",
+          correlationId
         });
 
         if (nextAttempt >= alert.maxRetries) {
