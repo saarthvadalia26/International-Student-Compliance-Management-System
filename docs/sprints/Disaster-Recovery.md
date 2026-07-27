@@ -1,31 +1,24 @@
-# Disaster Recovery & Backup Plan
+# Disaster Recovery & System Recovery Guide
 
 - **Status**: Production-Ready / Final Revision
 - **Role**: Lead Software Architect
-- **Sprint**: Sprint 08 - Production Deployment & Operations
+- **Sprint**: Sprint 10 - Production Integrations & Deployment
 - **Target Institution**: National Forensic Science University (NFSU)
 
 ---
 
-## 1. Backup Strategies
+## 1. Automated Backups
 
-### 1.1 Database Backups (Supabase PostgreSQL)
-*   **Daily Backups**: Automated snapshots managed by Supabase, retained for 30 days.
-*   **Point-in-Time Recovery (PITR)**: Enables database state recovery to any specific second in the past 7 days.
-*   **Manual Dump**: Command execution for ad-hoc database exports:
-    `supabase db dump --db-url "$DATABASE_URL" -f backup.sql`
-
-### 1.2 Storage Assets Backups
-*   Scheduled serverless functions mirror PDF files from the `passport-documents`, `visa-documents`, and `efrro-documents` buckets to a separate secure secondary AWS S3 backup bucket.
+*   **Database**: Automated snapshots managed by Supabase, retained for 30 days. Point-in-Time Recovery (PITR) is enabled.
+*   **Storage**: Automated hourly mirroring syncs PDF documents from Supabase storage buckets to AWS S3 backup buckets.
 
 ---
 
-## 2. Disaster Recovery Checklist
+## 2. Emergency Outage recovery
 
-- [ ] Step 1: Detect outage/corruption and verify alert logs.
-- [ ] Step 2: Route users to `maintenance` error page.
-- [ ] Step 3: Spin up a fresh Supabase database instance.
-- [ ] Step 4: Restore database state using point-in-time recovery.
-- [ ] Step 5: Synced document storage attachments.
-- [ ] Step 6: Validate connectivity via `/health` diagnostics.
-- [ ] Step 7: Transition system online.
+1.  **Detect Outage**: Monitoring tools notify teams on `/health` failures.
+2.  **Display Maintenance Banner**: Activate a standard maintenance routing page inside Vercel redirection rules.
+3.  **Restore Database**: Execute Point-in-Time recovery via Supabase Console to a clean timestamp before corruption.
+4.  **Redeploy App**: Use git rollback if code changes triggered the failure:
+    `git push origin <last_known_stable_commit>:main`
+5.  **Verify Services**: Ping health status endpoints and route the application back online.
