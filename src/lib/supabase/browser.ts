@@ -1,10 +1,12 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 let browserClient: SupabaseClient | null = null;
 
 /**
  * Expose a browser-safe Supabase client initialized with the anonymous key.
  * This client respects RLS rules and is safe to use in Client Components.
+ * Automatically synchronizes sessions using secure HttpOnly cookies via SSR.
  */
 export function getBrowserSupabase(): SupabaseClient {
   if (browserClient) return browserClient;
@@ -18,6 +20,6 @@ export function getBrowserSupabase(): SupabaseClient {
     );
   }
 
-  browserClient = createClient(supabaseUrl, supabaseAnonKey);
+  browserClient = createBrowserClient(supabaseUrl, supabaseAnonKey);
   return browserClient;
 }

@@ -199,11 +199,11 @@ export default function AdminProfilePage() {
             ) : (
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground" htmlFor="username">
+                  <label className="text-xs font-semibold text-foreground" htmlFor="fullName">
                     Full Name
                   </label>
                   <Input
-                    id="username"
+                    id="fullName"
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}

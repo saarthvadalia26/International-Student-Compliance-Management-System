@@ -16,7 +16,7 @@ const portalService = new StudentPortalService();
  * Helper to cryptographically verify user JWT and retrieve student association ID
  */
 async function verifyUserAndGetStudentId(jwt: string): Promise<string> {
-  const supabase = getServerSupabase();
+  const supabase = await getServerSupabase();
   const { data: { user }, error } = await supabase.auth.getUser(jwt);
 
   if (error || !user) {

@@ -14,7 +14,7 @@ import { Branding } from "@/config/branding";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -26,7 +26,7 @@ export default function LoginPage() {
     setError(null);
 
     // Simple client-side input validations
-    if (!username.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
       setError("Please fill in all fields.");
       return;
     }
@@ -37,14 +37,32 @@ export default function LoginPage() {
 
     try {
       const supabase = getBrowserSupabase();
-      const email = `${username}@nfsu-staff.in`;
+      const loginEmail = email.trim();
+      
+      if (process.env.NODE_ENV === "development") {
+        console.log("[AUTH_DEBUG] Initiating login flow", { 
+          email: loginEmail.replace(/(?<=^.{2}).*(?=@)/, '***'), 
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: loginEmail,
         password
       });
 
       if (authError) {
-        setError(authError.message);
+        if (authError.message.includes("Invalid login credentials")) {
+          setError("Invalid email or password.");
+        } else if (authError.message.includes("Email not confirmed")) {
+          setError("Email address is not verified.");
+        } else if (authError.message.toLowerCase().includes("disabled") || authError.status === 403) {
+          setError("Your account has been disabled.");
+        } else if (authError.status === 500 || authError.status === 502 || authError.status === 503) {
+          setError("Authentication service temporarily unavailable.");
+        } else {
+          setError("Network connection lost or request failed.");
+        }
         setIsError(true);
         setIsLoading(false);
       } else if (data?.session) {
@@ -102,17 +120,17 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="username">
-                  Username
+                <label className="text-xs font-medium text-foreground" htmlFor="email">
+                  Email Address
                 </label>
                 <Input
-                  id="username"
-                  type="text"
-                  placeholder="admin"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="admin@nfsu-staff.in"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
-                  autoComplete="username"
+                  autoComplete="email"
                   className="h-9 text-sm"
                 />
               </div>
@@ -149,7 +167,7 @@ export default function LoginPage() {
                 errorText="Try Again"
               />
               <div className="text-[11px] text-center text-muted-foreground bg-muted/30 w-full py-1.5 rounded-md border border-border/50 font-caption">
-                Demo Credentials: <span className="font-semibold text-foreground">admin</span> / <span className="font-semibold text-foreground">admin</span>
+                Demo Credentials: <span className="font-semibold text-foreground">admin@nfsu-staff.in</span> / <span className="font-semibold text-foreground">admin</span>
               </div>
             </CardFooter>
           </form>

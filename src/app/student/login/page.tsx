@@ -35,15 +35,32 @@ export default function StudentLoginPage() {
     setIsLoading(true);
 
     try {
+      const loginEmail = email.trim();
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("[AUTH_DEBUG] Initiating student magic link flow", { 
+          email: loginEmail.replace(/(?<=^.{2}).*(?=@)/, '***'), 
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
+        email: loginEmail,
         options: {
           emailRedirectTo: `${window.location.origin}/student/dashboard`
         }
       });
 
       if (otpError) {
-        throw otpError;
+        if (otpError.message.toLowerCase().includes("rate limit") || otpError.status === 429) {
+          throw new Error("Too many requests. Please try again later.");
+        } else if (otpError.message.toLowerCase().includes("disabled") || otpError.status === 403) {
+          throw new Error("Your account has been disabled.");
+        } else if (otpError.status === 500 || otpError.status === 502 || otpError.status === 503) {
+          throw new Error("Authentication service temporarily unavailable.");
+        } else {
+          throw new Error("Failed to send secure login link. Please try again.");
+        }
       }
 
       setIsSuccess(true);
