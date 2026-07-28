@@ -6,7 +6,7 @@ import {
   ScheduledJob,
   ReminderRule 
 } from "../types/notification.types";
-import { getAdminSupabase } from "@/lib/supabase";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { NOTIFICATION_TABLE_NAME } from "../config";
 
 export interface INotificationRepository {

@@ -1,5 +1,5 @@
 import { ComplianceDocumentType } from "../types/student-snapshot.types";
-import { getAdminSupabase } from "@/lib/supabase";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 
 export interface IStorageService {
   uploadFile(studentId: string, type: ComplianceDocumentType, file: Buffer, fileName: string): Promise<string>;

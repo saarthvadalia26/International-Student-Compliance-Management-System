@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { toast } from "sonner";
-import { getAdminSupabase } from "@/lib/supabase/admin";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { Branding } from "@/config/branding";
 
 export default function LoginPage() {
@@ -36,7 +36,7 @@ export default function LoginPage() {
     setIsError(false);
 
     try {
-      const supabase = getAdminSupabase();
+      const supabase = getBrowserSupabase();
       const email = `${username}@nfsu-staff.in`;
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,

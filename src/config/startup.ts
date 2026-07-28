@@ -1,14 +1,17 @@
 import { validateEnvironment } from "./env";
-import { getAdminSupabase } from "@/lib/supabase/admin";
 import { NOTIFICATION_TABLE_NAME, isTableNotFoundError } from "@/domain/notifications/config";
 
 let isInitialized = false;
 
 /**
  * Background check to verify if the notifications table is deployed.
+ * Strictly guarded to run only on Node.js server runtime.
  */
 async function verifyNotificationTableExists(): Promise<void> {
+  if (typeof window !== "undefined") return;
+
   try {
+    const { getAdminSupabase } = await import("@/lib/supabase/admin");
     const supabase = getAdminSupabase();
     const { error } = await supabase
       .from(NOTIFICATION_TABLE_NAME)

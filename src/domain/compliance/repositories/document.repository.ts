@@ -1,5 +1,5 @@
 import { ComplianceDocument, ComplianceDocumentType, StudentSnapshot } from "../types/student-snapshot.types";
-import { getAdminSupabase } from "@/lib/supabase";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { DocumentMapper } from "../mappers/document.mapper";
 
 export interface IComplianceDocumentRepository {

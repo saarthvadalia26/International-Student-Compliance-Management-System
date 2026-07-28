@@ -5,7 +5,7 @@ import {
   INotificationProvider,
   ProviderResponse
 } from "../types/provider.types";
-import { getAdminSupabase } from "@/lib/supabase";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { StudentPortalService } from "@/domain/student-portal/services/student-portal.service";
 import crypto from "crypto";
 
