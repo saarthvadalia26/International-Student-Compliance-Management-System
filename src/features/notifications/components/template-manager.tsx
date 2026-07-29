@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-export interface MockTemplate {
+export interface Template {
   id: string;
   code: string;
   languageCode: string;
@@ -21,30 +21,9 @@ export interface MockTemplate {
 }
 
 export function TemplateManager(): React.JSX.Element {
-  const [templates, setTemplates] = React.useState<MockTemplate[]>([
-    {
-      id: "t1",
-      code: "EXPIRY_ALERT",
-      languageCode: "en",
-      version: 1,
-      isActive: true,
-      title: "Document Expiry Alert (EN)",
-      subjectTemplate: "ISCMS Alert: {{document_type}} Expiration Warning",
-      bodyTemplate: "Dear {{student_name}},\n\nYour {{document_type}} is expiring in {{days_left}} days on {{expiry_date}}. Please upload a revised version in the ISCMS portal immediately to maintain compliant standing.\n\nBest regards,\nOffice of International Compliance"
-    },
-    {
-      id: "t2",
-      code: "EXPIRY_ALERT",
-      languageCode: "es",
-      version: 1,
-      isActive: true,
-      title: "Alerta de vencimiento del documento (ES)",
-      subjectTemplate: "Alerta ISCMS: Advertencia de vencimiento de {{document_type}}",
-      bodyTemplate: "Estimado {{student_name}},\n\nSu {{document_type}} vencerá en {{days_left}} días el {{expiry_date}}. Cargue una versión revisada en el portal de ISCMS de inmediato para mantener su estado de cumplimiento.\n\nAtentamente,\nOficina de Cumplimiento Internacional"
-    }
-  ]);
+  const [templates, setTemplates] = React.useState<Template[]>([]);
 
-  const [selectedTemplate, setSelectedTemplate] = React.useState<MockTemplate | null>(templates[0]);
+  const [selectedTemplate, setSelectedTemplate] = React.useState<Template | null>(templates[0] || null);
   const [subject, setSubject] = React.useState(selectedTemplate?.subjectTemplate || "");
   const [body, setBody] = React.useState(selectedTemplate?.bodyTemplate || "");
   const [lang, setLang] = React.useState(selectedTemplate?.languageCode || "en");
@@ -66,40 +45,20 @@ export function TemplateManager(): React.JSX.Element {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedTemplate) return;
     
     setIsSaving(true);
     setSaveSuccess(false);
     setSaveError(false);
 
-    // Simulate saving latency
-    setTimeout(() => {
-      try {
-        setTemplates(prev => prev.map(t => {
-          if (t.id === selectedTemplate.id) {
-            return {
-              ...t,
-              subjectTemplate: subject,
-              bodyTemplate: body,
-              languageCode: lang,
-              version: version
-            };
-          }
-          return t;
-        }));
-
-        setSaveSuccess(true);
-        toast.success("Profile updated successfully.", { 
-          description: `Saved as version ${version} translation for language code: ${lang.toUpperCase()}`
-        });
-      } catch (err) {
-        setSaveError(true);
-        toast.error("Unable to save changes. Please try again.");
-      } finally {
-        setIsSaving(false);
-      }
-    }, 800);
+    try {
+      // TODO: Implement actual database save
+      setSaveError(true);
+      toast.error("Database integration required for saving templates.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

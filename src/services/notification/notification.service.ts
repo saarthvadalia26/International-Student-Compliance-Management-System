@@ -41,18 +41,7 @@ export class NotificationQueueService implements INotificationService {
   ) {}
 
   async enqueueNotification(notification: Omit<QueueNotification, "id" | "status" | "retryCount">): Promise<string> {
-    const mockId = `notif_${Math.random().toString(36).substring(7)}`;
-    
-    await this.loggingService.log({
-      action: "INSERT",
-      eventName: "ReminderScheduled",
-      tableName: "notifications",
-      rowId: mockId,
-      changes: notification
-    });
-
-    console.log(`[NOTIF_QUEUE] Enqueued notification ${mockId} for student ${notification.studentId}`);
-    return mockId;
+    throw new Error("Supabase Notification Queue table integration not implemented for production yet.");
   }
 
   async processQueue(): Promise<{ processedCount: number; failedCount: number }> {

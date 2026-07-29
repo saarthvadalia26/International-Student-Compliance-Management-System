@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export interface MockVersion {
+export interface DocumentVersion {
   id: string;
   versionNumber: number;
   isActive: boolean;
@@ -24,12 +24,12 @@ export interface MockVersion {
 }
 
 interface ComplianceDocumentTableProps {
-  versions: MockVersion[];
-  onDownloadClick?: (version: MockVersion) => void;
+  versions: DocumentVersion[];
+  onDownloadClick?: (version: DocumentVersion) => void;
 }
 
 export function ComplianceDocumentTable({ versions, onDownloadClick }: ComplianceDocumentTableProps): React.JSX.Element {
-  const getVerificationBadge = (status: MockVersion["verificationStatus"]) => {
+  const getVerificationBadge = (status: DocumentVersion["verificationStatus"]) => {
     switch (status) {
       case "verified":
         return <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium">Verified</Badge>;
@@ -44,7 +44,7 @@ export function ComplianceDocumentTable({ versions, onDownloadClick }: Complianc
   if (versions.length === 0) {
     return (
       <div className="py-8 text-center text-xs text-muted-foreground font-caption">
-        No previous document history versions registered.
+        No document versions are available.
       </div>
     );
   }
@@ -94,9 +94,9 @@ export function ComplianceDocumentTable({ versions, onDownloadClick }: Complianc
   );
 }
 
-export function ComplianceDocumentTimeline({ versions }: { versions: MockVersion[] }): React.JSX.Element {
+export function ComplianceDocumentTimeline({ versions }: { versions: DocumentVersion[] }): React.JSX.Element {
   if (versions.length === 0) {
-    return <div className="text-center text-xs text-muted-foreground py-4">Timeline is empty.</div>;
+    return <div className="text-center text-xs text-muted-foreground py-4">This student has not uploaded any document versions yet.</div>;
   }
 
   return (

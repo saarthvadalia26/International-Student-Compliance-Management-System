@@ -106,23 +106,13 @@ export default function StudentRegistrationPage() {
     setSubmittingSuccess(false);
     setSubmittingError(false);
 
-    // Mock insertion delay
-    setTimeout(() => {
-      try {
-        setIsSubmitting(false);
-        setSubmittingSuccess(true);
-        toast.success("Profile updated successfully.", {
-          description: `${formData.fullName} has been registered successfully.`,
-        });
-        setTimeout(() => {
-          router.push("/students");
-        }, 1500);
-      } catch (err) {
-        setIsSubmitting(false);
-        setSubmittingError(true);
-        toast.error("Unable to save changes. Please try again.");
-      }
-    }, 1500);
+    try {
+      // TODO: Implement actual database insert
+      setSubmittingError(true);
+      toast.error("Database integration required to register student.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

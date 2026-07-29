@@ -11,7 +11,6 @@ import {
   Trash2,
   AlertCircle
 } from "lucide-react";
-import { mockStudents, MockStudent } from "@/lib/mock-data";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,16 +34,32 @@ import {
   DropdownMenuSeparator 
 } from "@/components/ui/dropdown-menu";
 
+export interface Student {
+  id: string;
+  fullName: string;
+  registrationNumber: string;
+  nationalityCode: string;
+  nationalityName: string;
+  programName: string;
+  school: string;
+  passport: { number: string };
+  visa: { number: string };
+  email: string;
+  complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
+  academicStatus: "good_standing" | "probation" | "suspended";
+}
+
 export default function StudentListPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [complianceFilter, setComplianceFilter] = React.useState<string>("all");
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
+  const [students, setStudents] = React.useState<Student[]>([]);
 
   // Filter logic
   const filteredStudents = React.useMemo(() => {
-    return mockStudents.filter((student) => {
+    return students.filter((student) => {
       // 1. Search Query
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch = 
@@ -70,7 +85,7 @@ export default function StudentListPage() {
 
       return matchesSearch && matchesCompliance && matchesAcademic;
     });
-  }, [searchQuery, complianceFilter, academicFilter]);
+  }, [students, searchQuery, complianceFilter, academicFilter]);
 
   // Reset all filters
   const resetFilters = () => {
@@ -88,7 +103,7 @@ export default function StudentListPage() {
     return filteredStudents.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredStudents, currentPage]);
 
-  const getComplianceBadge = (status: MockStudent["complianceStatus"]) => {
+  const getComplianceBadge = (status: Student["complianceStatus"]) => {
     switch (status) {
       case "compliant":
         return <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium">Compliant</Badge>;
@@ -103,7 +118,7 @@ export default function StudentListPage() {
     }
   };
 
-  const getAcademicStatusBadge = (status: MockStudent["academicStatus"]) => {
+  const getAcademicStatusBadge = (status: Student["academicStatus"]) => {
     switch (status) {
       case "good_standing":
         return <Badge variant="outline" className="border-slate-200 text-slate-700 dark:border-zinc-800 dark:text-zinc-300 font-normal">Good Standing</Badge>;

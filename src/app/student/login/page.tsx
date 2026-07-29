@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { toast } from "sonner";
+import { TurnstileStub } from "@/components/ui/turnstile-stub";
 
 import { Branding } from "@/config/branding";
 
@@ -16,6 +17,7 @@ export default function StudentLoginPage() {
   const supabase = getBrowserSupabase();
   
   const [email, setEmail] = React.useState("");
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
@@ -31,18 +33,18 @@ export default function StudentLoginPage() {
       setError("Please enter a valid student email address.");
       return;
     }
+    
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
 
     setIsLoading(true);
 
     try {
       const loginEmail = email.trim();
 
-      if (process.env.NODE_ENV === "development") {
-        console.log("[AUTH_DEBUG] Initiating student magic link flow", { 
-          email: loginEmail.replace(/(?<=^.{2}).*(?=@)/, '***'), 
-          timestamp: new Date().toISOString()
-        });
-      }
+
 
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email: loginEmail,
@@ -127,7 +129,7 @@ export default function StudentLoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="student@nfsu.edu"
+                  placeholder="student@university.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading || isSuccess}
@@ -135,9 +137,16 @@ export default function StudentLoginPage() {
                   className="h-9 text-sm"
                 />
               </div>
+
+              <div className="pt-2 flex justify-center w-full">
+                <TurnstileStub 
+                  onVerify={(token) => setTurnstileToken(token)} 
+                  onError={() => setError("Security check failed. Please refresh the page.")}
+                />
+              </div>
             </CardContent>
 
-            <CardFooter className="flex flex-col gap-3">
+            <CardFooter className="flex flex-col gap-3 pt-6">
               <AsyncActionButton
                 type="submit"
                 className="w-full h-9 text-sm"
@@ -146,7 +155,7 @@ export default function StudentLoginPage() {
                 isError={isError}
                 idleText="Send Magic Link"
                 loadingText="Sending Link..."
-                successText="Changes saved"
+                successText="Link sent successfully"
                 errorText="Try Again"
               />
             </CardFooter>

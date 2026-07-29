@@ -7,7 +7,6 @@ import * as Icons from "lucide-react";
 import { cn } from "@/lib/utils";
 import { desktopNavigation, NavItem } from "@/config/navigation";
 import { Button } from "@/components/ui/button";
-import { mockStudents } from "@/lib/mock-data";
 import { Branding } from "@/config/branding";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -28,7 +27,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, className, ...props }: Si
         studentId = segments[studentIdx + 1];
       }
       if (!studentId) {
-        studentId = mockStudents[0]?.id || "s1";
+        studentId = "1"; // Fallback identifier
       }
       return href.replace(":id", studentId);
     }

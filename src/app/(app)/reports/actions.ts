@@ -7,6 +7,8 @@ import { ReportFilters, ReportPagination } from "@/domain/reports/types";
 import { headers as getHeaders } from "next/headers";
 import { Branding } from "@/config/branding";
 
+import { getServerSupabase } from "@/lib/supabase/server";
+
 const reportRepo = new SupabaseReportRepository();
 const reportService = new ReportingService(reportRepo);
 
@@ -66,9 +68,13 @@ export async function exportReport(
   filters: ReportFilters,
   format: "csv" | "excel"
 ) {
+  const supabase = await getServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  
   const { ip, userAgent } = await getRequestMetadata();
-  const actorId = "c1010101-1010-1010-1010-101010101010"; // System placeholder admin UUID
-  const actorEmail = Branding.supportEmail;
+  const actorId = user.id;
+  const actorEmail = user.email || Branding.supportEmail;
 
   switch (type) {
     case "student":
@@ -92,11 +98,15 @@ export async function unmaskIdentifier(
   studentId: string,
   documentType: "passport" | "visa" | "efrro"
 ): Promise<string> {
+  const serverSupabase = await getServerSupabase();
+  const { data: { user } } = await serverSupabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+  
   const supabase = getAdminSupabase();
   const { ip, userAgent } = await getRequestMetadata();
   
-  const actorId = "c1010101-1010-1010-1010-101010101010";
-  const actorEmail = Branding.supportEmail;
+  const actorId = user.id;
+  const actorEmail = user.email || Branding.supportEmail;
 
   console.log(`[SECURITY] Unmask request for student: ${studentId} document: ${documentType}`);
 

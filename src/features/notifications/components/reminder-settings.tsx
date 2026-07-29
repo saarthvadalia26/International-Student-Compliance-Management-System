@@ -8,7 +8,7 @@ import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
-export interface MockReminderRule {
+export interface ReminderRule {
   id: string;
   documentType: "passport" | "visa" | "efrro";
   alertThresholdDays: number;
@@ -44,14 +44,7 @@ export function CustomSwitch({ checked, onCheckedChange, "aria-label": ariaLabel
 }
 
 export function ReminderSettings(): React.JSX.Element {
-  const [rules, setRules] = React.useState<MockReminderRule[]>([
-    { id: "r1", documentType: "passport", alertThresholdDays: 90, channel: "email", isActive: true },
-    { id: "r2", documentType: "passport", alertThresholdDays: 60, channel: "email", isActive: true },
-    { id: "r3", documentType: "passport", alertThresholdDays: 30, channel: "both", isActive: true },
-    { id: "r4", documentType: "passport", alertThresholdDays: -7, channel: "both", isActive: true }, // Post expiry
-    { id: "r5", documentType: "visa", alertThresholdDays: 60, channel: "email", isActive: true },
-    { id: "r6", documentType: "visa", alertThresholdDays: 30, channel: "both", isActive: true }
-  ]);
+  const [rules, setRules] = React.useState<ReminderRule[]>([]);
 
   const [preferences, setPreferences] = React.useState({
     email: true,
@@ -73,8 +66,8 @@ export function ReminderSettings(): React.JSX.Element {
   };
 
   const handleAddRule = () => {
-    const newRule: MockReminderRule = {
-      id: `r-${Math.random().toString(36).substring(7)}`,
+    const newRule: ReminderRule = {
+      id: `r-${Math.random().toString(36).substring(7)}`, // Note: Temp ID generator until real DB save
       documentType: "passport",
       alertThresholdDays: 30,
       channel: "email",
@@ -89,22 +82,18 @@ export function ReminderSettings(): React.JSX.Element {
     toast.error("Alert threshold removed");
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
     setSaveSuccess(false);
     setSaveError(false);
 
-    setTimeout(() => {
-      try {
-        setSaveSuccess(true);
-        toast.success("Profile updated successfully.", { description: "Global engine triggers re-loaded successfully." });
-      } catch (err) {
-        setSaveError(true);
-        toast.error("Unable to save changes. Please try again.");
-      } finally {
-        setIsSaving(false);
-      }
-    }, 800);
+    try {
+      // TODO: Implement actual database save
+      setSaveError(true);
+      toast.error("Database integration required for saving settings.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

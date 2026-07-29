@@ -5,8 +5,8 @@ export const DocumentUploadSchema = z.object({
   documentNumber: z.string().min(1, "Document number cannot be empty").max(100),
   issueDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Invalid issue date" }),
   expiryDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Invalid expiry date" }),
-  fileSize: z.number().max(2 * 1024 * 1024, "File size exceeds limit of 2MB"),
-  fileType: z.literal("application/pdf", { message: "Only PDF documents are allowed" })
+  fileSize: z.number().max(5 * 1024 * 1024, "File size exceeds limit of 5MB"),
+  fileType: z.enum(["application/pdf", "image/jpeg", "image/png"], { message: "Only PDF, JPG, or PNG documents are allowed" })
 }).refine((data) => {
   const issue = new Date(data.issueDate);
   const expiry = new Date(data.expiryDate);
@@ -31,6 +31,6 @@ export const DocumentVerificationSchema = z.object({
 });
 
 export const DocumentReplacementSchema = z.object({
-  fileSize: z.number().max(2 * 1024 * 1024, "File size exceeds limit of 2MB"),
-  fileType: z.literal("application/pdf", { message: "Only PDF documents are allowed" })
+  fileSize: z.number().max(5 * 1024 * 1024, "File size exceeds limit of 5MB"),
+  fileType: z.enum(["application/pdf", "image/jpeg", "image/png"], { message: "Only PDF, JPG, or PNG documents are allowed" })
 });

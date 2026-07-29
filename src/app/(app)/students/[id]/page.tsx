@@ -18,7 +18,6 @@ import {
   Send,
   Building
 } from "lucide-react";
-import { mockStudents, MockStudent, MockDocument } from "@/lib/mock-data";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,20 +30,64 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
+export interface StudentDocument {
+  number: string;
+  issueDate: string;
+  expiryDate: string;
+  issuePlace?: string;
+  visaType?: string;
+  verificationStatus: "pending" | "verified" | "rejected";
+}
+
+export interface StudentProfile {
+  id: string;
+  fullName: string;
+  email: string;
+  phoneHome: string;
+  phoneLocal?: string;
+  permanentAddress: string;
+  localAddress?: string;
+  currentSemester: number;
+  academicStatus: "good_standing" | "probation" | "suspended";
+  status: "active" | "suspended" | "graduated" | "withdrawn";
+  registrationNumber: string;
+  nationalityCode: string;
+  nationalityName: string;
+  programName: string;
+  programCode: string;
+  school: string;
+  admissionDate: string;
+  expectedGraduation: string;
+  complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
+  daysToPassportExpiry?: number;
+  daysToVisaExpiry?: number;
+  daysToEfrroExpiry?: number;
+  passport: StudentDocument;
+  visa: StudentDocument;
+  efrro?: StudentDocument;
+  emergencyContact: {
+    name: string;
+    relationship: string;
+    phone: string;
+    email?: string;
+  };
+  embassy: {
+    name: string;
+    phone?: string;
+    address: string;
+  };
+}
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
 export default function StudentDetailsPage({ params }: PageProps) {
-  // Unwrap promise params using React.use
   const resolvedParams = React.use(params);
   const studentId = resolvedParams.id;
   
-  // Find student in mock database
-  const initialStudent = mockStudents.find(s => s.id === studentId);
-
-  // Use local state to make the profile interactive for the staff member
-  const [student, setStudent] = React.useState<MockStudent | undefined>(initialStudent);
+  // Real implementation would fetch this from Supabase based on studentId
+  const [student, setStudent] = React.useState<StudentProfile | undefined>(undefined);
   const [activeSubTab, setActiveSubTab] = React.useState<"immigration" | "academic" | "contact">("immigration");
 
   // Edit Profile States
@@ -58,8 +101,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
     permanentAddress: "",
     localAddress: "",
     currentSemester: 1,
-    academicStatus: "good_standing" as MockStudent["academicStatus"],
-    status: "active" as MockStudent["status"]
+    academicStatus: "good_standing" as StudentProfile["academicStatus"],
+    status: "active" as StudentProfile["status"]
   });
 
   const openEditDialog = () => {
@@ -106,17 +149,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setSendAlertSuccess(false);
     setSendAlertError(false);
 
-    setTimeout(() => {
-      try {
-        setSendAlertSuccess(true);
-        toast.success("Profile updated successfully.", { description: "Email and WhatsApp warning alerts dispatched to student." });
-      } catch (err) {
-        setSendAlertError(true);
-        toast.error("Unable to save changes. Please try again.");
-      } finally {
-        setIsSendingAlert(false);
-      }
-    }, 800);
+    try {
+      // TODO: Implement actual database trigger for alerts
+      setSendAlertError(true);
+      toast.error("Database integration required for dispatching alerts.");
+    } finally {
+      setIsSendingAlert(false);
+    }
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -130,39 +169,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setSaveSuccess(false);
     setSaveError(false);
 
-    // Mock API saving latency
-    setTimeout(() => {
-      try {
-        setStudent(prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            fullName: editForm.fullName,
-            email: editForm.email,
-            phoneHome: editForm.phoneHome,
-            phoneLocal: editForm.phoneLocal,
-            permanentAddress: editForm.permanentAddress,
-            localAddress: editForm.localAddress,
-            currentSemester: Number(editForm.currentSemester),
-            academicStatus: editForm.academicStatus,
-            status: editForm.status
-          };
-        });
-        setIsDirty(false);
-        setSaveSuccess(true);
-        
-        setTimeout(() => {
-          setIsEditDialogOpen(false);
-        }, 800);
-
-        toast.success("Profile updated successfully.", { description: "Student coordinates and profile saved successfully." });
-      } catch (err) {
-        setSaveError(true);
-        toast.error("Unable to save changes. Please try again.");
-      } finally {
-        setIsSaving(false);
-      }
-    }, 800);
+    try {
+      // TODO: Implement actual database save
+      setSaveError(true);
+      toast.error("Database integration required for saving student profile.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCloseDialog = (open: boolean) => {
@@ -195,10 +208,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
   // Update compliance snapshot on-the-fly based on document states
   const recalculateCompliance = (
-    passport: MockDocument, 
-    visa: MockDocument, 
-    efrro?: MockDocument
-  ): MockStudent["complianceStatus"] => {
+    passport: StudentDocument, 
+    visa: StudentDocument, 
+    efrro?: StudentDocument
+  ): StudentProfile["complianceStatus"] => {
     // 1. Check if expired or rejected
     const isPassportExpired = student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry < 0;
     const isVisaExpired = student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry < 0;
@@ -267,7 +280,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     });
   };
 
-  const getComplianceHeaderBadge = (status: MockStudent["complianceStatus"]) => {
+  const getComplianceHeaderBadge = (status: StudentProfile["complianceStatus"]) => {
     switch (status) {
       case "compliant":
         return <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-semibold px-3 py-1 text-sm h-7 rounded-md">Compliant</Badge>;
@@ -280,7 +293,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     }
   };
 
-  const getDocStatusIcon = (doc: MockDocument | undefined, daysLeft?: number) => {
+  const getDocStatusIcon = (doc: StudentDocument | undefined, daysLeft?: number) => {
     if (!doc) return <XCircle className="h-5 w-5 text-muted-foreground" />;
     
     const isExpired = daysLeft !== undefined && daysLeft < 0;

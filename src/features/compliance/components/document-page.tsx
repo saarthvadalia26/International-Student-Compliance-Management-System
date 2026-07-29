@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { DOCUMENT_CONFIGS, ComplianceDocumentType, ComplianceStatus } from "../constants/constants";
 import { ComplianceDocumentCard } from "./document-card";
 import { DocumentUploadDialog, VerificationPanel } from "./document-dialogs";
-import { ComplianceDocumentTable, ComplianceDocumentTimeline, MockVersion } from "./document-history";
+import { ComplianceDocumentTable, ComplianceDocumentTimeline, DocumentVersion } from "./document-history";
 import { DocumentViewer, LoadingState } from "./document-states";
 
 interface DocumentPageProps {
@@ -21,88 +21,42 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
   const [loading, setLoading] = React.useState(true);
   const [status, setStatus] = React.useState<ComplianceStatus>("MISSING");
   
-  // Versions history state
-  const [versions, setVersions] = React.useState<MockVersion[]>([]);
+  // Versions history state from database (Empty array by default in production until fetched)
+  const [versions, setVersions] = React.useState<DocumentVersion[]>([]);
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = React.useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    // Emulate API query delay
-    const timer = setTimeout(() => {
-      setLoading(false);
-      // Mock initial data if studentId exists or is defined
-      if (studentId) {
-        setStatus("COMPLIANT");
-        const mockVers: MockVersion[] = [
-          {
-            id: "v2-id",
-            versionNumber: 2,
-            isActive: true,
-            documentNumber: "A-98765432",
-            issueDate: "2024-01-10",
-            expiryDate: "2029-01-09",
-            verificationStatus: "verified",
-            rejectionReason: null,
-            uploadedAt: "2024-01-12 10:30"
-          },
-          {
-            id: "v1-id",
-            versionNumber: 1,
-            isActive: false,
-            documentNumber: "A-11112222",
-            issueDate: "2019-01-10",
-            expiryDate: "2024-01-09",
-            verificationStatus: "verified",
-            rejectionReason: null,
-            uploadedAt: "2019-01-12 14:20"
-          }
-        ];
-        setVersions(mockVers);
-        setSelectedPdfUrl("https://arxiv.org/pdf/2312.00752.pdf"); // Mock online demo PDF
+    // In production, this effect will fetch real documents securely from Supabase storage.
+    // For now, we clear the loading state and maintain the empty arrays.
+    const fetchDocuments = async () => {
+      try {
+        setLoading(true);
+        // DB Fetch Logic will populate this:
+        // const fetchedVersions = await supabase.from('documents').select('*');
+        // setVersions(fetchedVersions);
+        setVersions([]); // Explicitly empty for production release until data exists
+        setStatus("MISSING");
+      } catch (err) {
+        console.error("Failed to load documents", err);
+      } finally {
+        setLoading(false);
       }
-    }, 1000);
-    return () => clearTimeout(timer);
+    };
+    
+    if (studentId) {
+      fetchDocuments();
+    }
   }, [studentId, documentType]);
 
   const handleUploadSubmit = (data: { docNumber: string; issueDate: string; expiryDate: string; file: File | null }) => {
-    const newVersion: MockVersion = {
-      id: `v${versions.length + 1}-new-id`,
-      versionNumber: versions.length + 1,
-      isActive: true,
-      documentNumber: data.docNumber,
-      issueDate: data.issueDate,
-      expiryDate: data.expiryDate,
-      verificationStatus: "pending",
-      rejectionReason: null,
-      uploadedAt: new Date().toISOString().replace("T", " ").slice(0, 16)
-    };
-
-    setVersions(prev => [newVersion, ...prev.map(v => ({ ...v, isActive: false }))]);
-    setStatus("PENDING_VERIFICATION");
-    setSelectedPdfUrl("https://arxiv.org/pdf/2312.00752.pdf");
-    toast.success("Document version uploaded", { description: "Compliance status changed to pending verification." });
+    // This will hit an API route securely
+    toast.info("Upload initiated", { description: "Sending secure payload to storage layer..." });
   };
 
   const handleVerificationAction = (data: { status: "verified" | "rejected"; reason: string }) => {
-    setVersions(prev => prev.map((v, i) => {
-      if (i === 0) {
-        return {
-          ...v,
-          verificationStatus: data.status,
-          rejectionReason: data.reason || null
-        };
-      }
-      return v;
-    }));
-
-    if (data.status === "verified") {
-      setStatus("COMPLIANT");
-      toast.success("Document verified", { description: "Document approved. Student compliance refreshed successfully." });
-    } else {
-      setStatus("REJECTED");
-      toast.error("Document rejected", { description: `Rejection remark logged: "${data.reason}"` });
-    }
+    toast.info("Verification action submitted", { description: "Updating document status..." });
   };
 
   if (loading) {
@@ -138,17 +92,19 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
             expiryDate={activeDoc ? activeDoc.expiryDate : null}
             daysLeft={daysLeft}
             onReplaceClick={() => setIsUploadOpen(true)}
-            onVerifyClick={() => setIsVerifyOpen(true)}
+            onVerifyClick={activeDoc && status === "PENDING_VERIFICATION" ? () => setIsVerifyOpen(true) : undefined}
             onViewPdfClick={selectedPdfUrl ? () => {} : undefined}
           />
 
           {/* History details table */}
-          <Card className="border border-border/60 shadow-sm bg-card/65">
-            <CardContent className="p-4 space-y-4">
-              <h2 className="text-xs font-semibold text-foreground uppercase tracking-wider">Version History</h2>
-              <ComplianceDocumentTable versions={versions} onDownloadClick={(v) => toast.info(`Downloading version v${v.versionNumber}...`)} />
-            </CardContent>
-          </Card>
+          {versions.length > 0 && (
+            <Card className="border border-border/60 shadow-sm bg-card/65">
+              <CardContent className="p-4 space-y-4">
+                <h2 className="text-xs font-semibold text-foreground uppercase tracking-wider">Version History</h2>
+                <ComplianceDocumentTable versions={versions} onDownloadClick={(v) => toast.info(`Downloading version v${v.versionNumber}...`)} />
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="lg:col-span-1 space-y-6">

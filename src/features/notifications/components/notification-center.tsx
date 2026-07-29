@@ -16,7 +16,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { STATUS_CONFIGS, DeliveryStatus } from "../constants/constants";
 
-export interface MockNotificationItem {
+export interface NotificationItem {
   id: string;
   recipient: string;
   documentType: "passport" | "visa" | "efrro";
@@ -83,11 +83,11 @@ export function NotificationHealthMetrics(): React.JSX.Element {
 }
 
 interface NotificationTableProps {
-  items: MockNotificationItem[];
+  items: NotificationItem[];
 }
 
 export function NotificationQueueTable({ items }: NotificationTableProps): React.JSX.Element {
-  const [selectedItem, setSelectedItem] = React.useState<MockNotificationItem | null>(null);
+  const [selectedItem, setSelectedItem] = React.useState<NotificationItem | null>(null);
 
   const getStatusBadge = (status: DeliveryStatus) => {
     const config = STATUS_CONFIGS[status] || STATUS_CONFIGS.queued;
@@ -173,7 +173,7 @@ export function NotificationQueueTable({ items }: NotificationTableProps): React
               <div>
                 <span className="text-muted-foreground block font-caption">Gateway Response payload</span>
                 <pre className="mt-1.5 p-3 rounded bg-muted/60 text-muted-foreground font-mono text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto border border-border/30">
-                  {JSON.stringify(selectedItem.gatewayResponse || { status: "200", message: "Mock transaction success details." }, null, 2)}
+                  {JSON.stringify(selectedItem.gatewayResponse || { status: "N/A", message: "No gateway response recorded." }, null, 2)}
                 </pre>
               </div>
             </div>

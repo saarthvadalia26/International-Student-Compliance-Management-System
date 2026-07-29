@@ -154,7 +154,8 @@ export class VersionHistoryService {
 export class VerificationService {
   constructor(
     private repository: IComplianceDocumentRepository,
-    private snapshotService: SnapshotService
+    private snapshotService: SnapshotService,
+    private notificationEngine?: any // Dependency injected loosely for now
   ) {}
 
   async verifyDocument(id: string, type: ComplianceDocumentType, status: "verified" | "rejected", actorId: string | null, reason?: string, notes?: string): Promise<ComplianceDocument> {
@@ -175,9 +176,23 @@ export class VerificationService {
 
     // Recompute cached snapshot score
     await this.snapshotService.refreshSnapshot(updated.studentId);
+
+    // Dispatch notification
+    if (this.notificationEngine) {
+      await (this.notificationEngine as { dispatchVerificationEvent: Function }).dispatchVerificationEvent(
+        updated.studentId,
+        type,
+        status,
+        reason
+      ).catch((err: unknown) => console.error("[VERIFICATION_SERVICE_ERROR] Notification dispatch failed:", err));
+    }
+
     return updated;
   }
 }
+
+import { FileSignatureValidator } from "../validators/magic-number.validator";
+import { StubAntivirusScanner } from "./antivirus.service";
 
 export class ComplianceDocumentService {
   constructor(
@@ -198,21 +213,36 @@ export class ComplianceDocumentService {
   ): Promise<ComplianceDocument> {
     console.log(`[DOCUMENT_SERVICE] Received upload request for student ${studentId} type: ${type}`);
 
-    // 1. Run Zod Validation checks
+    // 1. Run Zod Validation checks (File Size, Extension)
+    const fileType = fileName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 
+                     fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+
     const parse = DocumentUploadSchema.safeParse({
       studentId,
       documentNumber: docNumber,
       issueDate: issueDate.toISOString().split("T")[0],
       expiryDate: expiryDate.toISOString().split("T")[0],
       fileSize: fileBuffer.length,
-      fileType: "application/pdf"
+      fileType
     });
 
     if (!parse.success) {
       throw new ValidationFailedError(`Validation error: ${parse.error.issues[0]?.message || "Invalid payload"}`);
     }
 
-    // 2. Fetch current active document version to resolve sequence
+    // 2. Validate Magic Number Signature
+    if (!FileSignatureValidator.isValidSignature(fileBuffer, fileType as 'application/pdf' | 'image/jpeg' | 'image/png')) {
+      throw new ValidationFailedError("File signature mismatch. The file content does not match its extension.");
+    }
+
+    // 3. Antivirus Scan
+    const avScanner = new StubAntivirusScanner();
+    const isSafe = await avScanner.scanBuffer(fileBuffer, fileName);
+    if (!isSafe) {
+      throw new ValidationFailedError("Security violation: Malware detected in uploaded document.");
+    }
+
+    // 4. Fetch current active document version to resolve sequence
     const currentActive = await this.repository.getActiveDocument(studentId, type);
     const nextVersion = currentActive ? currentActive.versionNumber + 1 : 1;
 

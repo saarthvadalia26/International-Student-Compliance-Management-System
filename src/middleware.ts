@@ -93,6 +93,25 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Inject Security Headers
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  
+  // CSP for production (allows Supabase, Turnstile, and essential assets)
+  const csp = `
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: blob: https://*.supabase.co;
+    font-src 'self' data:;
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+    frame-src 'self' https://challenges.cloudflare.com;
+  `.replace(/\s{2,}/g, ' ').trim();
+  
+  response.headers.set("Content-Security-Policy", csp);
+
   return response;
 }
 

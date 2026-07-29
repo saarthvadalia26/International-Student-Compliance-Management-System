@@ -16,13 +16,12 @@ export interface IWhatsAppService {
   verifyProviderStatus(): Promise<boolean>;
 }
 
-export class MockWhatsAppService implements IWhatsAppService {
+export class WhatsAppService implements IWhatsAppService {
   async sendWhatsApp(message: WhatsAppMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    console.log(`[WHATSAPP_SERVICE] Dispatched WhatsApp to: ${message.recipientPhone}. Template: ${message.templateName}`);
-    return { success: true, messageId: `wa_msg_${Math.random().toString(36).substring(7)}` };
+    throw new Error("WhatsApp provider integration not implemented for production yet.");
   }
 
   async verifyProviderStatus(): Promise<boolean> {
-    return true;
+    throw new Error("WhatsApp provider integration not implemented for production yet.");
   }
 }

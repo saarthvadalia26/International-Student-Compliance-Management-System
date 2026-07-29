@@ -217,7 +217,7 @@ export class QueueProcessor {
             notificationId: alert.id,
             attemptNumber: alert.retryCount + 1,
             status: "sent",
-            gatewayResponse: (result.rawResponse as Record<string, unknown>) || { gateway_id: result.gatewayId || "mock-gate-id" },
+            gatewayResponse: (result.rawResponse as Record<string, unknown>) || { gateway_id: result.gatewayId || "unknown-gateway-id" },
             errorMessage: null,
             latencyMs,
             providerName: activeProvider?.name || "unknown",
@@ -258,5 +258,80 @@ export class QueueProcessor {
     }
 
     return { processed, failures };
+  }
+}
+
+export class NotificationEngine {
+  constructor(private repository: INotificationRepository) {}
+
+  async dispatchVerificationEvent(
+    studentId: string, 
+    documentType: "passport" | "visa" | "efrro", 
+    status: "verified" | "rejected", 
+    reason?: string
+  ): Promise<void> {
+    console.log(`[NOTIFICATION_ENGINE] Dispatching ${status} event for ${documentType} (student: ${studentId})`);
+    
+    const supabase = getAdminSupabase();
+    
+    // Get student details
+    const { data: studentAccount } = await supabase
+      .from("students")
+      .select("email, phone")
+      .eq("id", studentId)
+      .single();
+      
+    const { data: studentPersonal } = await supabase
+      .from("student_personal")
+      .select("full_name, preferred_language")
+      .eq("student_id", studentId)
+      .single();
+
+    if (!studentAccount || !studentPersonal) {
+      console.error("[NOTIFICATION_ENGINE] Could not load student details for notification dispatch.");
+      return;
+    }
+
+    const templateType = status === "verified" ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED";
+    const prefLang = studentPersonal.preferred_language || "en";
+    
+    let template = await this.repository.getActiveTemplate(templateType, prefLang);
+    if (!template && prefLang !== "en") {
+      template = await this.repository.getActiveTemplate(templateType, "en");
+    }
+
+    if (!template) {
+      console.warn(`[NOTIFICATION_ENGINE] No active template found for ${templateType}. Notifications skipped.`);
+      return;
+    }
+
+    const key = `${studentId}:${documentType}:${status}:${Date.now()}`;
+    const channels = ["email", "whatsapp"];
+
+    for (const channel of channels) {
+      const address = channel === "email" ? studentAccount.email : studentAccount.phone;
+      if (!address) continue;
+
+      try {
+        await this.repository.queueNotification({
+          studentId,
+          templateId: template.id,
+          documentType,
+          status: "queued",
+          channel: channel as "email" | "whatsapp" | "both",
+          recipientAddress: address,
+          triggerSource: "event_handler",
+          idempotencyKey: `${key}:${channel}`,
+          notificationContext: {
+            student_name: studentPersonal.full_name,
+            document_type: documentType,
+            status,
+            rejection_reason: reason || "N/A"
+          }
+        });
+      } catch (e) {
+        console.error(`[NOTIFICATION_ENGINE_ERROR] Failed to queue ${channel} notification:`, e);
+      }
+    }
   }
 }

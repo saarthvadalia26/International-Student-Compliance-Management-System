@@ -9,7 +9,6 @@ import { mobileNavigation, NavItem } from "@/config/navigation";
 import { Dialog, DialogPortal, DialogOverlay, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Button } from "@/components/ui/button";
-import { mockStudents } from "@/lib/mock-data";
 import { Branding } from "@/config/branding";
 
 interface MobileSidebarProps {
@@ -30,7 +29,7 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
         studentId = segments[studentIdx + 1];
       }
       if (!studentId) {
-        studentId = mockStudents[0]?.id || "s1";
+        studentId = "1"; // Fallback identifier
       }
       return href.replace(":id", studentId);
     }

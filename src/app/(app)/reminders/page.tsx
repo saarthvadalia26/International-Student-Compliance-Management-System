@@ -1,49 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { NotificationHealthMetrics, NotificationQueueTable, MockNotificationItem } from "@/features/notifications/components/notification-center";
+import { NotificationHealthMetrics, NotificationQueueTable, NotificationItem } from "@/features/notifications/components/notification-center";
 import { ReminderSettings } from "@/features/notifications/components/reminder-settings";
 import { TemplateManager } from "@/features/notifications/components/template-manager";
 
 export default function RemindersPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = React.useState<"logs" | "rules" | "templates">("logs");
 
-  // Mock data representing standard logs queue
-  const [mockItems] = React.useState<MockNotificationItem[]>([
-    {
-      id: "n1-uuid",
-      recipient: "john.doe@university.edu",
-      documentType: "passport",
-      channel: "email",
-      status: "sent",
-      retryCount: 0,
-      triggerSource: "cron_scheduler",
-      scheduledFor: "2026-07-08 09:00",
-      gatewayResponse: { gateway_id: "resend-msg-8a9d2c", status: "delivered" }
-    },
-    {
-      id: "n2-uuid",
-      recipient: "+919876543210",
-      documentType: "visa",
-      channel: "whatsapp",
-      status: "queued",
-      retryCount: 1,
-      triggerSource: "event_handler",
-      scheduledFor: "2026-07-08 22:45",
-      gatewayResponse: { status: "queued_retry", error: "Carrier temporary throttling" }
-    },
-    {
-      id: "n3-uuid",
-      recipient: "clara.smith@university.edu",
-      documentType: "efrro",
-      channel: "email",
-      status: "failed",
-      retryCount: 3,
-      triggerSource: "cron_scheduler",
-      scheduledFor: "2026-07-07 09:00",
-      gatewayResponse: { error: "SMTP invalid recipient address format ref: RFC-5322" }
-    }
-  ]);
+  // State for standard logs queue (empty until fetched)
+  const [items, setItems] = React.useState<NotificationItem[]>([]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12 text-xs">
@@ -79,7 +45,7 @@ export default function RemindersPage(): React.JSX.Element {
         {activeTab === "logs" && (
           <div className="space-y-6">
             <NotificationHealthMetrics />
-            <NotificationQueueTable items={mockItems} />
+            <NotificationQueueTable items={items} />
           </div>
         )}
 

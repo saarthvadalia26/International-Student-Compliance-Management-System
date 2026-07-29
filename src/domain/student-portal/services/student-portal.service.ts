@@ -223,7 +223,7 @@ export class StudentPortalService {
         .from("student_snapshot")
         .update({
           efrro_status: "PENDING_VERIFICATION",
-          efrro_number: `PENDING_${versionUuid.substring(0, 8).toUpperCase()}`, // temp placeholder until verified
+          efrro_number: null,
           updated_at: new Date().toISOString()
         })
         .eq("student_id", studentId);

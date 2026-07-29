@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { getCountryByCode } from "@/utils/countries";
 
-interface CountryFlagProps {
-  countryCode: string; // ISO Alpha-2 or Alpha-3 code (e.g. "IN", "IND")
+export interface CountryFlagProps {
+  countryCode?: string;
   fallbackEmoji?: string;
   className?: string;
   size?: "sm" | "md" | "lg";
@@ -27,15 +28,8 @@ export function CountryFlag({
     if (!countryCode) return "";
     const clean = countryCode.trim().toLowerCase();
     if (clean.length === 2) return clean;
-    // Map common Alpha-3 to Alpha-2
-    const alpha3To2: Record<string, string> = {
-      ind: "in", usa: "us", gbr: "gb", npl: "np", bgd: "bd", btn: "bt",
-      lka: "lk", afg: "af", deu: "de", fra: "fr", jpn: "jp", chn: "cn",
-      aus: "au", can: "ca", ken: "ke", nga: "ng", zaf: "za", are: "ae",
-      sau: "sa", rus: "ru", bra: "br", ita: "it", esp: "es", kor: "kr",
-      mex: "mx", arg: "ar", egy: "eg", tur: "tr", idn: "id", tha: "th"
-    };
-    return alpha3To2[clean] || clean.substring(0, 2);
+    const country = getCountryByCode(clean);
+    return country ? country.alpha2.toLowerCase() : clean.substring(0, 2);
   }, [countryCode]);
 
   const dimensions = {

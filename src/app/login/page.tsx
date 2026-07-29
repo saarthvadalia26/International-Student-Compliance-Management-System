@@ -11,11 +11,13 @@ import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { toast } from "sonner";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { Branding } from "@/config/branding";
+import { TurnstileStub } from "@/components/ui/turnstile-stub";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
@@ -30,6 +32,11 @@ export default function LoginPage() {
       setError("Please fill in all fields.");
       return;
     }
+    
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
 
     setIsLoading(true);
     setIsSuccess(false);
@@ -39,12 +46,7 @@ export default function LoginPage() {
       const supabase = getBrowserSupabase();
       const loginEmail = email.trim();
       
-      if (process.env.NODE_ENV === "development") {
-        console.log("[AUTH_DEBUG] Initiating login flow", { 
-          email: loginEmail.replace(/(?<=^.{2}).*(?=@)/, '***'), 
-          timestamp: new Date().toISOString()
-        });
-      }
+
 
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: loginEmail,
@@ -126,7 +128,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@nfsu-staff.in"
+                  placeholder="name@university.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
@@ -152,9 +154,16 @@ export default function LoginPage() {
                   className="h-9 text-sm"
                 />
               </div>
+
+              <div className="pt-2 flex justify-center w-full">
+                <TurnstileStub 
+                  onVerify={(token) => setTurnstileToken(token)} 
+                  onError={() => setError("Security check failed. Please refresh the page.")}
+                />
+              </div>
             </CardContent>
 
-            <CardFooter className="flex flex-col gap-3">
+            <CardFooter className="flex flex-col gap-3 pt-6">
               <AsyncActionButton
                 type="submit"
                 className="w-full h-9 text-sm"
@@ -162,13 +171,10 @@ export default function LoginPage() {
                 isSuccess={isSuccess}
                 isError={isError}
                 idleText="Sign In"
-                loadingText="Authenticating..."
-                successText="Changes saved"
+                loadingText="Signing in..."
+                successText="Signed in successfully"
                 errorText="Try Again"
               />
-              <div className="text-[11px] text-center text-muted-foreground bg-muted/30 w-full py-1.5 rounded-md border border-border/50 font-caption">
-                Demo Credentials: <span className="font-semibold text-foreground">admin@nfsu-staff.in</span> / <span className="font-semibold text-foreground">admin</span>
-              </div>
             </CardFooter>
           </form>
         </Card>

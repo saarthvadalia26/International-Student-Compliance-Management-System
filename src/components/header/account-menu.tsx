@@ -92,7 +92,7 @@ export function AccountMenu() {
     setLogoutSuccess(false);
     setLogoutError(false);
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       if (error) {
         throw error;
       }
@@ -208,7 +208,7 @@ export function AccountMenu() {
               isError={logoutError}
               idleText="Sign Out"
               loadingText="Processing..."
-              successText="Changes saved"
+              successText="Signed out"
               errorText="Try Again"
               className="text-xs px-4"
             />
