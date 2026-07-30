@@ -10,6 +10,8 @@ export interface IComplianceDocumentRepository {
   updateVerificationStatus(id: string, type: ComplianceDocumentType, status: string, actorId: string | null, rejectionReason?: string, notes?: string): Promise<ComplianceDocument>;
   getSnapshot(studentId: string): Promise<StudentSnapshot | null>;
   upsertSnapshot(snapshot: StudentSnapshot): Promise<StudentSnapshot>;
+  updateStorageLifecycle(id: string, type: ComplianceDocumentType, status: string, deletionReason?: string, deletedBySystem?: boolean): Promise<void>;
+  logStorageAudit(studentId: string, documentId: string, documentType: ComplianceDocumentType, action: string, operatorSystem: string, correlationId?: string, details?: Record<string, unknown>): Promise<void>;
 }
 
 export class SupabaseComplianceDocumentRepository implements IComplianceDocumentRepository {
@@ -164,5 +166,60 @@ export class SupabaseComplianceDocumentRepository implements IComplianceDocument
     }
 
     return DocumentMapper.toSnapshotDomain(data);
+  }
+
+  async updateStorageLifecycle(id: string, type: ComplianceDocumentType, status: string, deletionReason?: string, deletedBySystem?: boolean): Promise<void> {
+    const supabase = getAdminSupabase();
+    const table = this.getTableName(type);
+
+    console.log(`[DB_REPOSITORY] Updating storage lifecycle for ${type} record ${id} to status: ${status}`);
+    const updatePayload: Record<string, unknown> = {
+      storage_status: status,
+      updated_at: new Date().toISOString()
+    };
+
+    if (status === 'DELETED') {
+      updatePayload.deleted_at = new Date().toISOString();
+    }
+    
+    if (deletionReason !== undefined) {
+      updatePayload.deletion_reason = deletionReason;
+    }
+    
+    if (deletedBySystem !== undefined) {
+      updatePayload.deleted_by_system = deletedBySystem;
+    }
+
+    const { error } = await supabase
+      .from(table)
+      .update(updatePayload)
+      .eq("id", id);
+
+    if (error) {
+      throw new Error(`[DB_UPDATE_FAILED] Failed to update storage lifecycle: ${error.message}`);
+    }
+  }
+
+  async logStorageAudit(studentId: string, documentId: string, documentType: ComplianceDocumentType, action: string, operatorSystem: string, correlationId?: string, details?: Record<string, unknown>): Promise<void> {
+    const supabase = getAdminSupabase();
+    
+    console.log(`[DB_REPOSITORY] Logging storage audit event: ${action} for document ${documentId}`);
+    
+    const { error } = await supabase
+      .from("document_lifecycle_audit_log")
+      .insert({
+        student_id: studentId,
+        document_id: documentId,
+        document_type: documentType,
+        action: action,
+        operator_system: operatorSystem,
+        correlation_id: correlationId || null,
+        details: details || {}
+      });
+
+    if (error) {
+      console.error(`[DB_INSERT_FAILED] Failed to log storage audit: ${error.message}`);
+      // Not throwing error to avoid blocking the main workflow due to logging failure
+    }
   }
 }

@@ -150,6 +150,7 @@ export default function StudentLoginPage() {
               <AsyncActionButton
                 type="submit"
                 className="w-full h-9 text-sm"
+                disabled={!turnstileToken || isLoading}
                 isLoading={isLoading}
                 isSuccess={isSuccess}
                 isError={isError}

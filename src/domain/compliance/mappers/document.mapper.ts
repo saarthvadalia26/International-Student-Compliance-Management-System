@@ -19,6 +19,11 @@ export interface IDocumentDbRow {
   deleted_at: string | null;
   created_by: string | null;
   updated_by: string | null;
+  deletion_reason?: string | null;
+  deleted_by_system?: boolean;
+  storage_provider?: string;
+  storage_object_key?: string | null;
+  storage_status?: "ACTIVE" | "REJECTED_PENDING_DELETE" | "APPROVED_PENDING_RETENTION" | "DELETED";
 }
 
 export interface ISnapshotDbRow {
@@ -60,7 +65,12 @@ export class DocumentMapper {
       updatedAt: new Date(row.updated_at),
       deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
       createdBy: row.created_by,
-      updatedBy: row.updated_by
+      updatedBy: row.updated_by,
+      deletionReason: row.deletion_reason,
+      deletedBySystem: row.deleted_by_system,
+      storageProvider: row.storage_provider,
+      storageObjectKey: row.storage_object_key,
+      storageStatus: row.storage_status
     };
   }
 
@@ -83,7 +93,12 @@ export class DocumentMapper {
       updated_at: doc.updatedAt.toISOString(),
       deleted_at: doc.deletedAt ? doc.deletedAt.toISOString() : null,
       created_by: doc.createdBy,
-      updated_by: doc.updatedBy
+      updated_by: doc.updatedBy,
+      deletion_reason: doc.deletionReason,
+      deleted_by_system: doc.deletedBySystem,
+      storage_provider: doc.storageProvider,
+      storage_object_key: doc.storageObjectKey,
+      storage_status: doc.storageStatus
     };
   }
 

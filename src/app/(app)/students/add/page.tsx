@@ -29,6 +29,7 @@ export default function StudentRegistrationPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submittingSuccess, setSubmittingSuccess] = React.useState(false);
   const [submittingError, setSubmittingError] = React.useState(false);
+  const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({});
 
   // Form State
   const [formData, setFormData] = React.useState({
@@ -90,18 +91,49 @@ export default function StudentRegistrationPage() {
       currentSemester: 1,
       relationshipType: formData.emergencyContactRelation || "parent",
       relationshipName: formData.emergencyContactName,
-      relationshipPhone: formData.emergencyContactPhone
+      relationshipPhone: formData.emergencyContactPhone,
+      passportNumber: formData.passportNumber || undefined,
+      passportExpiry: formData.passportExpiry || undefined,
+      visaNumber: formData.visaNumber || undefined,
+      visaExpiry: formData.visaExpiry || undefined
     };
 
     const result = RegisterStudentValidationSchema.safeParse(validationPayload);
     if (!result.success) {
-      const errorMsg = result.error.issues[0]?.message || "Validation checks failed.";
-      toast.error("Form Validation Failed", {
-        description: errorMsg,
+      const fieldErrors: Record<string, string> = {};
+      let firstErrorField = "";
+      
+      result.error.issues.forEach(issue => {
+        const path = issue.path[0] as string;
+        if (path && !fieldErrors[path]) {
+          fieldErrors[path] = issue.message;
+          if (!firstErrorField) firstErrorField = path;
+        }
+      });
+      
+      setValidationErrors(fieldErrors);
+      
+      if (firstErrorField) {
+        // Focus the first invalid field
+        const el = document.getElementById(firstErrorField);
+        if (el) {
+          // If the element is on a different tab, switch tabs first
+          if (["fullName", "nationality", "gender", "dateOfBirth"].includes(firstErrorField)) setActiveTab("personal");
+          else if (["program", "school", "admissionDate", "expectedGraduation"].includes(firstErrorField)) setActiveTab("academic");
+          else if (["email", "phoneLocal", "phoneHome", "permanentAddress", "localAddress", "emergencyContactName", "emergencyContactRelation", "emergencyContactPhone"].includes(firstErrorField)) setActiveTab("contact");
+          else if (["passportNumber", "passportExpiry", "visaNumber", "visaExpiry"].includes(firstErrorField)) setActiveTab("documents");
+          
+          setTimeout(() => el.focus(), 50);
+        }
+      }
+
+      toast.error("Please correct the highlighted fields.", {
+        description: "Some required information is missing or invalid.",
       });
       return;
     }
 
+    setValidationErrors({});
     setIsSubmitting(true);
     setSubmittingSuccess(false);
     setSubmittingError(false);
@@ -212,8 +244,11 @@ export default function StudentRegistrationPage() {
                       value={formData.fullName}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.fullName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.fullName && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.fullName}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -224,6 +259,9 @@ export default function StudentRegistrationPage() {
                       value={formData.nationality} 
                       onChange={(v) => handleSelectChange("nationality", v)} 
                     />
+                    {validationErrors.nationalityCode && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.nationalityCode}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -240,6 +278,9 @@ export default function StudentRegistrationPage() {
                         <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
+                    {validationErrors.gender && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.gender}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -252,8 +293,11 @@ export default function StudentRegistrationPage() {
                       value={formData.dateOfBirth}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.dateOfBirth ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.dateOfBirth && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.dateOfBirth}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -285,6 +329,9 @@ export default function StudentRegistrationPage() {
                         <SelectItem value="MTECH_VLSI">M.Tech in VLSI Design</SelectItem>
                       </SelectContent>
                     </Select>
+                    {validationErrors.programCode && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.programCode}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -311,8 +358,11 @@ export default function StudentRegistrationPage() {
                       value={formData.admissionDate}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.admissionDate ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.admissionDate && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.admissionDate}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -325,8 +375,11 @@ export default function StudentRegistrationPage() {
                       value={formData.expectedGraduation}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.expectedGraduation ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.expectedGraduation && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.expectedGraduation}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -343,6 +396,23 @@ export default function StudentRegistrationPage() {
                 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">
+                      Home Country Phone Number <span className="text-rose-500">*</span>
+                    </label>
+                    <Input
+                      id="phoneHome"
+                      placeholder="+CountryCode-XXXXX-XXXXX"
+                      value={formData.phoneHome}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className={`h-9 text-sm ${validationErrors.phoneHome ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                    />
+                    {validationErrors.phoneHome && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.phoneHome}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="email">
                       Student Institutional Email <span className="text-rose-500">*</span>
                     </label>
@@ -353,8 +423,11 @@ export default function StudentRegistrationPage() {
                       value={formData.email}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.email ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.email && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.email}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -367,9 +440,50 @@ export default function StudentRegistrationPage() {
                       value={formData.phoneLocal}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.phoneLocal ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.phoneLocal && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.phoneLocal}</p>
+                    )}
                   </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">
+                      Permanent Address (Home Country) <span className="text-rose-500">*</span>
+                    </label>
+                    <Input
+                      id="permanentAddress"
+                      placeholder="Full residential address in home country"
+                      value={formData.permanentAddress}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className={`h-9 text-sm ${validationErrors.permanentAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                    />
+                    {validationErrors.permanentAddress && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.permanentAddress}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="localAddress">
+                      Local Address (India)
+                    </label>
+                    <Input
+                      id="localAddress"
+                      placeholder="Hostel or local residential address"
+                      value={formData.localAddress}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className={`h-9 text-sm ${validationErrors.localAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                    />
+                    {validationErrors.localAddress && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.localAddress}</p>
+                    )}
+                  </div>
+                  
+                  <Separator className="my-2 sm:col-span-2" />
+
+
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactName">
@@ -381,8 +495,11 @@ export default function StudentRegistrationPage() {
                       value={formData.emergencyContactName}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.relationshipName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.relationshipName && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.relationshipName}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -399,6 +516,9 @@ export default function StudentRegistrationPage() {
                         <SelectItem value="local_sponsor">Local Sponsor</SelectItem>
                       </SelectContent>
                     </Select>
+                    {validationErrors.relationshipType && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.relationshipType}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5 sm:col-span-2">
@@ -411,8 +531,11 @@ export default function StudentRegistrationPage() {
                       value={formData.emergencyContactPhone}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.relationshipPhone ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.relationshipPhone && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.relationshipPhone}</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -438,8 +561,11 @@ export default function StudentRegistrationPage() {
                       value={formData.passportNumber}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.passportNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.passportNumber && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.passportNumber}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -452,8 +578,11 @@ export default function StudentRegistrationPage() {
                       value={formData.passportExpiry}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.passportExpiry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.passportExpiry && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.passportExpiry}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -466,8 +595,11 @@ export default function StudentRegistrationPage() {
                       value={formData.visaNumber}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.visaNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.visaNumber && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.visaNumber}</p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -480,8 +612,11 @@ export default function StudentRegistrationPage() {
                       value={formData.visaExpiry}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className={`h-9 text-sm ${validationErrors.visaExpiry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
+                    {validationErrors.visaExpiry && (
+                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.visaExpiry}</p>
+                    )}
                   </div>
                 </div>
 

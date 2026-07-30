@@ -1,6 +1,6 @@
 import { ComplianceDocument, ComplianceDocumentType, StudentSnapshot, ComplianceStatus } from "../types/student-snapshot.types";
 import { IComplianceDocumentRepository } from "../repositories/document.repository";
-import { IStorageService } from "./storage.service";
+import { IStorageProvider } from "../../storage/providers/storage.provider";
 import { DocumentUploadSchema } from "../validators/document.validator";
 import { 
   DocumentNotFoundError, 
@@ -155,7 +155,8 @@ export class VerificationService {
   constructor(
     private repository: IComplianceDocumentRepository,
     private snapshotService: SnapshotService,
-    private notificationEngine?: any // Dependency injected loosely for now
+    private storageProvider: IStorageProvider,
+    private notificationEngine?: unknown
   ) {}
 
   async verifyDocument(id: string, type: ComplianceDocumentType, status: "verified" | "rejected", actorId: string | null, reason?: string, notes?: string): Promise<ComplianceDocument> {
@@ -174,12 +175,27 @@ export class VerificationService {
       notes
     );
 
+    // Storage Lifecycle Hooks
+    if (status === "rejected") {
+      try {
+        await this.storageProvider.delete("student-documents", updated.filePath);
+        await this.repository.updateStorageLifecycle(id, type, "DELETED", reason || "Staff Rejected", false);
+        await this.repository.logStorageAudit(updated.studentId, updated.id, type, "Rejection", actorId || "System", undefined, { reason });
+      } catch (err) {
+        console.error("[STORAGE_LIFECYCLE_ERROR] Failed to physically delete rejected file:", err);
+        await this.repository.updateStorageLifecycle(id, type, "REJECTED_PENDING_DELETE", reason || "Staff Rejected", false);
+      }
+    } else if (status === "verified") {
+      await this.repository.updateStorageLifecycle(id, type, "APPROVED_PENDING_RETENTION");
+      await this.repository.logStorageAudit(updated.studentId, updated.id, type, "Approval", actorId || "System");
+    }
+
     // Recompute cached snapshot score
     await this.snapshotService.refreshSnapshot(updated.studentId);
 
     // Dispatch notification
     if (this.notificationEngine) {
-      await (this.notificationEngine as { dispatchVerificationEvent: Function }).dispatchVerificationEvent(
+      await (this.notificationEngine as { dispatchVerificationEvent: (s: string, t: string, st: string, r?: string) => Promise<void> }).dispatchVerificationEvent(
         updated.studentId,
         type,
         status,
@@ -197,7 +213,7 @@ import { StubAntivirusScanner } from "./antivirus.service";
 export class ComplianceDocumentService {
   constructor(
     private repository: IComplianceDocumentRepository,
-    private storageService: IStorageService,
+    private storageProvider: IStorageProvider,
     private snapshotService: SnapshotService
   ) {}
 
@@ -247,11 +263,11 @@ export class ComplianceDocumentService {
     const nextVersion = currentActive ? currentActive.versionNumber + 1 : 1;
 
     // 3. Upload file to secure isolated storage folder
-    const storagePath = await this.storageService.uploadFile(
-      studentId,
-      type,
+    const storagePath = await this.storageProvider.upload(
+      "student-documents", // Ensure it uploads to the correct bucket
+      `${type}/${studentId}/v${nextVersion}_${fileName}`,
       fileBuffer,
-      `v${nextVersion}_${fileName}`
+      fileType
     );
 
     // 4. Save metadata records in database
@@ -272,11 +288,20 @@ export class ComplianceDocumentService {
       updatedBy: actorId
     }, type);
 
-    // 5. Deactivate old records
-    await this.repository.deactivatePreviousVersions(studentId, type, newDoc.id);
+    // 5. Deactivate old records & handle retention of superseded version
+    if (currentActive) {
+      await this.repository.deactivatePreviousVersions(studentId, type, newDoc.id);
+      
+      const newStatus = currentActive.verificationStatus === "verified" ? "APPROVED_PENDING_RETENTION" : "REJECTED_PENDING_DELETE";
+      await this.repository.updateStorageLifecycle(currentActive.id, type, newStatus, "Superseded by newer version", true);
+      await this.repository.logStorageAudit(studentId, currentActive.id, type, "Retention scheduling", "System", undefined, { reason: "Superseded" });
+    }
 
     // 6. Refresh score snapshot
     await this.snapshotService.refreshSnapshot(studentId);
+
+    // 7. Log Upload Audit
+    await this.repository.logStorageAudit(studentId, newDoc.id, type, "Upload", actorId || "System", undefined, { fileName, fileSize: fileBuffer.length });
 
     return newDoc;
   }

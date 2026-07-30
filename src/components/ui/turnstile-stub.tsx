@@ -10,10 +10,20 @@ export interface TurnstileStubProps {
 
 export function TurnstileStub({ onVerify, onError }: TurnstileStubProps) {
   const [status, setStatus] = React.useState<"verifying" | "success" | "error">("verifying");
+  const [showLoading, setShowLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    let loadingTimer: NodeJS.Timeout;
+    if (status === "verifying") {
+      loadingTimer = setTimeout(() => setShowLoading(true), 500);
+    }
+    return () => clearTimeout(loadingTimer);
+  }, [status]);
 
   React.useEffect(() => {
     // Simulate network delay for verification
     const timer = setTimeout(() => {
+      // In real scenario, failure would trigger onError
       setStatus("success");
       onVerify("mock-turnstile-token-" + Date.now());
     }, 1200);
@@ -21,20 +31,26 @@ export function TurnstileStub({ onVerify, onError }: TurnstileStubProps) {
     return () => clearTimeout(timer);
   }, [onVerify]);
 
-  return (
-    <div className="flex items-center gap-3 p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-md shadow-sm h-[65px] w-full max-w-[300px]">
-      <div className="flex-shrink-0 w-8 flex justify-center">
-        {status === "verifying" && <Loader2 className="h-5 w-5 text-zinc-400 animate-spin" />}
-        {status === "success" && <CheckCircle2 className="h-6 w-6 text-emerald-500" />}
+  if (status === "success") {
+    return null; // Silent background verification
+  }
+
+  if (status === "error") {
+    return (
+      <div className="flex items-center gap-2 text-rose-500 text-sm">
+        <span>Security check failed. Please refresh the page and try again.</span>
       </div>
-      <div className="flex flex-col flex-1">
-        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          {status === "verifying" ? "Verifying..." : "Success!"}
-        </span>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          Security check by Cloudflare
-        </span>
+    );
+  }
+
+  if (status === "verifying" && showLoading) {
+    return (
+      <div className="flex items-center gap-2 text-zinc-500 text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>Verifying security...</span>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }

@@ -2,12 +2,14 @@ import * as crypto from "crypto";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { SupabaseStudentPortalRepository } from "../repositories/student-portal.repository";
 import { SupabaseNotificationRepository } from "@/domain/notifications/repositories/notification.repository";
+import { StorageProviderFactory } from "@/domain/storage/factory";
 import { UploadToken } from "../types";
 import { Branding } from "@/config/branding";
 
 export class StudentPortalService {
   private portalRepo = new SupabaseStudentPortalRepository();
   private notifRepo = new SupabaseNotificationRepository();
+  private storageProvider = StorageProviderFactory.getProvider();
 
   /**
    * Generates a secure, 7-day single-use upload/login token
@@ -173,14 +175,15 @@ export class StudentPortalService {
     const versionUuid = crypto.randomUUID();
     const storagePath = `efrro/${studentId}/${year}/${versionUuid}.pdf`;
 
-    const { error: storageError } = await supabase.storage
-      .from("efrro-documents")
-      .upload(storagePath, fileBuffer, {
-        contentType: "application/pdf",
-        upsert: false
-      });
-
-    if (storageError) {
+    try {
+      await this.storageProvider.upload(
+        "efrro-documents",
+        storagePath,
+        fileBuffer,
+        "application/pdf"
+      );
+    } catch (error: unknown) {
+      const storageError = error as Error;
       console.error("[STORAGE_UPLOAD_ERROR] Storage write failed:", storageError.message);
       throw new Error(`[STORAGE_WRITE_FAILED] ${storageError.message}`);
     }
@@ -264,7 +267,7 @@ export class StudentPortalService {
     } catch (dbErr) {
       // Roll back storage file if database inserts fail (Manual rollback)
       console.error("[PORTAL_UPLOAD_ROLLBACK] Database write failed. Rolling back storage file path:", storagePath);
-      await supabase.storage.from("efrro-documents").remove([storagePath]);
+      await this.storageProvider.delete("efrro-documents", storagePath);
       throw dbErr;
     }
   }

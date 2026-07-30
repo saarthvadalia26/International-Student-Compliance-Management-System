@@ -20,6 +20,13 @@ export interface ComplianceDocument {
   deletedAt: Date | null;
   createdBy: string | null;
   updatedBy: string | null;
+  
+  // Storage Lifecycle
+  deletionReason?: string | null;
+  deletedBySystem?: boolean;
+  storageProvider?: string;
+  storageObjectKey?: string | null;
+  storageStatus?: "ACTIVE" | "REJECTED_PENDING_DELETE" | "APPROVED_PENDING_RETENTION" | "DELETED";
 }
 
 export interface StudentSnapshot {

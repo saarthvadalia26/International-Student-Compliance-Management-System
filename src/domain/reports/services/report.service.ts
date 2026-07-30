@@ -10,10 +10,10 @@ import {
   PaginatedResult 
 } from "../types";
 import { ExporterService } from "./exporters";
-import { SupabaseStorageService } from "@/domain/compliance/services/storage.service";
+import { StorageProviderFactory } from "@/domain/storage/factory";
 
 export class ReportingService {
-  private storageService = new SupabaseStorageService();
+  private storageProvider = StorageProviderFactory.getProvider();
 
   constructor(private repository: IReportRepository) {}
 
@@ -101,7 +101,7 @@ export class ReportingService {
    * Generates a short-lived (5-minute) signed URL to download private documents.
    */
   async generateSignedUrl(filePath: string): Promise<string> {
-    return this.storageService.generateSignedUrl(filePath, 300);
+    return this.storageProvider.generateSignedUrl("student-documents", filePath, 300);
   }
 
   /**
