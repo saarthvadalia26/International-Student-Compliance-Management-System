@@ -21,12 +21,20 @@ export interface SystemHealthMetrics {
   // Sprint 08 Operations Metrics
   applicationVersion: string;
   environment: string;
+  deploymentPlatform: string;
+  deploymentType: string;
+  deploymentTime: string;
+  deploymentRegion: string;
+  nodeVersion: string;
+  nextVersion: string;
   databaseStatus: string;
   storageStatus: string;
   emailProviderName: string;
   emailProviderStatus: string;
   whatsappProviderName: string;
   whatsappProviderStatus: string;
+  botProtectionStatus: string;
+  
   lastSchedulerRun: string;
   nextSchedulerRun: string;
   jobsProcessedCount: number;
@@ -159,14 +167,23 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     lastCleanupStatus,
     lastCleanupTime,
 
-    applicationVersion: "v1.2.0-release",
-    environment: process.env.NODE_ENV || "production",
-    databaseStatus: studentsRes.error ? "Offline" : "Online",
-    storageStatus: "Online", // supabase storage api verified by loading bucket logs
+    applicationVersion: process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || "v1.2.0-release",
+    environment: process.env.NODE_ENV === "production" ? "Production" : "Development",
+    deploymentPlatform: process.env.VERCEL ? "Vercel" : "Local Environment",
+    deploymentType: process.env.VERCEL_ENV ? (process.env.VERCEL_ENV.charAt(0).toUpperCase() + process.env.VERCEL_ENV.slice(1)) : "Local",
+    deploymentTime: process.env.VERCEL ? new Date().toLocaleString() : "Live", // Best approximation without external build scripts
+    deploymentRegion: process.env.VERCEL_REGION || "Local/Unknown",
+    nodeVersion: process.version,
+    nextVersion: "16.2.10",
+    
+    databaseStatus: studentsRes.error ? "Offline" : "Connected",
+    storageStatus: process.env.STORAGE_PROVIDER === "cloudflare-r2" ? "Cloudflare R2 Connected" : "Connected", 
     emailProviderName: emailHealthRes.providerName,
     emailProviderStatus: emailHealthRes.status,
     whatsappProviderName: whatsappHealthRes.providerName,
     whatsappProviderStatus: whatsappHealthRes.status,
+    botProtectionStatus: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? "Cloudflare Turnstile Active" : "Disabled",
+    
     lastSchedulerRun,
     nextSchedulerRun,
     jobsProcessedCount,

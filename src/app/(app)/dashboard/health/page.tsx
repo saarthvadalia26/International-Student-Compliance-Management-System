@@ -130,33 +130,73 @@ export default async function SystemHealthDashboardPage() {
               System Infrastructure & Environment
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6 space-y-4">
+          <CardContent className="p-6 space-y-2">
             
-            <div className="flex items-center justify-between py-2 border-b border-border/20">
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Environment</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary font-mono">{metrics.environment}</span>
+            </div>
+            
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Deployment Platform</span>
+              <span className="text-xs font-semibold text-foreground">{metrics.deploymentPlatform}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Deployment Type</span>
+              <span className="text-xs font-semibold text-foreground">{metrics.deploymentType}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
               <span className="text-xs text-muted-foreground font-medium">Application Version</span>
               <span className="text-xs font-semibold font-mono text-foreground">{metrics.applicationVersion}</span>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b border-border/20">
-              <span className="text-xs text-muted-foreground font-medium">Environment Mode</span>
-              <span className="text-xs font-semibold uppercase tracking-wider text-primary font-mono">{metrics.environment}</span>
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Deployment Time</span>
+              <span className="text-xs font-semibold font-mono text-foreground">{metrics.deploymentTime}</span>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b border-border/20">
-              <span className="text-xs text-muted-foreground font-medium">Database Status</span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${metrics.databaseStatus === "Online" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Region</span>
+              <span className="text-xs font-semibold text-foreground">{metrics.deploymentRegion}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Node.js Version</span>
+              <span className="text-xs font-semibold font-mono text-foreground">{metrics.nodeVersion}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Next.js Version</span>
+              <span className="text-xs font-semibold font-mono text-foreground">{metrics.nextVersion}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Database</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${metrics.databaseStatus === "Connected" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
                 {metrics.databaseStatus}
               </span>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b border-border/20">
-              <span className="text-xs text-muted-foreground font-medium">Storage Status</span>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${metrics.storageStatus === "Online" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Storage</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${metrics.storageStatus === "Cloudflare R2 Connected" ? "bg-emerald-500/10 text-emerald-600" : metrics.storageStatus === "Connected" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
                 {metrics.storageStatus}
               </span>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b border-border/20">
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
+              <span className="text-xs text-muted-foreground font-medium">Notification Provider</span>
+              <div className="text-right">
+                <span className="text-xs font-semibold text-foreground font-mono">{metrics.whatsappProviderName}</span>
+                <span className={`text-[10px] ml-2 font-bold px-1.5 py-0.5 rounded ${metrics.whatsappProviderStatus === "healthy" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                  {metrics.whatsappProviderStatus}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5 border-b border-border/20">
               <span className="text-xs text-muted-foreground font-medium">Email Provider</span>
               <div className="text-right">
                 <span className="text-xs font-semibold text-foreground font-mono">{metrics.emailProviderName}</span>
@@ -166,14 +206,11 @@ export default async function SystemHealthDashboardPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between py-2 last:border-b-0">
-              <span className="text-xs text-muted-foreground font-medium">WhatsApp Provider</span>
-              <div className="text-right">
-                <span className="text-xs font-semibold text-foreground font-mono">{metrics.whatsappProviderName}</span>
-                <span className={`text-[10px] ml-2 font-bold px-1.5 py-0.5 rounded ${metrics.whatsappProviderStatus === "healthy" ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
-                  {metrics.whatsappProviderStatus}
-                </span>
-              </div>
+            <div className="flex items-center justify-between py-1.5 last:border-b-0">
+              <span className="text-xs text-muted-foreground font-medium">Bot Protection</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${metrics.botProtectionStatus === "Cloudflare Turnstile Active" ? "bg-emerald-500/10 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
+                {metrics.botProtectionStatus}
+              </span>
             </div>
 
           </CardContent>
