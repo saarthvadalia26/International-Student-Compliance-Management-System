@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { toast } from "sonner";
 import { DocumentConfig } from "../constants/constants";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface UploadDialogProps {
   config: DocumentConfig;
@@ -104,14 +105,27 @@ export function DocumentUploadDialog({ config, isOpen, onOpenChange, onSubmit }:
             <Input id="docNumber" value={docNumber} onChange={(e) => { setDocNumber(e.target.value); setIsDirty(true); }} className="h-9 text-sm" placeholder="e.g. A-12345678" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 w-full">
+            <div className="flex-1 space-y-1.5">
               <label className="text-xs font-medium text-foreground" htmlFor="issueDate">Issue Date</label>
-              <Input id="issueDate" type="date" value={issueDate} onChange={(e) => { setIssueDate(e.target.value); setIsDirty(true); }} className="h-9 text-sm" />
+              <DatePicker 
+                id="issueDate" 
+                value={issueDate} 
+                onChange={(e) => { setIssueDate(e.target.value); setIsDirty(true); }} 
+              />
             </div>
-            <div className="space-y-1.5">
+            <div className="flex-1 space-y-1.5">
               <label className="text-xs font-medium text-foreground" htmlFor="expiryDate">Expiry Date</label>
-              <Input id="expiryDate" type="date" value={expiryDate} onChange={(e) => { setExpiryDate(e.target.value); setIsDirty(true); }} className="h-9 text-sm" />
+              <DatePicker 
+                id="expiryDate" 
+                value={expiryDate} 
+                onChange={(e) => { setExpiryDate(e.target.value); setIsDirty(true); }} 
+                error={
+                  issueDate && expiryDate && new Date(expiryDate) <= new Date(issueDate) 
+                    ? "Expiry date must be after issue date" 
+                    : undefined
+                }
+              />
             </div>
           </div>
 

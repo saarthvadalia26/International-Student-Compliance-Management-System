@@ -244,7 +244,7 @@ export default function StudentRegistrationPage() {
                       value={formData.fullName}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.fullName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={validationErrors.fullName ? "border-rose-500 focus-visible:ring-rose-500" : ""}
                     />
                     {validationErrors.fullName && (
                       <p className="text-[11px] text-rose-500 font-medium">{validationErrors.fullName}</p>
@@ -269,13 +269,14 @@ export default function StudentRegistrationPage() {
                       Gender <span className="text-rose-500">*</span>
                     </label>
                     <Select value={formData.gender} onValueChange={(v) => handleSelectChange("gender", v || "")}>
-                      <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder="Select Gender" />
+                      <SelectTrigger className={validationErrors.gender ? "border-rose-500 focus-visible:ring-rose-500" : ""}>
+                        <SelectValue placeholder="Choose Gender" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="male">Male</SelectItem>
                         <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="transgender">Transgender</SelectItem>
+                        <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
                       </SelectContent>
                     </Select>
                     {validationErrors.gender && (
@@ -293,7 +294,7 @@ export default function StudentRegistrationPage() {
                       value={formData.dateOfBirth}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.dateOfBirth ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={validationErrors.dateOfBirth ? "border-rose-500 focus-visible:ring-rose-500" : ""}
                     />
                     {validationErrors.dateOfBirth && (
                       <p className="text-[11px] text-rose-500 font-medium">{validationErrors.dateOfBirth}</p>

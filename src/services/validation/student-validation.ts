@@ -4,7 +4,7 @@ export const RegisterStudentValidationSchema = z.object({
   registrationNumber: z.string().min(3, "Registration number must contain at least 3 characters").max(50),
   fullName: z.string().min(2, "Full name must be at least 2 characters").max(255),
   nationalityCode: z.string().length(3, "Nationality must be a 3-letter ISO code"),
-  gender: z.enum(["male", "female", "other"], { message: "Gender is required" }),
+  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional(),
   dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
     const date = new Date(dob);
     return date < new Date();
@@ -44,7 +44,7 @@ export const RegisterStudentValidationSchema = z.object({
 export const UpdateStudentValidationSchema = z.object({
   status: z.enum(["active", "suspended", "graduated", "withdrawn"]).optional(),
   fullName: z.string().min(2).max(255).optional(),
-  gender: z.enum(["male", "female", "other"]).optional(),
+  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional(),
   dateOfBirth: z.string().optional(),
   email: z.string().email().max(255).optional(),
   phoneHome: z.string().min(7).max(20).optional(),

@@ -10,7 +10,7 @@ export const StudentSchema = z.object({
 export const StudentPersonalSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters").max(255),
   nationalityCode: z.string().length(3, "Nationality must be a 3-letter ISO code"),
-  gender: z.enum(["male", "female", "other"]),
+  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional(),
   dateOfBirth: z.string().refine((dob) => {
     const date = new Date(dob);
     return date < new Date();

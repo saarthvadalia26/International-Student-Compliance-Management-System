@@ -175,8 +175,8 @@ export function NationalitySelector({
           onKeyDown={handleKeyDown}
           placeholder={selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : placeholder}
           className={cn(
-            "pr-10 h-9 text-xs cursor-text font-sans transition-all",
-            selectedCountry && !isOpen ? "pl-9" : "pl-3"
+            "pr-10 h-10 text-sm cursor-text font-sans transition-all",
+            selectedCountry && !isOpen ? "pl-10" : "pl-3"
           )}
         />
         <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 gap-1 pointer-events-none">

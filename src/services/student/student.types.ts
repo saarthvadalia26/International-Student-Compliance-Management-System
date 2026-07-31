@@ -17,7 +17,7 @@ export interface StudentPersonal {
   studentId: string;
   fullName: string;
   nationalityCode: string;
-  gender: "male" | "female" | "other";
+  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
   dateOfBirth: Date;
   bloodGroup: string | null;
   religion: string | null;
@@ -98,7 +98,7 @@ export interface RegisterStudentInput {
   registrationNumber: string;
   fullName: string;
   nationalityCode: string;
-  gender: "male" | "female" | "other";
+  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
   dateOfBirth: Date;
   email: string;
   phoneHome: string;
@@ -124,7 +124,7 @@ export interface RegisterStudentInput {
 export interface UpdateStudentInput {
   status?: StudentStatus;
   fullName?: string;
-  gender?: "male" | "female" | "other";
+  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
   dateOfBirth?: Date;
   email?: string;
   phoneHome?: string;
