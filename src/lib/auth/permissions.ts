@@ -15,13 +15,20 @@ import type { User } from "@supabase/supabase-js";
 /** All first-class application roles */
 export type AppRole = "administrator" | "staff" | "student";
 
+/** Centralized role constants */
+export const USER_ROLES = {
+  ADMINISTRATOR: "administrator" as const,
+  STAFF: "staff" as const,
+  STUDENT: "student" as const,
+} as const;
+
 /** Normalizes the raw role string from user_metadata to a canonical AppRole */
 export function getAppRole(user: User | null | undefined): AppRole | null {
   if (!user) return null;
   const raw = (user.user_metadata?.role as string | undefined)?.toLowerCase().trim();
-  if (raw === "administrator" || raw === "admin") return "administrator";
-  if (raw === "staff") return "staff";
-  if (raw === "student") return "student";
+  if (raw === USER_ROLES.ADMINISTRATOR || raw === "admin") return USER_ROLES.ADMINISTRATOR;
+  if (raw === USER_ROLES.STAFF) return USER_ROLES.STAFF;
+  if (raw === USER_ROLES.STUDENT) return USER_ROLES.STUDENT;
   return null;
 }
 

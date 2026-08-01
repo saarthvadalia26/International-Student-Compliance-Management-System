@@ -33,8 +33,16 @@ export interface RoleChangeAuditEntry {
   changedByEmail: string;
   targetUserId: string;
   targetUserEmail: string;
+  action?: string;
   previousRole: string;
   newRole: string;
+  ipAddress?: string;
+}
+
+export interface InitialAdminAuditEntry {
+  adminId: string;
+  adminEmail: string;
+  ipAddress?: string;
 }
 
 export interface ConfigChangeAuditEntry {
@@ -46,6 +54,26 @@ export interface ConfigChangeAuditEntry {
 }
 
 const auditService = {
+  /**
+   * Log Initial Administrator Account Setup
+   */
+  async logInitialAdminSetup(entry: InitialAdminAuditEntry): Promise<void> {
+    const admin = getAdminSupabase();
+    await admin.from("audit_log").insert({
+      actor_id: entry.adminId,
+      actor_email: entry.adminEmail,
+      action: "INITIALIZE_ADMIN",
+      resource: "system_setup",
+      category: "security",
+      severity: "critical",
+      ip_address: entry.ipAddress ?? null,
+      details: {
+        event: "Initial Administrator account created",
+        role: "administrator",
+      },
+    });
+  },
+
   /**
    * Log a Global Sign Out event (current user signing out of all their sessions)
    */
@@ -91,17 +119,18 @@ const auditService = {
   },
 
   /**
-   * Log a Role Change event (Administrator promoting or demoting a user)
+   * Log a Role Change event (Administrator promoting, demoting, or modifying a user)
    */
   async logRoleChange(entry: RoleChangeAuditEntry): Promise<void> {
     const admin = getAdminSupabase();
     await admin.from("audit_log").insert({
       actor_id: entry.changedById,
       actor_email: entry.changedByEmail,
-      action: "ROLE_CHANGE",
+      action: entry.action ?? "ROLE_CHANGE",
       resource: "user_account",
       category: "role_change",
       severity: "warning",
+      ip_address: entry.ipAddress ?? null,
       details: {
         target_user_id: entry.targetUserId,
         target_user_email: entry.targetUserEmail,

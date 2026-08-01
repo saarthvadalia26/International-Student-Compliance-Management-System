@@ -10,6 +10,7 @@ import {
   Clock, 
   Database, 
   Lock, 
+  Users,
   Loader2, 
   CheckCircle2, 
   ShieldAlert, 
@@ -20,6 +21,7 @@ import {
   Check,
   AlertTriangle
 } from "lucide-react";
+import { UserManagementTab } from "@/components/settings/user-management-tab";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +52,7 @@ export default function SettingsPage() {
   const [isEmergencyLogoutOpen, setIsEmergencyLogoutOpen] = React.useState(false);
 
   // Active Tab navigation state
-  const [activeTab, setActiveTab] = React.useState<"general" | "notifications" | "retention" | "system" | "security">("general");
+  const [activeTab, setActiveTab] = React.useState<"general" | "notifications" | "retention" | "system" | "security" | "users">("general");
 
   // General Settings State
   const [schoolName, setSchoolName] = React.useState(`${Branding.universityName} (${Branding.shortName})`);
@@ -274,6 +276,7 @@ export default function SettingsPage() {
         {[
           { id: "general", label: "General", icon: Building },
           { id: "notifications", label: "Notifications", icon: Bell },
+          { id: "users", label: "User Management", icon: Users },
           { id: "retention", label: "Retention Policies", icon: Clock },
           { id: "system", label: "System Health", icon: Database },
           { id: "security", label: "Security", icon: Lock }
@@ -283,7 +286,7 @@ export default function SettingsPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as "general" | "notifications" | "retention" | "system" | "security")}
+              onClick={() => setActiveTab(tab.id as "general" | "notifications" | "retention" | "system" | "security" | "users")}
               className={`flex items-center gap-2 px-4 py-2 border-b-2 text-xs font-medium whitespace-nowrap transition-colors outline-none focus:text-primary ${
                 isActive 
                   ? "border-primary text-primary" 
@@ -299,6 +302,9 @@ export default function SettingsPage() {
 
       {/* Tab Workspaces Content */}
       <div className="space-y-6">
+        
+        {/* Tab: User Management */}
+        {activeTab === "users" && <UserManagementTab />}
         
         {/* Tab 1: General */}
         {activeTab === "general" && (
