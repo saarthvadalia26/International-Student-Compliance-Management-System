@@ -23,14 +23,25 @@ export default function LoginPage() {
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [isError, setIsError] = React.useState(false);
 
-  // Prefetch the dashboard route immediately on mount so navigation
-  // feels instant after successful login.
+  // Check if user is already authenticated on mount & prefetch dashboard route
   React.useEffect(() => {
     router.prefetch("/dashboard");
+    const supabase = getBrowserSupabase();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const role = (session.user.user_metadata?.role as string | undefined)?.toLowerCase();
+        if (role === "student") {
+          router.replace("/student/dashboard");
+        } else {
+          router.replace("/dashboard");
+        }
+      }
+    });
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading || isSuccess) return;
     setError(null);
 
     // Simple client-side input validations
@@ -51,8 +62,6 @@ export default function LoginPage() {
     try {
       const supabase = getBrowserSupabase();
       const loginEmail = email.trim();
-      
-
 
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: loginEmail,
@@ -75,14 +84,17 @@ export default function LoginPage() {
         setIsLoading(false);
       } else if (data?.session) {
         setIsSuccess(true);
-        // Eagerly prefetch dashboard data while the success toast is visible
-        router.prefetch("/dashboard");
         toast.success("Signed in successfully.", {
-          description: "Redirecting you to the workspace dashboard...",
+          description: "Welcome to the workspace dashboard.",
         });
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 1500);
+        
+        // Immediate redirection without artificial delay
+        const targetPath = (data.session.user.user_metadata?.role as string | undefined)?.toLowerCase() === "student"
+          ? "/student/dashboard"
+          : "/dashboard";
+
+        router.replace(targetPath);
+        router.refresh();
       } else {
         setError("An unexpected authentication error occurred.");
         setIsError(true);

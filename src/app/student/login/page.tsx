@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { GraduationCap, Mail, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { TurnstileStub } from "@/components/ui/turnstile-stub";
 import { Branding } from "@/config/branding";
 
 export default function StudentLoginPage() {
+  const router = useRouter();
   const supabase = getBrowserSupabase();
   
   const [email, setEmail] = React.useState("");
@@ -23,8 +25,19 @@ export default function StudentLoginPage() {
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [isError, setIsError] = React.useState(false);
 
+  // Check if student is already authenticated on mount
+  React.useEffect(() => {
+    router.prefetch("/student/dashboard");
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        router.replace("/student/dashboard");
+      }
+    });
+  }, [router, supabase]);
+
   const handleMagicLinkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading || isSuccess) return;
     setError(null);
     setIsSuccess(false);
     setIsError(false);
