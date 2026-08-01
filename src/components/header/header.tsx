@@ -5,6 +5,7 @@ import { Menu, Bell, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { AccountMenu } from "./account-menu";
+import { RealtimeIndicator } from "./realtime-indicator";
 import { Branding } from "@/config/branding";
 
 interface HeaderProps {
@@ -47,6 +48,8 @@ export function Header({ onMenuOpen }: HeaderProps) {
 
       {/* Right side: Actions & Profile */}
       <div className="flex items-center gap-2">
+        <RealtimeIndicator />
+
         <ThemeToggle />
 
         {/* Notifications Placeholder */}

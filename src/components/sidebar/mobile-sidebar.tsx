@@ -138,6 +138,7 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
                     <Link
                       href={getResolvedHref(item.href)}
                       onClick={onClose}
+                      prefetch={item.href === "/dashboard"}
                       className={cn(
                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                         active && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"

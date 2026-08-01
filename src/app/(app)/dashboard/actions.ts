@@ -4,23 +4,51 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { DashboardMetrics } from "@/domain/reports/types";
 import { SupabaseReportRepository } from "@/domain/reports/repositories/report.repository";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
+import { unstable_cache } from "next/cache";
 
 const reportRepo = new SupabaseReportRepository();
 
+// =====================================================================
+// Cached Dashboard Metrics (revalidates every 60 seconds)
+// =====================================================================
+const getCachedDashboardMetrics = unstable_cache(
+  async (): Promise<DashboardMetrics> => {
+    return reportRepo.getDashboardMetrics();
+  },
+  ["dashboard-metrics"],
+  { revalidate: 60, tags: ["dashboard-metrics"] }
+);
+
 export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
-  return reportRepo.getDashboardMetrics();
+  return getCachedDashboardMetrics();
 }
 
+// =====================================================================
+// Cached Analytics Charts (revalidates every 60 seconds)
+// =====================================================================
+const getCachedAnalyticsCharts = unstable_cache(
+  async () => {
+    return _fetchAnalyticsChartsInternal();
+  },
+  ["dashboard-analytics-charts"],
+  { revalidate: 60, tags: ["dashboard-charts"] }
+);
+
 export async function fetchAnalyticsCharts() {
+  return getCachedAnalyticsCharts();
+}
+
+// Internal (uncached) implementation
+async function _fetchAnalyticsChartsInternal() {
   const supabase = getAdminSupabase();
 
-  console.log("[DASHBOARD_ACTIONS] Querying analytics aggregates...");
-
+  // Execute ALL queries in parallel (including reference_data which was previously sequential)
   const [
     countriesRes,
     academicRes,
     snapshotRes,
-    notificationsRes
+    notificationsRes,
+    refDataRes
   ] = await Promise.all([
     // 1. Group by nationality
     supabase.from("student_personal").select("nationality_code"),
@@ -29,7 +57,9 @@ export async function fetchAnalyticsCharts() {
     // 3. Group by compliance and efrro expiry
     supabase.from("student_snapshot").select("compliance_status, efrro_expiry, efrro_status"),
     // 4. Group by notification statuses
-    supabase.from(NOTIFICATION_TABLE_NAME).select("status")
+    supabase.from(NOTIFICATION_TABLE_NAME).select("status"),
+    // 5. Reference data (moved into parallel batch — was previously sequential)
+    supabase.from("reference_data").select("code, display_name, category")
   ]);
 
   if (countriesRes.error) throw new Error(`[DB_QUERY_FAILED] ${countriesRes.error.message}`);
@@ -39,14 +69,10 @@ export async function fetchAnalyticsCharts() {
 
   const notifRows = notificationsRes.data || [];
 
-  // Load reference data
-  const { data: refData } = await supabase
-    .from("reference_data")
-    .select("code, display_name, category");
-
+  // Build reference map
   const refMap: Record<string, string> = {};
-  if (refData) {
-    refData.forEach(r => {
+  if (refDataRes.data) {
+    refDataRes.data.forEach(r => {
       refMap[r.code] = r.display_name;
     });
   }

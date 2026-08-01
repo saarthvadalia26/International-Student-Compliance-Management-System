@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/sidebar/sidebar";
 import { MobileSidebar } from "@/components/sidebar/mobile-sidebar";
 import { Header } from "@/components/header/header";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { RealtimeProvider } from "@/providers/realtime-provider";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -77,27 +78,29 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground font-sans">
-      {/* Desktop Sidebar */}
-      <Sidebar
-        isCollapsed={isSidebarCollapsed}
-        setIsCollapsed={setIsSidebarCollapsed}
-        className="hidden md:flex animate-fade-in"
-      />
+    <RealtimeProvider>
+      <div className="flex h-screen w-full overflow-hidden bg-background text-foreground font-sans">
+        {/* Desktop Sidebar */}
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          setIsCollapsed={setIsSidebarCollapsed}
+          className="hidden md:flex animate-fade-in"
+        />
 
-      {/* Mobile Navigation Drawer */}
-      <MobileSidebar
-        isOpen={isMobileSidebarOpen}
-        onClose={() => setIsMobileSidebarOpen(false)}
-      />
+        {/* Mobile Navigation Drawer */}
+        <MobileSidebar
+          isOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
+        />
 
-      {/* Header + Content Container */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header onMenuOpen={() => setIsMobileSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto bg-muted/20 p-4 md:p-6 transition-all duration-200">
-          {children}
-        </main>
+        {/* Header + Content Container */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header onMenuOpen={() => setIsMobileSidebarOpen(true)} />
+          <main className="flex-1 overflow-y-auto bg-muted/20 p-4 md:p-6 transition-all duration-200">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </RealtimeProvider>
   );
 }

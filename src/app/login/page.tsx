@@ -23,6 +23,12 @@ export default function LoginPage() {
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [isError, setIsError] = React.useState(false);
 
+  // Prefetch the dashboard route immediately on mount so navigation
+  // feels instant after successful login.
+  React.useEffect(() => {
+    router.prefetch("/dashboard");
+  }, [router]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -69,7 +75,9 @@ export default function LoginPage() {
         setIsLoading(false);
       } else if (data?.session) {
         setIsSuccess(true);
-        toast.success("Profile updated successfully.", {
+        // Eagerly prefetch dashboard data while the success toast is visible
+        router.prefetch("/dashboard");
+        toast.success("Signed in successfully.", {
           description: "Redirecting you to the workspace dashboard...",
         });
         setTimeout(() => {
