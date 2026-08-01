@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
@@ -21,6 +22,8 @@ interface RealtimeContextType {
   lastSyncedAt: Date | null;
   subscribe: (table: string, callback: TableEventCallback) => () => void;
   reconnect: () => void;
+  /** Broadcasts a session logout event to all connected browser tabs */
+  broadcastSessionLogout: (type: "global_signout" | "emergency_logout") => void;
 }
 
 const RealtimeContext = React.createContext<RealtimeContextType>({
@@ -28,6 +31,7 @@ const RealtimeContext = React.createContext<RealtimeContextType>({
   lastSyncedAt: null,
   subscribe: () => () => {},
   reconnect: () => {},
+  broadcastSessionLogout: () => {},
 });
 
 export function useRealtime() {
@@ -50,11 +54,13 @@ const MONITORED_TABLES = [
 ];
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [status, setStatus] = React.useState<ConnectionStatus>("connecting");
   const [lastSyncedAt, setLastSyncedAt] = React.useState<Date | null>(null);
   
   const listenersRef = React.useRef<Map<string, Set<TableEventCallback>>>(new Map());
   const channelRef = React.useRef<RealtimeChannel | null>(null);
+  const sessionControlChannelRef = React.useRef<RealtimeChannel | null>(null);
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const pendingEventsRef = React.useRef<RealtimeEventPayload[]>([]);
 
@@ -161,15 +167,63 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [handleIncomingPayload, logConnectionAudit]);
 
+  // ── Session Control Broadcast Channel ───────────────────────────────────────
+  // Listens for emergency_logout and global_signout broadcast events.
+  // On receipt, immediately signs out and redirects every connected tab.
+  const initSessionControlChannel = React.useCallback(() => {
+    const supabase = getBrowserSupabase();
+    if (sessionControlChannelRef.current) {
+      supabase.removeChannel(sessionControlChannelRef.current);
+    }
+
+    const ch = supabase
+      .channel("iscms_session_control")
+      .on("broadcast", { event: "emergency_logout" }, async () => {
+        logConnectionAudit("Received emergency_logout broadcast — signing out all sessions");
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch { /* best-effort */ }
+        // Clear any cached client state
+        if (typeof window !== "undefined") {
+          sessionStorage.clear();
+          Object.keys(localStorage)
+            .filter(k => k.startsWith("isms_") || k.startsWith("sb-"))
+            .forEach(k => localStorage.removeItem(k));
+        }
+        router.push("/login");
+      })
+      .on("broadcast", { event: "global_signout" }, async () => {
+        logConnectionAudit("Received global_signout broadcast — redirecting");
+        router.push("/login");
+      })
+      .subscribe();
+
+    sessionControlChannelRef.current = ch;
+  }, [logConnectionAudit, router]);
+
+  const broadcastSessionLogout = React.useCallback(
+    (type: "global_signout" | "emergency_logout") => {
+      const supabase = getBrowserSupabase();
+      supabase.channel("iscms_session_control").send({
+        type: "broadcast",
+        event: type,
+        payload: { timestamp: new Date().toISOString() },
+      });
+    },
+    []
+  );
+
   React.useEffect(() => {
     const timer = setTimeout(() => {
       initRealtimeChannel();
+      initSessionControlChannel();
     }, 0);
 
     // Auto-reconnect handling on window focus / online event
     const handleOnline = () => {
       logConnectionAudit("Network online detected, reconnecting realtime...");
       initRealtimeChannel();
+      initSessionControlChannel();
     };
 
     window.addEventListener("online", handleOnline);
@@ -178,11 +232,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timer);
       window.removeEventListener("online", handleOnline);
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      const supabase = getBrowserSupabase();
       if (channelRef.current) {
-        getBrowserSupabase().removeChannel(channelRef.current);
+        supabase.removeChannel(channelRef.current);
+      }
+      if (sessionControlChannelRef.current) {
+        supabase.removeChannel(sessionControlChannelRef.current);
       }
     };
-  }, [initRealtimeChannel, logConnectionAudit]);
+  }, [initRealtimeChannel, initSessionControlChannel, logConnectionAudit]);
 
   const subscribe = React.useCallback((table: string, callback: TableEventCallback) => {
     if (!listenersRef.current.has(table)) {
@@ -208,8 +266,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       lastSyncedAt,
       subscribe,
       reconnect: initRealtimeChannel,
+      broadcastSessionLogout,
     }),
-    [status, lastSyncedAt, subscribe, initRealtimeChannel]
+    [status, lastSyncedAt, subscribe, initRealtimeChannel, broadcastSessionLogout]
   );
 
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>;

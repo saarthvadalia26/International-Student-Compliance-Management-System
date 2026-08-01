@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { 
   Building, 
@@ -16,26 +17,37 @@ import {
   HelpCircle,
   Play,
   Languages,
-  Check
+  Check,
+  AlertTriangle
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { useRealtime } from "@/providers/realtime-provider";
+import { useUserRole } from "@/hooks/use-user-role";
 import { toast } from "sonner";
 import { 
   fetchRetentionPolicies, 
   updateRetentionPolicyAction, 
-  runDocumentCleanupAction 
+  runDocumentCleanupAction,
+  globalSignOutAction
 } from "./actions";
 import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
-
+import { EmergencyLogoutDialog } from "@/components/settings/emergency-logout-dialog";
 import { Branding } from "@/config/branding";
 
+
 export default function SettingsPage() {
+  const router = useRouter();
   const supabase = getBrowserSupabase();
   const { theme, setTheme } = useTheme();
+  const { isAdministrator } = useUserRole();
+  const { broadcastSessionLogout } = useRealtime();
+
+  // Emergency Logout dialog state
+  const [isEmergencyLogoutOpen, setIsEmergencyLogoutOpen] = React.useState(false);
 
   // Active Tab navigation state
   const [activeTab, setActiveTab] = React.useState<"general" | "notifications" | "retention" | "system" | "security">("general");
@@ -219,19 +231,35 @@ export default function SettingsPage() {
     setSignOutSuccess(false);
     setSignOutError(false);
     try {
+      // Write audit trail server-side before signing out
+      await globalSignOutAction();
+
+      // Sign out of all sessions via Supabase
       const { error } = await supabase.auth.signOut({ scope: "global" });
       if (error) throw error;
+
+      // Broadcast to other open tabs so they also redirect
+      broadcastSessionLogout("global_signout");
+
       setSignOutSuccess(true);
-      toast.success("Profile updated successfully.");
+      toast.success("Signed out of all sessions.", {
+        description: "All active sessions across every device have been terminated.",
+      });
+
+      // Redirect after short delay to show success state
+      setTimeout(() => {
+        router.push("/login");
+      }, 1200);
     } catch (err: unknown) {
       setSignOutError(true);
-      toast.error("Unable to save changes. Please try again.");
+      toast.error("Failed to sign out all sessions. Please try again.");
     } finally {
       setIsSigningOutAll(false);
     }
   };
 
   return (
+    <>
     <div className="space-y-6 max-w-5xl mx-auto font-sans p-4">
       {/* Header */}
       <div>
@@ -586,6 +614,7 @@ export default function SettingsPage() {
         {/* Tab 5: Security */}
         {activeTab === "security" && (
           <div className="grid gap-6">
+            {/* Change Passphrase — visible to all internal users */}
             <Card className="border border-border/60 shadow-sm">
               <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
                 <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
@@ -630,15 +659,16 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
+            {/* Global Sign Out — visible to all internal users */}
             <Card className="border border-border/60 shadow-sm">
               <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
                 <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-rose-700">
-                  <ShieldAlert className="h-4 w-4" /> Global Sign Out Option
+                  <ShieldAlert className="h-4 w-4" /> Global Sign Out
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                 <p className="text-xs text-muted-foreground">
-                  Signing out globally terminates all active session access tokens across other browsers and administrator consoles.
+                  Signs you out from every active session across all your devices and browsers simultaneously.
                 </p>
                 <AsyncActionButton
                   variant="outline"
@@ -649,16 +679,56 @@ export default function SettingsPage() {
                   isSuccess={signOutSuccess}
                   isError={signOutError}
                   idleText="Sign Out All Sessions"
-                  loadingText="Processing..."
-                  successText="Changes saved"
+                  loadingText="Terminating sessions..."
+                  successText="Signed out — redirecting"
                   errorText="Try Again"
                 />
               </CardContent>
             </Card>
+
+            {/* Emergency Force Logout — Administrator only */}
+            {isAdministrator && (
+              <Card className="border border-destructive/40 shadow-sm">
+                <CardHeader className="bg-destructive/5 border-b border-destructive/30 py-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-destructive">
+                    <AlertTriangle className="h-4 w-4" /> Emergency Force Logout
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    Immediately terminates <strong>every active session</strong> across the entire system for all users.
+                    Use only in emergency situations such as a suspected security breach.
+                    You will also be signed out and must re-authenticate.
+                  </p>
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                    <p className="text-xs text-destructive font-medium">
+                      ⚠ This action is irreversible. All users will be immediately redirected to the login page.
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => setIsEmergencyLogoutOpen(true)}
+                  >
+                    <ShieldAlert className="h-3.5 w-3.5 mr-1.5" />
+                    Force Logout All Users
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
       </div>
     </div>
+
+    {/* Emergency Logout Dialog — outside main div to avoid z-index issues */}
+    <EmergencyLogoutDialog
+      open={isEmergencyLogoutOpen}
+      onOpenChange={setIsEmergencyLogoutOpen}
+    />
+  </>
   );
 }
+

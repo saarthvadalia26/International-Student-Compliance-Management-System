@@ -1,9 +1,11 @@
 "use server";
 
 import { getAdminSupabase } from "@/lib/supabase/admin";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { requireAdministrator } from "@/lib/auth/permissions";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
-
 import { NotificationProviderFactory } from "@/domain/notifications/services/provider-factory";
+
 
 export interface SystemHealthMetrics {
   totalStudents: number;
@@ -43,6 +45,11 @@ export interface SystemHealthMetrics {
 }
 
 export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
+  // Backend authorization — Administrator only
+  const serverSupabase = await getServerSupabase();
+  const { data: { user } } = await serverSupabase.auth.getUser();
+  requireAdministrator(user);
+
   const supabase = getAdminSupabase();
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
 

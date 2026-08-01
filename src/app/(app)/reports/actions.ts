@@ -1,13 +1,14 @@
 "use server";
 
 import { getAdminSupabase } from "@/lib/supabase/admin";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { requireAdministrator, requireInternalUser } from "@/lib/auth/permissions";
 import { SupabaseReportRepository } from "@/domain/reports/repositories/report.repository";
 import { ReportingService } from "@/domain/reports/services/report.service";
 import { ReportFilters, ReportPagination } from "@/domain/reports/types";
 import { headers as getHeaders } from "next/headers";
 import { Branding } from "@/config/branding";
 
-import { getServerSupabase } from "@/lib/supabase/server";
 
 const reportRepo = new SupabaseReportRepository();
 const reportService = new ReportingService(reportRepo);
@@ -57,8 +58,13 @@ export async function fetchAuditReport(
   sortBy?: string,
   sortOrder?: "asc" | "desc"
 ) {
+  // Backend authorization — Audit log is Administrator only
+  const supabase = await getServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  requireAdministrator(user);
   return reportService.getAuditReport(filters, pagination, sortBy, sortOrder);
 }
+
 
 /**
  * Server-side report exports compiling files and writing audit records.
@@ -71,6 +77,13 @@ export async function exportReport(
   const supabase = await getServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
+  // Audit exports are Administrator-only; other exports require internal user
+  if (type === "audit") {
+    requireAdministrator(user);
+  } else {
+    requireInternalUser(user);
+  }
+
   
   const { ip, userAgent } = await getRequestMetadata();
   const actorId = user.id;

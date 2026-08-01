@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { desktopNavigation, NavItem } from "@/config/navigation";
 import { Button } from "@/components/ui/button";
 import { Branding } from "@/config/branding";
+import { useUserRole } from "@/hooks/use-user-role";
+
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed: boolean;
@@ -17,8 +19,10 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Sidebar({ isCollapsed, setIsCollapsed, className, ...props }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { isAdministrator } = useUserRole();
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
   const prefetchedRoutesRef = React.useRef<Set<string>>(new Set());
+
 
   const getResolvedHref = (href: string) => {
     if (href.includes(":id")) {
@@ -115,7 +119,14 @@ export function Sidebar({ isCollapsed, setIsCollapsed, className, ...props }: Si
 
       {/* Navigation List */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-none">
-        {desktopNavigation.items.map((item: NavItem) => {
+        {desktopNavigation.items
+          .filter((item: NavItem) => {
+            // Settings is Administrator-only
+            if (item.href === "/settings") return isAdministrator;
+            return true;
+          })
+          .map((item: NavItem) => {
+
           const hasChildren = item.items && item.items.length > 0;
           const active = isLinkActive(item.href);
           const isOpen = openMenus[item.title];

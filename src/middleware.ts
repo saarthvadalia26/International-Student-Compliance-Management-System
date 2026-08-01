@@ -57,32 +57,64 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const url = request.nextUrl.clone();
 
-  // Protect Staff Routes (App)
-  if (request.nextUrl.pathname.startsWith("/dashboard") || 
-      request.nextUrl.pathname.startsWith("/students") ||
-      request.nextUrl.pathname.startsWith("/compliance") ||
-      request.nextUrl.pathname.startsWith("/settings") ||
-      request.nextUrl.pathname.startsWith("/profile")) {
-    
+  // ── Helper: extract and normalize role from user metadata ──────────────────
+  const rawRole = (user?.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+  const isAdministrator = rawRole === "administrator" || rawRole === "admin";
+  const isInternalUser = rawRole === "administrator" || rawRole === "admin" || rawRole === "staff";
+
+  // ── Administrator-only routes ───────────────────────────────────────────────
+  // These routes require the Administrator role. Unauthenticated users are
+  // redirected to /login. Authenticated non-admin users are redirected to /dashboard.
+  const adminOnlyPaths = [
+    "/dashboard/health",
+    "/reports/audit",
+    "/settings",
+  ];
+
+  if (adminOnlyPaths.some(p => request.nextUrl.pathname.startsWith(p))) {
     if (!user) {
-      // Redirect to staff login
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+    if (!isAdministrator) {
+      url.pathname = "/dashboard";
+      url.searchParams.set("unauthorized", "1");
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // ── General authenticated Staff/Admin routes ────────────────────────────────
+  if (
+    request.nextUrl.pathname.startsWith("/dashboard") ||
+    request.nextUrl.pathname.startsWith("/students") ||
+    request.nextUrl.pathname.startsWith("/compliance") ||
+    request.nextUrl.pathname.startsWith("/profile") ||
+    request.nextUrl.pathname.startsWith("/reminders") ||
+    request.nextUrl.pathname.startsWith("/reports") ||
+    request.nextUrl.pathname.startsWith("/monitoring")
+  ) {
+    if (!user) {
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+    if (!isInternalUser) {
       url.pathname = "/login";
       return NextResponse.redirect(url);
     }
   }
 
-  // Protect Student Portal Routes
-  if (request.nextUrl.pathname.startsWith("/student/dashboard") ||
-      request.nextUrl.pathname.startsWith("/student/upload")) {
-    
+  // ── Student Portal Routes ───────────────────────────────────────────────────
+  if (
+    request.nextUrl.pathname.startsWith("/student/dashboard") ||
+    request.nextUrl.pathname.startsWith("/student/upload")
+  ) {
     if (!user) {
-      // Redirect to student login
       url.pathname = "/student/login";
       return NextResponse.redirect(url);
     }
   }
 
-  // Prevent authenticated users from visiting login pages
+  // ── Prevent authenticated users from visiting login pages ──────────────────
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/student/login")) {
     const role = user.user_metadata?.role;
     if (role === "student") {
@@ -93,7 +125,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Inject Security Headers
+  // ── Security Headers ────────────────────────────────────────────────────────
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");

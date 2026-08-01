@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { User, Settings, HelpCircle, LogOut } from "lucide-react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { useUserRole } from "@/hooks/use-user-role";
 import { Button } from "@/components/ui/button";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { cn } from "@/lib/utils";
@@ -25,12 +26,15 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
+
 export function AccountMenu() {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = getBrowserSupabase();
+  const { isAdministrator } = useUserRole();
   
   const [userProfile, setUserProfile] = React.useState<{ name: string; email: string; role: string } | null>(null);
+
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [logoutSuccess, setLogoutSuccess] = React.useState(false);
@@ -48,12 +52,20 @@ export function AccountMenu() {
           const metadata = session.user.user_metadata || {};
           const emailPrefix = email.split("@")[0];
           const name = metadata.username || emailPrefix || "User";
-          const role = metadata.role || "Staff Member";
+          const rawRole = (metadata.role as string | undefined)?.toLowerCase();
+          const displayRole =
+            rawRole === "administrator" || rawRole === "admin"
+              ? "Administrator"
+              : rawRole === "staff"
+              ? "Staff"
+              : metadata.role
+              ? String(metadata.role).charAt(0).toUpperCase() + String(metadata.role).slice(1)
+              : "Staff Member";
 
           setUserProfile({
             email,
             name: name.charAt(0).toUpperCase() + name.slice(1),
-            role: role.charAt(0).toUpperCase() + role.slice(1),
+            role: displayRole,
           });
         }
       } catch (err) {
@@ -69,12 +81,20 @@ export function AccountMenu() {
         const metadata = session.user.user_metadata || {};
         const emailPrefix = email.split("@")[0];
         const name = metadata.username || emailPrefix || "User";
-        const role = metadata.role || "Staff Member";
+        const rawRole = (metadata.role as string | undefined)?.toLowerCase();
+        const displayRole =
+          rawRole === "administrator" || rawRole === "admin"
+            ? "Administrator"
+            : rawRole === "staff"
+            ? "Staff"
+            : metadata.role
+            ? String(metadata.role).charAt(0).toUpperCase() + String(metadata.role).slice(1)
+            : "Staff Member";
 
         setUserProfile({
           email,
           name: name.charAt(0).toUpperCase() + name.slice(1),
-          role: role.charAt(0).toUpperCase() + role.slice(1),
+          role: displayRole,
         });
       } else if (mounted) {
         setUserProfile(null);
@@ -151,15 +171,18 @@ export function AccountMenu() {
           >
             <User className="mr-2 h-4 w-4 text-muted-foreground" /> My Profile
           </DropdownMenuItem>
-          <DropdownMenuItem 
-            onClick={() => router.push("/settings")}
-            className={cn(
-              "text-xs cursor-pointer focus:bg-accent",
-              pathname === "/settings" && "text-primary font-semibold bg-accent/40"
-            )}
-          >
-            <Settings className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
-          </DropdownMenuItem>
+          {/* Settings — Administrator only */}
+          {isAdministrator && (
+            <DropdownMenuItem 
+              onClick={() => router.push("/settings")}
+              className={cn(
+                "text-xs cursor-pointer focus:bg-accent",
+                pathname === "/settings" && "text-primary font-semibold bg-accent/40"
+              )}
+            >
+              <Settings className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem 
             onClick={() => router.push("/help")}
             className={cn(
@@ -169,6 +192,7 @@ export function AccountMenu() {
           >
             <HelpCircle className="mr-2 h-4 w-4 text-muted-foreground" /> Help
           </DropdownMenuItem>
+
           
           <DropdownMenuSeparator />
 
