@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Menu, Bell, GraduationCap } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { AccountMenu } from "./account-menu";
 import { RealtimeIndicator } from "./realtime-indicator";
+import { NotificationCenterDropdown } from "./notification-center-dropdown";
 import { Branding } from "@/config/branding";
 
 interface HeaderProps {
@@ -52,10 +53,8 @@ export function Header({ onMenuOpen }: HeaderProps) {
 
         <ThemeToggle />
 
-        {/* Notifications Placeholder */}
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" aria-label="Notifications">
-          <Bell className="h-5 w-5" />
-        </Button>
+        {/* Real-time Notification Center Dropdown */}
+        <NotificationCenterDropdown />
 
         {/* Account Dropdown Menu */}
         <AccountMenu />

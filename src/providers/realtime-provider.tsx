@@ -44,6 +44,7 @@ const MONITORED_TABLES = [
   "visa_versions",
   "efrro_versions",
   "notifications",
+  "in_app_notifications",
   "audit_log",
   "reference_data",
 ];

@@ -26,6 +26,15 @@ export const metadata: Metadata = {
     template: `%s | ${Branding.shortName}`
   },
   description: `Official ${Branding.appName} of the ${Branding.universityName}.`,
+  icons: {
+    icon: [
+      { url: "/assets/branding/nfsu-logo.png", type: "image/png" },
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" }
+    ],
+    shortcut: "/assets/branding/nfsu-logo.png",
+    apple: "/apple-touch-icon.png"
+  },
   openGraph: {
     title: Branding.appName,
     description: `Official portal for the ${Branding.universityName}.`,
@@ -61,6 +70,11 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link rel="icon" href="/assets/branding/nfsu-logo.png" type="image/png" />
+        <link rel="shortcut icon" href="/assets/branding/nfsu-logo.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider
           attribute="class"
