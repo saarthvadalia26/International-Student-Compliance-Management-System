@@ -56,72 +56,80 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const url = request.nextUrl.clone();
+  const pathname = request.nextUrl.pathname;
 
   // ── Helper: extract and normalize role from user metadata ──────────────────
   const rawRole = (user?.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+  const isStudent = rawRole === "student";
   const isAdministrator = rawRole === "administrator" || rawRole === "admin";
-  const isInternalUser = rawRole === "administrator" || rawRole === "admin" || rawRole === "staff";
+  // Non-student users (admin, staff, or accounts without role set) default to internal workspace access
+  const isInternalUser = !isStudent;
 
   // ── Administrator-only routes ───────────────────────────────────────────────
-  // These routes require the Administrator role. Unauthenticated users are
-  // redirected to /login. Authenticated non-admin users are redirected to /dashboard.
   const adminOnlyPaths = [
     "/dashboard/health",
     "/reports/audit",
     "/settings",
   ];
 
-  if (adminOnlyPaths.some(p => request.nextUrl.pathname.startsWith(p))) {
+  if (adminOnlyPaths.some(p => pathname.startsWith(p))) {
     if (!user) {
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
-    if (!isAdministrator) {
-      url.pathname = "/dashboard";
-      url.searchParams.set("unauthorized", "1");
-      return NextResponse.redirect(url);
+      if (pathname !== "/login") {
+        url.pathname = "/login";
+        return NextResponse.redirect(url);
+      }
+    } else if (!isAdministrator) {
+      if (pathname !== "/dashboard") {
+        url.pathname = "/dashboard";
+        url.searchParams.set("unauthorized", "1");
+        return NextResponse.redirect(url);
+      }
     }
   }
 
   // ── General authenticated Staff/Admin routes ────────────────────────────────
   if (
-    request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/students") ||
-    request.nextUrl.pathname.startsWith("/compliance") ||
-    request.nextUrl.pathname.startsWith("/profile") ||
-    request.nextUrl.pathname.startsWith("/reminders") ||
-    request.nextUrl.pathname.startsWith("/reports") ||
-    request.nextUrl.pathname.startsWith("/monitoring")
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/students") ||
+    pathname.startsWith("/compliance") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/reminders") ||
+    pathname.startsWith("/reports") ||
+    pathname.startsWith("/monitoring")
   ) {
     if (!user) {
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
-    if (!isInternalUser) {
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
+      if (pathname !== "/login") {
+        url.pathname = "/login";
+        return NextResponse.redirect(url);
+      }
+    } else if (!isInternalUser) {
+      if (pathname !== "/student/dashboard") {
+        url.pathname = "/student/dashboard";
+        return NextResponse.redirect(url);
+      }
     }
   }
 
   // ── Student Portal Routes ───────────────────────────────────────────────────
   if (
-    request.nextUrl.pathname.startsWith("/student/dashboard") ||
-    request.nextUrl.pathname.startsWith("/student/upload")
+    pathname.startsWith("/student/dashboard") ||
+    pathname.startsWith("/student/upload")
   ) {
     if (!user) {
-      url.pathname = "/student/login";
+      if (pathname !== "/student/login") {
+        url.pathname = "/student/login";
+        return NextResponse.redirect(url);
+      }
+    } else if (isInternalUser && !pathname.startsWith("/dashboard")) {
+      // If internal staff accidentally lands on student dashboard, route them to staff dashboard
+      url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
   }
 
   // ── Prevent authenticated users from visiting login pages ──────────────────
-  if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/student/login")) {
-    const role = user.user_metadata?.role;
-    if (role === "student") {
-      url.pathname = "/student/dashboard";
-    } else {
-      url.pathname = "/dashboard";
-    }
+  if (user && (pathname === "/login" || pathname === "/student/login")) {
+    url.pathname = isStudent ? "/student/dashboard" : "/dashboard";
     return NextResponse.redirect(url);
   }
 

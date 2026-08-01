@@ -25,53 +25,32 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
   React.useEffect(() => {
     let mounted = true;
 
-    async function checkSession() {
+    async function hydrateStudentInfo() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          if (mounted) {
-            setIsAuthenticated(false);
-            router.replace("/student/login");
-          }
-          return;
-        }
-
-        // Verify role is student
-        const role = session.user.user_metadata?.role;
-        if (role !== "student") {
-          toast.error("Access Denied", {
-            description: "Admins must access the administrator portal instead.",
-          });
-          if (mounted) {
-            setIsAuthenticated(false);
-            router.replace("/login");
-          }
-          return;
-        }
-
-        if (mounted) {
+        if (session && mounted) {
           setIsAuthenticated(true);
           const email = session.user.email || "";
           const username = session.user.user_metadata?.username || email.split("@")[0];
           setStudentName(username.charAt(0).toUpperCase() + username.slice(1));
+        } else if (mounted) {
+          setIsAuthenticated(true); // Trust middleware for route access
         }
       } catch (err) {
-        console.error("Session verification failed:", err);
-        if (mounted) {
-          setIsAuthenticated(false);
-          router.replace("/student/login");
-        }
+        console.error("Student session hydration error:", err);
+        if (mounted) setIsAuthenticated(true);
       }
     }
 
-    checkSession();
+    hydrateStudentInfo();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session) {
         if (mounted) {
           setIsAuthenticated(false);
-          router.replace("/student/login");
         }
+      } else if (session && mounted) {
+        setIsAuthenticated(true);
       }
     });
 
@@ -79,7 +58,7 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [router, supabase]);
+  }, [supabase]);
 
   const handleSignOut = async () => {
     try {

@@ -23,20 +23,9 @@ export default function LoginPage() {
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [isError, setIsError] = React.useState(false);
 
-  // Check if user is already authenticated on mount & prefetch dashboard route
+  // Prefetch dashboard route on mount
   React.useEffect(() => {
     router.prefetch("/dashboard");
-    const supabase = getBrowserSupabase();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const role = (session.user.user_metadata?.role as string | undefined)?.toLowerCase();
-        if (role === "student") {
-          router.replace("/student/dashboard");
-        } else {
-          router.replace("/dashboard");
-        }
-      }
-    });
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {

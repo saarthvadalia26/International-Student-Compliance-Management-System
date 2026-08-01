@@ -23,30 +23,7 @@ export function AppShell({ children }: AppShellProps) {
   React.useEffect(() => {
     let mounted = true;
 
-    async function checkSession() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          if (mounted) {
-            setIsAuthenticated(false);
-            router.replace("/login");
-          }
-        } else {
-          if (mounted) {
-            setIsAuthenticated(true);
-          }
-        }
-      } catch (e) {
-        console.error("Session verification error:", e);
-        if (mounted) {
-          setIsAuthenticated(false);
-          router.replace("/login");
-        }
-      }
-    }
-
-    checkSession();
-
+    // Listen for SIGNED_OUT auth events when user manually logs out
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT" || !session) {
         if (mounted) {

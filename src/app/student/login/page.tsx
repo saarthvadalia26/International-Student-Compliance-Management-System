@@ -25,15 +25,10 @@ export default function StudentLoginPage() {
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [isError, setIsError] = React.useState(false);
 
-  // Check if student is already authenticated on mount
+  // Prefetch student dashboard on mount
   React.useEffect(() => {
     router.prefetch("/student/dashboard");
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        router.replace("/student/dashboard");
-      }
-    });
-  }, [router, supabase]);
+  }, [router]);
 
   const handleMagicLinkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
