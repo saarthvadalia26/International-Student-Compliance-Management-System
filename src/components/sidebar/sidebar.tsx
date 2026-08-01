@@ -82,32 +82,35 @@ export function Sidebar({ isCollapsed, setIsCollapsed, className, ...props }: Si
   return (
     <aside
       className={cn(
-        "flex flex-col border-r border-border bg-card text-card-foreground transition-all duration-300 ease-in-out select-none",
-        isCollapsed ? "w-[72px]" : "w-64",
+        "flex flex-col border-r border-border bg-card text-card-foreground transition-[width] duration-300 ease-in-out select-none shrink-0",
+        isCollapsed ? "w-20" : "w-64",
         className
       )}
       {...props}
     >
-      {/* Branding Header Area — Logo removed as per specification */}
-      <div className="flex h-16 items-center justify-between px-4 border-b border-border">
-        {!isCollapsed && (
-          <div className="flex items-center gap-2 font-semibold">
-            <span className="text-primary font-display text-sm font-bold tracking-tight">
+      {/* Branding Header Area */}
+      <div className="flex h-16 items-center justify-between px-3.5 border-b border-border overflow-hidden">
+        {!isCollapsed ? (
+          <div className="flex items-center gap-2 font-semibold overflow-hidden truncate">
+            <span className="text-primary font-display text-sm font-bold tracking-tight truncate">
               {Branding.appShortName} Workspace
             </span>
           </div>
-        )}
-        {isCollapsed && (
-          <div className="flex mx-auto items-center justify-center font-display text-xs font-bold text-primary">
-            {Branding.appShortName}
+        ) : (
+          <div
+            className="flex items-center justify-center font-display text-xs font-bold text-primary w-8 h-8 rounded-lg bg-primary/10 select-none shrink-0"
+            title={`${Branding.appShortName} Workspace`}
+          >
+            NFSU
           </div>
         )}
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className={cn("mx-auto h-8 w-8 text-muted-foreground", !isCollapsed && "ml-auto")}
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground ml-auto"
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!isCollapsed}
         >
           {isCollapsed ? (
             <Icons.ChevronRight className="h-4 w-4" />
@@ -126,86 +129,87 @@ export function Sidebar({ isCollapsed, setIsCollapsed, className, ...props }: Si
             return true;
           })
           .map((item: NavItem) => {
+            const hasChildren = item.items && item.items.length > 0;
+            const active = isLinkActive(item.href);
+            const isOpen = openMenus[item.title];
+            const resolvedHref = getResolvedHref(item.href);
 
-          const hasChildren = item.items && item.items.length > 0;
-          const active = isLinkActive(item.href);
-          const isOpen = openMenus[item.title];
-          const resolvedHref = getResolvedHref(item.href);
+            return (
+              <div key={item.title} className="space-y-1">
+                {hasChildren ? (
+                  // Parent Link with Sub-menu toggles
+                  <div>
+                    <button
+                      onClick={() => !isCollapsed && toggleMenu(item.title)}
+                      onMouseEnter={() => handlePrefetch(item.href)}
+                      onFocus={() => handlePrefetch(item.href)}
+                      title={isCollapsed ? item.title : undefined}
+                      className={cn(
+                        "flex min-h-[44px] w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        active && (isCollapsed ? "bg-primary/15 text-primary font-semibold" : "bg-accent/60 text-foreground"),
+                        isCollapsed ? "justify-center px-0" : "justify-between"
+                      )}
+                    >
+                      <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")}>
+                        {renderIcon(item.icon)}
+                        {!isCollapsed && <span className="truncate">{item.title}</span>}
+                      </div>
+                      {!isCollapsed && (
+                        <Icons.ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-transform duration-200",
+                            isOpen && "rotate-180"
+                          )}
+                        />
+                      )}
+                    </button>
 
-          return (
-            <div key={item.title} className="space-y-1">
-              {hasChildren ? (
-                // Parent Link with Sub-menu toggles
-                <div>
-                  <button
-                    onClick={() => !isCollapsed && toggleMenu(item.title)}
+                    {/* Sub-menu rendering */}
+                    {!isCollapsed && isOpen && (
+                      <div className="mt-1 ml-8 space-y-1 border-l border-border pl-3">
+                        {item.items?.map((subItem) => {
+                          const subResolved = getResolvedHref(subItem.href);
+                          const subActive = pathname === subResolved;
+                          return (
+                            <Link
+                              key={subItem.title}
+                              href={subResolved}
+                              prefetch={true}
+                              onMouseEnter={() => handlePrefetch(subItem.href)}
+                              onFocus={() => handlePrefetch(subItem.href)}
+                              className={cn(
+                                "block rounded-md px-3 py-2 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                                subActive && "text-primary font-semibold"
+                              )}
+                            >
+                              {subItem.title}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Direct Navigation Link
+                  <Link
+                    href={resolvedHref}
+                    prefetch={true}
                     onMouseEnter={() => handlePrefetch(item.href)}
                     onFocus={() => handlePrefetch(item.href)}
+                    title={isCollapsed ? item.title : undefined}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      active && "bg-accent/50 text-foreground",
-                      isCollapsed ? "justify-center" : "justify-between"
+                      "flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      active && "bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 hover:text-primary-foreground",
+                      isCollapsed && "justify-center px-0"
                     )}
                   >
-                    <div className="flex items-center gap-3">
-                      {renderIcon(item.icon)}
-                      {!isCollapsed && <span>{item.title}</span>}
-                    </div>
-                    {!isCollapsed && (
-                      <Icons.ChevronDown
-                        className={cn(
-                          "h-4 w-4 transition-transform duration-200",
-                          isOpen && "rotate-180"
-                        )}
-                      />
-                    )}
-                  </button>
-
-                  {/* Sub-menu rendering */}
-                  {!isCollapsed && isOpen && (
-                    <div className="mt-1 ml-8 space-y-1 border-l border-border pl-3">
-                      {item.items?.map((subItem) => {
-                        const subResolved = getResolvedHref(subItem.href);
-                        const subActive = pathname === subResolved;
-                        return (
-                          <Link
-                            key={subItem.title}
-                            href={subResolved}
-                            prefetch={true}
-                            onMouseEnter={() => handlePrefetch(subItem.href)}
-                            onFocus={() => handlePrefetch(subItem.href)}
-                            className={cn(
-                              "block rounded-md px-3 py-1.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                              subActive && "text-primary font-semibold"
-                            )}
-                          >
-                            {subItem.title}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                // Direct Navigation Link
-                <Link
-                  href={resolvedHref}
-                  prefetch={true}
-                  onMouseEnter={() => handlePrefetch(item.href)}
-                  onFocus={() => handlePrefetch(item.href)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                    active && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
-                    isCollapsed && "justify-center"
-                  )}
-                >
-                  {renderIcon(item.icon)}
-                  {!isCollapsed && <span>{item.title}</span>}
-                </Link>
-              )}
-            </div>
-          );
-        })}
+                    {renderIcon(item.icon)}
+                    {!isCollapsed && <span className="truncate">{item.title}</span>}
+                  </Link>
+                )}
+              </div>
+            );
+          })}
       </nav>
     </aside>
   );

@@ -16,9 +16,24 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const supabase = getBrowserSupabase();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const saved = localStorage.getItem("isms_sidebar_collapsed");
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
+
+  const handleToggleSidebar = React.useCallback((collapsed: boolean) => {
+    setIsSidebarCollapsed(collapsed);
+    try {
+      localStorage.setItem("isms_sidebar_collapsed", JSON.stringify(collapsed));
+    } catch { /* ignore */ }
+  }, []);
 
   React.useEffect(() => {
     let mounted = true;
@@ -60,7 +75,7 @@ export function AppShell({ children }: AppShellProps) {
         {/* Desktop Sidebar */}
         <Sidebar
           isCollapsed={isSidebarCollapsed}
-          setIsCollapsed={setIsSidebarCollapsed}
+          setIsCollapsed={handleToggleSidebar}
           className="hidden md:flex animate-fade-in"
         />
 
