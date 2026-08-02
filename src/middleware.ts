@@ -58,10 +58,16 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   const pathname = request.nextUrl.pathname;
 
-  // ── Initial Setup Gating (Database Source of Truth) ─────────────────────────
-  // Non-API routes verify if the application has been initialized.
+  // Extract and normalize user role
+  const rawRole = (user?.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+  const isStudent = rawRole === "student";
+  const isAdministrator = rawRole === "administrator" || rawRole === "admin";
+  const isInternalUser = !isStudent;
+
+  // ── Single Authoritative Setup & Route Decision for Non-API Requests ──────
   if (!pathname.startsWith("/api")) {
     let isSystemInitialized = false;
+
     try {
       const { data: config } = await supabase
         .from("system_config")
@@ -78,51 +84,48 @@ export async function middleware(request: NextRequest) {
       isSystemInitialized = false;
     }
 
-    // Case A: System is UNINITIALIZED (0 Administrators exist)
+    // ── CASE A: No Administrator Exists (System Uninitialized) ─────────────
     if (!isSystemInitialized) {
       if (pathname !== "/setup") {
         url.pathname = "/setup";
         return NextResponse.redirect(url);
       }
-    } else {
-      // Case B: System is INITIALIZED (Administrator exists)
-      if (pathname === "/setup") {
+      return response;
+    }
+
+    // ── CASE B: Administrator Exists (System Initialized) ───────────────────
+    // 1. Block access to /setup if system is initialized
+    if (pathname === "/setup") {
+      url.pathname = user ? (isStudent ? "/student/dashboard" : "/dashboard") : "/login";
+      return NextResponse.redirect(url);
+    }
+
+    // 2. Authoritative Root "/" Request Handling
+    if (pathname === "/") {
+      if (user) {
+        url.pathname = isStudent ? "/student/dashboard" : "/dashboard";
+      } else {
         url.pathname = "/login";
-        return NextResponse.redirect(url);
       }
+      return NextResponse.redirect(url);
     }
   }
 
-  // ── Helper: extract and normalize role from user metadata ──────────────────
-  const rawRole = (user?.user_metadata?.role as string | undefined)?.toLowerCase().trim();
-  const isStudent = rawRole === "student";
-  const isAdministrator = rawRole === "administrator" || rawRole === "admin";
-  // Non-student users (admin, staff, or accounts without role set) default to internal workspace access
-  const isInternalUser = !isStudent;
+  // ── Administrator-Only Route Guards ───────────────────────────────────────
+  const adminOnlyPaths = ["/dashboard/health", "/reports/audit", "/settings"];
 
-  // ── Administrator-only routes ───────────────────────────────────────────────
-  const adminOnlyPaths = [
-    "/dashboard/health",
-    "/reports/audit",
-    "/settings",
-  ];
-
-  if (adminOnlyPaths.some(p => pathname.startsWith(p))) {
+  if (adminOnlyPaths.some((p) => pathname.startsWith(p))) {
     if (!user) {
-      if (pathname !== "/login") {
-        url.pathname = "/login";
-        return NextResponse.redirect(url);
-      }
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
     } else if (!isAdministrator) {
-      if (pathname !== "/dashboard") {
-        url.pathname = "/dashboard";
-        url.searchParams.set("unauthorized", "1");
-        return NextResponse.redirect(url);
-      }
+      url.pathname = "/dashboard";
+      url.searchParams.set("unauthorized", "1");
+      return NextResponse.redirect(url);
     }
   }
 
-  // ── General authenticated Staff/Admin routes ────────────────────────────────
+  // ── Protected Staff/Admin Routes ──────────────────────────────────────────
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/students") ||
@@ -133,48 +136,40 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/monitoring")
   ) {
     if (!user) {
-      if (pathname !== "/login") {
-        url.pathname = "/login";
-        return NextResponse.redirect(url);
-      }
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
     } else if (!isInternalUser) {
-      if (pathname !== "/student/dashboard") {
-        url.pathname = "/student/dashboard";
-        return NextResponse.redirect(url);
-      }
+      url.pathname = "/student/dashboard";
+      return NextResponse.redirect(url);
     }
   }
 
-  // ── Student Portal Routes ───────────────────────────────────────────────────
+  // ── Student Portal Routes ──────────────────────────────────────────────────
   if (
     pathname.startsWith("/student/dashboard") ||
     pathname.startsWith("/student/upload")
   ) {
     if (!user) {
-      if (pathname !== "/student/login") {
-        url.pathname = "/student/login";
-        return NextResponse.redirect(url);
-      }
+      url.pathname = "/student/login";
+      return NextResponse.redirect(url);
     } else if (isInternalUser && !pathname.startsWith("/dashboard")) {
-      // If internal staff accidentally lands on student dashboard, route them to staff dashboard
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
   }
 
-  // ── Prevent authenticated users from visiting setup or login pages ────────
-  if (user && (pathname === "/login" || pathname === "/student/login" || pathname === "/setup")) {
+  // ── Prevent Authenticated Users from Visiting Login Pages ──────────────────
+  if (user && (pathname === "/login" || pathname === "/student/login")) {
     url.pathname = isStudent ? "/student/dashboard" : "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  // ── Security Headers ────────────────────────────────────────────────────────
+  // ── Security Headers ───────────────────────────────────────────────────────
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   
-  // CSP for production (allows Supabase, Turnstile, and essential assets)
   const csp = `
     default-src 'self';
     script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com;
