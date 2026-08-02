@@ -63,7 +63,6 @@ export const systemConfigService = {
 
       if (data?.value) {
         const val = data.value as { is_initialized?: boolean; initialized_at?: string; initialized_by?: string };
-        isDbInitialized = Boolean(val.is_initialized);
         initializedAt = val.initialized_at;
         initializedBy = val.initialized_by;
       }
@@ -71,8 +70,9 @@ export const systemConfigService = {
       // Table might not be migrated yet; fallback to adminCount check
     }
 
-    // Gating rule: Initialized if EITHER database flag is true OR at least 1 Administrator exists
-    const isInitialized = isDbInitialized || adminCount > 0;
+    // Authoritative Gating Rule: System is initialized ONLY if at least 1 Administrator exists.
+    // If adminCount === 0, the system is strictly NOT initialized (even if system_config contains stale rows).
+    const isInitialized = adminCount > 0;
 
     return {
       isInitialized,

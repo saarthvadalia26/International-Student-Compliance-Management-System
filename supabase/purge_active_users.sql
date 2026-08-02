@@ -19,9 +19,7 @@ BEGIN;
 -- ----------------------------------------------------------------------------
 
 DELETE FROM auth.users;
-
--- OR if foreign keys require CASCADE:
--- TRUNCATE TABLE auth.users CASCADE;
+DELETE FROM public.system_config WHERE key = 'initialization';
 
 -- ----------------------------------------------------------------------------
 -- OPTION 2 (ALTERNATIVE): Terminate Active Sessions ONLY (Preserve Accounts)
