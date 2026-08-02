@@ -64,7 +64,7 @@ export async function middleware(request: NextRequest) {
   const isAdministrator = rawRole === "administrator" || rawRole === "admin";
   const isInternalUser = !isStudent;
 
-  // ── Single Authoritative Setup & Route Decision for Non-API Requests ──────
+  // ── Single Authoritative Setup & Auth Routing Authority for Non-API Requests ──
   if (!pathname.startsWith("/api")) {
     let isSystemInitialized = false;
 
@@ -94,7 +94,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // ── CASE B: Administrator Exists (System Initialized) ───────────────────
-    // 1. Block access to /setup if system is initialized
+    // 1. Permanently disable /setup
     if (pathname === "/setup") {
       url.pathname = user ? (isStudent ? "/student/dashboard" : "/dashboard") : "/login";
       return NextResponse.redirect(url);

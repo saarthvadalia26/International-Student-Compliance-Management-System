@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
-
 export default function RootPage() {
-  // Edge Middleware handles root route '/' redirection authoritatively based on DB setup status.
-  // Fallback to /login if middleware is bypassed.
-  redirect("/login");
+  // Edge Middleware handles root route '/' redirection authoritatively as the single source of truth.
+  // No page-level redirects exist to prevent duplicate redirects and redirect loops.
+  return null;
 }
