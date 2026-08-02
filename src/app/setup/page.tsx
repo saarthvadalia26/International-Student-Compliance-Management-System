@@ -63,9 +63,9 @@ const DATE_FORMAT_PRESETS = [
 export default function InitialSetupWizardPage() {
   const router = useRouter();
 
-  // Initialization check state
   const [checking, setChecking] = React.useState(true);
   const [required, setRequired] = React.useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = React.useState(false);
 
   // Wizard active step (1 to 4)
   const [step, setStep] = React.useState<1 | 2 | 3 | 4>(1);
@@ -111,11 +111,14 @@ export default function InitialSetupWizardPage() {
         const data = await res.json();
         if (data.initialAdminRequired) {
           setRequired(true);
+          setIsRecoveryMode(Boolean(data.isRecoveryMode));
         } else {
           setRequired(false);
+          setIsRecoveryMode(false);
         }
       } catch {
         setRequired(false);
+        setIsRecoveryMode(false);
       } finally {
         setChecking(false);
       }
@@ -375,6 +378,17 @@ export default function InitialSetupWizardPage() {
             {/* STEP 1: Admin Account */}
             {step === 1 && (
               <div className="space-y-4">
+                {isRecoveryMode && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-600 dark:text-amber-400 space-y-1">
+                    <div className="flex items-center gap-2 font-semibold text-xs uppercase tracking-wider">
+                      <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                      <span>Administrator Account Recovery Mode</span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      System configuration was detected, but no active Administrator user exists in Supabase. Creating a new Administrator will restore full system access while preserving all existing university configuration and compliance records.
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Full Name

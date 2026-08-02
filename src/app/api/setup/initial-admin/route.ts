@@ -14,6 +14,8 @@ export async function GET() {
     return NextResponse.json({
       initialAdminRequired: !state.isInitialized,
       isInitialized: state.isInitialized,
+      isDbInitialized: state.isDbInitialized,
+      isRecoveryMode: state.isRecoveryMode,
       existingAdminCount: state.adminCount,
     });
   } catch (err: unknown) {

@@ -3,7 +3,9 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 
 export interface SystemInitializationState {
   isInitialized: boolean;
+  isDbInitialized: boolean;
   adminCount: number;
+  isRecoveryMode: boolean;
   initializedAt?: string;
   initializedBy?: string;
 }
@@ -29,13 +31,15 @@ export interface SystemPreferencesConfig {
 export const systemConfigService = {
   /**
    * Check whether the system is initialized.
-   * System is considered initialized if system_config.initialization.is_initialized === true
-   * OR if at least one Administrator user exists in auth.users.
+   * Dual-Condition Initialization Rule:
+   * System is initialized ONLY IF system_config.initialization.is_initialized === true
+   * AND at least one Administrator user exists in auth.users.
+   * If isDbInitialized === true BUT adminCount === 0, Recovery Mode is automatically triggered.
    */
   async checkInitializationState(): Promise<SystemInitializationState> {
     const admin = getAdminSupabase();
 
-    // 1. Check auth.users count of Administrators
+    // 1. Count Administrator accounts in auth.users
     let adminCount = 0;
     try {
       const { data: { users }, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -49,7 +53,7 @@ export const systemConfigService = {
       adminCount = 0;
     }
 
-    // 2. Check system_config table in DB
+    // 2. Query system_config table for initialization status
     let isDbInitialized = false;
     let initializedAt: string | undefined;
     let initializedBy: string | undefined;
@@ -63,20 +67,25 @@ export const systemConfigService = {
 
       if (data?.value) {
         const val = data.value as { is_initialized?: boolean; initialized_at?: string; initialized_by?: string };
+        isDbInitialized = Boolean(val.is_initialized);
         initializedAt = val.initialized_at;
         initializedBy = val.initialized_by;
       }
     } catch {
-      // Table might not be migrated yet; fallback to adminCount check
+      isDbInitialized = false;
     }
 
-    // Authoritative Gating Rule: System is initialized ONLY if at least 1 Administrator exists.
-    // If adminCount === 0, the system is strictly NOT initialized (even if system_config contains stale rows).
-    const isInitialized = adminCount > 0;
+    // Dual-Condition Initialization Rule
+    const isInitialized = isDbInitialized && adminCount > 0;
+
+    // Recovery Mode Trigger Rule: Flag is true, BUT zero Administrator accounts exist
+    const isRecoveryMode = isDbInitialized && adminCount === 0;
 
     return {
       isInitialized,
+      isDbInitialized,
       adminCount,
+      isRecoveryMode,
       initializedAt,
       initializedBy,
     };
