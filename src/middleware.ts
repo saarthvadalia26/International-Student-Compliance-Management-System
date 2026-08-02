@@ -58,6 +58,41 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone();
   const pathname = request.nextUrl.pathname;
 
+  // ── Initial Setup Gating (Database Source of Truth) ─────────────────────────
+  // Non-API routes verify if the application has been initialized.
+  if (!pathname.startsWith("/api")) {
+    let isSystemInitialized = false;
+    try {
+      const { data: config } = await supabase
+        .from("system_config")
+        .select("value")
+        .eq("key", "initialization")
+        .maybeSingle();
+
+      if (config?.value) {
+        isSystemInitialized = Boolean(
+          (config.value as { is_initialized?: boolean })?.is_initialized
+        );
+      }
+    } catch {
+      isSystemInitialized = false;
+    }
+
+    // Case A: System is UNINITIALIZED (0 Administrators exist)
+    if (!isSystemInitialized) {
+      if (pathname !== "/setup") {
+        url.pathname = "/setup";
+        return NextResponse.redirect(url);
+      }
+    } else {
+      // Case B: System is INITIALIZED (Administrator exists)
+      if (pathname === "/setup") {
+        url.pathname = "/login";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   // ── Helper: extract and normalize role from user metadata ──────────────────
   const rawRole = (user?.user_metadata?.role as string | undefined)?.toLowerCase().trim();
   const isStudent = rawRole === "student";

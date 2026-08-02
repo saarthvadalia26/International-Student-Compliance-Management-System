@@ -23,9 +23,21 @@ export default function LoginPage() {
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [isError, setIsError] = React.useState(false);
 
-  // Prefetch dashboard route on mount
+  // Prefetch dashboard route and check if initial setup is required
   React.useEffect(() => {
     router.prefetch("/dashboard");
+    async function verifyInitialSetup() {
+      try {
+        const res = await fetch("/api/setup/initial-admin");
+        const data = await res.json();
+        if (data.initialAdminRequired) {
+          router.replace("/setup");
+        }
+      } catch {
+        // Fallthrough to standard login rendering
+      }
+    }
+    verifyInitialSetup();
   }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
