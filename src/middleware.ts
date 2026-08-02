@@ -127,8 +127,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Prevent authenticated users from visiting login pages ──────────────────
-  if (user && (pathname === "/login" || pathname === "/student/login")) {
+  // ── Prevent authenticated users from visiting setup or login pages ────────
+  if (user && (pathname === "/login" || pathname === "/student/login" || pathname === "/setup")) {
     url.pathname = isStudent ? "/student/dashboard" : "/dashboard";
     return NextResponse.redirect(url);
   }

@@ -2,22 +2,62 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Loader2, UserPlus, CheckCircle2, AlertCircle } from "lucide-react";
+import { 
+  ShieldCheck, 
+  Loader2, 
+  User, 
+  Building, 
+  Sliders, 
+  CheckCircle2, 
+  AlertCircle, 
+  ArrowRight, 
+  ArrowLeft,
+  Sparkles,
+  Lock,
+  Globe,
+  Clock,
+  Bell,
+  Check
+} from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Branding } from "@/config/branding";
 import { toast } from "sonner";
 
-export default function InitialAdminSetupPage() {
+export default function InitialSetupWizardPage() {
   const router = useRouter();
+
+  // Initialization check state
   const [checking, setChecking] = React.useState(true);
   const [required, setRequired] = React.useState(false);
 
+  // Wizard active step (1 to 4)
+  const [step, setStep] = React.useState<1 | 2 | 3 | 4>(1);
+
+  // Step 1: Administrator Account State
   const [fullName, setFullName] = React.useState("");
-  const [email, setEmail] = React.useState("");
+  const [email, setEmail] = React.useState("admin@nfsu.ac.in");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
+
+  // Step 2: University Information State
+  const [universityName, setUniversityName] = React.useState(Branding.universityName);
+  const [shortName, setShortName] = React.useState(Branding.shortName);
+  const [timezone, setTimezone] = React.useState("Asia/Kolkata");
+  const [defaultLanguage, setDefaultLanguage] = React.useState("en");
+  const [academicYear, setAcademicYear] = React.useState("2026-2027");
+  const [logoUrl, setLogoUrl] = React.useState("");
+
+  // Step 3: System Preferences State
+  const [reminderSchedule, setReminderSchedule] = React.useState("30,15,7,1");
+  const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = React.useState(60);
+  const [maxUploadSizeBytes, setMaxUploadSizeBytes] = React.useState(10485760); // 10 MB
+  const [dateFormat, setDateFormat] = React.useState("DD/MM/YYYY");
+  const [enableAuditLogging, setEnableAuditLogging] = React.useState(true);
+  const [enableMaintenanceNotifications, setEnableMaintenanceNotifications] = React.useState(true);
+
+  // Submission State
   const [submitting, setSubmitting] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
@@ -40,41 +80,116 @@ export default function InitialAdminSetupPage() {
     checkRequirement();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Validation for Step 1
+  const validateStep1 = (): boolean => {
     setErrorMsg(null);
-
-    if (!fullName.trim() || !email.trim() || !password) {
-      setErrorMsg("Please fill out all required fields.");
-      return;
+    if (!fullName.trim()) {
+      setErrorMsg("Full name is required.");
+      return false;
     }
-
+    if (!email.trim() || !email.includes("@")) {
+      setErrorMsg("A valid official university email is required.");
+      return false;
+    }
     if (password.length < 8) {
       setErrorMsg("Password must be at least 8 characters long.");
-      return;
+      return false;
     }
-
+    if (!/[A-Z]/.test(password) || !/[0-9!@#$%^&*]/.test(password)) {
+      setErrorMsg("Password must contain at least one uppercase letter and one number or special character.");
+      return false;
+    }
     if (password !== confirmPassword) {
       setErrorMsg("Passwords do not match.");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  // Validation for Step 2
+  const validateStep2 = (): boolean => {
+    setErrorMsg(null);
+    if (!universityName.trim()) {
+      setErrorMsg("University name is required.");
+      return false;
+    }
+    if (!shortName.trim()) {
+      setErrorMsg("Short name is required.");
+      return false;
+    }
+    return true;
+  };
+
+  // Validation for Step 3
+  const validateStep3 = (): boolean => {
+    setErrorMsg(null);
+    if (!reminderSchedule.trim()) {
+      setErrorMsg("Reminder schedule is required.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (step === 1 && !validateStep1()) return;
+    if (step === 2 && !validateStep2()) return;
+    if (step === 3 && !validateStep3()) return;
+
+    if (step < 4) {
+      setStep((prev) => (prev + 1) as 1 | 2 | 3 | 4);
+    }
+  };
+
+  const handleBack = () => {
+    setErrorMsg(null);
+    if (step > 1) {
+      setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4);
+    }
+  };
+
+  const handleFinishSetup = async () => {
+    setErrorMsg(null);
+
+    const payload = {
+      admin: {
+        fullName,
+        email,
+        password,
+      },
+      university: {
+        universityName,
+        shortName,
+        timezone,
+        defaultLanguage,
+        academicYear,
+        logoUrl: logoUrl || undefined,
+      },
+      preferences: {
+        reminderSchedule,
+        sessionTimeoutMinutes,
+        maxUploadSizeBytes,
+        dateFormat,
+        enableAuditLogging,
+        enableMaintenanceNotifications,
+      },
+    };
 
     try {
       setSubmitting(true);
       const res = await fetch("/api/setup/initial-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, email, password }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error ?? "Failed to create Administrator account.");
+        throw new Error(data.error ?? "Failed to complete setup wizard.");
       }
 
-      toast.success("Initial Administrator account created successfully!");
-      router.push("/login?setup=success");
+      toast.success("Initial Setup Wizard completed successfully!");
+      router.push("/login?setup=complete");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "An unexpected error occurred.";
       setErrorMsg(message);
@@ -98,12 +213,12 @@ export default function InitialAdminSetupPage() {
   if (!required) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background p-4 text-foreground">
-        <Card className="w-full max-w-md shadow-lg">
+        <Card className="w-full max-w-md shadow-lg border-border">
           <CardHeader className="text-center">
             <ShieldCheck className="mx-auto h-12 w-12 text-primary" />
-            <CardTitle className="text-xl font-bold">System Already Initialized</CardTitle>
-            <CardDescription>
-              An Administrator account already exists for {Branding.shortName}. Initial setup is permanently disabled.
+            <CardTitle className="text-xl font-bold">403 — Setup Disabled</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground mt-1">
+              The One-Time Initial Setup Wizard has already been completed for {Branding.shortName}. Initial setup is permanently disabled.
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex justify-center">
@@ -117,108 +232,373 @@ export default function InitialAdminSetupPage() {
   }
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-muted/20 p-4 text-foreground">
-      <Card className="w-full max-w-lg shadow-xl border-primary/20">
-        <CardHeader className="space-y-2 text-center border-b pb-6">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <ShieldCheck className="h-8 w-8" />
+    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-muted/20 p-4 text-foreground">
+      <div className="w-full max-w-2xl space-y-6">
+        
+        {/* Wizard Header Progress Indicator */}
+        <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground mb-3 px-1">
+            <span>One-Time Initial Setup Wizard</span>
+            <span className="text-primary">Step {step} of 4</span>
           </div>
-          <CardTitle className="text-2xl font-bold font-display tracking-tight text-primary">
-            Production Setup — Initial Administrator
-          </CardTitle>
-          <CardDescription className="text-sm text-muted-foreground max-w-sm mx-auto">
-            Create the primary Administrator account for {Branding.universityName}. This setup flow runs once.
-          </CardDescription>
-        </CardHeader>
 
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4 pt-6">
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { num: 1, label: "Admin Account", icon: User },
+              { num: 2, label: "University Details", icon: Building },
+              { num: 3, label: "Preferences", icon: Sliders },
+              { num: 4, label: "Review & Finish", icon: CheckCircle2 },
+            ].map((s) => {
+              const Icon = s.icon;
+              const isCompleted = step > s.num;
+              const isCurrent = step === s.num;
+
+              return (
+                <div
+                  key={s.num}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-lg text-center transition-all ${
+                    isCurrent
+                      ? "bg-primary/10 text-primary font-bold border border-primary/20"
+                      : isCompleted
+                      ? "text-foreground font-medium"
+                      : "text-muted-foreground opacity-60"
+                  }`}
+                >
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+                    isCompleted
+                      ? "bg-primary text-primary-foreground"
+                      : isCurrent
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {isCompleted ? <Check className="h-4 w-4" /> : s.num}
+                  </div>
+                  <span className="text-[11px] truncate hidden sm:block">{s.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Wizard Main Card Workspace */}
+        <Card className="shadow-xl border-primary/20">
+          <CardHeader className="border-b pb-4">
+            <CardTitle className="text-xl font-bold font-display flex items-center gap-2 text-primary">
+              {step === 1 && <User className="h-5 w-5 text-primary" />}
+              {step === 2 && <Building className="h-5 w-5 text-primary" />}
+              {step === 3 && <Sliders className="h-5 w-5 text-primary" />}
+              {step === 4 && <Sparkles className="h-5 w-5 text-primary" />}
+
+              {step === 1 && "Step 1 — Create Administrator Account"}
+              {step === 2 && "Step 2 — University Information"}
+              {step === 3 && "Step 3 — Application System Preferences"}
+              {step === 4 && "Step 4 — Final Review & Initialization"}
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              {step === 1 && "Configure the root Administrator credentials. This account holds full system permissions."}
+              {step === 2 && "Set institutional branding and localization defaults for NFSU."}
+              {step === 3 && "Set operational schedules, upload limits, and session preferences."}
+              {step === 4 && "Review your choices below before completing permanent system initialization."}
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="pt-6 space-y-4">
             {errorMsg && (
-              <div className="flex items-center gap-3 rounded-lg bg-destructive/15 p-3 text-sm text-destructive font-medium">
-                <AlertCircle className="h-5 w-5 shrink-0" />
+              <div className="flex items-center gap-3 rounded-lg bg-destructive/15 p-3 text-xs text-destructive font-medium">
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{errorMsg}</span>
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Administrator Full Name
-              </label>
-              <Input
-                type="text"
-                placeholder="Dr. Admin Name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                disabled={submitting}
-                required
-              />
-            </div>
+            {/* STEP 1: Admin Account */}
+            {step === 1 && (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Full Name
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Dr. Administrator Name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
+                </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Official Email Address
-              </label>
-              <Input
-                type="email"
-                placeholder="admin@nfsu.ac.in"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={submitting}
-                required
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Official University Email
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="admin@nfsu.ac.in"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Secure Password
-                </label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={submitting}
-                  required
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Password
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <p className="text-[10px] text-muted-foreground">Min. 8 chars, 1 uppercase, 1 number/symbol.</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Confirm Password
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
+            )}
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Confirm Password
-                </label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  disabled={submitting}
-                  required
-                />
+            {/* STEP 2: University Information */}
+            {step === 2 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      University Name
+                    </label>
+                    <Input
+                      value={universityName}
+                      onChange={(e) => setUniversityName(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Short Name
+                    </label>
+                    <Input
+                      value={shortName}
+                      onChange={(e) => setShortName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Time Zone
+                    </label>
+                    <Input
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Default Language
+                    </label>
+                    <Input
+                      value={defaultLanguage}
+                      onChange={(e) => setDefaultLanguage(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Academic Year
+                    </label>
+                    <Input
+                      value={academicYear}
+                      onChange={(e) => setAcademicYear(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    University Logo URL (Optional)
+                  </label>
+                  <Input
+                    placeholder="https://example.com/logo.png"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* STEP 3: System Preferences */}
+            {step === 3 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Reminder Schedule (Days Before Due)
+                    </label>
+                    <Input
+                      value={reminderSchedule}
+                      onChange={(e) => setReminderSchedule(e.target.value)}
+                      placeholder="30,15,7,1"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Session Timeout (Minutes)
+                    </label>
+                    <Input
+                      type="number"
+                      value={sessionTimeoutMinutes}
+                      onChange={(e) => setSessionTimeoutMinutes(Number(e.target.value))}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Max Document Upload Size (MB)
+                    </label>
+                    <Input
+                      type="number"
+                      value={Math.round(maxUploadSizeBytes / 1048576)}
+                      onChange={(e) => setMaxUploadSizeBytes(Number(e.target.value) * 1048576)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Date Format
+                    </label>
+                    <Input
+                      value={dateFormat}
+                      onChange={(e) => setDateFormat(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <label className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg border border-border/60 bg-muted/10 hover:bg-muted/20">
+                    <input
+                      type="checkbox"
+                      checked={enableAuditLogging}
+                      onChange={(e) => setEnableAuditLogging(e.target.checked)}
+                      className="h-4 w-4 rounded border-primary text-primary"
+                    />
+                    <div>
+                      <div className="text-xs font-semibold text-foreground">Enable Immutable Audit Logging</div>
+                      <div className="text-[11px] text-muted-foreground">Record all security, role change, and logout events to audit_log table.</div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer p-2.5 rounded-lg border border-border/60 bg-muted/10 hover:bg-muted/20">
+                    <input
+                      type="checkbox"
+                      checked={enableMaintenanceNotifications}
+                      onChange={(e) => setEnableMaintenanceNotifications(e.target.checked)}
+                      className="h-4 w-4 rounded border-primary text-primary"
+                    />
+                    <div>
+                      <div className="text-xs font-semibold text-foreground">Enable System Maintenance Alerts</div>
+                      <div className="text-[11px] text-muted-foreground">Display critical system health and maintenance notices in administrator dashboard.</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 4: Summary & Finish */}
+            {step === 4 && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                  <div className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 border-b border-primary/20 pb-2">
+                    <User className="h-4 w-4" /> Root Administrator
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Name:</span> <strong className="text-foreground">{fullName}</strong></div>
+                    <div><span className="text-muted-foreground">Email:</span> <strong className="text-foreground">{email}</strong></div>
+                    <div><span className="text-muted-foreground">Role:</span> <strong className="text-primary">administrator</strong></div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                  <div className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+                    <Building className="h-4 w-4 text-muted-foreground" /> University Metadata
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Institution:</span> <strong className="text-foreground">{universityName}</strong></div>
+                    <div><span className="text-muted-foreground">Short Code:</span> <strong className="text-foreground">{shortName}</strong></div>
+                    <div><span className="text-muted-foreground">Timezone:</span> <strong className="text-foreground">{timezone}</strong></div>
+                    <div><span className="text-muted-foreground">Academic Year:</span> <strong className="text-foreground">{academicYear}</strong></div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                  <div className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+                    <Sliders className="h-4 w-4 text-muted-foreground" /> System Preferences
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Reminders:</span> <strong className="text-foreground">{reminderSchedule} days</strong></div>
+                    <div><span className="text-muted-foreground">Timeout:</span> <strong className="text-foreground">{sessionTimeoutMinutes} mins</strong></div>
+                    <div><span className="text-muted-foreground">Upload Size:</span> <strong className="text-foreground">{Math.round(maxUploadSizeBytes / 1048576)} MB</strong></div>
+                    <div><span className="text-muted-foreground">Audit Trail:</span> <strong className="text-emerald-600">{enableAuditLogging ? "Enabled" : "Disabled"}</strong></div>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
 
-          <CardFooter className="flex flex-col gap-3 border-t pt-4">
-            <Button type="submit" disabled={submitting} className="w-full font-semibold h-11">
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Administrator Account...
-                </>
-              ) : (
-                <>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Create Initial Administrator
-                </>
-              )}
-            </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              By creating this account, you assume root administrative authority for ISCMS.
-            </p>
+          <CardFooter className="flex items-center justify-between border-t pt-4">
+            {step > 1 ? (
+              <Button type="button" variant="outline" size="sm" onClick={handleBack} disabled={submitting}>
+                <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+              </Button>
+            ) : (
+              <div />
+            )}
+
+            {step < 4 ? (
+              <Button type="button" size="sm" onClick={handleNext}>
+                Next <ArrowRight className="ml-1.5 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button type="button" size="sm" disabled={submitting} onClick={handleFinishSetup} className="font-bold px-6">
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Completing Setup...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Finish Setup & Initialize System
+                  </>
+                )}
+              </Button>
+            )}
           </CardFooter>
-        </form>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }
