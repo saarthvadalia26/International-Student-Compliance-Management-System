@@ -28,11 +28,10 @@ export const metadata: Metadata = {
   description: `Official ${Branding.appName} of the ${Branding.universityName}.`,
   icons: {
     icon: [
-      { url: "/assets/branding/nfsu-logo.png", type: "image/png" },
       { url: "/favicon.png", type: "image/png" },
       { url: "/favicon.ico", sizes: "any" }
     ],
-    shortcut: "/assets/branding/nfsu-logo.png",
+    shortcut: "/favicon.png",
     apple: "/apple-touch-icon.png"
   },
   openGraph: {
