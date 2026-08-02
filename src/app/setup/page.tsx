@@ -13,17 +13,52 @@ import {
   ArrowRight, 
   ArrowLeft,
   Sparkles,
-  Lock,
+  Check,
+  Calendar,
   Globe,
   Clock,
-  Bell,
-  Check
+  Languages
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Branding } from "@/config/branding";
 import { toast } from "sonner";
+
+// Predefined Timezone Options (IANA Compliant)
+const TIMEZONE_OPTIONS = [
+  { value: "Asia/Kolkata", label: "Asia / Kolkata (IST — India +05:30)", region: "Asia" },
+  { value: "Asia/Dubai", label: "Asia / Dubai (GST — Gulf +04:00)", region: "Asia" },
+  { value: "Asia/Singapore", label: "Asia / Singapore (SGT +08:00)", region: "Asia" },
+  { value: "Asia/Tokyo", label: "Asia / Tokyo (JST +09:00)", region: "Asia" },
+  { value: "Europe/London", label: "Europe / London (GMT/BST +00:00)", region: "Europe" },
+  { value: "Europe/Paris", label: "Europe / Paris (CET/CEST +01:00)", region: "Europe" },
+  { value: "America/New_York", label: "America / New York (EST/EDT -05:00)", region: "Americas" },
+  { value: "America/Los_Angeles", label: "America / Los Angeles (PST/PDT -08:00)", region: "Americas" },
+  { value: "Australia/Sydney", label: "Australia / Sydney (AEST +10:00)", region: "Oceania" },
+  { value: "UTC", label: "UTC (Coordinated Universal Time +00:00)", region: "Global" },
+];
+
+// Predefined Language Options (Code to Human Name Mapping)
+const LANGUAGE_OPTIONS = [
+  { code: "en", name: "English", native: "English (Default)" },
+  { code: "hi", name: "Hindi", native: "Hindi (हिन्दी)" },
+  { code: "gu", name: "Gujarati", native: "Gujarati (ગુજરાતી)" },
+  { code: "ar", name: "Arabic", native: "Arabic (العربية)" },
+  { code: "fr", name: "French", native: "French (Français)" },
+  { code: "es", name: "Spanish", native: "Spanish (Español)" },
+  { code: "zh", name: "Chinese", native: "Chinese (中文)" },
+  { code: "ja", name: "Japanese", native: "Japanese (日本語)" },
+];
+
+// Predefined Date Format Presets
+const DATE_FORMAT_PRESETS = [
+  { format: "DD/MM/YYYY", label: "DD/MM/YYYY (Standard UK/India — e.g. 25/12/2026)" },
+  { format: "MM/DD/YYYY", label: "MM/DD/YYYY (US Format — e.g. 12/25/2026)" },
+  { format: "YYYY-MM-DD", label: "YYYY-MM-DD (ISO Standard — e.g. 2026-12-25)" },
+  { format: "DD-MM-YYYY", label: "DD-MM-YYYY (Hyphen Separated — e.g. 25-12-2026)" },
+  { format: "YYYY/MM/DD", label: "YYYY/MM/DD (Year First — e.g. 2026/12/25)" },
+];
 
 export default function InitialSetupWizardPage() {
   const router = useRouter();
@@ -53,7 +88,15 @@ export default function InitialSetupWizardPage() {
   const [reminderSchedule, setReminderSchedule] = React.useState("30,15,7,1");
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = React.useState(60);
   const [maxUploadSizeBytes, setMaxUploadSizeBytes] = React.useState(10485760); // 10 MB
-  const [dateFormat, setDateFormat] = React.useState("DD/MM/YYYY");
+  
+  // Date Format Builder State (No free-text input allowed)
+  const [dateFormatPreset, setDateFormatPreset] = React.useState("DD/MM/YYYY");
+  const [dateFormatPart1, setDateFormatPart1] = React.useState("DD");
+  const [dateFormatPart2, setDateFormatPart2] = React.useState("MM");
+  const [dateFormatPart3, setDateFormatPart3] = React.useState("YYYY");
+  const [dateSeparator, setDateSeparator] = React.useState("/");
+  const [customBuilderActive, setCustomBuilderActive] = React.useState(false);
+
   const [enableAuditLogging, setEnableAuditLogging] = React.useState(true);
   const [enableMaintenanceNotifications, setEnableMaintenanceNotifications] = React.useState(true);
 
@@ -79,6 +122,14 @@ export default function InitialSetupWizardPage() {
     }
     checkRequirement();
   }, []);
+
+  // Compute final canonical date format string
+  const computedDateFormat = React.useMemo(() => {
+    if (!customBuilderActive) {
+      return dateFormatPreset;
+    }
+    return `${dateFormatPart1}${dateSeparator}${dateFormatPart2}${dateSeparator}${dateFormatPart3}`;
+  }, [customBuilderActive, dateFormatPreset, dateFormatPart1, dateSeparator, dateFormatPart2, dateFormatPart3]);
 
   // Validation for Step 1
   const validateStep1 = (): boolean => {
@@ -117,6 +168,14 @@ export default function InitialSetupWizardPage() {
       setErrorMsg("Short name is required.");
       return false;
     }
+    if (!timezone.trim()) {
+      setErrorMsg("Time zone selection is required.");
+      return false;
+    }
+    if (!defaultLanguage.trim()) {
+      setErrorMsg("Default language selection is required.");
+      return false;
+    }
     return true;
   };
 
@@ -125,6 +184,10 @@ export default function InitialSetupWizardPage() {
     setErrorMsg(null);
     if (!reminderSchedule.trim()) {
       setErrorMsg("Reminder schedule is required.");
+      return false;
+    }
+    if (customBuilderActive && (dateFormatPart1 === dateFormatPart2 || dateFormatPart2 === dateFormatPart3 || dateFormatPart1 === dateFormatPart3)) {
+      setErrorMsg("Custom date format parts must be unique (Day, Month, Year).");
       return false;
     }
     return true;
@@ -168,7 +231,7 @@ export default function InitialSetupWizardPage() {
         reminderSchedule,
         sessionTimeoutMinutes,
         maxUploadSizeBytes,
-        dateFormat,
+        dateFormat: computedDateFormat,
         enableAuditLogging,
         enableMaintenanceNotifications,
       },
@@ -239,7 +302,7 @@ export default function InitialSetupWizardPage() {
         <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground mb-3 px-1">
             <span>One-Time Initial Setup Wizard</span>
-            <span className="text-primary">Step {step} of 4</span>
+            <span className="text-primary font-bold">Step {step} of 4</span>
           </div>
 
           <div className="grid grid-cols-4 gap-2">
@@ -249,7 +312,6 @@ export default function InitialSetupWizardPage() {
               { num: 3, label: "Preferences", icon: Sliders },
               { num: 4, label: "Review & Finish", icon: CheckCircle2 },
             ].map((s) => {
-              const Icon = s.icon;
               const isCompleted = step > s.num;
               const isCurrent = step === s.num;
 
@@ -295,10 +357,10 @@ export default function InitialSetupWizardPage() {
               {step === 4 && "Step 4 — Final Review & Initialization"}
             </CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
-              {step === 1 && "Configure the root Administrator credentials. This account holds full system permissions."}
+              {step === 1 && "Configure root Administrator credentials. Account automatically receives administrator role."}
               {step === 2 && "Set institutional branding and localization defaults for NFSU."}
-              {step === 3 && "Set operational schedules, upload limits, and session preferences."}
-              {step === 4 && "Review your choices below before completing permanent system initialization."}
+              {step === 3 && "Set operational schedules, upload limits, and date format preferences."}
+              {step === 4 && "Review your configuration choices below before completing permanent system initialization."}
             </CardDescription>
           </CardHeader>
 
@@ -370,7 +432,7 @@ export default function InitialSetupWizardPage() {
               </div>
             )}
 
-            {/* STEP 2: University Information */}
+            {/* STEP 2: University Information (Structured Dropdowns) */}
             {step === 2 && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -398,26 +460,41 @@ export default function InitialSetupWizardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  {/* Time Zone Searchable/Structured Dropdown */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Time Zone
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5 text-primary" /> Time Zone
                     </label>
-                    <Input
+                    <select
                       value={timezone}
                       onChange={(e) => setTimezone(e.target.value)}
-                      required
-                    />
+                      className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-card px-3 py-2 text-xs font-medium text-foreground ring-offset-background transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
+                  {/* Default Language Dropdown */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Default Language
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                      <Languages className="h-3.5 w-3.5 text-primary" /> Default Language
                     </label>
-                    <Input
+                    <select
                       value={defaultLanguage}
                       onChange={(e) => setDefaultLanguage(e.target.value)}
-                      required
-                    />
+                      className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-card px-3 py-2 text-xs font-medium text-foreground ring-offset-background transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {LANGUAGE_OPTIONS.map((lang) => (
+                        <option key={lang.code} value={lang.code}>
+                          {lang.native}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-1.5">
@@ -445,7 +522,7 @@ export default function InitialSetupWizardPage() {
               </div>
             )}
 
-            {/* STEP 3: System Preferences */}
+            {/* STEP 3: System Preferences (No Free-Text Date Format) */}
             {step === 3 && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -487,15 +564,83 @@ export default function InitialSetupWizardPage() {
                     />
                   </div>
 
+                  {/* Date Format Preset Selector & Dynamic Builder */}
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Date Format
-                    </label>
-                    <Input
-                      value={dateFormat}
-                      onChange={(e) => setDateFormat(e.target.value)}
-                      required
-                    />
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5 text-primary" /> Date Format
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setCustomBuilderActive(!customBuilderActive)}
+                        className="text-[10px] text-primary hover:underline font-semibold"
+                      >
+                        {customBuilderActive ? "Use Presets" : "Build Custom Order"}
+                      </button>
+                    </div>
+
+                    {!customBuilderActive ? (
+                      <select
+                        value={dateFormatPreset}
+                        onChange={(e) => setDateFormatPreset(e.target.value)}
+                        className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-card px-3 py-2 text-xs font-medium text-foreground ring-offset-background transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        {DATE_FORMAT_PRESETS.map((fmt) => (
+                          <option key={fmt.format} value={fmt.format}>
+                            {fmt.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="grid grid-cols-4 gap-1.5">
+                        <select
+                          value={dateFormatPart1}
+                          onChange={(e) => setDateFormatPart1(e.target.value)}
+                          className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
+                        >
+                          <option value="DD">DD (Day)</option>
+                          <option value="MM">MM (Month)</option>
+                          <option value="YYYY">YYYY (Year)</option>
+                        </select>
+                        
+                        <select
+                          value={dateSeparator}
+                          onChange={(e) => setDateSeparator(e.target.value)}
+                          className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
+                        >
+                          <option value="/">/ (Slash)</option>
+                          <option value="-">- (Hyphen)</option>
+                          <option value=".">. (Dot)</option>
+                        </select>
+
+                        <select
+                          value={dateFormatPart2}
+                          onChange={(e) => setDateFormatPart2(e.target.value)}
+                          className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
+                        >
+                          <option value="MM">MM (Month)</option>
+                          <option value="DD">DD (Day)</option>
+                          <option value="YYYY">YYYY (Year)</option>
+                        </select>
+
+                        <select
+                          value={dateFormatPart3}
+                          onChange={(e) => setDateFormatPart3(e.target.value)}
+                          className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
+                        >
+                          <option value="YYYY">YYYY (Year)</option>
+                          <option value="MM">MM (Month)</option>
+                          <option value="DD">DD (Day)</option>
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5 px-1">
+                      <span>Generated Format:</span>
+                      <code className="font-mono text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
+                        {computedDateFormat}
+                      </code>
+                    </div>
                   </div>
                 </div>
 
@@ -551,6 +696,7 @@ export default function InitialSetupWizardPage() {
                     <div><span className="text-muted-foreground">Institution:</span> <strong className="text-foreground">{universityName}</strong></div>
                     <div><span className="text-muted-foreground">Short Code:</span> <strong className="text-foreground">{shortName}</strong></div>
                     <div><span className="text-muted-foreground">Timezone:</span> <strong className="text-foreground">{timezone}</strong></div>
+                    <div><span className="text-muted-foreground">Language:</span> <strong className="text-foreground">{LANGUAGE_OPTIONS.find(l => l.code === defaultLanguage)?.native || defaultLanguage} ({defaultLanguage})</strong></div>
                     <div><span className="text-muted-foreground">Academic Year:</span> <strong className="text-foreground">{academicYear}</strong></div>
                   </div>
                 </div>
@@ -563,6 +709,7 @@ export default function InitialSetupWizardPage() {
                     <div><span className="text-muted-foreground">Reminders:</span> <strong className="text-foreground">{reminderSchedule} days</strong></div>
                     <div><span className="text-muted-foreground">Timeout:</span> <strong className="text-foreground">{sessionTimeoutMinutes} mins</strong></div>
                     <div><span className="text-muted-foreground">Upload Size:</span> <strong className="text-foreground">{Math.round(maxUploadSizeBytes / 1048576)} MB</strong></div>
+                    <div><span className="text-muted-foreground">Date Format:</span> <strong className="text-primary font-mono font-bold">{computedDateFormat}</strong></div>
                     <div><span className="text-muted-foreground">Audit Trail:</span> <strong className="text-emerald-600">{enableAuditLogging ? "Enabled" : "Disabled"}</strong></div>
                   </div>
                 </div>
