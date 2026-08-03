@@ -3,6 +3,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { USER_ROLES } from "@/lib/auth/permissions";
 import { auditService } from "@/lib/audit/audit.service";
 import { systemConfigService } from "@/lib/system-config";
+import { administratorDetectionService } from "@/services/auth/administrator-detection.service";
 
 /**
  * GET /api/setup/initial-admin
@@ -128,6 +129,9 @@ export async function POST(req: Request) {
       previousValue: "uninitialized",
       newValue: "initialized",
     });
+
+    // Invalidate Administrator Detection Service cache so middleware immediately recognizes new Admin
+    administratorDetectionService.invalidateCache();
 
     return NextResponse.json(
       {
