@@ -111,7 +111,8 @@ export default function InitialSetupWizardPage() {
         const data = await res.json();
         if (data.initialAdminRequired) {
           setRequired(true);
-          setIsRecoveryMode(Boolean(data.isRecoveryMode));
+          const isRecovery = Boolean(data.isRecoveryMode && data.hasOperationalData && !data.isFreshInstallation);
+          setIsRecoveryMode(isRecovery);
         } else {
           setRequired(false);
           setIsRecoveryMode(false);

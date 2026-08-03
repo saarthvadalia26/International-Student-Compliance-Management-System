@@ -35,7 +35,7 @@ export const systemStateService = {
   /**
    * Intelligently inspect database state to differentiate between:
    * 1. Fresh Installation (No Admin + No Operational Data)
-   * 2. Recovery Mode (No Admin + Has Operational Data)
+   * 2. Recovery Mode (Previously Initialized + No Admin + Has Operational Data)
    * 3. Fully Initialized System (Admin Exists + System Config Initialized)
    */
   async getSystemState(forceRefresh = false): Promise<SystemStateResult> {
@@ -91,14 +91,17 @@ export const systemStateService = {
     }
 
     // Intelligent State Deduction Matrix:
-    // A system is Initialized ONLY IF an Administrator exists AND system_config is marked initialized
+    // 1. A system is Initialized ONLY IF an Administrator exists AND system_config is marked initialized
     const isInitialized = administratorExists && isDbInitialized;
 
-    // A system is a Fresh Installation if NO Administrator exists AND NO Operational Data exists
-    const isFreshInstallation = !administratorExists && !hasOperationalData;
+    // 2. Recovery Mode MUST meet ALL 3 strict criteria:
+    //    - Previously initialized (isDbInitialized === true)
+    //    - NO Administrator account exists (administratorExists === false)
+    //    - Operational data DOES exist in database (hasOperationalData === true)
+    const isRecoveryMode = !administratorExists && isDbInitialized && hasOperationalData;
 
-    // A system requires Recovery Mode ONLY IF NO Administrator exists BUT Operational Data DOES exist
-    const isRecoveryMode = !administratorExists && hasOperationalData;
+    // 3. Fresh Installation IF NO Administrator exists AND Operational Data does NOT exist (even if flag was true from dev reset)
+    const isFreshInstallation = !administratorExists && !isRecoveryMode;
 
     const result: SystemStateResult = {
       administratorExists,
