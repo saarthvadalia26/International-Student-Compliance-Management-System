@@ -4,14 +4,24 @@
  * Converts raw framework exceptions, database timeouts, Supabase auth errors,
  * and network failures into clear, professional, plain-English messages.
  *
- * SECURITY: Never exposes stack traces, SQL error codes, internal IDs, or digest IDs to the browser.
+ * SECURITY: Never exposes stack traces, SQL error codes, internal IDs, API secrets,
+ * or digest IDs to regular users. Provides safe diagnostic metadata only for Administrators.
  */
+
+export interface DiagnosticMetadata {
+  logReferenceId: string;
+  category: "auth" | "database" | "network" | "permission" | "validation" | "unknown";
+  timestamp: string;
+  route: string;
+  statusCode: number;
+}
 
 export interface HumanFriendlyError {
   title: string;
   message: string;
   category: "auth" | "database" | "network" | "permission" | "validation" | "unknown";
-  errorId?: string;
+  errorId: string;
+  diagnostics: DiagnosticMetadata;
 }
 
 export interface ErrorLogContext {
@@ -36,14 +46,15 @@ function generateErrorId(): string {
 export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFriendlyError {
   const errorId = generateErrorId();
   const timestamp = new Date().toISOString();
+  const route = context?.route ?? (typeof window !== "undefined" ? window.location.pathname : "/");
 
   const rawMessage = err instanceof Error ? err.message : String(err || "");
   const rawStack = err instanceof Error ? err.stack : undefined;
   const rawName = err instanceof Error ? err.name : "UnknownError";
 
-  // Server-side diagnostic log (never sent to client)
+  // Server-side diagnostic log (never sent to client response)
   if (typeof window === "undefined") {
-    console.error(`[SERVER_ERROR_LOG] [${timestamp}] [${errorId}]`, {
+    console.error(`[SERVER_DIAGNOSTIC_LOG] [${timestamp}] [${errorId}]`, {
       name: rawName,
       message: rawMessage,
       stack: rawStack,
@@ -53,7 +64,7 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
 
   const normalized = rawMessage.toLowerCase();
 
-  // 1. Session & Authentication Errors
+  // 1. Session & Authentication Errors (Status: 401)
   if (
     normalized.includes("jwt expired") ||
     normalized.includes("jwt_expired") ||
@@ -68,10 +79,17 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
       message: "Your session has expired. Please sign in again.",
       category: "auth",
       errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "auth",
+        timestamp,
+        route,
+        statusCode: 401,
+      },
     };
   }
 
-  // 2. Authorization & Permission Errors
+  // 2. Authorization & Permission Errors (Status: 403)
   if (
     normalized.includes("403") ||
     normalized.includes("forbidden") ||
@@ -85,10 +103,17 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
       message: "You don't have permission to perform this action.",
       category: "permission",
       errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "permission",
+        timestamp,
+        route,
+        statusCode: 403,
+      },
     };
   }
 
-  // 3. Network & Connection Errors
+  // 3. Network & Connection Errors (Status: 503)
   if (
     normalized.includes("failed to fetch") ||
     normalized.includes("networkerror") ||
@@ -103,10 +128,17 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
       message: "Connection lost. Please check your internet connection.",
       category: "network",
       errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "network",
+        timestamp,
+        route,
+        statusCode: 503,
+      },
     };
   }
 
-  // 4. Database & Timeout Errors
+  // 4. Database & Timeout Errors (Status: 500)
   if (
     normalized.includes("pgrst") ||
     normalized.includes("postgres") ||
@@ -122,10 +154,17 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
       message: "Unable to load data. Please try again.",
       category: "database",
       errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "database",
+        timestamp,
+        route,
+        statusCode: 500,
+      },
     };
   }
 
-  // 5. Rate Limiting Errors
+  // 5. Rate Limiting Errors (Status: 429)
   if (
     normalized.includes("rate limit") ||
     normalized.includes("429") ||
@@ -136,10 +175,17 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
       message: "Too many requests. Please try again in a few moments.",
       category: "validation",
       errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "validation",
+        timestamp,
+        route,
+        statusCode: 429,
+      },
     };
   }
 
-  // 6. Validation Errors (Preserve clean user-facing validation hints)
+  // 6. Validation Errors (Status: 400)
   if (
     normalized.includes("required") ||
     normalized.includes("invalid email") ||
@@ -153,15 +199,29 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
       message: rawMessage,
       category: "validation",
       errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "validation",
+        timestamp,
+        route,
+        statusCode: 400,
+      },
     };
   }
 
-  // 7. Default Fallback for Uncaught Errors
+  // 7. Default Fallback for Uncaught Errors (Status: 500)
   return {
     title: "Something went wrong",
-    message: "Something went wrong. Please try again later.",
+    message: "Something went wrong. The requested operation could not be completed. Please try again or contact the system administrator.",
     category: "unknown",
     errorId,
+    diagnostics: {
+      logReferenceId: errorId,
+      category: "unknown",
+      timestamp,
+      route,
+      statusCode: 500,
+    },
   };
 }
 
