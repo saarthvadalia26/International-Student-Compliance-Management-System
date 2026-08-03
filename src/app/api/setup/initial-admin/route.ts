@@ -17,6 +17,8 @@ export async function GET() {
       isInitialized: state.isInitialized,
       isDbInitialized: state.isDbInitialized,
       isRecoveryMode: state.isRecoveryMode,
+      isFreshInstallation: state.isFreshInstallation,
+      hasOperationalData: state.hasOperationalData,
       existingAdminCount: state.adminCount,
     });
   } catch (err: unknown) {
