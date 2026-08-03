@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
@@ -8,9 +9,13 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         get(name: string) {
@@ -66,8 +71,10 @@ export async function middleware(request: NextRequest) {
 
   // ── Single Authoritative Setup & Auth Routing Authority for Non-API Requests ──
   if (!pathname.startsWith("/api")) {
-    let isSystemInitialized = false;
+    let isDbInitialized = false;
+    let hasAdminUser = false;
 
+    // 1. Read system_config.initialization flag
     try {
       const { data: config } = await supabase
         .from("system_config")
@@ -76,15 +83,38 @@ export async function middleware(request: NextRequest) {
         .maybeSingle();
 
       if (config?.value) {
-        isSystemInitialized = Boolean(
+        isDbInitialized = Boolean(
           (config.value as { is_initialized?: boolean })?.is_initialized
         );
       }
     } catch {
-      isSystemInitialized = false;
+      isDbInitialized = false;
     }
 
-    // ── CASE A: No Administrator Exists (System Uninitialized) ─────────────
+    // 2. Determine whether a valid Administrator exists in auth.users using Service Role Client on server
+    if (serviceRoleKey) {
+      try {
+        const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+
+        const { data: { users }, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 100 });
+        if (!error && users) {
+          hasAdminUser = users.some((u) => {
+            const role = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+            return role === "administrator" || role === "admin";
+          });
+        }
+      } catch {
+        hasAdminUser = false;
+      }
+    }
+
+    // 3. System Initialized Decision:
+    // System Initialized = (initialization flag == true) AND (administrator exists)
+    const isSystemInitialized = isDbInitialized && hasAdminUser;
+
+    // ── CASE A & B: System Uninitialized OR Recovery Mode (No Admin Exists) ──
     if (!isSystemInitialized) {
       if (pathname !== "/setup") {
         url.pathname = "/setup";
@@ -93,7 +123,7 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
-    // ── CASE B: Administrator Exists (System Initialized) ───────────────────
+    // ── CASE C: System Fully Initialized (Admin Exists & Flag is True) ────────
     // 1. Permanently disable /setup
     if (pathname === "/setup") {
       url.pathname = user ? (isStudent ? "/student/dashboard" : "/dashboard") : "/login";
