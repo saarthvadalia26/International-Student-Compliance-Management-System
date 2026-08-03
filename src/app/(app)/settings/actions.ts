@@ -7,6 +7,8 @@ import { requireAdministrator, requireInternalUser } from "@/lib/auth/permission
 import { auditService } from "@/lib/audit/audit.service";
 import { retentionService } from "@/domain/retention/services/retention.service";
 import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
+import { systemStateService } from "@/services/auth/system-state.service";
+import { administratorDetectionService } from "@/services/auth/administrator-detection.service";
 
 // ── Shared Auth Helpers ─────────────────────────────────────────────────────
 
@@ -437,4 +439,83 @@ export async function resetUserPasswordAdminAction(targetUserId: string, newPass
     newRole: targetUser.user_metadata?.role ?? "staff",
     ipAddress: meta.ipAddress,
   });
+}
+
+/**
+ * Permanently delete a staff or user account. Administrator only.
+ * Safeguards:
+ * 1. Requires Administrator role (throws 403 / Unauthorized error if called by non-admin).
+ * 2. Prevents deleting the target user if they are an Administrator AND total active Administrators <= 1.
+ * 3. Permanently removes user from Supabase auth.users.
+ * 4. Logs an immutable audit trail entry to audit_log.
+ * 5. Invalidates state detection caches.
+ */
+export async function deleteStaffAccountAction(targetUserId: string): Promise<void> {
+  const adminUser = await getAdminUser();
+  const meta = await getRequestMeta();
+  const adminClient = getAdminSupabase();
+
+  if (!targetUserId) {
+    throw new Error("Target user ID is required.");
+  }
+
+  // 1. Retrieve target user from Supabase Auth
+  const { data: { user: targetUser }, error: getUserError } = await adminClient.auth.admin.getUserById(targetUserId);
+  if (getUserError || !targetUser) {
+    throw new Error("Target user account not found or has already been deleted.");
+  }
+
+  const targetRole = ((targetUser.user_metadata?.role as string | undefined) ?? "staff").toLowerCase().trim();
+  const isTargetAdmin = targetRole === "administrator" || targetRole === "admin";
+
+  // 2. Count active Administrators to prevent deleting the last Administrator
+  const { data: { users: allUsers }, error: listError } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (listError) {
+    throw new Error(`Failed verifying administrator accounts: ${listError.message}`);
+  }
+
+  const adminUsers = (allUsers || []).filter((u) => {
+    const r = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+    return r === "administrator" || r === "admin";
+  });
+
+  if (isTargetAdmin && adminUsers.length <= 1) {
+    throw new Error("Action Denied: Cannot delete the last remaining Administrator account.");
+  }
+
+  // 3. Delete user from Supabase Auth
+  const { error: deleteError } = await adminClient.auth.admin.deleteUser(targetUserId);
+  if (deleteError) {
+    await auditService.logUserDeletion({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email ?? "unknown",
+      targetUserId,
+      targetUserEmail: targetUser.email ?? "unknown",
+      targetRole,
+      sessionsTerminated: 0,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      reason: `Deletion failed: ${deleteError.message}`,
+      success: false,
+    });
+    throw new Error(`Failed to delete account: ${deleteError.message}`);
+  }
+
+  // 4. Log successful audit trail
+  await auditService.logUserDeletion({
+    adminId: adminUser.id,
+    adminEmail: adminUser.email ?? "unknown",
+    targetUserId,
+    targetUserEmail: targetUser.email ?? "unknown",
+    targetRole,
+    sessionsTerminated: 1,
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
+    reason: "Administrator Account Deletion",
+    success: true,
+  });
+
+  // 5. Invalidate system state detection caches
+  systemStateService.invalidateCache();
+  administratorDetectionService.invalidateCache();
 }

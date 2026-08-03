@@ -53,6 +53,19 @@ export interface ConfigChangeAuditEntry {
   newValue: string;
 }
 
+export interface UserDeletionAuditEntry {
+  adminId: string;
+  adminEmail: string;
+  targetUserId: string;
+  targetUserEmail: string;
+  targetRole: string;
+  sessionsTerminated: number;
+  ipAddress?: string;
+  userAgent?: string;
+  reason?: string;
+  success: boolean;
+}
+
 const auditService = {
   /**
    * Log Initial Administrator Account Setup
@@ -156,6 +169,31 @@ const auditService = {
         setting: entry.setting,
         previous_value: entry.previousValue,
         new_value: entry.newValue,
+      },
+    });
+  },
+
+  /**
+   * Log User Account Deletion event (Administrator permanently removing a user account)
+   */
+  async logUserDeletion(entry: UserDeletionAuditEntry): Promise<void> {
+    const admin = getAdminSupabase();
+    await admin.from("audit_log").insert({
+      actor_id: entry.adminId,
+      actor_email: entry.adminEmail,
+      action: "DELETE_USER_ACCOUNT",
+      resource: "user_account",
+      category: "security",
+      severity: "critical",
+      ip_address: entry.ipAddress ?? null,
+      user_agent: entry.userAgent ?? null,
+      details: {
+        target_user_id: entry.targetUserId,
+        target_user_email: entry.targetUserEmail,
+        target_role: entry.targetRole,
+        sessions_terminated: entry.sessionsTerminated,
+        reason: entry.reason ?? "Administrator Account Deletion",
+        success: entry.success,
       },
     });
   },
