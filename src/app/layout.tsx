@@ -26,14 +26,7 @@ export const metadata: Metadata = {
     template: `%s | ${Branding.shortName}`
   },
   description: `Official ${Branding.appName} of the ${Branding.universityName}.`,
-  icons: {
-    icon: [
-      { url: "/favicon.png", type: "image/png" },
-      { url: "/favicon.ico", sizes: "any" }
-    ],
-    shortcut: "/favicon.png",
-    apple: "/apple-touch-icon.png"
-  },
+  icons: [],
   openGraph: {
     title: Branding.appName,
     description: `Official portal for the ${Branding.universityName}.`,
@@ -41,7 +34,7 @@ export const metadata: Metadata = {
     siteName: Branding.universityName,
     images: [
       {
-        url: Branding.faviconPaths.ogImage,
+        url: Branding.ogImage,
         width: 1200,
         height: 630,
         alt: Branding.universityName
@@ -54,7 +47,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: Branding.appName,
     description: `Official portal for the ${Branding.universityName}.`,
-    images: [Branding.faviconPaths.ogImage]
+    images: [Branding.ogImage]
   }
 };
 
