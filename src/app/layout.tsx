@@ -26,7 +26,12 @@ export const metadata: Metadata = {
     template: `%s | ${Branding.shortName}`
   },
   description: `Official ${Branding.appName} of the ${Branding.universityName}.`,
-  icons: [],
+  icons: [
+    {
+      url: "data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      type: "image/x-icon",
+    },
+  ],
   openGraph: {
     title: Branding.appName,
     description: `Official portal for the ${Branding.universityName}.`,
