@@ -26,12 +26,16 @@ export const metadata: Metadata = {
     template: `%s | ${Branding.shortName}`
   },
   description: `Official ${Branding.appName} of the ${Branding.universityName}.`,
-  icons: [
-    {
-      url: "data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-      type: "image/x-icon",
-    },
-  ],
+  icons: {
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon.ico", sizes: "any" }
+    ],
+    shortcut: "/favicon.png",
+    apple: "/apple-touch-icon.png"
+  },
   openGraph: {
     title: Branding.appName,
     description: `Official portal for the ${Branding.universityName}.`,
