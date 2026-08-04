@@ -1,8 +1,10 @@
 "use server";
 
 import { getServerSupabase } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
 import { StudentPortalService } from "@/domain/student-portal/services/student-portal.service";
 import { SupabaseStudentPortalRepository } from "@/domain/student-portal/repositories/student-portal.repository";
+import { StudentOtpService } from "@/domain/student-portal/services/student-otp.service";
 import { 
   StudentPortalProfile, 
   StudentHistoryRow, 
@@ -11,6 +13,7 @@ import {
 
 const portalRepo = new SupabaseStudentPortalRepository();
 const portalService = new StudentPortalService();
+const otpService = new StudentOtpService();
 
 /**
  * Helper to cryptographically verify user JWT and retrieve student association ID
@@ -31,6 +34,121 @@ async function verifyUserAndGetStudentId(jwt: string): Promise<string> {
   }
 
   return studentId;
+}
+
+/**
+ * Server action: Request a 6-digit WhatsApp OTP for a registered mobile number
+ */
+export async function requestStudentWhatsAppOtpAction(
+  rawMobileNumber: string,
+  turnstileToken: string | null
+): Promise<{
+  success: boolean;
+  maskedPhone?: string;
+  cooldownSeconds?: number;
+  error?: string;
+}> {
+  try {
+    if (!turnstileToken) {
+      return { success: false, error: "Please complete the security check." };
+    }
+
+    if (!rawMobileNumber || rawMobileNumber.trim().length < 8) {
+      return { success: false, error: "Please enter a valid registered mobile number." };
+    }
+
+    return await otpService.generateAndSendOtp(rawMobileNumber.trim());
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[STUDENT_OTP_ACTION_ERROR] OTP generation failed:", msg);
+    return { success: false, error: "Unable to send verification code. Please try again." };
+  }
+}
+
+/**
+ * Server action: Verify 6-digit WhatsApp OTP and issue authenticated student session
+ */
+export async function verifyStudentWhatsAppOtpAction(
+  rawMobileNumber: string,
+  otpCode: string,
+  ipAddress?: string | null,
+  userAgent?: string | null
+): Promise<{
+  success: boolean;
+  studentId?: string;
+  magicLink?: string;
+  error?: string;
+}> {
+  try {
+    if (!rawMobileNumber || !otpCode) {
+      return { success: false, error: "Mobile number and verification code are required." };
+    }
+
+    const verification = await otpService.verifyOtp(
+      rawMobileNumber.trim(),
+      otpCode.trim(),
+      ipAddress,
+      userAgent
+    );
+
+    if (!verification.success || !verification.studentId || !verification.studentEmail) {
+      return { success: false, error: verification.error || "Verification failed." };
+    }
+
+    // Generate Supabase Auth Magic Link or session for verified student
+    const adminSupabase = getAdminSupabase();
+    
+    // Ensure auth user exists for this student
+    const { data: userList } = await adminSupabase.auth.admin.listUsers();
+    let authUser = userList.users.find(
+      u => u.email?.toLowerCase() === verification.studentEmail!.toLowerCase() ||
+           u.user_metadata?.student_id === verification.studentId
+    );
+
+    if (!authUser) {
+      const { data: newUser, error: createError } = await adminSupabase.auth.admin.createUser({
+        email: verification.studentEmail,
+        email_confirm: true,
+        user_metadata: {
+          role: "student",
+          student_id: verification.studentId
+        }
+      });
+      if (createError || !newUser.user) {
+        throw new Error(`Failed to create authenticated student identity: ${createError?.message}`);
+      }
+      authUser = newUser.user;
+    } else {
+      // Ensure user_metadata contains role and student_id
+      await adminSupabase.auth.admin.updateUserById(authUser.id, {
+        user_metadata: {
+          ...authUser.user_metadata,
+          role: "student",
+          student_id: verification.studentId
+        }
+      });
+    }
+
+    // Generate session magic link for instant client sign in
+    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+      type: "magiclink",
+      email: verification.studentEmail
+    });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      throw new Error(`Failed to establish session: ${linkError?.message}`);
+    }
+
+    return {
+      success: true,
+      studentId: verification.studentId,
+      magicLink: linkData.properties.action_link
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[STUDENT_OTP_ACTION_ERROR] OTP verification failed:", msg);
+    return { success: false, error: msg };
+  }
 }
 
 export async function fetchStudentDashboard(jwt: string): Promise<{
@@ -141,33 +259,6 @@ export async function uploadStudentDocumentAction(
       );
     } else {
       await portalRepo.logActivity(studentId, `UPLOAD_${documentType.toUpperCase()}`, ipAddress, userAgent, { filename });
-    }
-
-    return { success: true };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, error: msg };
-  }
-}
-
-export async function updateStudentPasswordAction(
-  jwt: string,
-  newPassword: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = await getServerSupabase();
-    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
-
-    if (userError || !user) {
-      throw new Error("Authentication failed.");
-    }
-
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-
-    if (updateError) {
-      throw new Error(updateError.message);
     }
 
     return { success: true };

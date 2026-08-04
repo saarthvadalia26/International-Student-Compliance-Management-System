@@ -702,6 +702,27 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <span className="font-medium text-foreground block leading-relaxed">{student.localAddress || "Not Provided"}</span>
                   </div>
                 </div>
+
+                <Separator />
+
+                {/* WhatsApp OTP Auth Control for Admin */}
+                <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5" />
+                      Registered WhatsApp OTP Number
+                    </span>
+                    <Badge variant={student.status === "active" ? "default" : "destructive"} className="text-[10px] h-5">
+                      {student.status === "active" ? "Login Enabled" : "Login Disabled"}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-foreground font-mono font-medium">
+                    {student.phoneLocal || student.phoneHome || "No mobile number registered"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Administrators can update the mobile number or disable portal access via the Edit Profile action.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           )}
