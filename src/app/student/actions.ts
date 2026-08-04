@@ -43,15 +43,42 @@ export async function fetchStudentDashboard(jwt: string): Promise<{
     console.log(`[STUDENT_ACTION] Loading dashboard assets for student: ${studentId}`);
 
     const [profile, history, reminders] = await Promise.all([
-      portalRepo.getStudentProfile(studentId),
-      portalRepo.getStudentHistory(studentId),
-      portalRepo.getStudentReminders(studentId)
+      portalRepo.getStudentProfile(studentId).catch(() => null),
+      portalRepo.getStudentHistory(studentId).catch(() => []),
+      portalRepo.getStudentReminders(studentId).catch(() => [])
     ]);
 
     return { profile, history, reminders };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[STUDENT_ACTION_ERROR] Failed loading dashboard:", msg);
+    throw new Error(msg);
+  }
+}
+
+export async function fetchStudentActivityHistory(jwt: string): Promise<{
+  history: StudentHistoryRow[];
+  reminders: StudentReminderHistoryRow[];
+}> {
+  try {
+    const studentId = await verifyUserAndGetStudentId(jwt);
+    console.log(`[STUDENT_ACTION] Loading history timeline for student: ${studentId}`);
+
+    const [history, reminders] = await Promise.all([
+      portalRepo.getStudentHistory(studentId).catch((err) => {
+        console.error("[STUDENT_ACTION_ERROR] getStudentHistory error:", err);
+        return [];
+      }),
+      portalRepo.getStudentReminders(studentId).catch((err) => {
+        console.error("[STUDENT_ACTION_ERROR] getStudentReminders error:", err);
+        return [];
+      })
+    ]);
+
+    return { history, reminders };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[STUDENT_ACTION_ERROR] Failed loading activity history:", msg);
     throw new Error(msg);
   }
 }
@@ -113,7 +140,6 @@ export async function uploadStudentDocumentAction(
         userAgent
       );
     } else {
-      // General upload for passport / visa
       await portalRepo.logActivity(studentId, `UPLOAD_${documentType.toUpperCase()}`, ipAddress, userAgent, { filename });
     }
 
