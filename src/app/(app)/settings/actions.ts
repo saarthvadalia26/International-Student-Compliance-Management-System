@@ -692,7 +692,7 @@ export async function factoryResetAction(password: string): Promise<FactoryReset
 
   return {
     success: true,
-    message: "System reset successfully. The application is ready for first-time setup.",
+    message: "System Reset Successfully",
     deletedCounts,
   };
 }

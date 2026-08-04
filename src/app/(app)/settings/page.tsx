@@ -741,14 +741,20 @@ export default function SettingsPage() {
                               setIsResettingFactory(true);
                               const result = await factoryResetAction(resetPassword);
                               if (result.success) {
-                                toast.success(result.message);
+                                toast.success("System Reset Successfully", {
+                                  duration: 4000,
+                                  id: "factory-reset-toast",
+                                  description: undefined,
+                                });
                                 setTimeout(() => {
                                   window.location.href = "/setup";
-                                }, 1500);
+                                }, 1200);
                               }
-                            } catch (err: unknown) {
-                              const msg = err instanceof Error ? err.message : "Factory reset failed.";
-                              toast.error(msg);
+                            } catch {
+                              toast.error("System reset could not be completed. Please try again.", {
+                                duration: 6000,
+                                id: "factory-reset-toast-error",
+                              });
                               setResetStep(1);
                               setResetPassword("");
                               setResetConfirmText("");
