@@ -8,10 +8,53 @@ export interface StudentPortalProfile {
   email: string;
   phoneHome: string;
   phoneLocal: string;
-  efrroStatus: string;
+  avatarUrl?: string | null;
+  
+  // Overall Status
+  overallCompliance: "COMPLIANT" | "ATTENTION_REQUIRED";
+
+  // Passport Info
+  passportNumber?: string | null;
+  passportExpiry?: string | null;
+  passportStatus: "APPROVED" | "PENDING_VERIFICATION" | "REJECTED" | "EXPIRED" | "NOT_SUBMITTED";
+  passportRemarks?: string | null;
+  passportUploadDate?: string | null;
+
+  // Visa Info
+  visaNumber?: string | null;
+  visaType?: string | null;
+  visaExpiry?: string | null;
+  visaStatus: "APPROVED" | "PENDING_VERIFICATION" | "REJECTED" | "EXPIRED" | "NOT_SUBMITTED";
+  visaRemarks?: string | null;
+  visaUploadDate?: string | null;
+
+  // eFRRO Info
+  efrroStatus: "COMPLIANT" | "WARNING" | "EXPIRED" | "PENDING_VERIFICATION" | "REJECTED" | "NOT_SUBMITTED";
   efrroExpiry: string | null;
+  efrroNumber?: string | null;
+  efrroRemarks?: string | null;
+  efrroUploadDate?: string | null;
   daysRemaining: number | null;
+
   lastUploadDate: string | null;
+}
+
+export interface StudentNotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: "approval" | "rejection" | "reminder" | "alert" | "system";
+  read: boolean;
+  timestamp: string;
+}
+
+export interface StudentDocumentDownload {
+  type: "passport" | "visa" | "efrro";
+  title: string;
+  filename: string;
+  fileUrl: string;
+  uploadDate: string;
+  status: string;
 }
 
 export interface UploadToken {
@@ -49,6 +92,7 @@ export interface UploadAuditLog {
 
 export interface StudentHistoryRow {
   versionId: string;
+  documentType?: "passport" | "visa" | "efrro";
   filename: string;
   uploadDate: string;
   verificationStatus: string;

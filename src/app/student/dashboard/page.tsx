@@ -5,20 +5,28 @@ import Link from "next/link";
 import { 
   User, 
   AlertTriangle, 
-  CheckCircle, 
+  CheckCircle2, 
   Clock, 
   FileText, 
   Bell, 
   ArrowRight,
   ShieldAlert,
-  Loader2
+  Loader2,
+  Calendar,
+  Building2,
+  Globe2,
+  Award,
+  Upload,
+  AlertCircle,
+  FileCheck2,
+  History
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentDashboard } from "../actions";
 import { StudentPortalProfile, StudentHistoryRow, StudentReminderHistoryRow } from "@/domain/student-portal/types";
+import { cn } from "@/lib/utils";
 
 export default function StudentDashboardPage() {
   const supabase = getBrowserSupabase();
@@ -69,7 +77,7 @@ export default function StudentDashboardPage() {
       <div className="flex h-64 w-full items-center justify-center">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">Loading dashboard overview...</span>
+          <span className="text-xs text-muted-foreground">Loading student dashboard...</span>
         </div>
       </div>
     );
@@ -77,13 +85,13 @@ export default function StudentDashboardPage() {
 
   if (error || !profile) {
     return (
-      <Card className="border-destructive/35 bg-destructive/5 text-destructive p-6 max-w-lg mx-auto mt-10">
+      <Card className="border-destructive/35 bg-destructive/5 text-destructive p-6 max-w-lg mx-auto mt-10 rounded-2xl shadow-sm">
         <div className="flex items-start gap-3">
-          <ShieldAlert className="h-6 w-6 shrink-0" />
+          <ShieldAlert className="h-6 w-6 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <h3 className="text-sm font-semibold">Failed to load student dashboard</h3>
-            <p className="text-xs text-muted-foreground/80 mt-1">
-              {error || "Student identity coordinates could not be loaded."}
+            <p className="text-xs text-muted-foreground mt-1">
+              {error || "Student identity coordinates could not be retrieved."}
             </p>
           </div>
         </div>
@@ -91,193 +99,209 @@ export default function StudentDashboardPage() {
     );
   }
 
-  // Determine eFRRO compliance badge
-  const isExpired = profile.efrroStatus === "EXPIRED";
-  const isWarning = profile.efrroStatus === "WARNING";
-  const isPending = profile.efrroStatus === "PENDING_VERIFICATION";
-  const isCompliant = profile.efrroStatus === "COMPLIANT";
+  const isOverallCompliant = profile.overallCompliance === "COMPLIANT";
 
   return (
     <div className="space-y-6">
-      {/* Welcome Block */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Student Workspace</h1>
-        <p className="text-xs text-muted-foreground mt-1">
-          Review your compliance statistics, reminder queues, and submit document updates.
-        </p>
-      </div>
-
-      {/* Profile Overview Card */}
-      <Card className="border border-border/60 shadow-sm">
-        <CardContent className="p-6">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 items-center">
-            {/* Student bio info */}
-            <div className="space-y-1.5 md:col-span-2">
+      {/* Welcome Banner */}
+      <Card className="border-border/80 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-6 shadow-md overflow-hidden relative">
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            {/* Student Avatar / Photo Fallback */}
+            <div className="h-16 w-16 rounded-2xl bg-primary/20 border-2 border-primary/40 flex items-center justify-center font-bold text-2xl text-primary shadow-inner shrink-0">
+              {profile.fullName ? profile.fullName.charAt(0).toUpperCase() : "S"}
+            </div>
+            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <User className="h-4 w-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-foreground">{profile.fullName}</h2>
-                  <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider">
-                    Registration No: {profile.registrationNumber}
-                  </p>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground pl-10 space-y-0.5">
-                <p>Programme: <span className="font-medium text-foreground">{profile.programme}</span></p>
-                <p>School: <span className="font-medium text-foreground">{profile.school}</span></p>
-                <p>Nationality: <span className="font-medium text-foreground">{profile.nationality}</span></p>
-              </div>
-            </div>
-
-            {/* Current eFRRO Status Badge */}
-            <div className="flex flex-col items-center justify-center p-4 border-l border-border/50">
-              <span className="text-[10px] uppercase font-mono text-muted-foreground">eFRRO Status</span>
-              {isCompliant && (
-                <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-xs border border-emerald-500/20">
-                  <CheckCircle className="h-3.5 w-3.5" /> Compliant
-                </div>
-              )}
-              {isPending && (
-                <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 font-semibold text-xs border border-yellow-500/20 animate-pulse">
-                  <Clock className="h-3.5 w-3.5" /> Pending Verification
-                </div>
-              )}
-              {isWarning && (
-                <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold text-xs border border-amber-500/20">
-                  <AlertTriangle className="h-3.5 w-3.5" /> Expiring Soon
-                </div>
-              )}
-              {isExpired && (
-                <div className="flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full bg-destructive/10 text-destructive font-semibold text-xs border border-destructive/20">
-                  <ShieldAlert className="h-3.5 w-3.5" /> Expired
-                </div>
-              )}
-              {profile.efrroExpiry && (
-                <span className="text-[10px] text-muted-foreground/80 mt-2 font-mono">
-                  Expiry: {new Date(profile.efrroExpiry).toLocaleDateString()}
+                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white">{profile.fullName}</h1>
+                <span className={cn(
+                  "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                  isOverallCompliant ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                )}>
+                  {isOverallCompliant ? "Compliant" : "Attention Required"}
                 </span>
-              )}
-            </div>
-
-            {/* Days Remaining block */}
-            <div className="flex flex-col items-center justify-center p-4 border-l border-border/50">
-              <span className="text-[10px] uppercase font-mono text-muted-foreground">Days Remaining</span>
-              {profile.daysRemaining !== null ? (
-                <span className={`text-2xl font-bold mt-1 font-mono ${profile.daysRemaining <= 15 ? "text-destructive" : profile.daysRemaining <= 30 ? "text-amber-500" : "text-foreground"}`}>
-                  {profile.daysRemaining} Days
-                </span>
-              ) : (
-                <span className="text-sm font-semibold text-muted-foreground mt-2">N/A</span>
-              )}
-              <Link href="/student/efrro" passHref>
-                <Button size="xs" variant="outline" className="mt-3 text-[10px] h-7 gap-1">
-                  Renew Now <ArrowRight className="h-3 w-3" />
-                </Button>
-              </Link>
+              </div>
+              <p className="text-xs text-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span>Enrollment: <strong className="text-white">{profile.registrationNumber}</strong></span>
+                <span>•</span>
+                <span>Programme: <strong className="text-white">{profile.programme}</strong></span>
+                <span>•</span>
+                <span>Nationality: <strong className="text-white">{profile.nationality || "International"}</strong></span>
+              </p>
             </div>
           </div>
-        </CardContent>
+
+          <Link href="/student/efrro">
+            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold gap-2 shadow-sm rounded-xl px-4 h-9">
+              <Upload className="h-4 w-4" />
+              Document Centre
+            </Button>
+          </Link>
+        </div>
       </Card>
 
-      {/* Split grid for History Tables */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-        {/* Upload History list */}
-        <Card className="border border-border/60 shadow-sm overflow-hidden">
-          <CardHeader className="bg-muted/30 border-b border-border/40 py-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-              <FileText className="h-4 w-4 text-muted-foreground" /> Document Upload History
-            </CardTitle>
-            <CardDescription className="text-xs">Your previous document submissions and audits status.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {history.length === 0 ? (
-              <div className="text-center py-10 text-xs text-muted-foreground">
-                No renewal documents submitted yet.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Document File</TableHead>
-                    <TableHead className="text-xs">Uploaded Date</TableHead>
-                    <TableHead className="text-xs">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.map((row) => (
-                    <TableRow key={row.versionId}>
-                      <TableCell className="text-xs font-medium truncate max-w-[160px]" title={row.filename}>
-                        {row.filename}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono">
-                        {new Date(row.uploadDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        {row.verificationStatus === "approved" && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15">
-                            Verified
-                          </span>
-                        )}
-                        {row.verificationStatus === "pending" && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/15">
-                            Pending Review
-                          </span>
-                        )}
-                        {row.verificationStatus === "rejected" && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/10 text-destructive border border-destructive/15" title={row.reviewerComments || undefined}>
-                            Rejected
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
+      {/* Compliance Status Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Passport Status */}
+        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Passport Status</span>
+            <FileCheck2 className="h-4 w-4 text-blue-500" />
+          </div>
+          <div className="mt-3">
+            <span className={cn(
+              "inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase",
+              profile.passportStatus === "APPROVED" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+              profile.passportStatus === "REJECTED" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            )}>
+              {profile.passportStatus.replace("_", " ")}
+            </span>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              {profile.passportExpiry ? `Expires: ${profile.passportExpiry}` : "No passport on file"}
+            </p>
+          </div>
         </Card>
 
-        {/* Reminder History list */}
-        <Card className="border border-border/60 shadow-sm overflow-hidden">
-          <CardHeader className="bg-muted/30 border-b border-border/40 py-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-              <Bell className="h-4 w-4 text-muted-foreground" /> Compliance Reminders History
-            </CardTitle>
-            <CardDescription className="text-xs">Compliance reminders and alert dispatches logged by the cell.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {reminders.length === 0 ? (
-              <div className="text-center py-10 text-xs text-muted-foreground">
-                No reminders sent to your address yet.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Trigger Source</TableHead>
-                    <TableHead className="text-xs">Channel</TableHead>
-                    <TableHead className="text-xs">Dispatch Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reminders.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="text-xs capitalize font-medium text-foreground">
-                        {row.triggerSource.replace(/_/g, " ")}
-                      </TableCell>
-                      <TableCell className="text-xs capitalize font-mono">{row.channel}</TableCell>
-                      <TableCell className="text-xs font-mono">
-                        {new Date(row.sentAt).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
+        {/* Visa Status */}
+        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Visa Status</span>
+            <Globe2 className="h-4 w-4 text-indigo-500" />
+          </div>
+          <div className="mt-3">
+            <span className={cn(
+              "inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase",
+              profile.visaStatus === "APPROVED" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+              profile.visaStatus === "REJECTED" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            )}>
+              {profile.visaStatus.replace("_", " ")}
+            </span>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              {profile.visaExpiry ? `Expires: ${profile.visaExpiry}` : "No visa on file"}
+            </p>
+          </div>
         </Card>
+
+        {/* eFRRO Status */}
+        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">eFRRO Registration</span>
+            <Award className="h-4 w-4 text-purple-500" />
+          </div>
+          <div className="mt-3">
+            <span className={cn(
+              "inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase",
+              profile.efrroStatus === "COMPLIANT" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+              profile.efrroStatus === "WARNING" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+            )}>
+              {profile.efrroStatus.replace("_", " ")}
+            </span>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              {profile.daysRemaining !== null ? `${profile.daysRemaining} days remaining` : "Pending compliance"}
+            </p>
+          </div>
+        </Card>
+
+        {/* Overall Status Badge */}
+        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Overall Compliance</span>
+            <CheckCircle2 className={cn("h-4 w-4", isOverallCompliant ? "text-emerald-500" : "text-amber-500")} />
+          </div>
+          <div className="mt-3">
+            <span className={cn(
+              "inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase",
+              isOverallCompliant ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+            )}>
+              {profile.overallCompliance.replace("_", " ")}
+            </span>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              {isOverallCompliant ? "All requirements satisfied" : "Action required on documents"}
+            </p>
+          </div>
+        </Card>
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Expiry Alerts & Remarks */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card">
+            <CardHeader className="p-0 pb-4 border-b border-border/50">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                Compliance Actions & Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 pt-4 space-y-3">
+              {profile.passportRemarks && (
+                <div className="p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/5 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2.5">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-semibold">Passport Remarks:</strong> {profile.passportRemarks}
+                  </div>
+                </div>
+              )}
+
+              {profile.visaRemarks && (
+                <div className="p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/5 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2.5">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-semibold">Visa Remarks:</strong> {profile.visaRemarks}
+                  </div>
+                </div>
+              )}
+
+              {profile.efrroRemarks && (
+                <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/5 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2.5">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-semibold">eFRRO Remarks:</strong> {profile.efrroRemarks}
+                  </div>
+                </div>
+              )}
+
+              {!profile.passportRemarks && !profile.visaRemarks && !profile.efrroRemarks && (
+                <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>No outstanding rejection remarks or urgent actions required on your account.</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Quick Links & Summary */}
+        <div className="space-y-6">
+          <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card">
+            <CardHeader className="p-0 pb-3">
+              <CardTitle className="text-sm font-semibold">Quick Navigation</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 pt-2 space-y-2">
+              <Link href="/student/efrro" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-colors text-xs font-medium text-foreground">
+                <span className="flex items-center gap-2.5">
+                  <Upload className="h-4 w-4 text-primary" />
+                  Document Centre
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </Link>
+              <Link href="/student/profile" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-colors text-xs font-medium text-foreground">
+                <span className="flex items-center gap-2.5">
+                  <User className="h-4 w-4 text-primary" />
+                  View Full Profile
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </Link>
+              <Link href="/student/history" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-colors text-xs font-medium text-foreground">
+                <span className="flex items-center gap-2.5">
+                  <History className="h-4 w-4 text-primary" />
+                  Activity History Timeline
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

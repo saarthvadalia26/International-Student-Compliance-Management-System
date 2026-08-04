@@ -1,19 +1,28 @@
 "use client";
 
 import * as React from "react";
-import { History, FileText, CheckCircle, Clock, XCircle, Loader2, ShieldAlert } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { 
+  History, 
+  CheckCircle2, 
+  AlertCircle, 
+  Clock, 
+  FileText, 
+  Bell, 
+  Loader2, 
+  Check, 
+  XCircle 
+} from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentDashboard } from "../actions";
-import { StudentHistoryRow } from "@/domain/student-portal/types";
+import { StudentHistoryRow, StudentReminderHistoryRow } from "@/domain/student-portal/types";
+import { cn } from "@/lib/utils";
 
 export default function StudentHistoryPage() {
   const supabase = getBrowserSupabase();
-  
   const [history, setHistory] = React.useState<StudentHistoryRow[]>([]);
+  const [reminders, setReminders] = React.useState<StudentReminderHistoryRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let mounted = true;
@@ -21,23 +30,16 @@ export default function StudentHistoryPage() {
     async function loadHistory() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          throw new Error("No active student session found.");
-        }
+        if (!session) return;
 
-        const jwt = session.access_token;
-        const data = await fetchStudentDashboard(jwt);
-
+        const data = await fetchStudentDashboard(session.access_token);
         if (mounted) {
           setHistory(data.history);
+          setReminders(data.reminders);
           setIsLoading(false);
         }
-      } catch (err: unknown) {
-        if (mounted) {
-          const msg = err instanceof Error ? err.message : String(err);
-          setError(msg);
-          setIsLoading(false);
-        }
+      } catch {
+        if (mounted) setIsLoading(false);
       }
     }
 
@@ -51,103 +53,76 @@ export default function StudentHistoryPage() {
   if (isLoading) {
     return (
       <div className="flex h-64 w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">Loading upload history...</span>
-        </div>
+        <Loader2 className="h-7 w-7 animate-spin text-primary" />
       </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card className="border-destructive/35 bg-destructive/5 text-destructive p-6 max-w-lg mx-auto mt-10">
-        <div className="flex items-start gap-3">
-          <ShieldAlert className="h-6 w-6 shrink-0" />
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold">Failed to load upload history</h3>
-            <p className="text-xs text-muted-foreground/80 mt-1">{error}</p>
-          </div>
-        </div>
-      </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Upload History</h1>
-        <p className="text-xs text-muted-foreground mt-1">
-          Review all your historical eFRRO document updates and their compliance verification status.
-        </p>
+        <h1 className="text-xl font-bold text-foreground tracking-tight">Activity History Timeline</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">Chronological audit trail of document uploads, verification approvals, and reminder alerts.</p>
       </div>
 
-      <Card className="border border-border/60 shadow-sm overflow-hidden">
-        <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
-          <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-            <History className="h-4 w-4 text-muted-foreground" /> Document Submission History
+      <Card className="border-border/80 rounded-2xl p-6 shadow-xs bg-card">
+        <CardHeader className="p-0 pb-4 border-b border-border/50">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <History className="h-4 w-4 text-primary" />
+            Compliance Timeline
           </CardTitle>
-          <CardDescription className="text-xs">Audit log of your compliance submissions.</CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 pt-6">
           {history.length === 0 ? (
-            <div className="text-center py-12 text-xs text-muted-foreground">
-              No historical renewal uploads registered.
+            <div className="text-center py-10 text-xs text-muted-foreground">
+              No historical compliance records found.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Document File</TableHead>
-                  <TableHead className="text-xs">Upload Date</TableHead>
-                  <TableHead className="text-xs">Verification Status</TableHead>
-                  <TableHead className="text-xs">Review Details & Comments</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.map((row) => (
-                  <TableRow key={row.versionId}>
-                    <TableCell className="text-xs font-semibold flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="truncate max-w-[200px]" title={row.filename}>{row.filename}</span>
-                    </TableCell>
-                    <TableCell className="text-xs font-mono">
-                      {new Date(row.uploadDate).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {row.verificationStatus === "approved" && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/15">
-                          <CheckCircle className="h-3 w-3" /> Verified
+            <div className="relative pl-6 space-y-8 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border/60">
+              {history.map((item, idx) => {
+                const isApproved = item.verificationStatus === "APPROVED" || item.verificationStatus === "COMPLIANT";
+                const isRejected = item.verificationStatus === "REJECTED";
+
+                return (
+                  <div key={item.versionId || idx} className="relative flex items-start gap-4 text-xs">
+                    <div className={cn(
+                      "absolute -left-[31px] top-0 h-5 w-5 rounded-full flex items-center justify-center border-2 bg-background z-10",
+                      isApproved ? "border-emerald-500 text-emerald-500" :
+                      isRejected ? "border-rose-500 text-rose-500" : "border-amber-500 text-amber-500"
+                    )}>
+                      {isApproved ? <Check className="h-3 w-3" /> :
+                       isRejected ? <XCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                    </div>
+
+                    <div className="flex-1 space-y-1 bg-accent/30 p-3.5 rounded-xl border border-border/50">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-foreground flex items-center gap-2">
+                          <FileText className="h-3.5 w-3.5 text-primary" />
+                          {item.filename}
                         </span>
-                      )}
-                      {row.verificationStatus === "pending" && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/15">
-                          <Clock className="h-3 w-3" /> Pending Review
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                          isApproved ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
+                          isRejected ? "bg-rose-500/15 text-rose-700 dark:text-rose-300" : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                        )}>
+                          {item.verificationStatus}
                         </span>
-                      )}
-                      {row.verificationStatus === "rejected" && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/10 text-destructive border border-destructive/15">
-                          <XCircle className="h-3 w-3" /> Rejected
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-xs">
-                      {row.reviewerComments ? (
-                        <div className="space-y-0.5">
-                          <p className="italic text-foreground">&ldquo;{row.reviewerComments}&rdquo;</p>
-                          {row.reviewedAt && (
-                            <p className="text-[10px] font-mono">Reviewed at: {new Date(row.reviewedAt).toLocaleDateString()}</p>
-                          )}
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground">
+                        Uploaded on {new Date(item.uploadDate).toLocaleString()}
+                      </p>
+
+                      {item.reviewerComments && (
+                        <div className="mt-2 p-2 rounded bg-background border border-border/60 text-[11px] text-foreground">
+                          <strong>Staff Remarks:</strong> {item.reviewerComments}
                         </div>
-                      ) : (
-                        <span className="italic text-muted-foreground/60">—</span>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </CardContent>
       </Card>

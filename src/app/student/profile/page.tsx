@@ -1,18 +1,27 @@
 "use client";
 
 import * as React from "react";
-import { User, Mail, Phone, Loader2, ShieldAlert, GraduationCap } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { 
+  User, 
+  Mail, 
+  Phone, 
+  Globe, 
+  BookOpen, 
+  ShieldCheck, 
+  FileText, 
+  Calendar, 
+  CheckCircle2, 
+  AlertCircle, 
+  Loader2 
+} from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentProfile } from "../actions";
 import { StudentPortalProfile } from "@/domain/student-portal/types";
-import { Branding } from "@/config/branding";
-import { CountryFlag } from "@/components/ui/country-flag";
-import { getCountryByCode } from "@/utils/countries";
+import { cn } from "@/lib/utils";
 
 export default function StudentProfilePage() {
   const supabase = getBrowserSupabase();
-  
   const [profile, setProfile] = React.useState<StudentPortalProfile | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -24,20 +33,16 @@ export default function StudentProfilePage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
-          throw new Error("No active student session found.");
+          throw new Error("No active session found.");
         }
-
-        const jwt = session.access_token;
-        const studentProfile = await fetchStudentProfile(jwt);
-
+        const data = await fetchStudentProfile(session.access_token);
         if (mounted) {
-          setProfile(studentProfile);
+          setProfile(data);
           setIsLoading(false);
         }
       } catch (err: unknown) {
         if (mounted) {
-          const msg = err instanceof Error ? err.message : String(err);
-          setError(msg);
+          setError(err instanceof Error ? err.message : String(err));
           setIsLoading(false);
         }
       }
@@ -53,127 +58,149 @@ export default function StudentProfilePage() {
   if (isLoading) {
     return (
       <div className="flex h-64 w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">Loading profile information...</span>
-        </div>
+        <Loader2 className="h-7 w-7 animate-spin text-primary" />
       </div>
     );
   }
 
   if (error || !profile) {
     return (
-      <Card className="border-destructive/35 bg-destructive/5 text-destructive p-6 max-w-lg mx-auto mt-10">
-        <div className="flex items-start gap-3">
-          <ShieldAlert className="h-6 w-6 shrink-0" />
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold">Failed to load student profile</h3>
-            <p className="text-xs text-muted-foreground/80 mt-1">
-              {error || "Student identity coordinates could not be loaded."}
-            </p>
-          </div>
-        </div>
+      <Card className="border-destructive/35 bg-destructive/5 text-destructive p-6 max-w-lg mx-auto">
+        <p className="text-xs">{error || "Failed to load profile details."}</p>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">My Profile</h1>
-        <p className="text-xs text-muted-foreground mt-1">
-          Review your institutional registration details, nationality, and contact coordinates.
-        </p>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* Header Profile Summary Card */}
+      <Card className="border-border/80 rounded-2xl p-6 shadow-xs bg-card">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+          <div className="h-20 w-20 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-3xl border-2 border-primary/20 shrink-0">
+            {profile.fullName.charAt(0).toUpperCase()}
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-xl font-bold text-foreground tracking-tight">{profile.fullName}</h1>
+            <p className="text-xs text-muted-foreground font-mono">{profile.registrationNumber}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-2 pt-1">
+              <span className="inline-flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-primary" /> {profile.programme}</span>
+              <span>•</span>
+              <span className="inline-flex items-center gap-1"><Globe className="h-3.5 w-3.5 text-primary" /> {profile.nationality || "International"}</span>
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Grid: Personal & Contact Information */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card space-y-4">
+          <CardHeader className="p-0 pb-3 border-b border-border/50">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              Personal & Academic Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 pt-2 space-y-3 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-border/40">
+              <span className="text-muted-foreground">Full Name</span>
+              <span className="font-medium text-foreground">{profile.fullName}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-border/40">
+              <span className="text-muted-foreground">Enrollment Number</span>
+              <span className="font-mono font-medium text-foreground">{profile.registrationNumber}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-border/40">
+              <span className="text-muted-foreground">School / Faculty</span>
+              <span className="font-medium text-foreground">{profile.school}</span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-muted-foreground">Nationality</span>
+              <span className="font-medium text-foreground">{profile.nationality || "N/A"}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card space-y-4">
+          <CardHeader className="p-0 pb-3 border-b border-border/50">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" />
+              Contact Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 pt-2 space-y-3 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-border/40">
+              <span className="text-muted-foreground">Email Address</span>
+              <span className="font-medium text-foreground">{profile.email || "N/A"}</span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-border/40">
+              <span className="text-muted-foreground">Local Phone Number</span>
+              <span className="font-medium text-foreground">{profile.phoneLocal || "N/A"}</span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-muted-foreground">Home Phone Number</span>
+              <span className="font-medium text-foreground">{profile.phoneHome || "N/A"}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-6 grid-cols-1">
-        {/* Personal Details */}
-        <Card className="border border-border/60 shadow-sm">
-          <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-              <User className="h-4 w-4 text-muted-foreground" /> Personal Details
-            </CardTitle>
-            <CardDescription className="text-xs">Your personal biographical credentials registered with {Branding.shortName}.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Full Name</span>
-                <p className="text-sm font-semibold text-foreground">{profile.fullName}</p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Registration Number</span>
-                <p className="text-sm font-semibold text-foreground font-mono">{profile.registrationNumber}</p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Nationality / Country</span>
-                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                  <CountryFlag countryCode={profile.nationality} size="md" /> 
-                  <span>{getCountryByCode(profile.nationality)?.name || profile.nationality}</span>
-                  {getCountryByCode(profile.nationality) && (
-                    <span className="text-[10px] text-muted-foreground font-mono">({getCountryByCode(profile.nationality)?.code})</span>
-                  )}
-                </p>
-              </div>
-            </div>
-          </CardContent>
+      {/* Grid: Compliance Records (Passport, Visa, eFRRO) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Passport Card */}
+        <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-border/50">
+            <span className="text-xs font-semibold text-foreground">Passport Record</span>
+            <span className={cn(
+              "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+              profile.passportStatus === "APPROVED" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+            )}>
+              {profile.passportStatus.replace("_", " ")}
+            </span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <p className="text-muted-foreground">Number: <strong className="text-foreground">{profile.passportNumber || "N/A"}</strong></p>
+            <p className="text-muted-foreground">Expiry: <strong className="text-foreground">{profile.passportExpiry || "N/A"}</strong></p>
+            {profile.passportRemarks && (
+              <p className="text-[11px] text-rose-600 bg-rose-50 dark:bg-rose-950/40 p-2 rounded-lg mt-2">
+                Remarks: {profile.passportRemarks}
+              </p>
+            )}
+          </div>
         </Card>
 
-        {/* Academic Enrollment */}
-        <Card className="border border-border/60 shadow-sm">
-          <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-              <GraduationCap className="h-4 w-4 text-muted-foreground" /> Academic Program
-            </CardTitle>
-            <CardDescription className="text-xs">Enrollment tracks details and school designations.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Degree / Programme</span>
-                <p className="text-sm font-semibold text-foreground">{profile.programme}</p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Academic School</span>
-                <p className="text-sm font-semibold text-foreground">{profile.school}</p>
-              </div>
-            </div>
-          </CardContent>
+        {/* Visa Card */}
+        <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-border/50">
+            <span className="text-xs font-semibold text-foreground">Visa Record</span>
+            <span className={cn(
+              "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+              profile.visaStatus === "APPROVED" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+            )}>
+              {profile.visaStatus.replace("_", " ")}
+            </span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <p className="text-muted-foreground">Number: <strong className="text-foreground">{profile.visaNumber || "N/A"}</strong></p>
+            <p className="text-muted-foreground">Type: <strong className="text-foreground">{profile.visaType || "Student Visa"}</strong></p>
+            <p className="text-muted-foreground">Expiry: <strong className="text-foreground">{profile.visaExpiry || "N/A"}</strong></p>
+          </div>
         </Card>
 
-        {/* Contact Coordinates */}
-        <Card className="border border-border/60 shadow-sm">
-          <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-              <Mail className="h-4 w-4 text-muted-foreground" /> Contact Coordinates
-            </CardTitle>
-            <CardDescription className="text-xs">Your registered contact numbers and address coordinates.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Email Address</span>
-                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                  <Mail className="h-3.5 w-3.5 text-muted-foreground" /> {profile.email}
-                </p>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Home Country Phone</span>
-                <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5 text-muted-foreground" /> {profile.phoneHome}
-                </p>
-              </div>
-              {profile.phoneLocal && (
-                <div className="space-y-0.5">
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Local Contact Phone</span>
-                  <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /> {profile.phoneLocal}
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
+        {/* eFRRO Card */}
+        <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-border/50">
+            <span className="text-xs font-semibold text-foreground">eFRRO Certificate</span>
+            <span className={cn(
+              "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+              profile.efrroStatus === "COMPLIANT" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+            )}>
+              {profile.efrroStatus.replace("_", " ")}
+            </span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <p className="text-muted-foreground">Expiry Date: <strong className="text-foreground">{profile.efrroExpiry || "N/A"}</strong></p>
+            <p className="text-muted-foreground">Days Remaining: <strong className="text-foreground">{profile.daysRemaining ?? "N/A"}</strong></p>
+          </div>
         </Card>
       </div>
     </div>

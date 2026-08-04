@@ -57,7 +57,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       return null;
     }
 
-    // Load reference data mapping to resolve program, school, and country names
+    // Load reference data mapping to resolve program and school
     const { data: refData } = await supabase
       .from("reference_data")
       .select("code, display_name, category")
@@ -70,11 +70,32 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       });
     }
 
-    // Get last upload date from active efrro version
-    const { data: lastVer } = await supabase
-      .from("efrro_versions")
-      .select("created_at")
+    // Load latest Passport document version
+    const { data: passportVer } = await supabase
+      .from("passport_versions")
+      .select("id, passport_number, expiry_date, verification_status, comments, created_at")
       .eq("student_id", studentId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Load latest Visa document version
+    const { data: visaVer } = await supabase
+      .from("visa_versions")
+      .select("id, visa_number, visa_type, expiry_date, verification_status, comments, created_at")
+      .eq("student_id", studentId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Load latest eFRRO document version
+    const { data: efrroVer } = await supabase
+      .from("efrro_versions")
+      .select("id, created_at, verification_status, comments")
+      .eq("student_id", studentId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -86,20 +107,66 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
 
     const progCode = academic?.program_code || "";
 
+    // Resolve Passport status
+    const passportStatus: StudentPortalProfile["passportStatus"] = passportVer
+      ? (passportVer.verification_status === "APPROVED" ? "APPROVED" : passportVer.verification_status === "REJECTED" ? "REJECTED" : "PENDING_VERIFICATION")
+      : "NOT_SUBMITTED";
+
+    // Resolve Visa status
+    const visaStatus: StudentPortalProfile["visaStatus"] = visaVer
+      ? (visaVer.verification_status === "APPROVED" ? "APPROVED" : visaVer.verification_status === "REJECTED" ? "REJECTED" : "PENDING_VERIFICATION")
+      : "NOT_SUBMITTED";
+
+    // Resolve eFRRO status
+    const rawEfrro = snapshot?.efrro_status || (efrroVer ? efrroVer.verification_status : "NOT_SUBMITTED");
+    const efrroStatus: StudentPortalProfile["efrroStatus"] = 
+      rawEfrro === "APPROVED" || rawEfrro === "COMPLIANT" ? "COMPLIANT" :
+      rawEfrro === "WARNING" || rawEfrro === "EXPIRING_SOON" ? "WARNING" :
+      rawEfrro === "EXPIRED" ? "EXPIRED" :
+      rawEfrro === "REJECTED" ? "REJECTED" :
+      rawEfrro === "PENDING_VERIFICATION" || rawEfrro === "PENDING" ? "PENDING_VERIFICATION" : "NOT_SUBMITTED";
+
+    // Overall compliance
+    const isOverallCompliant = passportStatus === "APPROVED" && visaStatus === "APPROVED" && (efrroStatus === "COMPLIANT" || efrroStatus === "WARNING");
+    const overallCompliance: StudentPortalProfile["overallCompliance"] = isOverallCompliant ? "COMPLIANT" : "ATTENTION_REQUIRED";
+
+    const lastUpload = [passportVer?.created_at, visaVer?.created_at, efrroVer?.created_at]
+      .filter(Boolean)
+      .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0] || null;
+
     return {
       studentId: student.id,
       fullName: personal?.full_name || "",
       registrationNumber: student.registration_number,
-      programme: refMap[progCode] || progCode,
-      school: "School of Forensic Sciences", // Standard institutional fallback
+      programme: refMap[progCode] || progCode || "Postgraduate Studies",
+      school: "School of Forensic Sciences",
       nationality: personal?.nationality_code || "",
       email: contact?.email || "",
       phoneHome: contact?.phone_home || "",
       phoneLocal: contact?.phone_local || "",
-      efrroStatus: snapshot?.efrro_status || "MISSING",
+
+      overallCompliance,
+
+      passportNumber: passportVer?.passport_number || null,
+      passportExpiry: passportVer?.expiry_date || null,
+      passportStatus,
+      passportRemarks: passportVer?.comments || null,
+      passportUploadDate: passportVer?.created_at || null,
+
+      visaNumber: visaVer?.visa_number || null,
+      visaType: visaVer?.visa_type || null,
+      visaExpiry: visaVer?.expiry_date || null,
+      visaStatus,
+      visaRemarks: visaVer?.comments || null,
+      visaUploadDate: visaVer?.created_at || null,
+
+      efrroStatus,
       efrroExpiry: snapshot?.efrro_expiry || null,
+      efrroRemarks: efrroVer?.comments || null,
+      efrroUploadDate: efrroVer?.created_at || null,
       daysRemaining: snapshot?.days_until_efrro_expiry !== undefined ? snapshot.days_until_efrro_expiry : null,
-      lastUploadDate: lastVer?.created_at || null
+
+      lastUploadDate: lastUpload
     };
   }
 
@@ -111,7 +178,6 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
     createdBy?: string | null
   ): Promise<UploadToken> {
     const supabase = getAdminSupabase();
-    console.log(`[STUDENT_PORTAL_REPO] Creating secure token hash for student: ${studentId}, purpose: ${purpose}`);
 
     const { data, error } = await supabase
       .from("student_upload_tokens")
@@ -143,7 +209,6 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
 
   async verifyUploadToken(tokenHash: string): Promise<UploadToken | null> {
     const supabase = getAdminSupabase();
-    console.log(`[STUDENT_PORTAL_REPO] Verifying token hash lookup...`);
 
     const { data, error } = await supabase
       .from("student_upload_tokens")
@@ -169,7 +234,6 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
 
   async markTokenUsed(tokenId: string): Promise<void> {
     const supabase = getAdminSupabase();
-    console.log(`[STUDENT_PORTAL_REPO] Invalidating single-use token: ${tokenId}`);
 
     const { error } = await supabase
       .from("student_upload_tokens")
@@ -201,7 +265,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       });
 
     if (error) {
-      console.error(`[STUDENT_PORTAL_REPO_ERROR] Failed to write student activity: ${error.message}`);
+      console.error(`[STUDENT_PORTAL_REPO_ERROR] Failed to write activity: ${error.message}`);
     }
   }
 
@@ -228,25 +292,69 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
   async getStudentHistory(studentId: string): Promise<StudentHistoryRow[]> {
     const supabase = getAdminSupabase();
 
-    const { data, error } = await supabase
-      .from("efrro_versions")
-      .select("id, file_path, created_at, verification_status, comments, verified_at")
-      .eq("student_id", studentId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+    const [efrroRes, passportRes, visaRes] = await Promise.all([
+      supabase
+        .from("efrro_versions")
+        .select("id, file_path, created_at, verification_status, comments, verified_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null),
+      supabase
+        .from("passport_versions")
+        .select("id, file_path, created_at, verification_status, comments, verified_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null),
+      supabase
+        .from("visa_versions")
+        .select("id, file_path, created_at, verification_status, comments, verified_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+    ]);
 
-    if (error || !data) {
-      return [];
+    const history: StudentHistoryRow[] = [];
+
+    if (efrroRes.data) {
+      efrroRes.data.forEach(row => {
+        history.push({
+          versionId: row.id,
+          documentType: "efrro",
+          filename: row.file_path.split("/").pop() || "efrro_document.pdf",
+          uploadDate: row.created_at,
+          verificationStatus: row.verification_status,
+          reviewerComments: row.comments || null,
+          reviewedAt: row.verified_at || null
+        });
+      });
     }
 
-    return data.map(row => ({
-      versionId: row.id,
-      filename: row.file_path.split("/").pop() || "efrro_document.pdf",
-      uploadDate: row.created_at,
-      verificationStatus: row.verification_status,
-      reviewerComments: row.comments || null,
-      reviewedAt: row.verified_at || null
-    }));
+    if (passportRes.data) {
+      passportRes.data.forEach(row => {
+        history.push({
+          versionId: row.id,
+          documentType: "passport",
+          filename: row.file_path.split("/").pop() || "passport_document.pdf",
+          uploadDate: row.created_at,
+          verificationStatus: row.verification_status,
+          reviewerComments: row.comments || null,
+          reviewedAt: row.verified_at || null
+        });
+      });
+    }
+
+    if (visaRes.data) {
+      visaRes.data.forEach(row => {
+        history.push({
+          versionId: row.id,
+          documentType: "visa",
+          filename: row.file_path.split("/").pop() || "visa_document.pdf",
+          uploadDate: row.created_at,
+          verificationStatus: row.verification_status,
+          reviewerComments: row.comments || null,
+          reviewedAt: row.verified_at || null
+        });
+      });
+    }
+
+    return history.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
   }
 
   async getStudentReminders(studentId: string): Promise<StudentReminderHistoryRow[]> {
@@ -256,14 +364,9 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       .from(NOTIFICATION_TABLE_NAME)
       .select("id, channel, created_at, trigger_source, status")
       .eq("student_id", studentId)
-      .eq("document_type", "efrro")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      throw new Error(`[DB_QUERY_FAILED] ${error.message}`);
-    }
-
-    if (!data) {
+    if (error || !data) {
       return [];
     }
 
@@ -279,7 +382,6 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
   async checkDuplicateChecksum(checksum: string): Promise<boolean> {
     const supabase = getAdminSupabase();
 
-    // Check both upload audit logs and efrro_versions for matches
     const { count, error } = await supabase
       .from("upload_audit_log")
       .select("id", { count: "exact", head: true })
@@ -287,7 +389,6 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       .eq("status", "success");
 
     if (error) {
-      console.error(`[STUDENT_PORTAL_REPO_ERROR] Failed checksum lookup: ${error.message}`);
       return false;
     }
 

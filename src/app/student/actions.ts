@@ -91,3 +91,62 @@ export async function uploadEfrro(
     return { success: false, error: msg };
   }
 }
+
+export async function uploadStudentDocumentAction(
+  jwt: string,
+  documentType: "passport" | "visa" | "efrro",
+  filename: string,
+  fileBase64: string,
+  ipAddress: string | null,
+  userAgent: string | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const studentId = await verifyUserAndGetStudentId(jwt);
+    const fileBuffer = Buffer.from(fileBase64, "base64");
+
+    if (documentType === "efrro") {
+      await portalService.uploadEfrroDocument(
+        studentId,
+        filename,
+        fileBuffer,
+        ipAddress,
+        userAgent
+      );
+    } else {
+      // General upload for passport / visa
+      await portalRepo.logActivity(studentId, `UPLOAD_${documentType.toUpperCase()}`, ipAddress, userAgent, { filename });
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+export async function updateStudentPasswordAction(
+  jwt: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
+
+    if (userError || !user) {
+      throw new Error("Authentication failed.");
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
