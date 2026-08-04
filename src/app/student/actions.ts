@@ -37,13 +37,14 @@ async function verifyUserAndGetStudentId(jwt: string): Promise<string> {
 }
 
 /**
- * Server action: Request a 6-digit WhatsApp OTP for a registered mobile number
+ * Server action: Request a 6-digit WhatsApp OTP by Registration / Enrollment Number
  */
-export async function requestStudentWhatsAppOtpAction(
-  rawMobileNumber: string,
+export async function requestStudentWhatsAppOtpByIdentifierAction(
+  rawIdentifier: string,
   turnstileToken: string | null
 ): Promise<{
   success: boolean;
+  registrationNumber?: string;
   maskedPhone?: string;
   cooldownSeconds?: number;
   error?: string;
@@ -53,11 +54,11 @@ export async function requestStudentWhatsAppOtpAction(
       return { success: false, error: "Please complete the security check." };
     }
 
-    if (!rawMobileNumber || rawMobileNumber.trim().length < 8) {
-      return { success: false, error: "Please enter a valid registered mobile number." };
+    if (!rawIdentifier || rawIdentifier.trim().length < 3) {
+      return { success: false, error: "Please enter a valid Registration / Enrollment Number." };
     }
 
-    return await otpService.generateAndSendOtp(rawMobileNumber.trim());
+    return await otpService.generateAndSendOtpByIdentifier(rawIdentifier.trim());
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[STUDENT_OTP_ACTION_ERROR] OTP generation failed:", msg);
@@ -66,10 +67,10 @@ export async function requestStudentWhatsAppOtpAction(
 }
 
 /**
- * Server action: Verify 6-digit WhatsApp OTP and issue authenticated student session
+ * Server action: Verify 6-digit WhatsApp OTP bound to Registration / Enrollment Number
  */
-export async function verifyStudentWhatsAppOtpAction(
-  rawMobileNumber: string,
+export async function verifyStudentWhatsAppOtpByIdentifierAction(
+  rawIdentifier: string,
   otpCode: string,
   ipAddress?: string | null,
   userAgent?: string | null
@@ -80,12 +81,12 @@ export async function verifyStudentWhatsAppOtpAction(
   error?: string;
 }> {
   try {
-    if (!rawMobileNumber || !otpCode) {
-      return { success: false, error: "Mobile number and verification code are required." };
+    if (!rawIdentifier || !otpCode) {
+      return { success: false, error: "Registration Number and verification code are required." };
     }
 
-    const verification = await otpService.verifyOtp(
-      rawMobileNumber.trim(),
+    const verification = await otpService.verifyOtpByIdentifier(
+      rawIdentifier.trim(),
       otpCode.trim(),
       ipAddress,
       userAgent
@@ -119,7 +120,6 @@ export async function verifyStudentWhatsAppOtpAction(
       }
       authUser = newUser.user;
     } else {
-      // Ensure user_metadata contains role and student_id
       await adminSupabase.auth.admin.updateUserById(authUser.id, {
         user_metadata: {
           ...authUser.user_metadata,

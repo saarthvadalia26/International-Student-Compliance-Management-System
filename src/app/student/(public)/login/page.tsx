@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Phone, MessageSquare, AlertCircle, Loader2, ArrowLeft, RefreshCw, CheckCircle2 } from "lucide-react";
+import { UserCheck, MessageSquare, AlertCircle, Loader2, ArrowLeft, RefreshCw, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,16 +10,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { TurnstileStub } from "@/components/ui/turnstile-stub";
 import { Branding } from "@/config/branding";
-import { requestStudentWhatsAppOtpAction, verifyStudentWhatsAppOtpAction } from "../../actions";
+import { requestStudentWhatsAppOtpByIdentifierAction, verifyStudentWhatsAppOtpByIdentifierAction } from "../../actions";
 
 export default function StudentLoginPage() {
   const router = useRouter();
 
   // Step 1 vs Step 2 state
-  const [step, setStep] = React.useState<"mobile_input" | "otp_verify">("mobile_input");
+  const [step, setStep] = React.useState<"identifier_input" | "otp_verify">("identifier_input");
   
-  // Mobile & OTP inputs
-  const [mobileNumber, setMobileNumber] = React.useState("");
+  // Registration Number & OTP inputs
+  const [registrationNumber, setRegistrationNumber] = React.useState("");
+  const [confirmedRegNo, setConfirmedRegNo] = React.useState("");
   const [maskedPhone, setMaskedPhone] = React.useState("");
   const [otpDigits, setOtpDigits] = React.useState<string[]>(["", "", "", "", "", ""]);
   
@@ -51,16 +52,16 @@ export default function StudentLoginPage() {
     router.prefetch("/student/dashboard");
   }, [router]);
 
-  // Request WhatsApp OTP
+  // Request WhatsApp OTP by Registration / Enrollment Number
   const handleRequestOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isLoading) return;
 
     setError(null);
-    const cleanedPhone = mobileNumber.trim();
+    const identifier = registrationNumber.trim();
 
-    if (!cleanedPhone || cleanedPhone.replace(/\D/g, "").length < 8) {
-      setError("Please enter a valid registered mobile number.");
+    if (!identifier || identifier.length < 3) {
+      setError("Please enter a valid Registration or Enrollment Number.");
       return;
     }
 
@@ -72,15 +73,16 @@ export default function StudentLoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await requestStudentWhatsAppOtpAction(cleanedPhone, turnstileToken);
+      const res = await requestStudentWhatsAppOtpByIdentifierAction(identifier, turnstileToken);
 
       if (res.success) {
-        setMaskedPhone(res.maskedPhone || cleanedPhone);
+        setConfirmedRegNo(res.registrationNumber || identifier.toUpperCase());
+        setMaskedPhone(res.maskedPhone || "+91 ***** **000");
         setStep("otp_verify");
         setCooldown(res.cooldownSeconds || 60);
         setError(null);
         toast.success("Verification code sent!", {
-          description: `A 6-digit verification code was sent via WhatsApp to ${res.maskedPhone || cleanedPhone}.`
+          description: `A 6-digit verification code was sent via WhatsApp to ${res.maskedPhone || "your registered number"}.`
         });
 
         // Auto focus first OTP input box
@@ -88,7 +90,7 @@ export default function StudentLoginPage() {
           otpInputRefs.current[0]?.focus();
         }, 150);
       } else {
-        setError(res.error || "Unable to send verification code. Please check your mobile number.");
+        setError(res.error || "Unable to locate student record or send verification code.");
         toast.error(res.error || "OTP Dispatch Failed");
       }
     } catch (err: unknown) {
@@ -128,7 +130,7 @@ export default function StudentLoginPage() {
     }
   };
 
-  // Keyboard navigation for OTP digits (Backspace, Arrow keys)
+  // Keyboard navigation for OTP digits
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
       otpInputRefs.current[index - 1]?.focus();
@@ -155,8 +157,8 @@ export default function StudentLoginPage() {
     setIsVerifying(true);
 
     try {
-      const res = await verifyStudentWhatsAppOtpAction(
-        mobileNumber.trim(),
+      const res = await verifyStudentWhatsAppOtpByIdentifierAction(
+        registrationNumber.trim(),
         fullOtp,
         null,
         navigator.userAgent
@@ -194,15 +196,15 @@ export default function StudentLoginPage() {
       </div>
 
       <Card className="border border-border/80 bg-card/90 backdrop-blur-md shadow-xl rounded-2xl overflow-hidden">
-        {step === "mobile_input" ? (
+        {step === "identifier_input" ? (
           <>
             <CardHeader className="space-y-1">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-emerald-500" />
+                <UserCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Student Login
               </CardTitle>
               <CardDescription className="text-xs text-muted-foreground leading-relaxed">
-                Enter your registered mobile number to receive a secure one-time verification code via WhatsApp.
+                Enter your NFSU Registration or Enrollment Number to receive a secure one-time verification code via WhatsApp.
               </CardDescription>
             </CardHeader>
 
@@ -217,24 +219,24 @@ export default function StudentLoginPage() {
 
               <form onSubmit={handleRequestOtp} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="mobile-input" className="text-xs font-medium text-foreground block">
-                    Registered Mobile Number
+                  <label htmlFor="registration-input" className="text-xs font-medium text-foreground block">
+                    Registration / Enrollment Number
                   </label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <UserCheck className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="mobile-input"
-                      type="tel"
-                      placeholder="+91 98765 43210"
-                      value={mobileNumber}
-                      onChange={(e) => setMobileNumber(e.target.value)}
+                      id="registration-input"
+                      type="text"
+                      placeholder="e.g. NFSU/2026/INT/1001"
+                      value={registrationNumber}
+                      onChange={(e) => setRegistrationNumber(e.target.value)}
                       disabled={isLoading}
-                      className="pl-9 text-xs h-10 rounded-xl"
+                      className="pl-9 text-xs h-10 rounded-xl font-mono uppercase"
                       autoFocus
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Include country code (e.g. +91 for India)
+                    Your unique university identity assigned during admission
                   </p>
                 </div>
 
@@ -244,11 +246,11 @@ export default function StudentLoginPage() {
 
                 <Button
                   type="submit"
-                  disabled={isLoading || !mobileNumber.trim() || !turnstileToken}
+                  disabled={isLoading || !registrationNumber.trim() || !turnstileToken}
                   className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
                   {isLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Sending Code...</>
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Locating & Sending Code...</>
                   ) : (
                     <><MessageSquare className="h-4 w-4" /> Send WhatsApp Code</>
                   )}
@@ -264,8 +266,9 @@ export default function StudentLoginPage() {
                 Verify WhatsApp OTP
               </CardTitle>
               <CardDescription className="text-xs text-muted-foreground leading-relaxed">
-                A verification code has been sent to your registered WhatsApp number{" "}
-                <span className="font-semibold text-foreground">{maskedPhone}</span>.
+                A 6-digit verification code has been sent to the registered WhatsApp number{" "}
+                <span className="font-semibold text-foreground font-mono">{maskedPhone}</span> associated with Enrollment No:{" "}
+                <span className="font-semibold text-foreground font-mono">{confirmedRegNo}</span>.
               </CardDescription>
             </CardHeader>
 
@@ -320,14 +323,14 @@ export default function StudentLoginPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        setStep("mobile_input");
+                        setStep("identifier_input");
                         setOtpDigits(["", "", "", "", "", ""]);
                         setError(null);
                       }}
                       className="text-xs text-muted-foreground hover:text-foreground gap-1 px-2 h-8"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" />
-                      Change Mobile Number
+                      Change Enrollment No.
                     </Button>
 
                     <Button

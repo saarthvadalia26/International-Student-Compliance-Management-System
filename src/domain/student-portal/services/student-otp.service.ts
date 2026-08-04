@@ -13,7 +13,7 @@ interface StoredOtpRecord {
   createdAt: Date;
 }
 
-// In-memory OTP fallback store for development/testing if database table is creating
+// In-memory OTP fallback store for development/testing
 const memoryOtpStore = new Map<string, StoredOtpRecord>();
 
 const whatsappService = new WhatsAppService();
@@ -41,6 +41,7 @@ export class StudentOtpService {
    * Mask phone number for public display (e.g. "+91 ***** **210")
    */
   public maskPhoneNumber(phone: string): string {
+    if (!phone) return "No Phone Registered";
     const normalized = this.normalizePhoneNumber(phone);
     if (normalized.length < 8) return "****";
     const prefix = normalized.substring(0, 3);
@@ -67,124 +68,163 @@ export class StudentOtpService {
   }
 
   /**
-   * Find active student by mobile number
+   * Find active student by permanent University Registration / Enrollment Number
    */
-  public async findStudentByMobile(rawPhone: string): Promise<{
+  public async findStudentByIdentifier(rawIdentifier: string): Promise<{
     studentId: string;
+    registrationNumber: string;
     fullName: string;
     email: string;
-    phone: string;
+    whatsappNumber: string | null;
     isDisabled: boolean;
   } | null> {
     const supabase = getAdminSupabase();
-    const normalized = this.normalizePhoneNumber(rawPhone);
-    const plainDigits = normalized.replace(/\+/g, "");
+    const identifier = rawIdentifier.trim();
 
-    // Query student_contact table matching phone_local or phone_home
-    const { data: contacts, error } = await supabase
-      .from("student_contact")
-      .select("student_id, phone_local, phone_home, email")
-      .limit(50);
+    // Query core students record by registration_number or ID
+    const { data: student, error } = await supabase
+      .from("students")
+      .select(`
+        id,
+        registration_number,
+        status,
+        student_personal(full_name),
+        student_contact(email, phone_local, phone_home)
+      `)
+      .or(`registration_number.ilike.${identifier},id.eq.${identifier}`)
+      .maybeSingle();
 
-    if (error || !contacts) {
-      console.warn("[OTP_SERVICE] Failed querying student_contact:", error?.message);
-    }
-
-    let matchStudentId: string | null = null;
-    let matchEmail: string | null = null;
-    let matchPhone: string | null = null;
-
-    if (contacts) {
-      for (const c of contacts) {
-        const localNorm = c.phone_local ? this.normalizePhoneNumber(c.phone_local) : "";
-        const homeNorm = c.phone_home ? this.normalizePhoneNumber(c.phone_home) : "";
-
-        if (localNorm === normalized || homeNorm === normalized || 
-            (c.phone_local && c.phone_local.replace(/[^\d]/g, "") === plainDigits) ||
-            (c.phone_home && c.phone_home.replace(/[^\d]/g, "") === plainDigits)) {
-          matchStudentId = c.student_id;
-          matchEmail = c.email;
-          matchPhone = localNorm || homeNorm || normalized;
-          break;
-        }
-      }
-    }
-
-    // Fallback: If not found in contact table directly, check core students table
-    if (!matchStudentId) {
-      const { data: studentRecord } = await supabase
+    if (error || !student) {
+      // Security fallback: Search for case-insensitive partial or exact match
+      const { data: allStudents } = await supabase
         .from("students")
         .select(`
           id,
           registration_number,
+          status,
           student_personal(full_name),
           student_contact(email, phone_local, phone_home)
         `)
         .limit(100);
 
-      if (studentRecord) {
-        for (const s of studentRecord) {
-          const sc = s.student_contact?.[0] || s.student_contact;
-          if (sc) {
-            const localNorm = sc.phone_local ? this.normalizePhoneNumber(sc.phone_local) : "";
-            const homeNorm = sc.phone_home ? this.normalizePhoneNumber(sc.phone_home) : "";
-            if (localNorm === normalized || homeNorm === normalized ||
-                (sc.phone_local && sc.phone_local.replace(/[^\d]/g, "") === plainDigits)) {
-              matchStudentId = s.id;
-              matchEmail = sc.email;
-              matchPhone = localNorm || homeNorm || normalized;
-              break;
-            }
-          }
-        }
-      }
+      const match = allStudents?.find(
+        s => s.registration_number?.toLowerCase() === identifier.toLowerCase() ||
+             s.id === identifier
+      );
+
+      if (!match) return null;
+      return this.formatStudentMatch(match);
     }
 
-    if (!matchStudentId) {
-      return null;
-    }
+    return this.formatStudentMatch(student);
+  }
 
-    // Fetch personal details & status
-    const { data: student } = await supabase
-      .from("students")
-      .select("id, status, student_personal(full_name)")
-      .eq("id", matchStudentId)
-      .maybeSingle();
-
-    const personalRecord = student?.student_personal as unknown as { full_name?: string }[] | { full_name?: string } | null;
+  private formatStudentMatch(student: Record<string, unknown>) {
+    const personalRecord = student.student_personal as unknown as { full_name?: string }[] | { full_name?: string } | null;
     const fullName = Array.isArray(personalRecord) 
-      ? personalRecord[0]?.full_name || "NFSU International Student"
-      : personalRecord?.full_name || "NFSU International Student";
-    const isDisabled = student?.status === "suspended" || student?.status === "disabled";
+      ? personalRecord[0]?.full_name || "NFSU Student"
+      : personalRecord?.full_name || "NFSU Student";
+
+    const contactRecord = student.student_contact as unknown as { email?: string; phone_local?: string; phone_home?: string }[] | { email?: string; phone_local?: string; phone_home?: string } | null;
+    const contact = Array.isArray(contactRecord) ? contactRecord[0] : contactRecord;
+
+    const studentId = String(student.id || "");
+    const registrationNumber = String(student.registration_number || student.id || "");
+    const email = contact?.email || `student_${studentId.substring(0, 8)}@nfsu.ac.in`;
+    const whatsappNumber = contact?.phone_local || contact?.phone_home || null;
+    const isDisabled = student.status === "suspended" || student.status === "disabled" || student.status === "withdrawn";
 
     return {
-      studentId: matchStudentId,
+      studentId,
+      registrationNumber,
       fullName,
-      email: matchEmail || `student_${matchStudentId.substring(0, 8)}@nfsu.ac.in`,
-      phone: matchPhone || normalized,
+      email,
+      whatsappNumber,
       isDisabled
     };
   }
 
   /**
-   * Generate, hash, store, and dispatch WhatsApp OTP
+   * Check duplicate WhatsApp number across active students
    */
-  public async generateAndSendOtp(rawPhone: string): Promise<{
+  public async isDuplicateWhatsAppNumber(rawPhone: string, excludeStudentId?: string): Promise<boolean> {
+    const supabase = getAdminSupabase();
+    const normalized = this.normalizePhoneNumber(rawPhone);
+    const plainDigits = normalized.replace(/\+/g, "");
+
+    const { data: contacts } = await supabase
+      .from("student_contact")
+      .select("student_id, phone_local, phone_home");
+
+    if (!contacts) return false;
+
+    for (const c of contacts) {
+      if (excludeStudentId && c.student_id === excludeStudentId) continue;
+      const localNorm = c.phone_local ? this.normalizePhoneNumber(c.phone_local) : "";
+      const homeNorm = c.phone_home ? this.normalizePhoneNumber(c.phone_home) : "";
+
+      if (localNorm === normalized || homeNorm === normalized ||
+          (c.phone_local && c.phone_local.replace(/[^\d]/g, "") === plainDigits)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Log contact number modification in student_contact_audit
+   */
+  public async logContactNumberUpdate(
+    studentId: string,
+    previousPhone: string | null,
+    newPhone: string,
+    updatedBy?: string | null,
+    reason?: string
+  ): Promise<void> {
+    const supabase = getAdminSupabase();
+    try {
+      await supabase
+        .from("student_contact_audit")
+        .insert({
+          student_id: studentId,
+          previous_phone: previousPhone || null,
+          new_phone: newPhone,
+          updated_by: updatedBy || null,
+          reason: reason || "Administrator profile modification"
+        });
+
+      await supabase
+        .from("student_activity_log")
+        .insert({
+          student_id: studentId,
+          action: "WHATSAPP_NUMBER_UPDATED_BY_ADMIN",
+          details: { previous_phone: previousPhone, new_phone: newPhone, reason }
+        });
+    } catch (err) {
+      console.warn("[OTP_SERVICE_AUDIT_WARN] Failed writing contact audit:", err);
+    }
+  }
+
+  /**
+   * Generate, hash, store, and dispatch WhatsApp OTP using permanent Student Registration Number
+   */
+  public async generateAndSendOtpByIdentifier(rawIdentifier: string): Promise<{
     success: boolean;
+    registrationNumber?: string;
     maskedPhone?: string;
     cooldownSeconds?: number;
     error?: string;
   }> {
-    const normalizedPhone = this.normalizePhoneNumber(rawPhone);
+    const student = await this.findStudentByIdentifier(rawIdentifier);
 
-    // 1. Locate student
-    const student = await this.findStudentByMobile(normalizedPhone);
     if (!student) {
-      // Security defense: Return generic success response without leaking account existence
-      console.log(`[OTP_GENERATE] Phone ${normalizedPhone} not registered. Returning generic response.`);
+      // Security Defense: Generic response preventing student registration number probing
+      console.log(`[OTP_GENERATE] Enrollment No ${rawIdentifier} not found. Returning generic response.`);
       return {
         success: true,
-        maskedPhone: this.maskPhoneNumber(normalizedPhone),
+        registrationNumber: rawIdentifier.toUpperCase(),
+        maskedPhone: "+91 ***** **000",
         cooldownSeconds: 60
       };
     }
@@ -196,18 +236,27 @@ export class StudentOtpService {
       };
     }
 
+    if (!student.whatsappNumber) {
+      return {
+        success: false,
+        error: "No verified WhatsApp mobile number is registered for your Enrollment Number. Please contact the International Student Office to update your contact profile."
+      };
+    }
+
+    const normalizedPhone = this.normalizePhoneNumber(student.whatsappNumber);
+
     // 2. Generate 6-digit cryptographically secure OTP
     const rawOtp = crypto.randomInt(100000, 1000000).toString();
     const otpHash = this.hashOtp(rawOtp);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
     const recordId = crypto.randomUUID();
 
-    console.log(`[OTP_GENERATE_SECURE] Generated OTP for student ${student.studentId} (${student.phone}): [REDACTED_OTP_HASH: ${otpHash.substring(0, 10)}...]`);
+    console.log(`[OTP_GENERATE_SECURE] Generated OTP for Registration ${student.registrationNumber} (ID: ${student.studentId}): [OTP_HASH: ${otpHash.substring(0, 10)}...]`);
 
     // 3. Persist hashed OTP to Supabase DB or Memory Fallback
     const supabase = getAdminSupabase();
 
-    // Mark previous active OTPs as used
+    // Mark previous active OTPs for this student_id as used
     await supabase
       .from("student_otp_verifications")
       .update({ is_used: true })
@@ -219,7 +268,7 @@ export class StudentOtpService {
       .insert({
         id: recordId,
         student_id: student.studentId,
-        mobile_number: student.phone,
+        mobile_number: normalizedPhone,
         otp_hash: otpHash,
         attempts_count: 0,
         is_used: false,
@@ -228,10 +277,10 @@ export class StudentOtpService {
 
     if (dbError) {
       console.warn("[OTP_GENERATE_DB_WARN] Using memory fallback store:", dbError.message);
-      memoryOtpStore.set(normalizedPhone, {
+      memoryOtpStore.set(student.studentId, {
         id: recordId,
         studentId: student.studentId,
-        mobileNumber: student.phone,
+        mobileNumber: normalizedPhone,
         otpHash,
         attemptsCount: 0,
         isUsed: false,
@@ -243,7 +292,7 @@ export class StudentOtpService {
     // 4. Dispatch WhatsApp Message
     try {
       await whatsappService.sendWhatsApp({
-        recipientPhone: student.phone,
+        recipientPhone: normalizedPhone,
         templateName: "student_otp",
         templateParameters: {
           code: rawOtp,
@@ -254,7 +303,6 @@ export class StudentOtpService {
     } catch (wsErr: unknown) {
       const msg = wsErr instanceof Error ? wsErr.message : String(wsErr);
       console.log(`[WHATSAPP_DISPATCH_NOTICE] WhatsApp dispatch: ${msg}`);
-      // Don't throw - fallback mechanism allows student to test OTP in dev environment if needed
     }
 
     // 5. Audit Log
@@ -263,25 +311,24 @@ export class StudentOtpService {
         .from("student_activity_log")
         .insert({
           student_id: student.studentId,
-          action: "OTP_GENERATED_WHATSAPP",
-          details: { phone_masked: this.maskPhoneNumber(student.phone) }
+          action: "OTP_GENERATED_BY_REGISTRATION_NO",
+          details: { registration_number: student.registrationNumber, phone_masked: this.maskPhoneNumber(normalizedPhone) }
         });
-    } catch {
-      // Ignore non-fatal audit log errors
-    }
+    } catch {}
 
     return {
       success: true,
-      maskedPhone: this.maskPhoneNumber(student.phone),
+      registrationNumber: student.registrationNumber,
+      maskedPhone: this.maskPhoneNumber(normalizedPhone),
       cooldownSeconds: 60
     };
   }
 
   /**
-   * Verify 6-digit WhatsApp OTP input
+   * Verify 6-digit WhatsApp OTP input bound to Student Registration Number
    */
-  public async verifyOtp(
-    rawPhone: string, 
+  public async verifyOtpByIdentifier(
+    rawIdentifier: string, 
     inputOtp: string,
     ipAddress?: string | null,
     userAgent?: string | null
@@ -291,9 +338,13 @@ export class StudentOtpService {
     studentEmail?: string;
     error?: string;
   }> {
-    const normalizedPhone = this.normalizePhoneNumber(rawPhone);
-    const cleanedOtp = inputOtp.replace(/\D/g, "");
+    const student = await this.findStudentByIdentifier(rawIdentifier);
 
+    if (!student) {
+      return { success: false, error: "Enrollment Number not recognized. Please check your details." };
+    }
+
+    const cleanedOtp = inputOtp.replace(/\D/g, "");
     if (cleanedOtp.length !== 6) {
       return { success: false, error: "Please enter a valid 6-digit verification code." };
     }
@@ -301,13 +352,13 @@ export class StudentOtpService {
     const inputHash = this.hashOtp(cleanedOtp);
     const supabase = getAdminSupabase();
 
-    // 1. Fetch latest pending OTP record
+    // 1. Fetch latest pending OTP record by student_id
     let otpRecord: StoredOtpRecord | null = null;
 
     const { data: dbData } = await supabase
       .from("student_otp_verifications")
       .select("*")
-      .eq("mobile_number", normalizedPhone)
+      .eq("student_id", student.studentId)
       .eq("is_used", false)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -325,7 +376,7 @@ export class StudentOtpService {
         createdAt: new Date(dbData.created_at)
       };
     } else {
-      otpRecord = memoryOtpStore.get(normalizedPhone) || null;
+      otpRecord = memoryOtpStore.get(student.studentId) || null;
     }
 
     if (!otpRecord) {
@@ -355,7 +406,6 @@ export class StudentOtpService {
     const isMatch = this.constantTimeCompare(inputHash, otpRecord.otpHash);
 
     if (!isMatch) {
-      // Increment attempt counter
       const newAttempts = otpRecord.attemptsCount + 1;
       otpRecord.attemptsCount = newAttempts;
 
@@ -364,16 +414,15 @@ export class StudentOtpService {
         .update({ attempts_count: newAttempts })
         .eq("id", otpRecord.id);
 
-      if (memoryOtpStore.has(normalizedPhone)) {
-        memoryOtpStore.get(normalizedPhone)!.attemptsCount = newAttempts;
+      if (memoryOtpStore.has(student.studentId)) {
+        memoryOtpStore.get(student.studentId)!.attemptsCount = newAttempts;
       }
 
-      // Audit log failed attempt
       try {
         await supabase
           .from("student_activity_log")
           .insert({
-            student_id: otpRecord.studentId,
+            student_id: student.studentId,
             action: "OTP_VERIFICATION_FAILED",
             ip_address: ipAddress || null,
             user_agent: userAgent || null,
@@ -396,28 +445,25 @@ export class StudentOtpService {
       .update({ is_used: true })
       .eq("id", otpRecord.id);
 
-    memoryOtpStore.delete(normalizedPhone);
-
-    // Fetch student email for session mapping
-    const student = await this.findStudentByMobile(normalizedPhone);
+    memoryOtpStore.delete(student.studentId);
 
     // Audit log login success
     try {
       await supabase
         .from("student_activity_log")
         .insert({
-          student_id: otpRecord.studentId,
-          action: "LOGIN_SUCCESS_WHATSAPP_OTP",
+          student_id: student.studentId,
+          action: "LOGIN_SUCCESS_ENROLLMENT_NO_OTP",
           ip_address: ipAddress || null,
           user_agent: userAgent || null,
-          details: { channel: "WHATSAPP_OTP" }
+          details: { registration_number: student.registrationNumber, channel: "WHATSAPP_OTP" }
         });
     } catch {}
 
     return {
       success: true,
-      studentId: otpRecord.studentId,
-      studentEmail: student?.email || `student_${otpRecord.studentId.substring(0, 8)}@nfsu.ac.in`
+      studentId: student.studentId,
+      studentEmail: student.email
     };
   }
 }
