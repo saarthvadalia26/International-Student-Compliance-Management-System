@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { KeyRound, Bell, Loader2 } from "lucide-react";
+import { KeyRound, Bell, ShieldCheck, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
@@ -13,9 +13,6 @@ export default function StudentSettingsPage() {
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [isUpdatingPassword, setIsUpdatingPassword] = React.useState(false);
-
-  const [emailAlerts, setEmailAlerts] = React.useState(true);
-  const [whatsappAlerts, setWhatsappAlerts] = React.useState(true);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +49,7 @@ export default function StudentSettingsPage() {
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
         <h1 className="text-xl font-bold text-foreground tracking-tight">Account Settings</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Manage your student portal password, security options, and notification preferences.</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Manage your student portal password and view account security policy.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -104,39 +101,26 @@ export default function StudentSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Notification Preferences Card */}
+        {/* Read-Only Institutional Notification Policy Card */}
         <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card space-y-4">
           <CardHeader className="p-0 pb-3 border-b border-border/50">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Bell className="h-4 w-4 text-primary" />
-              Notification Preferences
+              Compliance Communication Policy
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0 pt-2 space-y-4 text-xs">
-            <div className="flex items-center justify-between py-2 border-b border-border/40">
-              <div>
-                <p className="font-semibold text-foreground">Email Compliance Alerts</p>
-                <p className="text-[11px] text-muted-foreground">Receive expiration warnings via official email</p>
+          <CardContent className="p-0 pt-2 space-y-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/5 text-foreground space-y-2">
+              <div className="flex items-center gap-2 font-semibold text-primary">
+                <ShieldCheck className="h-4 w-4 shrink-0" />
+                <span>Managed by International Student Office</span>
               </div>
-              <input
-                type="checkbox"
-                checked={emailAlerts}
-                onChange={(e) => { setEmailAlerts(e.target.checked); toast.success("Preferences saved."); }}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-              />
-            </div>
-
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <p className="font-semibold text-foreground">WhatsApp Reminders</p>
-                <p className="text-[11px] text-muted-foreground">Receive urgent reminders on registered phone number</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={whatsappAlerts}
-                onChange={(e) => { setWhatsappAlerts(e.target.checked); toast.success("Preferences saved."); }}
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-              />
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Compliance notifications are mandatory institutional communications governed by National Forensic Sciences University (NFSU).
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Automated email and WhatsApp alerts are dispatched for upcoming Passport, Visa, and eFRRO expiry deadlines to ensure continuous academic compliance.
+              </p>
             </div>
           </CardContent>
         </Card>
