@@ -519,3 +519,180 @@ export async function deleteStaffAccountAction(targetUserId: string): Promise<vo
   systemStateService.invalidateCache();
   administratorDetectionService.invalidateCache();
 }
+
+// ── Factory Reset (Administrator only — Pre-Handover) ───────────────────────
+
+export interface FactoryResetResult {
+  success: boolean;
+  message: string;
+  deletedCounts?: {
+    users: number;
+    students: number;
+    passportVersions: number;
+    visaVersions: number;
+    efrroVersions: number;
+    notifications: number;
+    auditLogs: number;
+    configRows: number;
+  };
+}
+
+/**
+ * Factory Reset — permanently destroys ALL operational data and authentication users.
+ * Restores the system to a brand-new installation state.
+ *
+ * Security:
+ * 1. Administrator-only (getAdminUser enforces role check).
+ * 2. Password re-verification via Supabase signInWithPassword.
+ * 3. Final audit trail entry written BEFORE truncation.
+ * 4. All auth.users deleted via admin API.
+ * 5. All caches invalidated.
+ */
+export async function factoryResetAction(password: string): Promise<FactoryResetResult> {
+  const adminUser = await getAdminUser();
+  const meta = await getRequestMeta();
+  const adminClient = getAdminSupabase();
+
+  if (!password || password.length < 1) {
+    throw new Error("Password is required to perform factory reset.");
+  }
+
+  // 1. Re-verify administrator password
+  const supabase = await getServerSupabase();
+  const { error: authError } = await supabase.auth.signInWithPassword({
+    email: adminUser.email ?? "",
+    password,
+  });
+
+  if (authError) {
+    throw new Error("Password verification failed. Factory reset aborted.");
+  }
+
+  // 2. Count records before deletion for audit trail
+  const countTable = async (table: string): Promise<number> => {
+    try {
+      const { count, error } = await adminClient
+        .from(table)
+        .select("*", { count: "exact", head: true });
+      if (error) return 0;
+      return count ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const [
+    studentCount,
+    passportCount,
+    visaCount,
+    efrroCount,
+    notificationCount,
+    auditCount,
+    configCount,
+    snapshotCount,
+  ] = await Promise.all([
+    countTable("students"),
+    countTable("passport_versions"),
+    countTable("visa_versions"),
+    countTable("efrro_versions"),
+    countTable("notification_delivery_log"),
+    countTable("audit_log"),
+    countTable("system_config"),
+    countTable("student_snapshot"),
+  ]);
+
+  // Count auth users
+  let userCount = 0;
+  try {
+    const { data: { users } } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    userCount = users?.length ?? 0;
+  } catch {
+    // Continue even if count fails
+  }
+
+  const deletedCounts = {
+    users: userCount,
+    students: studentCount + snapshotCount,
+    passportVersions: passportCount,
+    visaVersions: visaCount,
+    efrroVersions: efrroCount,
+    notifications: notificationCount,
+    auditLogs: auditCount,
+    configRows: configCount,
+  };
+
+  // 3. Write final audit entry BEFORE truncation
+  await auditService.logFactoryReset({
+    adminId: adminUser.id,
+    adminEmail: adminUser.email ?? "unknown",
+    ipAddress: meta.ipAddress,
+    userAgent: meta.userAgent,
+    reason: "Pre-handover factory reset for NFSU deployment",
+    deletedCounts,
+  });
+
+  // 4. Truncate operational tables in dependency order (children first)
+  const tablesToTruncate = [
+    "notification_delivery_log",
+    "efrro_versions",
+    "visa_versions",
+    "passport_versions",
+    "student_snapshot",
+    "students",
+    "audit_log",
+    "system_config",
+  ];
+
+  for (const table of tablesToTruncate) {
+    try {
+      await adminClient.from(table).delete().gte("id", "00000000-0000-0000-0000-000000000000");
+    } catch {
+      // Some tables may use integer IDs — try numeric fallback
+      try {
+        await adminClient.from(table).delete().gte("id", 0);
+      } catch {
+        // Table might be empty or have different schema — continue
+      }
+    }
+  }
+
+  // 5. Clear storage buckets
+  const buckets = ["documents", "uploads", "attachments"];
+  for (const bucket of buckets) {
+    try {
+      const { data: files } = await adminClient.storage.from(bucket).list("", { limit: 1000 });
+      if (files && files.length > 0) {
+        const paths = files.map((f) => f.name);
+        await adminClient.storage.from(bucket).remove(paths);
+      }
+    } catch {
+      // Bucket may not exist — continue
+    }
+  }
+
+  // 6. Delete ALL auth users via admin API
+  try {
+    const { data: { users: allUsers } } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (allUsers) {
+      for (const user of allUsers) {
+        try {
+          await adminClient.auth.admin.deleteUser(user.id);
+        } catch {
+          // Continue deleting remaining users
+        }
+      }
+    }
+  } catch {
+    // Auth cleanup failure — system will still detect fresh installation state
+  }
+
+  // 7. Invalidate all caches
+  systemStateService.invalidateCache();
+  administratorDetectionService.invalidateCache();
+
+  return {
+    success: true,
+    message: "System reset successfully. The application is ready for first-time setup.",
+    deletedCounts,
+  };
+}

@@ -66,6 +66,24 @@ export interface UserDeletionAuditEntry {
   success: boolean;
 }
 
+export interface FactoryResetAuditEntry {
+  adminId: string;
+  adminEmail: string;
+  ipAddress?: string;
+  userAgent?: string;
+  reason: string;
+  deletedCounts: {
+    users: number;
+    students: number;
+    passportVersions: number;
+    visaVersions: number;
+    efrroVersions: number;
+    notifications: number;
+    auditLogs: number;
+    configRows: number;
+  };
+}
+
 const auditService = {
   /**
    * Log Initial Administrator Account Setup
@@ -194,6 +212,29 @@ const auditService = {
         sessions_terminated: entry.sessionsTerminated,
         reason: entry.reason ?? "Administrator Account Deletion",
         success: entry.success,
+      },
+    });
+  },
+
+  /**
+   * Log Factory Reset event — final audit entry before system wipe
+   */
+  async logFactoryReset(entry: FactoryResetAuditEntry): Promise<void> {
+    const admin = getAdminSupabase();
+    await admin.from("audit_log").insert({
+      actor_id: entry.adminId,
+      actor_email: entry.adminEmail,
+      action: "FACTORY_RESET",
+      resource: "system",
+      category: "security",
+      severity: "critical",
+      ip_address: entry.ipAddress ?? null,
+      user_agent: entry.userAgent ?? null,
+      details: {
+        reason: entry.reason,
+        deleted_counts: entry.deletedCounts,
+        scope: "full_system_reset",
+        warning: "All operational data permanently destroyed",
       },
     });
   },

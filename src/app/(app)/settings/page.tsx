@@ -19,7 +19,9 @@ import {
   Play,
   Languages,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  RotateCcw,
+  Trash2
 } from "lucide-react";
 import { UserManagementTab } from "@/components/settings/user-management-tab";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -34,7 +36,8 @@ import {
   fetchRetentionPolicies, 
   updateRetentionPolicyAction, 
   runDocumentCleanupAction,
-  globalSignOutAction
+  globalSignOutAction,
+  factoryResetAction
 } from "./actions";
 import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
 import { EmergencyLogoutDialog } from "@/components/settings/emergency-logout-dialog";
@@ -89,6 +92,12 @@ export default function SettingsPage() {
   const [isSigningOutAll, setIsSigningOutAll] = React.useState(false);
   const [signOutSuccess, setSignOutSuccess] = React.useState(false);
   const [signOutError, setSignOutError] = React.useState(false);
+
+  // Factory Reset state
+  const [resetPassword, setResetPassword] = React.useState("");
+  const [resetConfirmText, setResetConfirmText] = React.useState("");
+  const [isResettingFactory, setIsResettingFactory] = React.useState(false);
+  const [resetStep, setResetStep] = React.useState<1 | 2 | 3>(1);
 
   const loadPolicies = async () => {
     try {
@@ -614,6 +623,152 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Factory Reset — Administrator only */}
+            {isAdministrator && (
+              <Card className="border border-rose-500/40 shadow-sm">
+                <CardHeader className="bg-rose-500/5 border-b border-rose-500/30 py-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
+                    <RotateCcw className="h-4 w-4" /> Factory Reset
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-5">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Permanently erases <strong>all operational data</strong>, authentication accounts, uploaded documents, and system configuration.
+                    The application will revert to a brand-new installation state suitable for university handover.
+                  </p>
+
+                  <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-3.5 text-xs text-rose-600 dark:text-rose-400 space-y-2">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
+                      <span>Warning: This action is permanent and irreversible</span>
+                    </div>
+                    <ul className="list-disc list-inside space-y-1 text-muted-foreground text-[11px] leading-relaxed">
+                      <li>All administrator and staff accounts will be deleted.</li>
+                      <li>All student records, passports, visas, and eFRRO filings will be erased.</li>
+                      <li>All notifications, audit logs, and system configuration will be cleared.</li>
+                      <li>All uploaded documents will be permanently removed from storage.</li>
+                      <li>The Setup Wizard will appear on the next visit.</li>
+                    </ul>
+                  </div>
+
+                  {/* Step 1: Password Verification */}
+                  {resetStep === 1 && (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">Confirm your password to proceed:</label>
+                        <Input
+                          type="password"
+                          value={resetPassword}
+                          onChange={(e) => setResetPassword(e.target.value)}
+                          placeholder="Enter your current password"
+                          className="h-9 text-xs max-w-sm border-rose-500/30 focus:border-rose-500"
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300"
+                        disabled={!resetPassword || resetPassword.length < 8}
+                        onClick={() => setResetStep(2)}
+                      >
+                        Continue
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Step 2: Type Confirmation Phrase */}
+                  {resetStep === 2 && (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground">
+                          Type <span className="font-mono font-bold text-rose-600 dark:text-rose-400">RESET ISCMS</span> to confirm:
+                        </label>
+                        <Input
+                          type="text"
+                          value={resetConfirmText}
+                          onChange={(e) => setResetConfirmText(e.target.value)}
+                          placeholder="RESET ISCMS"
+                          className="h-9 text-xs font-mono tracking-wider max-w-sm border-rose-500/30 focus:border-rose-500"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => { setResetStep(1); setResetConfirmText(""); }}
+                        >
+                          Back
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300"
+                          disabled={resetConfirmText.trim() !== "RESET ISCMS"}
+                          onClick={() => setResetStep(3)}
+                        >
+                          Continue
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Final Confirmation */}
+                  {resetStep === 3 && (
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-4 text-xs text-rose-700 dark:text-rose-400">
+                        <p className="font-semibold">Final Confirmation</p>
+                        <p className="mt-1 text-muted-foreground">You are about to permanently erase all data and restore the system to factory state. This cannot be undone.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          disabled={isResettingFactory}
+                          onClick={() => { setResetStep(1); setResetPassword(""); setResetConfirmText(""); }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-8 text-xs bg-rose-600 hover:bg-rose-700 text-white gap-1.5"
+                          disabled={isResettingFactory}
+                          onClick={async () => {
+                            try {
+                              setIsResettingFactory(true);
+                              const result = await factoryResetAction(resetPassword);
+                              if (result.success) {
+                                toast.success(result.message);
+                                setTimeout(() => {
+                                  window.location.href = "/setup";
+                                }, 1500);
+                              }
+                            } catch (err: unknown) {
+                              const msg = err instanceof Error ? err.message : "Factory reset failed.";
+                              toast.error(msg);
+                              setResetStep(1);
+                              setResetPassword("");
+                              setResetConfirmText("");
+                            } finally {
+                              setIsResettingFactory(false);
+                            }
+                          }}
+                        >
+                          {isResettingFactory ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Resetting System...</>
+                          ) : (
+                            <><Trash2 className="h-3.5 w-3.5" /> Execute Factory Reset</>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
