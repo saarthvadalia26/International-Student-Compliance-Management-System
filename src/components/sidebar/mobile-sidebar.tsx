@@ -23,6 +23,9 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   const { isAdministrator } = useUserRole();
   const prefetchedRoutesRef = React.useRef<Set<string>>(new Set());
 
+  // Accordion state for expandable parent menu items
+  const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
+
   const getResolvedHref = (href: string) => {
     if (href.includes(":id")) {
       const segments = pathname.split("/");
@@ -60,6 +63,29 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
     return pathname.startsWith(resolved);
   };
 
+  // Auto-expand parent menu if active route is one of its children
+  React.useEffect(() => {
+    mobileNavigation.items.forEach((item: NavItem) => {
+      if (item.items && item.items.length > 0) {
+        const hasActiveChild = item.items.some((sub) => {
+          const subResolved = getResolvedHref(sub.href);
+          return pathname === subResolved || pathname.startsWith(subResolved);
+        });
+        if (hasActiveChild) {
+          setOpenMenus((prev) => ({ ...prev, [item.title]: true }));
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const toggleMenu = (title: string) => {
+    setOpenMenus((prev) => ({
+      ...prev,
+      [title]: !prev[title],
+    }));
+  };
+
   const renderIcon = (iconName?: string) => {
     if (!iconName) return null;
     const IconComponent =
@@ -76,7 +102,7 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
       <DialogPortal>
         <DialogOverlay />
         <DialogPrimitive.Popup className="fixed top-0 left-0 bottom-0 z-50 flex h-full w-72 max-w-[80vw] flex-col border-r border-border bg-card text-card-foreground shadow-xl duration-200 outline-none data-open:animate-in data-open:slide-in-from-left-full data-closed:animate-out data-closed:slide-out-to-left-full">
-          {/* Header Area — Application Title ONLY (Zero Logo Images / Badges) */}
+          {/* Header Area */}
           <div className="flex h-16 w-full items-center justify-between border-b border-border/50 px-4">
             <div className="flex flex-col overflow-hidden truncate">
               <span className="text-primary font-display text-sm font-bold tracking-tight truncate">
@@ -104,9 +130,73 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
                 return true;
               })
               .map((item: NavItem) => {
+                const hasChildren = Boolean(item.items && item.items.length > 0);
                 const active = isLinkActive(item.href);
+                const isExpanded = Boolean(openMenus[item.title]);
                 const resolvedHref = getResolvedHref(item.href);
 
+                if (hasChildren) {
+                  return (
+                    <div key={item.title} className="space-y-1">
+                      {/* Parent Menu Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => toggleMenu(item.title)}
+                        onTouchStart={() => handlePrefetch(item.href)}
+                        onMouseEnter={() => handlePrefetch(item.href)}
+                        aria-expanded={isExpanded}
+                        aria-controls={`mobile-submenu-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+                        className={cn(
+                          "flex min-h-[44px] w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                          active && "bg-accent/70 text-foreground font-semibold"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          {renderIcon(item.icon)}
+                          <span className="truncate">{item.title}</span>
+                        </div>
+                        <Icons.ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-transform duration-200 text-muted-foreground",
+                            isExpanded && "rotate-180"
+                          )}
+                        />
+                      </button>
+
+                      {/* Expanded Submenu Items */}
+                      {isExpanded && (
+                        <div
+                          id={`mobile-submenu-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+                          className="mt-1 ml-6 space-y-1 border-l border-border/60 pl-3 animate-in fade-in-50 slide-in-from-top-1 duration-150"
+                        >
+                          {item.items?.map((subItem) => {
+                            const subResolved = getResolvedHref(subItem.href);
+                            const subActive = pathname === subResolved;
+
+                            return (
+                              <Link
+                                key={subItem.title}
+                                href={subResolved}
+                                onClick={onClose}
+                                prefetch={true}
+                                onTouchStart={() => handlePrefetch(subItem.href)}
+                                onMouseEnter={() => handlePrefetch(subItem.href)}
+                                className={cn(
+                                  "flex min-h-[44px] items-center rounded-md px-3 py-2 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                                  subActive && "bg-primary/10 text-primary font-bold"
+                                )}
+                              >
+                                {subItem.title}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                {/* Direct Link Item */}
                 return (
                   <Link
                     key={item.title}
