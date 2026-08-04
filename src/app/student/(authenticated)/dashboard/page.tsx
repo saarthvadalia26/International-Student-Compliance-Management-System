@@ -3,28 +3,23 @@
 import * as React from "react";
 import Link from "next/link";
 import { 
-  User, 
+  User,
   AlertTriangle, 
   CheckCircle2, 
-  Clock, 
-  FileText, 
-  Bell, 
-  ArrowRight,
+  Globe2, 
+  Award, 
+  Upload, 
+  AlertCircle, 
+  FileCheck2, 
+  History,
   ShieldAlert,
   Loader2,
-  Calendar,
-  Building2,
-  Globe2,
-  Award,
-  Upload,
-  AlertCircle,
-  FileCheck2,
-  History
+  ArrowRight
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { fetchStudentDashboard } from "../actions";
+import { fetchStudentDashboard } from "../../actions";
 import { StudentPortalProfile, StudentHistoryRow, StudentReminderHistoryRow } from "@/domain/student-portal/types";
 import { cn } from "@/lib/utils";
 
@@ -32,8 +27,8 @@ export default function StudentDashboardPage() {
   const supabase = getBrowserSupabase();
   
   const [profile, setProfile] = React.useState<StudentPortalProfile | null>(null);
-  const [history, setHistory] = React.useState<StudentHistoryRow[]>([]);
-  const [reminders, setReminders] = React.useState<StudentReminderHistoryRow[]>([]);
+  const [, setHistory] = React.useState<StudentHistoryRow[]>([]);
+  const [, setReminders] = React.useState<StudentReminderHistoryRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 

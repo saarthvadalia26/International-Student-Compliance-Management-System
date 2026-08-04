@@ -9,7 +9,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { uploadStudentDocumentAction, fetchStudentProfile } from "../actions";
+import { uploadStudentDocumentAction, fetchStudentProfile } from "../../actions";
 import { toast } from "sonner";
 import { StudentPortalProfile } from "@/domain/student-portal/types";
 

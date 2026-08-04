@@ -11,7 +11,6 @@ import {
   History, 
   Settings, 
   LogOut, 
-  Loader2, 
   Menu, 
   X, 
   Bell, 
@@ -24,59 +23,27 @@ import { toast } from "sonner";
 import { Branding } from "@/config/branding";
 import { cn } from "@/lib/utils";
 
-interface StudentLayoutProps {
+interface StudentPortalShellProps {
+  initialStudentName: string;
+  initialEmail: string;
   children: React.ReactNode;
 }
 
-export default function StudentLayout({ children }: StudentLayoutProps) {
+export default function StudentPortalShell({
+  initialStudentName,
+  initialEmail,
+  children
+}: StudentPortalShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = getBrowserSupabase();
 
-  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
-  const [studentName, setStudentName] = React.useState("Student");
-  const [studentEmail, setStudentEmail] = React.useState("");
+  const [studentName] = React.useState(
+    initialStudentName.charAt(0).toUpperCase() + initialStudentName.slice(1)
+  );
+  const [studentEmail] = React.useState(initialEmail);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    let mounted = true;
-
-    async function hydrateStudentInfo() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && mounted) {
-          setIsAuthenticated(true);
-          const email = session.user.email || "";
-          setStudentEmail(email);
-          const username = session.user.user_metadata?.username || email.split("@")[0];
-          setStudentName(username.charAt(0).toUpperCase() + username.slice(1));
-        } else if (mounted) {
-          setIsAuthenticated(true); // Trust middleware for route access
-        }
-      } catch (err) {
-        console.error("Student session hydration error:", err);
-        if (mounted) setIsAuthenticated(true);
-      }
-    }
-
-    hydrateStudentInfo();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT" || !session) {
-        if (mounted) {
-          setIsAuthenticated(false);
-        }
-      } else if (session && mounted) {
-        setIsAuthenticated(true);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [supabase]);
 
   const handleSignOut = async () => {
     try {
@@ -88,17 +55,6 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
       toast.error("Failed to sign out.");
     }
   };
-
-  if (isAuthenticated === null) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background text-foreground">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="text-sm text-muted-foreground font-medium">Verifying student session...</span>
-        </div>
-      </div>
-    );
-  }
 
   const navLinks = [
     { href: "/student/dashboard", label: "Dashboard", icon: LayoutDashboard },

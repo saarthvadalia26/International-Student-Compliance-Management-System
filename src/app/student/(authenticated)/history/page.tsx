@@ -3,25 +3,22 @@
 import * as React from "react";
 import { 
   History, 
-  CheckCircle2, 
-  AlertCircle, 
   Clock, 
   FileText, 
-  Bell, 
   Loader2, 
   Check, 
   XCircle 
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { fetchStudentDashboard } from "../actions";
+import { fetchStudentDashboard } from "../../actions";
 import { StudentHistoryRow, StudentReminderHistoryRow } from "@/domain/student-portal/types";
 import { cn } from "@/lib/utils";
 
 export default function StudentHistoryPage() {
   const supabase = getBrowserSupabase();
   const [history, setHistory] = React.useState<StudentHistoryRow[]>([]);
-  const [reminders, setReminders] = React.useState<StudentReminderHistoryRow[]>([]);
+  const [, setReminders] = React.useState<StudentReminderHistoryRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {

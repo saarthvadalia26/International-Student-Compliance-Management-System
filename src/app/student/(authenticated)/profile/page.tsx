@@ -4,19 +4,13 @@ import * as React from "react";
 import { 
   User, 
   Mail, 
-  Phone, 
   Globe, 
   BookOpen, 
-  ShieldCheck, 
-  FileText, 
-  Calendar, 
-  CheckCircle2, 
-  AlertCircle, 
   Loader2 
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { fetchStudentProfile } from "../actions";
+import { fetchStudentProfile } from "../../actions";
 import { StudentPortalProfile } from "@/domain/student-portal/types";
 import { cn } from "@/lib/utils";
 

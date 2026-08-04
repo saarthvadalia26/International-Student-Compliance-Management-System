@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Settings, KeyRound, Bell, Shield, Loader2, CheckCircle2 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { KeyRound, Bell, Loader2 } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { updateStudentPasswordAction } from "../actions";
+import { updateStudentPasswordAction } from "../../actions";
 import { toast } from "sonner";
 
 export default function StudentSettingsPage() {
