@@ -5,6 +5,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { StudentPortalService } from "@/domain/student-portal/services/student-portal.service";
 import { SupabaseStudentPortalRepository } from "@/domain/student-portal/repositories/student-portal.repository";
 import { StudentOtpService } from "@/domain/student-portal/services/student-otp.service";
+import { isStudentPortalEnabled } from "@/config/feature-flags";
 import { 
   StudentPortalProfile, 
   StudentHistoryRow, 
@@ -15,10 +16,16 @@ const portalRepo = new SupabaseStudentPortalRepository();
 const portalService = new StudentPortalService();
 const otpService = new StudentOtpService();
 
+const MAINTENANCE_MESSAGE = "The Student Portal is currently unavailable while final testing and verification are being completed. Please contact the International Student Office if you require immediate assistance.";
+
 /**
  * Helper to cryptographically verify user JWT and retrieve student association ID
  */
 async function verifyUserAndGetStudentId(jwt: string): Promise<string> {
+  if (!isStudentPortalEnabled()) {
+    throw new Error(MAINTENANCE_MESSAGE);
+  }
+
   const supabase = await getServerSupabase();
   const { data: { user }, error } = await supabase.auth.getUser(jwt);
 
@@ -50,6 +57,10 @@ export async function requestStudentWhatsAppOtpByIdentifierAction(
   error?: string;
 }> {
   try {
+    if (!isStudentPortalEnabled()) {
+      return { success: false, error: MAINTENANCE_MESSAGE };
+    }
+
     if (!turnstileToken) {
       return { success: false, error: "Please complete the security check." };
     }
@@ -81,6 +92,10 @@ export async function verifyStudentWhatsAppOtpByIdentifierAction(
   error?: string;
 }> {
   try {
+    if (!isStudentPortalEnabled()) {
+      return { success: false, error: MAINTENANCE_MESSAGE };
+    }
+
     if (!rawIdentifier || !otpCode) {
       return { success: false, error: "Registration Number and verification code are required." };
     }
