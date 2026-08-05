@@ -28,10 +28,10 @@ export default function StudentSettingsPage() {
                 <span>Passwordless Verification Active</span>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Your Student Portal account is protected by single-use 6-digit WhatsApp verification codes. Passwords and magic links are permanently disabled for security.
+                Your Student Portal is secured using single-use WhatsApp One-Time Password (OTP) verification issued by the International Student Office.
               </p>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                To update your registered WhatsApp mobile number, please present your valid Student ID to the International Student Office.
+                To update your registered WhatsApp mobile number, please visit the International Student Office with your valid Student ID for identity verification.
               </p>
             </div>
           </CardContent>
