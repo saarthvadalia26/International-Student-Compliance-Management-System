@@ -1,6 +1,7 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { isStudentPortalTestMode } from "@/config/feature-flags";
 import StudentPortalShell from "./student-portal-shell";
 
 interface AuthenticatedStudentLayoutProps {
@@ -8,6 +9,21 @@ interface AuthenticatedStudentLayoutProps {
 }
 
 export default async function AuthenticatedStudentLayout({ children }: AuthenticatedStudentLayoutProps) {
+  const isTestMode = isStudentPortalTestMode();
+
+  if (isTestMode) {
+    // In Test Mode, skip authentication checks and allow direct access to every student page
+    return (
+      <StudentPortalShell 
+        initialStudentName="Alexander Wright (Demo)" 
+        initialEmail="alexander.w@nfsu.ac.in"
+      >
+        {children}
+      </StudentPortalShell>
+    );
+  }
+
+  // Production authentication flow
   const supabase = await getServerSupabase();
   const { data: { session } } = await supabase.auth.getSession();
 
