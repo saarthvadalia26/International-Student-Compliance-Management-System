@@ -94,40 +94,93 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Banner */}
-      <Card className="border-border/80 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-6 shadow-md overflow-hidden relative">
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            {/* Student Avatar / Photo Fallback */}
-            <div className="h-16 w-16 rounded-2xl bg-primary/20 border-2 border-primary/40 flex items-center justify-center font-bold text-2xl text-primary shadow-inner shrink-0">
-              {profile.fullName ? profile.fullName.charAt(0).toUpperCase() : "S"}
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white">{profile.fullName}</h1>
-                <span className={cn(
-                  "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                  isOverallCompliant ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                )}>
-                  {isOverallCompliant ? "Compliant" : "Attention Required"}
-                </span>
+      {/* Redesigned Enterprise Student Profile Summary Card */}
+      <Card className="border border-border/80 bg-card rounded-2xl p-4 sm:p-5 shadow-xs relative overflow-hidden">
+        {/* Subtle background gradient tint */}
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 pointer-events-none" />
+
+        <div className="relative z-10 space-y-4">
+          {/* Top Row: Avatar | Name + Enrollment | Status Badge | CTA */}
+          <div className="flex flex-col sm:flex-row items-center sm:items-start md:items-center justify-between gap-4">
+            
+            {/* Left: Avatar + Core Info */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-3 sm:gap-4 text-center sm:text-left">
+              {/* 64px Circular Avatar */}
+              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 border-2 border-primary/30 dark:border-primary/40 flex items-center justify-center font-bold text-xl text-primary shadow-md shadow-primary/10 shrink-0">
+                {profile.fullName ? (
+                  profile.fullName.trim().split(/\s+/).length === 1
+                    ? profile.fullName.trim().charAt(0).toUpperCase()
+                    : (profile.fullName.trim().split(/\s+/)[0].charAt(0) + profile.fullName.trim().split(/\s+/).slice(-1)[0].charAt(0)).toUpperCase()
+                ) : "S"}
               </div>
-              <p className="text-xs text-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span>Enrollment: <strong className="text-white">{profile.registrationNumber}</strong></span>
-                <span>•</span>
-                <span>Programme: <strong className="text-white">{profile.programme}</strong></span>
-                <span>•</span>
-                <span>Nationality: <strong className="text-white">{profile.nationality || "International"}</strong></span>
-              </p>
+
+              {/* Name + Enrollment + Status Badge */}
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <h1 className="text-lg md:text-xl font-bold tracking-tight text-foreground">
+                    {profile.fullName}
+                  </h1>
+                  {/* Status Pill Badge */}
+                  <span className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-2xs",
+                    isOverallCompliant 
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25" 
+                      : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25"
+                  )}>
+                    {isOverallCompliant ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    )}
+                    <span>{isOverallCompliant ? "Compliant" : "Attention Required"}</span>
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground font-mono">
+                  Enrollment: <span className="font-semibold text-foreground">{profile.registrationNumber}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Document Centre Button */}
+            <div className="w-full sm:w-auto">
+              <Link href="/student/efrro" className="w-full sm:w-auto block">
+                <Button 
+                  size="sm" 
+                  className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold gap-2 shadow-xs hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 rounded-xl px-4 h-9"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>Document Centre</span>
+                </Button>
+              </Link>
             </div>
           </div>
 
-          <Link href="/student/efrro">
-            <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold gap-2 shadow-sm rounded-xl px-4 h-9">
-              <Upload className="h-4 w-4" />
-              Document Centre
-            </Button>
-          </Link>
+          {/* Second Row: Compact Information Chips */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-border/40">
+            {/* Programme Chip */}
+            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-center">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Programme</span>
+              <span className="text-xs font-semibold text-foreground truncate mt-0.5" title={profile.programme}>
+                {profile.programme || "Not Enrolled"}
+              </span>
+            </div>
+
+            {/* Nationality Chip */}
+            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-center">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Nationality</span>
+              <span className="text-xs font-semibold text-foreground truncate mt-0.5">
+                {profile.nationality || "International"}
+              </span>
+            </div>
+
+            {/* School / Department Chip */}
+            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-center">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">School / Department</span>
+              <span className="text-xs font-semibold text-foreground truncate mt-0.5" title={profile.school || ""}>
+                {profile.school || "School of Forensic Sciences"}
+              </span>
+            </div>
+          </div>
         </div>
       </Card>
 
