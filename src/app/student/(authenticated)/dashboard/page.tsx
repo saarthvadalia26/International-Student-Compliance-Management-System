@@ -94,93 +94,93 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Redesigned Enterprise Student Profile Summary Card */}
-      <Card className="border border-border/80 bg-card rounded-2xl p-4 sm:p-5 shadow-xs relative overflow-hidden">
-        {/* Subtle background gradient tint */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 pointer-events-none" />
+      {/* Complete Redesigned Enterprise Student Profile Header */}
+      <Card className="border border-border/70 bg-gradient-to-br from-card via-card/95 to-primary/5 rounded-2xl p-6 md:p-7 shadow-sm backdrop-blur-md relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 space-y-4">
-          {/* Top Row: Avatar | Name + Enrollment | Status Badge | CTA */}
-          <div className="flex flex-col sm:flex-row items-center sm:items-start md:items-center justify-between gap-4">
-            
-            {/* Left: Avatar + Core Info */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-start md:items-center gap-3 sm:gap-4 text-center sm:text-left">
-              {/* 64px Circular Avatar */}
-              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 border-2 border-primary/30 dark:border-primary/40 flex items-center justify-center font-bold text-xl text-primary shadow-md shadow-primary/10 shrink-0">
-                {profile.fullName ? (
-                  profile.fullName.trim().split(/\s+/).length === 1
-                    ? profile.fullName.trim().charAt(0).toUpperCase()
-                    : (profile.fullName.trim().split(/\s+/)[0].charAt(0) + profile.fullName.trim().split(/\s+/).slice(-1)[0].charAt(0)).toUpperCase()
-                ) : "S"}
-              </div>
-
-              {/* Name + Enrollment + Status Badge */}
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h1 className="text-lg md:text-xl font-bold tracking-tight text-foreground">
-                    {profile.fullName}
-                  </h1>
-                  {/* Status Pill Badge */}
-                  <span className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border shadow-2xs",
-                    isOverallCompliant 
-                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25" 
-                      : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25"
-                  )}>
-                    {isOverallCompliant ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    ) : (
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                    )}
-                    <span>{isOverallCompliant ? "Compliant" : "Attention Required"}</span>
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground font-mono">
-                  Enrollment: <span className="font-semibold text-foreground">{profile.registrationNumber}</span>
-                </p>
-              </div>
-            </div>
-
-            {/* Right: Document Centre Button */}
-            <div className="w-full sm:w-auto">
-              <Link href="/student/efrro" className="w-full sm:w-auto block">
-                <Button 
-                  size="sm" 
-                  className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold gap-2 shadow-xs hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 rounded-xl px-4 h-9"
-                >
-                  <Upload className="h-4 w-4" />
-                  <span>Document Centre</span>
-                </Button>
-              </Link>
+        <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-6 md:gap-8">
+          
+          {/* LEFT SECTION: 72px Circular Avatar */}
+          <div className="flex flex-col items-center shrink-0">
+            <div className="h-[72px] w-[72px] rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-primary/30 border-2 border-primary/40 flex items-center justify-center font-bold text-2xl text-primary shadow-md shadow-primary/10 shrink-0">
+              {profile.fullName ? (
+                profile.fullName.trim().split(/\s+/).length === 1
+                  ? profile.fullName.trim().charAt(0).toUpperCase()
+                  : (profile.fullName.trim().split(/\s+/)[0].charAt(0) + profile.fullName.trim().split(/\s+/).slice(-1)[0].charAt(0)).toUpperCase()
+              ) : "S"}
             </div>
           </div>
 
-          {/* Second Row: Compact Information Chips */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 border-t border-border/40">
-            {/* Programme Chip */}
-            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-center">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Programme</span>
-              <span className="text-xs font-semibold text-foreground truncate mt-0.5" title={profile.programme}>
-                {profile.programme || "Not Enrolled"}
-              </span>
+          {/* CENTER SECTION: Name + Enrollment + 3 Info Cards */}
+          <div className="flex-1 space-y-4 text-center md:text-left w-full">
+            {/* Student Name & Enrollment */}
+            <div className="space-y-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                {profile.fullName}
+              </h1>
+              <p className="text-xs sm:text-sm font-mono text-muted-foreground font-medium">
+                Enrollment No: <span className="font-semibold text-foreground">{profile.registrationNumber}</span>
+              </p>
             </div>
 
-            {/* Nationality Chip */}
-            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-center">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Nationality</span>
-              <span className="text-xs font-semibold text-foreground truncate mt-0.5">
-                {profile.nationality || "International"}
-              </span>
-            </div>
+            {/* Three Information Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              {/* Card 1: Programme */}
+              <div className="p-3 rounded-xl bg-card border border-border/80 shadow-2xs flex flex-col justify-between space-y-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Programme</span>
+                <span className="text-xs font-semibold text-foreground truncate" title={profile.programme}>
+                  {profile.programme || "Not Enrolled"}
+                </span>
+              </div>
 
-            {/* School / Department Chip */}
-            <div className="p-2.5 rounded-xl bg-muted/40 border border-border/60 flex flex-col justify-center">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">School / Department</span>
-              <span className="text-xs font-semibold text-foreground truncate mt-0.5" title={profile.school || ""}>
-                {profile.school || "School of Forensic Sciences"}
-              </span>
+              {/* Card 2: Nationality */}
+              <div className="p-3 rounded-xl bg-card border border-border/80 shadow-2xs flex flex-col justify-between space-y-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Nationality</span>
+                <span className="text-xs font-semibold text-foreground truncate">
+                  {profile.nationality || "International"}
+                </span>
+              </div>
+
+              {/* Card 3: Academic Year */}
+              <div className="p-3 rounded-xl bg-card border border-border/80 shadow-2xs flex flex-col justify-between space-y-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Academic Year</span>
+                <span className="text-xs font-semibold text-foreground truncate">
+                  {profile.registrationNumber?.includes("2026") ? "2026–2030" : "2024–2028"}
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* RIGHT SECTION: Status Badge & Large Document Centre CTA */}
+          <div className="flex flex-col items-center md:items-end justify-between self-stretch gap-4 w-full md:w-auto shrink-0 pt-2 md:pt-0">
+            {/* Status Badge */}
+            <span className={cn(
+              "inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border shadow-2xs",
+              isOverallCompliant
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+            )}>
+              {isOverallCompliant ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              )}
+              <span>{isOverallCompliant ? "COMPLIANT" : "ATTENTION REQUIRED"}</span>
+            </span>
+
+            {/* Document Centre Button (Large) */}
+            <Link href="/student/efrro" className="w-full md:w-auto">
+              <Button 
+                size="lg" 
+                className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold gap-2.5 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 rounded-xl px-5 h-11"
+              >
+                <Upload className="h-4 w-4" />
+                <span>Document Centre</span>
+              </Button>
+            </Link>
+          </div>
+
         </div>
       </Card>
 
