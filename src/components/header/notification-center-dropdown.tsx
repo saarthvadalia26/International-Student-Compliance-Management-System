@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 export function NotificationCenterDropdown() {
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
 
   const {
     notifications,
@@ -155,13 +156,24 @@ export function NotificationCenterDropdown() {
 
   return (
     <div className="relative" ref={dropdownRef}>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 md:hidden animate-in fade-in-0 duration-200"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Bell Trigger Button with Animated Unread Badge */}
       <Button
         variant="ghost"
         size="icon"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative h-9 w-9 text-muted-foreground hover:text-foreground focus:outline-none"
+        className="relative h-9 w-9 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
         aria-label={`Notification Center (${unreadCount} unread)`}
+        aria-expanded={isOpen}
+        aria-controls="notification-center-panel"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
@@ -171,30 +183,45 @@ export function NotificationCenterDropdown() {
         )}
       </Button>
 
-      {/* Notification Dropdown Panel */}
+      {/* Notification Responsive Panel */}
       {isOpen && (
-        <div className="absolute right-0 top-11 z-50 w-80 sm:w-96 rounded-xl border border-border bg-card shadow-2xl backdrop-blur-xl animate-in fade-in-0 zoom-in-95 duration-150">
-          {/* Header Controls */}
-          <div className="flex items-center justify-between border-b border-border p-3">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-sm text-foreground">Notifications</h3>
+        <div
+          id="notification-center-panel"
+          ref={panelRef}
+          role="dialog"
+          aria-label="Notification Center"
+          aria-modal="true"
+          className={cn(
+            "z-50 border border-border/80 bg-card/95 backdrop-blur-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200",
+            // Mobile Layout (below 768px): Centered popover below top navbar, max-width 94vw, rounded-[20px]
+            "fixed left-1/2 -translate-x-1/2 top-16 w-[94vw] max-w-md max-h-[82vh] rounded-[20px] shadow-black/20 dark:shadow-black/60",
+            "animate-in fade-in-0 slide-in-from-top-3 duration-200 ease-out",
+            // Desktop Layout (768px and above): Anchored dropdown below bell icon
+            "md:absolute md:left-auto md:right-0 md:top-11 md:translate-x-0 md:w-96 md:max-w-none md:max-h-[560px] md:rounded-2xl md:zoom-in-95"
+          )}
+        >
+          {/* Header Controls (Fixed Single Row) */}
+          <div className="flex items-center justify-between border-b border-border/80 px-3 py-2.5 sm:px-4 sm:py-3 shrink-0 bg-card/90">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="font-semibold text-xs sm:text-sm text-foreground truncate">Notifications</h3>
               {unreadCount > 0 && (
-                <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary font-bold">
+                <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary font-bold px-1.5 py-0.5 shrink-0">
                   {unreadCount} unread
                 </Badge>
               )}
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               {unreadCount > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={markAllAsRead}
-                  className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                  className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground focus:outline-none"
                   title="Mark all as read"
                 >
-                  <CheckCheck className="h-3.5 w-3.5 mr-1" /> Read All
+                  <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                  <span className="hidden sm:inline">Read All</span>
                 </Button>
               )}
               {notifications.length > 0 && (
@@ -202,25 +229,27 @@ export function NotificationCenterDropdown() {
                   variant="ghost"
                   size="sm"
                   onClick={clearAll}
-                  className="h-7 px-2 text-[11px] text-muted-foreground hover:text-destructive"
+                  className="h-7 px-2 text-[11px] text-muted-foreground hover:text-destructive focus:outline-none"
                   title="Clear all notifications"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
+                  <span className="sr-only">Clear All</span>
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsOpen(false)}
-                className="h-7 w-7 text-muted-foreground"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/80 focus:outline-none"
+                aria-label="Close notification center"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Search & Filters Section */}
-          <div className="p-3 border-b border-border/50 space-y-2.5 bg-muted/20">
+          {/* Search & Filters Section (Fixed Sub-header) */}
+          <div className="p-2.5 sm:p-3 border-b border-border/60 space-y-2 bg-muted/20 shrink-0">
             {/* Search Input */}
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -228,12 +257,13 @@ export function NotificationCenterDropdown() {
                 placeholder="Search alerts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 text-xs bg-background"
+                className="pl-8 h-8 text-xs bg-background/90 rounded-lg border-border/60 focus:ring-1 focus:ring-primary"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
                   className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search query"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -241,16 +271,16 @@ export function NotificationCenterDropdown() {
             </div>
 
             {/* Category Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[11px]">
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[11px] touch-pan-x">
               {categories.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => setCategory(cat.id)}
                   className={cn(
-                    "px-2.5 py-1 rounded-full whitespace-nowrap font-medium transition-colors border",
+                    "px-2.5 py-1 rounded-full whitespace-nowrap font-medium transition-all border text-[11px]",
                     category === cat.id
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                      ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                      : "bg-background text-muted-foreground border-border/80 hover:bg-accent hover:text-accent-foreground"
                   )}
                 >
                   {cat.label}
@@ -259,7 +289,7 @@ export function NotificationCenterDropdown() {
             </div>
 
             {/* Secondary Controls (Unread toggle + Priority filter) */}
-            <div className="flex items-center justify-between text-xs pt-1">
+            <div className="flex items-center justify-between text-xs pt-0.5">
               <label className="flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground">
                 <input
                   type="checkbox"
@@ -275,7 +305,7 @@ export function NotificationCenterDropdown() {
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="h-6 text-[11px] bg-background border border-border rounded px-1 text-muted-foreground focus:outline-none"
+                  className="h-6 text-[11px] bg-background border border-border/80 rounded-md px-1 text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="all">All Priorities</option>
                   <option value="critical">Critical</option>
@@ -287,8 +317,8 @@ export function NotificationCenterDropdown() {
             </div>
           </div>
 
-          {/* Notifications List Container */}
-          <div className="max-h-[380px] overflow-y-auto divide-y divide-border/40 scrollbar-thin">
+          {/* Notifications List Container (Scrollable Only) */}
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-2 p-2 sm:p-3 scroll-smooth overscroll-contain scrollbar-thin">
             {isLoading && notifications.length === 0 ? (
               <div className="p-8 text-center text-xs text-muted-foreground space-y-2">
                 <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -305,57 +335,61 @@ export function NotificationCenterDropdown() {
                 <div
                   key={item.id}
                   className={cn(
-                    "p-3 flex items-start gap-3 transition-colors relative group",
-                    !item.isRead ? "bg-primary/5 dark:bg-primary/10 font-medium" : "hover:bg-muted/30"
+                    "p-2.5 sm:p-3 rounded-xl border transition-all flex items-start gap-2.5 relative group animate-in fade-in-0 duration-150",
+                    !item.isRead
+                      ? "border-l-4 border-l-primary border-border/80 bg-primary/5 dark:bg-primary/10 shadow-xs"
+                      : "border-border/40 bg-background/80 hover:bg-muted/40"
                   )}
                 >
                   {/* Category Icon */}
-                  <div className="mt-0.5 p-2 rounded-lg bg-background border border-border/60 shrink-0">
+                  <div className="mt-0.5 p-2 rounded-xl bg-muted/60 border border-border/40 shrink-0">
                     {getCategoryIcon(item.category)}
                   </div>
 
                   {/* Notification Content */}
                   <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-semibold text-foreground truncate">{item.title}</span>
+                    <div className="flex items-center justify-between gap-1.5">
+                      <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{item.title}</span>
                       <span className="text-[10px] font-mono text-muted-foreground shrink-0">
                         {formatRelativeTime(item.createdAt)}
                       </span>
                     </div>
 
-                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                    <p className="text-[11px] sm:text-xs text-muted-foreground line-clamp-2 leading-relaxed break-words">
                       {item.description}
                     </p>
 
-                    <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center justify-between pt-1.5">
                       <div className="flex items-center gap-1.5">
                         {getPriorityBadge(item.priority)}
                         {item.actionUrl && (
                           <Link
                             href={item.actionUrl}
                             onClick={() => setIsOpen(false)}
-                            className="text-[11px] text-primary hover:underline flex items-center gap-0.5"
+                            className="text-[11px] font-medium text-primary hover:underline flex items-center gap-0.5 ml-1"
                           >
                             View <ExternalLink className="h-3 w-3" />
                           </Link>
                         )}
                       </div>
 
-                      {/* Item Quick Actions */}
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                      {/* Item Quick Actions (Always visible on mobile touch, hover on desktop) */}
+                      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         {!item.isRead && (
                           <button
                             onClick={() => markAsRead(item.id)}
-                            className="text-[10px] text-muted-foreground hover:text-foreground p-1"
+                            className="text-[10px] text-muted-foreground hover:text-foreground p-1 rounded-md hover:bg-muted/60"
                             title="Mark as read"
+                            aria-label="Mark notification as read"
                           >
                             <CheckCheck className="h-3.5 w-3.5" />
                           </button>
                         )}
                         <button
                           onClick={() => deleteNotification(item.id)}
-                          className="text-[10px] text-muted-foreground hover:text-destructive p-1"
+                          className="text-[10px] text-muted-foreground hover:text-destructive p-1 rounded-md hover:bg-muted/60"
                           title="Delete alert"
+                          aria-label="Delete notification"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -368,13 +402,13 @@ export function NotificationCenterDropdown() {
 
             {/* Load More Button for Pagination */}
             {hasMore && (
-              <div className="p-2 text-center bg-muted/10 border-t border-border">
+              <div className="p-2 text-center bg-muted/10 border-t border-border/60 rounded-b-xl">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={loadMore}
                   disabled={isLoading}
-                  className="w-full text-xs h-7 text-muted-foreground hover:text-foreground"
+                  className="w-full text-xs h-8 text-muted-foreground hover:text-foreground"
                 >
                   {isLoading ? "Loading older notifications..." : "Load Older Notifications"}
                 </Button>
