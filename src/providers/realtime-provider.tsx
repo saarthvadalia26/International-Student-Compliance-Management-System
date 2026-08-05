@@ -39,18 +39,35 @@ export function useRealtime() {
 }
 
 const MONITORED_TABLES = [
+  "reference_data",
+  "academic_programs",
+  "system_config",
   "students",
   "student_personal",
-  "student_academic",
   "student_contact",
-  "student_snapshot",
+  "student_academic",
+  "student_relationships",
+  "student_embassy",
   "passport_versions",
   "visa_versions",
   "efrro_versions",
+  "student_snapshot",
+  "notification_templates",
+  "student_notification_preferences",
   "notifications",
+  "notification_delivery_log",
   "in_app_notifications",
+  "reminder_rules",
+  "scheduled_jobs",
   "audit_log",
-  "reference_data",
+  "student_contact_audit",
+  "upload_audit_log",
+  "retention_policies",
+  "retention_audit_log",
+  "document_lifecycle_audit_log",
+  "student_activity_log",
+  "student_upload_tokens",
+  "student_otp_verifications"
 ];
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {

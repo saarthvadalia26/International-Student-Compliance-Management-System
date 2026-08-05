@@ -11,6 +11,8 @@ import { DocumentUploadDialog, VerificationPanel } from "./document-dialogs";
 import { ComplianceDocumentTable, ComplianceDocumentTimeline, DocumentVersion } from "./document-history";
 import { DocumentViewer, LoadingState } from "./document-states";
 
+import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+
 interface DocumentPageProps {
   documentType: ComplianceDocumentType;
   studentId: string;
@@ -27,28 +29,39 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
   const [isVerifyOpen, setIsVerifyOpen] = React.useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = React.useState<string | null>(null);
 
+  const fetchDocuments = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      setVersions([]); // Explicitly empty for production release until data exists
+      setStatus("MISSING");
+    } catch (err) {
+      console.error("Failed to load documents", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const targetTable = 
+    documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+  // Realtime Live Sync: Update UI instantly when documents are uploaded, verified, or updated by staff
+  useRealtimeSubscription({
+    table: targetTable,
+    onEvent: () => {
+      fetchDocuments();
+    },
+  });
+
   React.useEffect(() => {
-    // In production, this effect will fetch real documents securely from Supabase storage.
-    // For now, we clear the loading state and maintain the empty arrays.
-    const fetchDocuments = async () => {
-      try {
-        setLoading(true);
-        // DB Fetch Logic will populate this:
-        // const fetchedVersions = await supabase.from('documents').select('*');
-        // setVersions(fetchedVersions);
-        setVersions([]); // Explicitly empty for production release until data exists
-        setStatus("MISSING");
-      } catch (err) {
-        console.error("Failed to load documents", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     if (studentId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchDocuments();
     }
-  }, [studentId, documentType]);
+  }, [studentId, documentType, fetchDocuments]);
 
   const handleUploadSubmit = (data: { docNumber: string; issueDate: string; expiryDate: string; file: File | null }) => {
     // This will hit an API route securely

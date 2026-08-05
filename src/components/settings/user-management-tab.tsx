@@ -18,6 +18,7 @@ import {
   deleteStaffAccountAction,
   UserAccountItem,
 } from "@/app/(app)/settings/actions";
+import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 
 export function UserManagementTab() {
   const { isAdministrator } = useUserRole();
@@ -56,6 +57,14 @@ export function UserManagementTab() {
       setLoading(false);
     }
   }, []);
+
+  // Realtime Live Sync: Update user account management table live
+  useRealtimeSubscription({
+    table: "audit_log",
+    onEvent: () => {
+      loadUsers();
+    },
+  });
 
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

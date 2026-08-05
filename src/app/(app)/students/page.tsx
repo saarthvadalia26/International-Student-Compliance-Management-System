@@ -49,13 +49,22 @@ export interface Student {
   academicStatus: "good_standing" | "probation" | "suspended";
 }
 
+import { useRouter } from "next/navigation";
+import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+
 export default function StudentListPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = React.useState("");
   const [complianceFilter, setComplianceFilter] = React.useState<string>("all");
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
   const [students, setStudents] = React.useState<Student[]>([]);
+
+  // Realtime Live Sync: Refresh server component data when students, passports, or visas change
+  useRealtimeSubscription({ table: "students", onEvent: () => router.refresh() });
+  useRealtimeSubscription({ table: "student_personal", onEvent: () => router.refresh() });
+  useRealtimeSubscription({ table: "student_academic", onEvent: () => router.refresh() });
 
   // Filter logic
   const filteredStudents = React.useMemo(() => {

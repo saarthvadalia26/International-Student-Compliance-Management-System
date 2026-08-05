@@ -28,6 +28,8 @@ import {
   toggleAcademicProgramStatusAction 
 } from "@/app/(app)/settings/academic-programs-actions";
 
+import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+
 export function AcademicProgramsTab() {
   const [programs, setPrograms] = React.useState<AcademicProgram[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -58,6 +60,14 @@ export function AcademicProgramsTab() {
     }
     setIsLoading(false);
   }, []);
+
+  // Realtime Live Sync: Update UI instantly when programs are created, updated, or deleted by any user
+  useRealtimeSubscription({
+    table: "academic_programs",
+    onEvent: () => {
+      fetchProgramsData();
+    },
+  });
 
   React.useEffect(() => {
     let isMounted = true;

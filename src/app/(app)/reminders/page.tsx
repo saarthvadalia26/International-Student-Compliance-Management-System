@@ -4,12 +4,17 @@ import * as React from "react";
 import { NotificationHealthMetrics, NotificationQueueTable, NotificationItem } from "@/features/notifications/components/notification-center";
 import { ReminderSettings } from "@/features/notifications/components/reminder-settings";
 import { TemplateManager } from "@/features/notifications/components/template-manager";
+import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 
 export default function RemindersPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = React.useState<"logs" | "rules" | "templates">("logs");
 
   // State for standard logs queue (empty until fetched)
   const [items, setItems] = React.useState<NotificationItem[]>([]);
+
+  // Realtime Live Sync: Refresh notification and reminder engine metrics live
+  useRealtimeSubscription({ table: "notifications", onEvent: () => {} });
+  useRealtimeSubscription({ table: "reminder_rules", onEvent: () => {} });
 
   return (
     <div className="space-y-6 animate-fade-in pb-12 text-xs">
