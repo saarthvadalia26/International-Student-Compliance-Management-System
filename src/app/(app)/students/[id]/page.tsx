@@ -29,6 +29,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
+import { AcademicProgram } from "@/domain/academic-programs/types";
 
 export interface StudentDocument {
   number: string;
@@ -90,12 +92,26 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [student, setStudent] = React.useState<StudentProfile | undefined>(undefined);
   const [activeSubTab, setActiveSubTab] = React.useState<"immigration" | "academic" | "contact">("immigration");
 
+  // Academic Programs State
+  const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
+
+  React.useEffect(() => {
+    async function loadPrograms() {
+      const res = await getActiveAcademicProgramsAction();
+      if (res.success && res.programs) {
+        setAcademicPrograms(res.programs);
+      }
+    }
+    loadPrograms();
+  }, []);
+
   // Edit Profile States
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [isDirty, setIsDirty] = React.useState(false);
   const [editForm, setEditForm] = React.useState({
     fullName: "",
     email: "",
+    program: "",
     phoneHome: "",
     phoneLocal: "",
     permanentAddress: "",
@@ -110,6 +126,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
       setEditForm({
         fullName: student.fullName,
         email: student.email,
+        program: student.programName || student.programCode || "",
         phoneHome: student.phoneHome,
         phoneLocal: student.phoneLocal || "",
         permanentAddress: student.permanentAddress,
@@ -831,6 +848,22 @@ export default function StudentDetailsPage({ params }: PageProps) {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground" htmlFor="fullName">Full Name</label>
               <Input id="fullName" value={editForm.fullName} onChange={handleFormChange} className="h-9 text-sm" />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="program">Academic Program</label>
+              <Select value={editForm.program} onValueChange={(val) => handleFormSelectChange("program", val || "")}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Select Program" />
+                </SelectTrigger>
+                <SelectContent>
+                  {academicPrograms.map((p) => (
+                    <SelectItem key={p.id} value={p.programName}>
+                      {p.programName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="grid grid-cols-2 gap-3">

@@ -21,6 +21,8 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
+import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
+import { AcademicProgram } from "@/domain/academic-programs/types";
 import { RegisterStudentValidationSchema } from "@/services/validation/student-validation";
 
 export default function StudentRegistrationPage() {
@@ -30,6 +32,22 @@ export default function StudentRegistrationPage() {
   const [submittingSuccess, setSubmittingSuccess] = React.useState(false);
   const [submittingError, setSubmittingError] = React.useState(false);
   const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({});
+
+  // Dynamic Academic Programs state
+  const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
+  const [isLoadingPrograms, setIsLoadingPrograms] = React.useState(true);
+
+  React.useEffect(() => {
+    async function loadPrograms() {
+      setIsLoadingPrograms(true);
+      const res = await getActiveAcademicProgramsAction();
+      if (res.success && res.programs) {
+        setAcademicPrograms(res.programs);
+      }
+      setIsLoadingPrograms(false);
+    }
+    loadPrograms();
+  }, []);
 
   // Form State
   const [formData, setFormData] = React.useState({
@@ -103,8 +121,8 @@ export default function StudentRegistrationPage() {
       const fieldErrors: Record<string, string> = {};
       let firstErrorField = "";
       
-      result.error.issues.forEach(issue => {
-        const path = issue.path[0] as string;
+      result.error.issues.forEach((issue) => {
+        const path = String(issue.path[0] || "");
         if (path && !fieldErrors[path]) {
           fieldErrors[path] = issue.message;
           if (!firstErrorField) firstErrorField = path;
@@ -318,18 +336,23 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground" htmlFor="program">
                       Academic Program <span className="text-rose-500">*</span>
                     </label>
-                    <Select value={formData.program} onValueChange={(v) => handleSelectChange("program", v || "")}>
+                    <Select value={formData.program} onValueChange={(v) => handleSelectChange("program", v || "")} disabled={isLoadingPrograms || academicPrograms.length === 0}>
                       <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder="Select Program" />
+                        <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select Program"} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="BTECH_CSE">B.Tech in Computer Science</SelectItem>
-                        <SelectItem value="CS_PHD">Ph.D. in Computer Science</SelectItem>
-                        <SelectItem value="BBA_HONS">Bachelor of Business Administration</SelectItem>
-                        <SelectItem value="MS_BT">M.Sc. in Biotechnology</SelectItem>
-                        <SelectItem value="MTECH_VLSI">M.Tech in VLSI Design</SelectItem>
+                        {academicPrograms.map((prog) => (
+                          <SelectItem key={prog.id} value={prog.programName}>
+                            {prog.programName}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    {academicPrograms.length === 0 && !isLoadingPrograms && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                        No academic programs have been configured. Please contact the system administrator.
+                      </p>
+                    )}
                     {validationErrors.programCode && (
                       <p className="text-[11px] text-rose-500 font-medium">{validationErrors.programCode}</p>
                     )}

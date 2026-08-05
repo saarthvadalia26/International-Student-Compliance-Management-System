@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Wrench, ShieldAlert } from "lucide-react";
+import { Wrench } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Branding } from "@/config/branding";
 import { isStudentPortalEnabled } from "@/config/feature-flags";

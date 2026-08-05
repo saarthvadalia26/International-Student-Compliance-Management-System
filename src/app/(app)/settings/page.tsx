@@ -21,9 +21,11 @@ import {
   Check,
   AlertTriangle,
   RotateCcw,
-  Trash2
+  Trash2,
+  GraduationCap
 } from "lucide-react";
 import { UserManagementTab } from "@/components/settings/user-management-tab";
+import { AcademicProgramsTab } from "@/components/settings/academic-programs-tab";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,7 +57,7 @@ export default function SettingsPage() {
   const [isEmergencyLogoutOpen, setIsEmergencyLogoutOpen] = React.useState(false);
 
   // Active Tab navigation state
-  const [activeTab, setActiveTab] = React.useState<"general" | "notifications" | "retention" | "system" | "security" | "users">("general");
+  const [activeTab, setActiveTab] = React.useState<"general" | "programs" | "notifications" | "retention" | "system" | "security" | "users">("general");
 
   // General Settings State
   const [schoolName, setSchoolName] = React.useState(`${Branding.universityName} (${Branding.shortName})`);
@@ -284,6 +286,7 @@ export default function SettingsPage() {
       <div className="flex border-b border-border overflow-x-auto gap-2 pb-px scrollbar-none">
         {[
           { id: "general", label: "General", icon: Building },
+          { id: "programs", label: "Academic Programs", icon: GraduationCap },
           { id: "notifications", label: "Notifications", icon: Bell },
           { id: "users", label: "User Management", icon: Users },
           { id: "retention", label: "Retention Policies", icon: Clock },
@@ -295,7 +298,7 @@ export default function SettingsPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as "general" | "notifications" | "retention" | "system" | "security" | "users")}
+              onClick={() => setActiveTab(tab.id as "general" | "programs" | "notifications" | "retention" | "system" | "security" | "users")}
               className={`flex items-center gap-2 px-4 py-2 border-b-2 text-xs font-medium whitespace-nowrap transition-colors outline-none focus:text-primary ${
                 isActive 
                   ? "border-primary text-primary" 
@@ -312,6 +315,9 @@ export default function SettingsPage() {
       {/* Tab Workspaces Content */}
       <div className="space-y-6">
         
+        {/* Tab: Academic Programs */}
+        {activeTab === "programs" && <AcademicProgramsTab />}
+
         {/* Tab: User Management */}
         {activeTab === "users" && <UserManagementTab />}
         
