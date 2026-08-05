@@ -10,10 +10,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { TurnstileStub } from "@/components/ui/turnstile-stub";
 import { Branding } from "@/config/branding";
+import { isStudentPortalTestMode } from "@/config/feature-flags";
 import { requestStudentWhatsAppOtpByIdentifierAction, verifyStudentWhatsAppOtpByIdentifierAction } from "../../actions";
 
 export default function StudentLoginPage() {
   const router = useRouter();
+
+  // Redirect immediately if test mode is active
+  React.useEffect(() => {
+    if (isStudentPortalTestMode()) {
+      router.replace("/student/dashboard");
+    }
+  }, [router]);
 
   // Step 1 vs Step 2 state
   const [step, setStep] = React.useState<"identifier_input" | "otp_verify">("identifier_input");

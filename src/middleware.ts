@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { administratorDetectionService } from "@/services/auth/administrator-detection.service";
+import { isStudentPortalTestMode } from "@/config/feature-flags";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -66,11 +67,26 @@ export async function middleware(request: NextRequest) {
   const rawRole = (user?.user_metadata?.role as string | undefined)?.toLowerCase().trim();
   const isStudent = rawRole === "student";
   const isAdministrator = rawRole === "administrator" || rawRole === "admin";
-  const isInternalUser = !isStudent;
+
+  // ── Student Portal Test Mode Bypass ────────────────────────────────────────
+  if (isStudentPortalTestMode()) {
+    // Redirect root /student or /student/login directly to /student/dashboard
+    if (pathname === "/student" || pathname === "/student/" || pathname === "/student/login") {
+      url.pathname = "/student/dashboard";
+      return NextResponse.redirect(url);
+    }
+    // Allow all other /student/* subroutes to render cleanly without authentication redirects
+    if (pathname.startsWith("/student/")) {
+      response.headers.set("X-Frame-Options", "DENY");
+      response.headers.set("X-Content-Type-Options", "nosniff");
+      response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+      response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+      return response;
+    }
+  }
 
   // ── Single Authoritative Setup & Auth Routing Authority for Non-API Requests ──
   if (!pathname.startsWith("/api")) {
-    // Invoke the secure Administrator Detection Service
     const detectionState = await administratorDetectionService.detectAdministratorState();
 
     // Case 2: No Administrator Exists OR Recovery Mode Required
@@ -83,13 +99,12 @@ export async function middleware(request: NextRequest) {
     }
 
     // Case 1: Administrator Exists & System Initialized
-    // 1. Permanently disable /setup
     if (pathname === "/setup") {
       url.pathname = user ? (isStudent ? "/student/dashboard" : "/dashboard") : "/login";
       return NextResponse.redirect(url);
     }
 
-    // 2. Authoritative Root "/" Request Handling
+    // Authoritative Root "/" Request Handling
     if (pathname === "/") {
       if (user) {
         url.pathname = isStudent ? "/student/dashboard" : "/dashboard";
@@ -127,13 +142,13 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       url.pathname = "/login";
       return NextResponse.redirect(url);
-    } else if (!isInternalUser) {
+    } else if (isStudent) {
       url.pathname = "/student/dashboard";
       return NextResponse.redirect(url);
     }
   }
 
-  // ── Student Portal Routes ──────────────────────────────────────────────────
+  // ── Student Portal Routes (Production Mode) ─────────────────────────────────
   if (
     pathname.startsWith("/student/dashboard") ||
     pathname.startsWith("/student/upload")
@@ -141,7 +156,7 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       url.pathname = "/student/login";
       return NextResponse.redirect(url);
-    } else if (isInternalUser && !pathname.startsWith("/dashboard")) {
+    } else if (!isStudent) {
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);
     }
@@ -158,18 +173,6 @@ export async function middleware(request: NextRequest) {
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
-  
-  const csp = `
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com;
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' data: blob: https://*.supabase.co;
-    font-src 'self' data:;
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co;
-    frame-src 'self' https://challenges.cloudflare.com;
-  `.replace(/\s{2,}/g, ' ').trim();
-  
-  response.headers.set("Content-Security-Policy", csp);
 
   return response;
 }

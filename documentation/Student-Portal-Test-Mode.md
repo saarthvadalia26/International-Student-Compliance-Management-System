@@ -1,28 +1,29 @@
-# Student Portal Temporary Testing Mode Architecture (`STUDENT_PORTAL_TEST_MODE`)
+# Student Portal Test Mode Architecture (`STUDENT_PORTAL_TEST_MODE`)
 
 **Target Institution**: National Forensic Sciences University (NFSU)  
 **System**: International Student Compliance Management System (ISCMS)  
-**Feature**: Temporary Authentication Bypass for Student Self-Service Portal  
-**Status**: ACTIVE (Testing Mode Enabled)  
+**Feature**: Authentication Bypass & Direct Access for Student Self-Service Portal  
+**Status**: ACTIVE & IMPLEMENTED  
 
 ---
 
 ## 1. Executive Summary
 
-To facilitate rapid end-to-end evaluation of the Student Portal by university stakeholders, QA engineers, and solution architects, a configurable **Temporary Testing Mode (`STUDENT_PORTAL_TEST_MODE`)** has been implemented.
+To enable rapid testing and evaluation of the Student Portal by university administrators, QA engineers, and solution architects, a centralized environment variable **`STUDENT_PORTAL_TEST_MODE`** controls the authentication lifecycle of `/student/*` routes.
 
-### Key Highlights
-- **No Maintenance Screens**: The maintenance/unavailable screen has been completely removed.
-- **Direct Route Access**: All student subroutes (`/student/dashboard`, `/student/profile`, `/student/efrro`, `/student/history`, `/student/settings`, `/student/upload/[token]`) open directly without requiring OTP authentication.
-- **Demo Student Session**: Automatically loads an institutional demo student profile (**Alexander Wright**, Registration Number `NFSU/2026/FS/1089`) with realistic compliance, passport, visa, and eFRRO records.
+### Behavior When `STUDENT_PORTAL_TEST_MODE=true`
+- **Zero Authentication UI**: The Student Login page, Registration Number input field, WhatsApp OTP input, and "Send WhatsApp Code" buttons are **completely hidden and bypassed**.
+- **Automatic Redirect**: Accessing `/student` or `/student/login` automatically redirects directly to `/student/dashboard`.
+- **Direct Route Access**: All student subroutes (`/student/dashboard`, `/student/profile`, `/student/efrro`, `/student/history`, `/student/settings`) open immediately without OTP or login prompts.
+- **Demo Student Session**: Automatically loads an institutional demo student profile (**Alexander Wright**, Registration Number `NFSU/2026/FS/1089`, B.Tech Cybersecurity) with realistic compliance, passport, visa, and eFRRO records.
 - **Full Navigation & Upload Integrity**: All menus, sidebars, buttons, activity logs, and document upload forms remain 100% operational.
-- **Zero-Code Production Reversal**: Setting `STUDENT_PORTAL_TEST_MODE=false` in the environment instantly restores the complete OTP authentication flow with zero code modifications.
+
+### Behavior When `STUDENT_PORTAL_TEST_MODE=false`
+- Restores the complete production WhatsApp OTP authentication flow and session guard with **zero code modifications**.
 
 ---
 
-## 2. Configuration Model
-
-### Environment Variable Matrix
+## 2. Environment Configuration Matrix
 
 ```env
 # Enable Temporary Testing Mode (Default during evaluation)
@@ -32,7 +33,7 @@ STUDENT_PORTAL_TEST_MODE=true
 STUDENT_PORTAL_TEST_MODE=false
 ```
 
-### Centralized Feature Flag Logic (`src/config/feature-flags.ts`)
+### Centralized Feature Flag (`src/config/feature-flags.ts`)
 
 ```typescript
 export const FEATURE_FLAGS = {
@@ -54,7 +55,7 @@ export function isStudentPortalTestMode(): boolean {
 
 ---
 
-## 3. Architecture & Routing Control Flow
+## 3. Middleware & Control Flow Architecture (`src/middleware.ts`)
 
 ```
                                ┌───────────────────────────┐
@@ -69,27 +70,28 @@ export function isStudentPortalTestMode(): boolean {
              ┌────────────────────────┘             └────────────────────────┐
              ▼                                                               ▼
 ┌──────────────────────────┐                                   ┌──────────────────────────┐
-│  Bypass Auth Guard       │                                   │  Server Supabase Auth    │
-│  Inject Demo Session     │                                   │  Check User JWT Session  │
-│  (Alexander Wright)      │                                   └─────────────┬────────────┘
-└────────────┬─────────────┘                                                 │
-             │                                                      SESSION? │
-             │                                            ┌──────────────────┴──────────────────┐
-             │                                       YES  │                                NO   │
-             │                                            ▼                                     ▼
-             │                              ┌──────────────────────────┐          ┌──────────────────────────┐
-             │                              │ Render Student Route     │          │ Redirect /student/login  │
-             │                              └──────────────────────────┘          └──────────────────────────┘
-             ▼
-┌──────────────────────────┐
-│ Render Student Route     │
-│ with Live Interactive UI │
-└──────────────────────────┘
+│ Is request /student or   │                                   │  Server Supabase Auth    │
+│ /student/login?          │                                   │  Check User JWT Session  │
+└──────┬─────────────┬─────┘                                   └─────────────┬────────────┘
+       │             │                                                       │
+   YES │             │ NO                                           SESSION? │
+       ▼             ▼                                    ┌──────────────────┴──────────────────┐
+┌──────────────┐ ┌──────────────────────────┐        YES  │                                NO   │
+│ Redirect     │ │ Bypass Auth Guard        │             ▼                                     ▼
+│ to /student/ │ │ Inject Demo Session      │ ┌──────────────────────────┐          ┌──────────────────────────┐
+│ dashboard    │ │ (Alexander Wright)       │ │ Render Student Route     │          │ Redirect /student/login  │
+└──────────────┘ └───────────┬──────────────┘ └──────────────────────────┘          └──────────────────────────┘
+                             │
+                             ▼
+               ┌──────────────────────────┐
+               │ Render Student Route     │
+               │ with Live Interactive UI │
+               └──────────────────────────┘
 ```
 
 ---
 
-## 4. Demo Student Snapshot (`Alexander Wright`)
+## 4. Demo Student Profile (`Alexander Wright`)
 
 When accessing the portal in test mode, the system automatically injects the following institutional demo dataset:
 
@@ -105,13 +107,3 @@ When accessing the portal in test mode, the system automatically injects the fol
 | **Visa Expiry** | 31-Jul-2027 (Compliant) |
 | **eFRRO Status** | Compliant (360 Days Remaining) |
 | **Activity History** | 3 Verified Records |
-
----
-
-## 5. Security & Production Reversal Verification
-
-1. **Environment Isolation**: `STUDENT_PORTAL_TEST_MODE` is strictly evaluated at runtime.
-2. **Clean Switch**: Setting `STUDENT_PORTAL_TEST_MODE=false` in Vercel / environment settings instantly re-activates:
-   - Route protection middleware in `AuthenticatedStudentLayout`.
-   - Security checks in `requestStudentWhatsAppOtpByIdentifierAction` & `verifyStudentWhatsAppOtpByIdentifierAction`.
-   - Cryptographic JWT verification in `verifyUserAndGetStudentId`.
