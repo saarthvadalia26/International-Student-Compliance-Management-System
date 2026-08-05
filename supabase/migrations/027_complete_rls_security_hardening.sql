@@ -290,7 +290,7 @@ DROP POLICY IF EXISTS "SELECT_notifications_StaffAdmin" ON public.notifications;
 DROP POLICY IF EXISTS "SELECT_notifications_StudentSelf" ON public.notifications;
 DROP POLICY IF EXISTS "INSERT_notifications_StaffAdmin" ON public.notifications;
 CREATE POLICY "SELECT_notifications_StaffAdmin" ON public.notifications FOR SELECT USING (public.is_staff_ro());
-CREATE POLICY "SELECT_notifications_StudentSelf" ON public.notifications FOR SELECT USING (recipient_student_id = auth.uid());
+CREATE POLICY "SELECT_notifications_StudentSelf" ON public.notifications FOR SELECT USING (student_id = auth.uid());
 CREATE POLICY "INSERT_notifications_StaffAdmin" ON public.notifications FOR INSERT WITH CHECK (public.is_staff_rw());
 
 -- Table: notification_delivery_log
@@ -302,8 +302,8 @@ DROP POLICY IF EXISTS "SELECT_in_app_notifications_StaffAdmin" ON public.in_app_
 DROP POLICY IF EXISTS "SELECT_in_app_notifications_StudentSelf" ON public.in_app_notifications;
 DROP POLICY IF EXISTS "UPDATE_in_app_notifications_StudentSelf" ON public.in_app_notifications;
 CREATE POLICY "SELECT_in_app_notifications_StaffAdmin" ON public.in_app_notifications FOR SELECT USING (public.is_staff_ro());
-CREATE POLICY "SELECT_in_app_notifications_StudentSelf" ON public.in_app_notifications FOR SELECT USING (recipient_id = auth.uid() OR recipient_id IS NULL);
-CREATE POLICY "UPDATE_in_app_notifications_StudentSelf" ON public.in_app_notifications FOR UPDATE USING (recipient_id = auth.uid()) WITH CHECK (recipient_id = auth.uid());
+CREATE POLICY "SELECT_in_app_notifications_StudentSelf" ON public.in_app_notifications FOR SELECT USING (user_id = auth.uid() OR user_id IS NULL);
+CREATE POLICY "UPDATE_in_app_notifications_StudentSelf" ON public.in_app_notifications FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 -- Table: reminder_rules
 DROP POLICY IF EXISTS "SELECT_reminder_rules_StaffAdmin" ON public.reminder_rules;
