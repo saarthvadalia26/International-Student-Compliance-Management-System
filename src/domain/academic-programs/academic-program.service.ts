@@ -3,13 +3,13 @@ import { AcademicProgram, CreateProgramDto, UpdateProgramDto } from "./types";
 
 // In-memory fallback programs list if database table is empty or migrating
 const DEFAULT_FALLBACK_PROGRAMS: AcademicProgram[] = [
-  { id: "fallback-1", programName: "B.Tech in Computer Science & Engineering", programCode: "BTECH_CSE", displayOrder: 1, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-2", programName: "B.Tech in AI & Data Science", programCode: "BTECH_AIDS", displayOrder: 2, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-3", programName: "B.Sc. in Forensic Science", programCode: "BSC_FS", displayOrder: 3, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-4", programName: "M.Sc. in Digital Forensics & Information Security", programCode: "MSC_DFIS", displayOrder: 4, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-5", programName: "M.Tech in Cyber Security", programCode: "MTECH_CS", displayOrder: 5, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-6", programName: "Master of Business Administration (Cyber Security)", programCode: "MBA_CS", displayOrder: 6, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-7", programName: "Doctor of Philosophy (Ph.D.)", programCode: "PHD", displayOrder: 7, isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-1", programName: "B.Tech in Computer Science & Engineering", programCode: "BTECH_CSE", displayOrder: 1, isActive: true, durationValue: 4, durationUnit: "Years", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-2", programName: "B.Tech in AI & Data Science", programCode: "BTECH_AIDS", displayOrder: 2, isActive: true, durationValue: 4, durationUnit: "Years", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-3", programName: "B.Sc. in Forensic Science", programCode: "BSC_FS", displayOrder: 3, isActive: true, durationValue: 4, durationUnit: "Years", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-4", programName: "M.Sc. in Digital Forensics & Information Security", programCode: "MSC_DFIS", displayOrder: 4, isActive: true, durationValue: 2, durationUnit: "Years", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-5", programName: "M.Tech in Cyber Security", programCode: "MTECH_CS", displayOrder: 5, isActive: true, durationValue: 2, durationUnit: "Years", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-6", programName: "Master of Business Administration (Cyber Security)", programCode: "MBA_CS", displayOrder: 6, isActive: true, durationValue: 2, durationUnit: "Years", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-7", programName: "Doctor of Philosophy (Ph.D.)", programCode: "PHD", displayOrder: 7, isActive: true, durationValue: 6, durationUnit: "Years", academicLevel: "PhD", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 export class AcademicProgramService {
@@ -61,91 +61,122 @@ export class AcademicProgramService {
   }
 
   /**
-   * Create a new academic program with whitespace trimming & duplicate checks
+   * Create a new academic program master record
    */
   public async createProgram(dto: CreateProgramDto, userId?: string): Promise<AcademicProgram> {
-    const trimmedName = dto.programName.trim();
-    if (!trimmedName) {
-      throw new Error("Academic Program Name is required.");
-    }
-
     const supabase = getAdminSupabase();
 
-    // Check for duplicate active program name
-    const { data: existing } = await supabase
+    // Check duplicate program_name or program_code
+    const trimmedName = dto.programName.trim();
+    const trimmedCode = dto.programCode?.trim().toUpperCase() || null;
+    const durationVal = dto.durationValue && dto.durationValue > 0 ? Number(dto.durationValue) : 4;
+    const durationUnit = dto.durationUnit?.trim() || "Years";
+
+    const { data: existingName } = await supabase
       .from("academic_programs")
-      .select("id, program_name")
+      .select("id")
       .ilike("program_name", trimmedName)
       .maybeSingle();
 
-    if (existing) {
-      throw new Error(`An academic program named "${trimmedName}" already exists.`);
+    if (existingName) {
+      throw new Error(`An academic program with name "${trimmedName}" already exists.`);
     }
+
+    if (trimmedCode) {
+      const { data: existingCode } = await supabase
+        .from("academic_programs")
+        .select("id")
+        .ilike("program_code", trimmedCode)
+        .maybeSingle();
+
+      if (existingCode) {
+        throw new Error(`An academic program with code "${trimmedCode}" already exists.`);
+      }
+    }
+
+    const payload = {
+      program_name: trimmedName,
+      program_code: trimmedCode,
+      display_order: dto.displayOrder ?? 1,
+      is_active: dto.isActive ?? true,
+      duration_value: durationVal,
+      duration_unit: durationUnit,
+      school_name: dto.schoolName?.trim() || null,
+      academic_level: dto.academicLevel?.trim() || null,
+      created_by: userId || null
+    };
 
     const { data, error } = await supabase
       .from("academic_programs")
-      .insert({
-        program_name: trimmedName,
-        program_code: dto.programCode?.trim() || null,
-        display_order: dto.displayOrder || 0,
-        is_active: dto.isActive !== undefined ? dto.isActive : true,
-        school_name: dto.schoolName?.trim() || null,
-        academic_level: dto.academicLevel?.trim() || null,
-        created_by: userId || null
-      })
+      .insert([payload])
       .select()
       .single();
 
     if (error || !data) {
-      throw new Error(`Failed to create program: ${error?.message || "Database insert error"}`);
+      throw new Error(`Failed to create program: ${error?.message || "Unknown error"}`);
     }
 
     return this.mapToDomain(data);
   }
 
   /**
-   * Update an existing program
+   * Update an existing academic program record
    */
   public async updateProgram(id: string, dto: UpdateProgramDto): Promise<AcademicProgram> {
     const supabase = getAdminSupabase();
 
-    const updates: Record<string, unknown> = {
+    const payload: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     };
 
     if (dto.programName !== undefined) {
-      const trimmed = dto.programName.trim();
-      if (!trimmed) throw new Error("Program Name cannot be empty.");
-      
-      const { data: existing } = await supabase
+      const trimmedName = dto.programName.trim();
+      const { data: existingName } = await supabase
         .from("academic_programs")
         .select("id")
-        .ilike("program_name", trimmed)
         .neq("id", id)
+        .ilike("program_name", trimmedName)
         .maybeSingle();
 
-      if (existing) {
-        throw new Error(`Another academic program named "${trimmed}" already exists.`);
+      if (existingName) {
+        throw new Error(`Another academic program with name "${trimmedName}" already exists.`);
       }
-
-      updates.program_name = trimmed;
+      payload.program_name = trimmedName;
     }
 
-    if (dto.programCode !== undefined) updates.program_code = dto.programCode?.trim() || null;
-    if (dto.displayOrder !== undefined) updates.display_order = dto.displayOrder;
-    if (dto.isActive !== undefined) updates.is_active = dto.isActive;
-    if (dto.schoolName !== undefined) updates.school_name = dto.schoolName?.trim() || null;
-    if (dto.academicLevel !== undefined) updates.academic_level = dto.academicLevel?.trim() || null;
+    if (dto.programCode !== undefined) {
+      const trimmedCode = dto.programCode ? dto.programCode.trim().toUpperCase() : null;
+      if (trimmedCode) {
+        const { data: existingCode } = await supabase
+          .from("academic_programs")
+          .select("id")
+          .neq("id", id)
+          .ilike("program_code", trimmedCode)
+          .maybeSingle();
+
+        if (existingCode) {
+          throw new Error(`Another academic program with code "${trimmedCode}" already exists.`);
+        }
+      }
+      payload.program_code = trimmedCode;
+    }
+
+    if (dto.displayOrder !== undefined) payload.display_order = dto.displayOrder;
+    if (dto.isActive !== undefined) payload.is_active = dto.isActive;
+    if (dto.durationValue !== undefined) payload.duration_value = Number(dto.durationValue);
+    if (dto.durationUnit !== undefined) payload.duration_unit = dto.durationUnit;
+    if (dto.schoolName !== undefined) payload.school_name = dto.schoolName?.trim() || null;
+    if (dto.academicLevel !== undefined) payload.academic_level = dto.academicLevel?.trim() || null;
 
     const { data, error } = await supabase
       .from("academic_programs")
-      .update(updates)
+      .update(payload)
       .eq("id", id)
       .select()
       .single();
 
     if (error || !data) {
-      throw new Error(`Failed to update program: ${error?.message || "Database error"}`);
+      throw new Error(`Failed to update program: ${error?.message || "Unknown error"}`);
     }
 
     return this.mapToDomain(data);
@@ -165,6 +196,8 @@ export class AcademicProgramService {
       programCode: row.program_code ? String(row.program_code) : null,
       displayOrder: Number(row.display_order) || 0,
       isActive: Boolean(row.is_active),
+      durationValue: Number(row.duration_value) || 4,
+      durationUnit: row.duration_unit ? String(row.duration_unit) : "Years",
       schoolName: row.school_name ? String(row.school_name) : null,
       academicLevel: row.academic_level ? String(row.academic_level) : null,
       createdAt: String(row.created_at || new Date().toISOString()),

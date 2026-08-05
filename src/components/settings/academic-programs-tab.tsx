@@ -10,7 +10,8 @@ import {
   RotateCcw, 
   Loader2, 
   AlertCircle,
-  Filter
+  Filter,
+  Clock
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { toast } from "sonner";
-import { AcademicProgram } from "@/domain/academic-programs/types";
+import { AcademicProgram, AcademicProgramDurationUnit } from "@/domain/academic-programs/types";
 import { 
   getAllAcademicProgramsAction, 
   createAcademicProgramAction, 
@@ -42,6 +43,8 @@ export function AcademicProgramsTab() {
   const [formName, setFormName] = React.useState("");
   const [formCode, setFormCode] = React.useState("");
   const [formLevel, setFormLevel] = React.useState("UG");
+  const [formDurationValue, setFormDurationValue] = React.useState(4);
+  const [formDurationUnit, setFormDurationUnit] = React.useState<AcademicProgramDurationUnit>("Years");
   const [formOrder, setFormOrder] = React.useState(1);
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -94,6 +97,8 @@ export function AcademicProgramsTab() {
     setFormName("");
     setFormCode("");
     setFormLevel("UG");
+    setFormDurationValue(4);
+    setFormDurationUnit("Years");
     setFormOrder(programs.length + 1);
     setIsAddOpen(true);
   };
@@ -104,6 +109,8 @@ export function AcademicProgramsTab() {
     setFormName(prog.programName);
     setFormCode(prog.programCode || "");
     setFormLevel(prog.academicLevel || "UG");
+    setFormDurationValue(prog.durationValue || 4);
+    setFormDurationUnit((prog.durationUnit as AcademicProgramDurationUnit) || "Years");
     setFormOrder(prog.displayOrder);
     setIsEditOpen(true);
   };
@@ -116,18 +123,25 @@ export function AcademicProgramsTab() {
       return;
     }
 
+    if (!formDurationValue || formDurationValue <= 0) {
+      toast.error("Program Duration Value must be a positive integer.");
+      return;
+    }
+
     setIsSaving(true);
     const res = await createAcademicProgramAction({
       programName: formName,
       programCode: formCode,
       academicLevel: formLevel,
+      durationValue: Number(formDurationValue),
+      durationUnit: formDurationUnit,
       displayOrder: Number(formOrder) || 1,
       isActive: true
     });
 
     if (res.success) {
       toast.success("Academic Program Created Successfully", {
-        description: `"${formName.trim()}" has been added to master data.`
+        description: `"${formName.trim()}" (${formDurationValue} ${formDurationUnit}) added to master data.`
       });
       setIsAddOpen(false);
       fetchProgramsData();
@@ -142,17 +156,24 @@ export function AcademicProgramsTab() {
     e.preventDefault();
     if (!selectedProgram || !formName.trim()) return;
 
+    if (!formDurationValue || formDurationValue <= 0) {
+      toast.error("Program Duration Value must be a positive integer.");
+      return;
+    }
+
     setIsSaving(true);
     const res = await updateAcademicProgramAction(selectedProgram.id, {
       programName: formName,
       programCode: formCode,
       academicLevel: formLevel,
+      durationValue: Number(formDurationValue),
+      durationUnit: formDurationUnit,
       displayOrder: Number(formOrder) || selectedProgram.displayOrder
     });
 
     if (res.success) {
       toast.success("Academic Program Updated", {
-        description: `Changes saved for "${formName.trim()}".`
+        description: `Changes saved for "${formName.trim()}" (${formDurationValue} ${formDurationUnit}).`
       });
       setIsEditOpen(false);
       fetchProgramsData();
@@ -188,7 +209,7 @@ export function AcademicProgramsTab() {
             Administrator-Managed Academic Programs
           </CardTitle>
           <CardDescription className="text-xs text-muted-foreground mt-0.5">
-            Configure master data academic programs for enrollment dropdowns across the university.
+            Configure master data academic programs, program duration, and level for university enrollment.
           </CardDescription>
         </div>
         <Button onClick={handleOpenAdd} size="sm" className="text-xs font-semibold h-9 gap-1.5 rounded-xl">
@@ -245,6 +266,7 @@ export function AcademicProgramsTab() {
                   <th className="py-2.5 px-3">Program Name</th>
                   <th className="py-2.5 px-3">Code</th>
                   <th className="py-2.5 px-3">Level</th>
+                  <th className="py-2.5 px-3">Duration</th>
                   <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3 text-right">Actions</th>
                 </tr>
@@ -259,6 +281,12 @@ export function AcademicProgramsTab() {
                       <Badge variant="outline" className="text-[10px] uppercase font-mono">
                         {prog.academicLevel || "Degree"}
                       </Badge>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-1 text-foreground font-medium text-[11px]">
+                        <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span>{prog.durationValue || 4} {prog.durationUnit || "Years"}</span>
+                      </div>
                     </td>
                     <td className="py-2.5 px-3">
                       <Badge variant={prog.isActive ? "default" : "secondary"} className="text-[10px] rounded-md">
@@ -342,6 +370,37 @@ export function AcademicProgramsTab() {
               </div>
             </div>
 
+            {/* Duration Configuration */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Program Duration <span className="text-rose-500">*</span></label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="4"
+                  value={formDurationValue}
+                  onChange={(e) => setFormDurationValue(Math.max(1, Number(e.target.value)))}
+                  className="h-9 text-xs rounded-xl font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Duration Unit <span className="text-rose-500">*</span></label>
+                <Select value={formDurationUnit} onValueChange={(val) => setFormDurationUnit((val as AcademicProgramDurationUnit) || "Years")}>
+                  <SelectTrigger className="h-9 text-xs rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Years">Years</SelectItem>
+                    <SelectItem value="Semesters">Semesters</SelectItem>
+                    <SelectItem value="Trimesters">Trimesters</SelectItem>
+                    <SelectItem value="Months">Months</SelectItem>
+                    <SelectItem value="Credits">Credits</SelectItem>
+                    <SelectItem value="Research_Months">Research Months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground">Display Order</label>
               <Input
@@ -405,6 +464,36 @@ export function AcademicProgramsTab() {
                     <SelectItem value="PG">Postgraduate (PG)</SelectItem>
                     <SelectItem value="PhD">Doctorate (PhD)</SelectItem>
                     <SelectItem value="Diploma">Diploma / Cert</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Duration Configuration */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Program Duration <span className="text-rose-500">*</span></label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={formDurationValue}
+                  onChange={(e) => setFormDurationValue(Math.max(1, Number(e.target.value)))}
+                  className="h-9 text-xs rounded-xl font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Duration Unit <span className="text-rose-500">*</span></label>
+                <Select value={formDurationUnit} onValueChange={(val) => setFormDurationUnit((val as AcademicProgramDurationUnit) || "Years")}>
+                  <SelectTrigger className="h-9 text-xs rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Years">Years</SelectItem>
+                    <SelectItem value="Semesters">Semesters</SelectItem>
+                    <SelectItem value="Trimesters">Trimesters</SelectItem>
+                    <SelectItem value="Months">Months</SelectItem>
+                    <SelectItem value="Credits">Credits</SelectItem>
+                    <SelectItem value="Research_Months">Research Months</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

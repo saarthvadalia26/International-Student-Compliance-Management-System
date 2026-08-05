@@ -1,9 +1,19 @@
+export type AcademicProgramDurationUnit = 
+  | "Years" 
+  | "Semesters" 
+  | "Trimesters" 
+  | "Months" 
+  | "Credits" 
+  | "Research_Months";
+
 export interface AcademicProgram {
   id: string;
   programName: string;
   programCode: string | null;
   displayOrder: number;
   isActive: boolean;
+  durationValue: number;
+  durationUnit: AcademicProgramDurationUnit | string;
   schoolName?: string | null;
   academicLevel?: string | null;
   createdAt: string;
@@ -16,6 +26,8 @@ export interface CreateProgramDto {
   programCode?: string | null;
   displayOrder?: number;
   isActive?: boolean;
+  durationValue?: number;
+  durationUnit?: AcademicProgramDurationUnit | string;
   schoolName?: string | null;
   academicLevel?: string | null;
 }
@@ -25,6 +37,8 @@ export interface UpdateProgramDto {
   programCode?: string | null;
   displayOrder?: number;
   isActive?: boolean;
+  durationValue?: number;
+  durationUnit?: AcademicProgramDurationUnit | string;
   schoolName?: string | null;
   academicLevel?: string | null;
 }

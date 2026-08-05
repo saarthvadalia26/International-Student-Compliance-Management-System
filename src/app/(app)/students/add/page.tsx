@@ -73,19 +73,58 @@ export default function StudentRegistrationPage() {
     visaExpiry: "",
   });
 
+  // Helper to calculate expected graduation date dynamically from program duration
+  const calculateGraduationDate = (programName: string, admissionDateStr: string) => {
+    if (!admissionDateStr) return "";
+    const selectedProg = academicPrograms.find(p => p.programName === programName);
+    if (!selectedProg) return "";
+
+    const durationVal = selectedProg.durationValue || 4;
+    const durationUnit = selectedProg.durationUnit || "Years";
+    
+    const admissionDate = new Date(admissionDateStr);
+    if (isNaN(admissionDate.getTime())) return "";
+
+    const gradDate = new Date(admissionDate);
+
+    if (durationUnit === "Semesters") {
+      gradDate.setMonth(gradDate.getMonth() + durationVal * 6);
+    } else if (durationUnit === "Months" || durationUnit === "Research_Months") {
+      gradDate.setMonth(gradDate.getMonth() + durationVal);
+    } else {
+      gradDate.setFullYear(gradDate.getFullYear() + durationVal);
+    }
+
+    return gradDate.toISOString().split("T")[0];
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [id]: value
-    }));
+    setFormData(prev => {
+      const next = { ...prev, [id]: value };
+      if (id === "admissionDate" && prev.program) {
+        next.expectedGraduation = calculateGraduationDate(prev.program, value);
+      }
+      return next;
+    });
   };
 
   const handleSelectChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === "program") {
+        const selectedProg = academicPrograms.find(p => p.programName === value);
+        if (selectedProg) {
+          if (!prev.school) {
+            next.school = selectedProg.schoolName || "";
+          }
+          if (prev.admissionDate) {
+            next.expectedGraduation = calculateGraduationDate(value, prev.admissionDate);
+          }
+        }
+      }
+      return next;
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
