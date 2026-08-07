@@ -12,7 +12,7 @@ import {
 } from "@/app/(app)/notifications/actions";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 
-export function useNotificationCenter() {
+export function useNotificationCenter(portal: "staff" | "student" = "staff") {
   const [notifications, setNotifications] = React.useState<InAppNotification[]>([]);
   const [unreadCount, setUnreadCount] = React.useState<number>(0);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
@@ -30,6 +30,7 @@ export function useNotificationCenter() {
       setIsLoading(true);
       try {
         const res = await fetchInAppNotifications({
+          portal,
           page: targetPage,
           limit: 10,
           category,
@@ -46,7 +47,7 @@ export function useNotificationCenter() {
         setHasMore(res.hasMore);
         setPage(targetPage);
 
-        const count = await getUnreadNotificationCount();
+        const count = await getUnreadNotificationCount(portal);
         setUnreadCount(count);
       } catch (err) {
         console.error("[NOTIFICATION_CENTER_HOOK_ERROR]", err);
@@ -54,7 +55,7 @@ export function useNotificationCenter() {
         setIsLoading(false);
       }
     },
-    [category, priority, unreadOnly, searchQuery]
+    [portal, category, priority, unreadOnly, searchQuery]
   );
 
   React.useEffect(() => {
@@ -69,12 +70,19 @@ export function useNotificationCenter() {
     table: "in_app_notifications",
     onEvent: (evt) => {
       if (evt.eventType === "INSERT" && evt.newRecord) {
+        const cat = (evt.newRecord.category as InAppNotification["category"]) || "system";
+
+        // Filter out staff-only events for student portal
+        if (portal === "student" && ["security", "audit", "system"].includes(cat)) {
+          return;
+        }
+
         const item: InAppNotification = {
           id: String(evt.newRecord.id),
           userId: evt.newRecord.user_id ? String(evt.newRecord.user_id) : undefined,
           title: String(evt.newRecord.title || "Notification Alert"),
           description: String(evt.newRecord.description || ""),
-          category: (evt.newRecord.category as InAppNotification["category"]) || "system",
+          category: cat,
           priority: (evt.newRecord.priority as InAppNotification["priority"]) || "medium",
           eventType: String(evt.newRecord.event_type || "general"),
           isRead: Boolean(evt.newRecord.is_read),
@@ -94,49 +102,45 @@ export function useNotificationCenter() {
           prev.map((item) => (item.id === updatedId ? { ...item, isRead: updatedIsRead } : item))
         );
 
-        getUnreadNotificationCount().then(setUnreadCount);
+        getUnreadNotificationCount(portal).then(setUnreadCount);
       } else if (evt.eventType === "DELETE" && evt.oldRecord) {
         const deletedId = String(evt.oldRecord.id);
         setNotifications((prev) => prev.filter((item) => item.id !== deletedId));
-        getUnreadNotificationCount().then(setUnreadCount);
+        getUnreadNotificationCount(portal).then(setUnreadCount);
       }
     },
   });
 
-  const handleMarkAsRead = async (id: string) => {
+  const markAsReadHandler = React.useCallback(async (id: string) => {
     setNotifications((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, isRead: true } : item))
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
     await markNotificationAsRead(id);
-  };
+  }, []);
 
-  const handleMarkAllAsRead = async () => {
-    setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+  const markAllAsReadHandler = React.useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setUnreadCount(0);
-    await markAllNotificationsAsRead();
-  };
+    await markAllNotificationsAsRead(portal);
+  }, [portal]);
 
-  const handleDelete = async (id: string) => {
-    const target = notifications.find((item) => item.id === id);
-    setNotifications((prev) => prev.filter((item) => item.id !== id));
-    if (target && !target.isRead) {
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    }
+  const deleteHandler = React.useCallback(async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
     await deleteInAppNotification(id);
-  };
+  }, []);
 
-  const handleClearAll = async () => {
+  const clearAllHandler = React.useCallback(async () => {
     setNotifications([]);
     setUnreadCount(0);
-    await clearAllInAppNotifications();
-  };
+    await clearAllInAppNotifications(portal);
+  }, [portal]);
 
-  const handleLoadMore = () => {
+  const loadMoreHandler = React.useCallback(() => {
     if (hasMore && !isLoading) {
       loadNotifications(page + 1, true);
     }
-  };
+  }, [hasMore, isLoading, page, loadNotifications]);
 
   return {
     notifications,
@@ -151,11 +155,10 @@ export function useNotificationCenter() {
     setPriority,
     setUnreadOnly,
     setSearchQuery,
-    markAsRead: handleMarkAsRead,
-    markAllAsRead: handleMarkAllAsRead,
-    deleteNotification: handleDelete,
-    clearAll: handleClearAll,
-    loadMore: handleLoadMore,
-    refresh: () => loadNotifications(1, false),
+    markAsRead: markAsReadHandler,
+    markAllAsRead: markAllAsReadHandler,
+    deleteNotification: deleteHandler,
+    clearAll: clearAllHandler,
+    loadMore: loadMoreHandler,
   };
 }

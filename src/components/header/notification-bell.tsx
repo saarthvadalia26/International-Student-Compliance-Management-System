@@ -7,16 +7,25 @@ import { buttonVariants } from "@/components/ui/button";
 import { useNotificationCenter } from "@/hooks/use-notification-center";
 import { cn } from "@/lib/utils";
 
-export function NotificationBell() {
-  const { unreadCount } = useNotificationCenter();
+interface NotificationBellProps {
+  portal?: "staff" | "student";
+  href?: string;
+}
+
+export function NotificationBell({
+  portal = "staff",
+  href,
+}: NotificationBellProps) {
+  const targetHref = href || (portal === "student" ? "/student/notifications" : "/notifications");
+  const { unreadCount } = useNotificationCenter(portal);
 
   return (
     <Link
-      href="/notifications"
+      href={targetHref}
       prefetch
       className={cn(
         buttonVariants({ variant: "ghost", size: "icon" }),
-        "relative h-9 w-9 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+        "relative h-9 w-9 text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 rounded-xl"
       )}
       aria-label={`Notification Center (${unreadCount} unread)`}
     >

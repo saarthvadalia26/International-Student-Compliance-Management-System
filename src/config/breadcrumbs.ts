@@ -37,6 +37,7 @@ const staticRouteMap: Record<string, { section: string; title: string; parentLab
   "/student/efrro": { section: "Student Portal", title: "Document Centre" },
   "/student/history": { section: "Student Portal", title: "Activity History" },
   "/student/settings": { section: "Student Portal", title: "Preferences" },
+  "/student/notifications": { section: "Student Portal", title: "Notifications" },
 };
 
 /**
