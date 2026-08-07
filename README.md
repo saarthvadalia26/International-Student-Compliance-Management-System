@@ -1,179 +1,499 @@
 # International Student Compliance Management System (ISCMS)
 
-[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![License: Private](https://img.shields.io/badge/License-Private-red?style=for-the-badge)](https://github.com)
+### ISCMS — International Student Compliance Management System
 
-The **International Student Compliance Management System (ISCMS)** is a secure, production-grade web application custom-built for the **National Forensic Science University (NFSU)**. It is designed to manage international student profiles and track crucial compliance documents (Passports, Visas, and eFRRO forms). By automating compliance status evaluation, alerting administrators to upcoming expirations, and tracking document versions, ISCMS streamlines institutional compliance, minimizes risk, and maintains audit readiness.
+A centralized, enterprise-grade web application custom-built for the **National Forensic Sciences University (NFSU)** to streamline international student record management, compliance document verification, expiration tracking, automated alerts, institutional reporting, and administrative governance.
 
----
+[![Next.js](https://img.shields.io/badge/Next.js-16.2-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_RLS-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![Cloudflare R2](https://img.shields.io/badge/Storage-Cloudflare_R2-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://www.cloudflare.com/developer-platform/r2/)
 
-## 🚀 Features
-
-*   **Student Management**: Register, view, search, and update detailed international student profiles.
-*   **Passport Management**: Record passports details, issue/expiry dates, and track validation states.
-*   **Visa Management**: Track visas numbers, visa types, and verification logs.
-*   **eFRRO Management**: Log eFRRO registrations and compliance status.
-*   **Compliance Status Tracking**: Evaluates real-time compliance states (Compliant, Expiring Soon, Expired, or Missing Documents).
-*   **Automated Reminder Engine**: Runs evaluations against student document statuses to schedule automated pre-expiry and post-expiry alerts.
-*   **Notification Center**: Unified admin interface showing metrics, delivery statuses, and gateway retry logs.
-*   **Document Version History**: Keep auditable tracks of all uploaded document versions and verification records.
-*   **Secure Document Storage**: Integrates with Supabase Storage with dynamic URL signing to restrict document access.
-*   **Reporting Dashboard**: Summary cards detailing metrics, pending audits, and active warning statuses.
-*   **Search & Filtering**: Search students by name, registration ID, nationality, or compliance standing.
-*   **Audit Trail**: Logs all document verification comments and status changes.
-*   **Responsive UI**: Optimized for mobile and desktop screens.
+**Institution:** National Forensic Sciences University (NFSU)  
+**Deployment Target:** Production Institutional Deployment  
+**Application Type:** Secure Multi-Tenant Web Application  
 
 ---
 
-## 🛠 Technology Stack
+## 1. Overview
 
-*   **Frontend**: React, Next.js (App Router), Tailwind CSS
-*   **Backend**: Next.js Server Actions, Route Handlers
-*   **Database**: PostgreSQL, Supabase DB
-*   **Authentication**: Supabase Auth (Cookie-based session validation)
-*   **Storage**: Supabase Storage buckets
-*   **Notifications**: Custom queue manager with Resend and Twilio provider stubs
-*   **Deployment**: Vercel / Docker (Planned)
+The **International Student Compliance Management System (ISCMS)** is a specialized compliance management platform engineered for institutional oversight of foreign students enrolled across NFSU campuses. 
 
----
+International student administration involves strict regulatory requirements mandated by government immigration authorities (including eFRRO registration, passport validity, and student visa compliance). Manual tracking through spreadsheets introduces operational risks such as missed expiration dates, delayed document renewals, and regulatory non-compliance.
 
-## 📐 Architecture
+ISCMS centralizes the complete international student compliance lifecycle into two distinct, role-isolated workspaces:
 
-ISCMS implements a strict modular architecture to separate business logic from infrastructure details:
+### Administrator & Staff Workspace (`/dashboard`, `/students`, `/notifications`, etc.)
+Used by authorized university administrators and international office staff to register student profiles, review uploaded compliance documentation, verify passport/visa/eFRRO records, monitor expiration timelines, execute compliance reports, and manage institutional settings.
 
-*   **App Router**: Structural separation of public routes, app shells, and API handlers.
-*   **Feature-Based Structure**: Frontend components, utils, and assets are grouped under feature modules (e.g. `/features/compliance/`, `/features/notifications/`).
-*   **Domain Layer**: Houses canonical domain objects (e.g. `Passport`, `Visa`, `StudentSnapshot`) as the single source of truth.
-*   **Repository Pattern**: Standardized database query boundaries (`INotificationRepository`, `IComplianceDocumentRepository`) isolating public client API calls.
-*   **Dependency Injection**: Domain services receive their repository interfaces via constructor injection, decoupling code from Supabase endpoints.
-*   **Compliance Engine**: Central service evaluating expirations and document statuses against institutional guidelines.
-*   **Notification Engine**: Cron-driven processor evaluating active alerts and dispatching messages in transaction-locked batches.
+### Student Portal (`/student/dashboard`, `/student/notifications`, etc.)
+Used by enrolled international students to view their real-time compliance status, upload updated passport/visa/eFRRO document copies, view personal notifications, and manage individual portal preferences via secure, passwordless authentication.
 
 ---
 
-## 📁 Folder Structure
+## 2. Key Capabilities
+
+### Student Management
+* **Centralized Registry**: Complete digital registry of international students across NFSU campuses and academic programs.
+* **Rich Profiles**: Comprehensive tracking of passport details, visa numbers, eFRRO registration IDs, contact details, home country addresses, and enrollment status.
+* **Instant Search & Filter**: Real-time filtering by student name, registration ID, nationality, program, or active compliance standing.
+
+### Compliance Document Management
+* **Multi-Document Verification**: Dedicated inspection workflows for **Passport**, **Visa**, and **eFRRO** documents.
+* **Document Status Tracking**: Automated tracking of document verification states (`Pending Verification`, `Approved`, `Rejected`, `Expired`).
+* **Document History & Auditing**: Maintains full version histories and inspection audit comments for every document update.
+* **Secure Object Storage**: Direct integration with private object storage (Cloudflare R2 / Supabase Storage) using short-lived, presigned URL tokens.
+
+### Expiration & Compliance Monitoring
+* **Automated Compliance Engine**: Continuous evaluation of student document expiration dates against institutional guidelines.
+* **Status Classifications**: Evaluates real-time compliance statuses (`Compliant`, `Expiring Soon`, `Expired`, `Missing Documents`).
+* **Visual Expiry Timelines**: Color-coded badges and countdown timers for upcoming passport, visa, and eFRRO renewals.
+
+### Unified Notification Architecture
+* **Role-Aware Notification Center**: Centralized Notification Center (`/notifications` for staff, `/student/notifications` for students) featuring category filtering, search, priority levels, and unread badges.
+* **Supabase Realtime WebSockets**: Live notification dispatch and unread count badge updates without requiring manual browser refreshes.
+* **Multi-Channel Delivery Support**: Engine support for in-app alerts, institutional email (Resend API), and WhatsApp direct messaging (Meta Business API).
+
+### Institutional Reporting & Analytics
+* **Executive Dashboard**: Visual metric cards displaying active student totals, pending document verifications, upcoming expirations, and system health status.
+* **Specialized Compliance Reports**: Dedicated exportable report views for Student Registry, eFRRO Expirations, Audit Logs, and Notification Delivery status.
+* **System Health Monitoring**: Real-time status diagnostics for database connectivity, storage API readiness, and background services.
+
+### Administrative Governance & Security
+* **Initial Setup Wizard**: Zero-downtime system initialization workflow (`/setup`) for fresh database provisioning and initial administrator creation.
+* **Emergency Recovery Mode**: Secure recovery mechanism allowing system restoration if administrator credentials are lost.
+* **Audit Logging**: Comprehensive system log recording every login event, verification decision, administrative change, and document upload.
+
+---
+
+## 3. User Roles & Access Control
+
+ISCMS implements a strict, server-enforced role and authorization hierarchy:
+
+| Role | Workspace Access | Primary Responsibilities & Permissions |
+|---|---|---|
+| **Administrator** | Administrative Workspace (`/*`) | Full operational control. Can manage staff accounts, execute initial setup/recovery, configure retention policies, adjust system settings, manage all student records, verify compliance documents, and export reports. |
+| **Staff** | Administrative Workspace (`/*`) | Operational compliance staff. Can view and manage student profiles, perform document inspections (approve/reject), trigger reminder notifications, and view compliance reports. Cannot perform administrative setup/recovery or alter global security settings. |
+| **Student** | Student Portal (`/student/*`) | Restricted student portal. Authenticated via passwordless WhatsApp/email OTP. Can view own compliance standing, upload new passport/visa/eFRRO document copies, view personal notifications, and adjust portal light/dark theme settings. **Strictly isolated from staff data.** |
+
+---
+
+## 4. Student Portal Experience
+
+The Student Portal (`/student`) provides international students with a clean, responsive interface tailored for mobile and desktop devices:
 
 ```
-├── .agents/                 # Customize guidelines, rules, and assistant skills
-├── docs/                    # Sprints architectural plan specs and walkthroughs
-├── supabase/
-│   ├── migrations/          # Sorted SQL schema migrations
-│   └── seed/                # Mock data seeds
+                                    Student Portal Lifecycle
+                                               │
+                        ┌──────────────────────┴──────────────────────┐
+                        │                                             │
+             Passwordless Verification                         Student Dashboard
+             (WhatsApp / Email OTP)                            (Status Summary)
+                        │                                             │
+                        ├─────────────────────────────────────────────┤
+                        │                                             │
+               Document Centre                                Student Notifications
+               (Passport / Visa / eFRRO Upload)               (/student/notifications)
+```
+
+* **Passwordless OTP Login**: Students authenticate securely using single-use OTP codes dispatched via WhatsApp/Email.
+* **Compliance Overview**: High-level status cards displaying active validity for Passport, Visa, and eFRRO registration.
+* **Document Centre (`/student/efrro`)**: Dedicated document upload interface with file validation (PDF/JPEG/PNG, max 10MB) and upload progress indicators.
+* **Activity History (`/student/history`)**: Audit timeline showing historical verification approvals, rejections, and submission dates.
+* **Student Notification Center (`/student/notifications`)**: Dedicated workspace displaying account-specific compliance alerts and document approval notices.
+* **Light / Dark Mode**: Integrated theme toggle (`ThemeToggle`) supporting instant light and dark theme switching.
+
+---
+
+## 5. Administrator & Staff Workspace
+
+The Administrative Workspace (`/dashboard`) equips international student officers with comprehensive management tools:
+
+* **Dashboard (`/dashboard`)**: Central dashboard featuring compliance breakdown charts, urgent document verification queues, and system health metrics.
+* **Student Management (`/students`)**: Searchable tabular registry supporting pagination, nationality filters, program filters, and quick actions.
+* **Student Registration (`/students/add`)**: Form wizard for onboarding new international students with institutional validation.
+* **Document Inspection (`/students/[id]/passport`, `/visa`, `/efrro`)**: Detailed side-by-side document viewer, verification status toggle, and audit comment recorder.
+* **Communication & Reminders (`/reminders`)**: Management interface for queuing and monitoring compliance alerts across email and WhatsApp channels.
+* **System Reports (`/reports`)**: Specialized compliance reporting interfaces with data export options (`/reports/students`, `/reports/efrro`, `/reports/audit`, `/reports/notifications`).
+* **Settings & Governance (`/settings`)**: Multi-tab administration workspace for institutional details, document retention policies, user management, and security controls.
+
+---
+
+## 6. Compliance Workflow
+
+The core operational workflow ensures seamless document submission, verification, and monitoring:
+
+```text
+  Student Registration (Staff or Setup)
+                   │
+                   ▼
+  Student Uploads Compliance Documents (Student Portal)
+                   │
+                   ▼
+  Document Appears in Inspection Queue (Staff Dashboard)
+                   │
+                   ▼
+  Staff Verifies Document (Approved / Rejected with Audit Comment)
+                   │
+                   ▼
+  Compliance Engine Evaluates Expiration Date Continually
+                   │
+                   ▼
+  Pre-Expiry Warning Triggered (e.g., 30 Days Before Expiry)
+                   │
+                   ▼
+  Automated Reminder Dispatched (In-App + Email / WhatsApp)
+                   │
+                   ▼
+  Student Re-uploads Updated Document
+```
+
+---
+
+## 7. Technology Stack
+
+ISCMS is built using modern, production-grade web technologies:
+
+| Layer | Technology | Version / Specification |
+|---|---|---|
+| **Framework** | Next.js (App Router, Turbopack) | `v16.2.10` |
+| **UI Library** | React | `v19.2.4` |
+| **Language** | TypeScript (Strict Mode) | `v5.x` |
+| **Styling** | Tailwind CSS / tw-animate-css | `v4.x` |
+| **Component Primitives** | shadcn/ui / Base UI / Lucide Icons | Latest |
+| **Database** | PostgreSQL (Supabase DB) | PostgreSQL 15+ |
+| **Authentication** | Supabase Auth (Cookie-based Sessions) | `@supabase/ssr v0.12.3` |
+| **Object Storage** | Cloudflare R2 / Supabase Storage | `@aws-sdk/client-s3 v3.1098.0` |
+| **State & Fetching** | TanStack React Query | `v5.101.2` |
+| **Realtime Engine** | Supabase Realtime WebSockets | `@supabase/supabase-js v2.110.1` |
+| **Form Validation** | React Hook Form + Zod | `zod v4.4.3` |
+| **Theme Management** | next-themes | `v0.4.6` |
+| **Monitoring** | Sentry Next.js SDK | `v10.68.0` |
+
+---
+
+## 8. System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Clients["Client Access Layer"]
+        StudentClient["Student Portal Client\n(Mobile & Desktop)"]
+        StaffClient["Staff / Admin Client\n(Desktop & Mobile Workspace)"]
+    end
+
+    subgraph AppServer["Next.js App Server Layer"]
+        Middleware["Next.js Proxy / Middleware\n(Route Protection & Role Guard)"]
+        ServerActions["Server Actions & API Routes\n(Zod Validation & Business Logic)"]
+        RealtimeEngine["WebSocket Realtime Handler"]
+    end
+
+    subgraph StorageAuth["Data & Security Infrastructure"]
+        SupaAuth["Supabase Auth\n(Session Cookies & Metadata Roles)"]
+        PostgreSQL[("PostgreSQL Database\n(Row Level Security Policies)")]
+        CloudflareR2["Cloudflare R2 Object Storage\n(Presigned Dynamic S3 URLs)"]
+        NotificationGateways["Notification Services\n(Resend Email / Meta WhatsApp)"]
+    end
+
+    StudentClient -->|HTTP / HTTPS| Middleware
+    StaffClient -->|HTTP / HTTPS| Middleware
+
+    Middleware --> ServerActions
+    ServerActions --> SupaAuth
+    ServerActions --> PostgreSQL
+    ServerActions --> CloudflareR2
+    ServerActions --> NotificationGateways
+
+    RealtimeEngine <-->|WebSocket| StudentClient
+    RealtimeEngine <-->|WebSocket| StaffClient
+    PostgreSQL <-->|Realtime Publication| RealtimeEngine
+```
+
+---
+
+## 9. Security Architecture & Controls
+
+ISCMS enforces multi-layered defense-in-depth security:
+
+* **Server-Side Authorization**: Every route and Server Action verifies user identity and role server-side. Frontend UI hiding is never relied upon as a primary security control.
+* **Row Level Security (RLS)**: PostgreSQL tables feature RLS policies (`SELECT_in_app_notifications_StudentSelf`, `SELECT_in_app_notifications_StaffAdmin`) ensuring students can only access records matching `user_id = auth.uid()`.
+* **Cookie-Based Session Management**: Built on `@supabase/ssr` with HTTP-only, secure, same-site session cookies.
+* **Private Object Storage**: Compliance PDF/image uploads are stored in private buckets. Access is mediated strictly via short-lived, presigned URL tokens.
+* **Strict Input & File Validation**: Server-side Zod validation schemas inspect file MIME types (`application/pdf`, `image/jpeg`, `image/png`) and file size limits (10MB max).
+* **Audit Trail Records**: Administrative changes, verification approvals, rejections, and system recovery triggers are logged to PostgreSQL audit tables.
+* **Security Headers & CSP**: Configured with strict Content Security Policy (CSP), X-Frame-Options, X-Content-Type-Options, and Referrer Policy headers.
+
+---
+
+## 10. System Initialization & Emergency Recovery
+
+### Fresh System Initialization (`/setup`)
+When ISCMS is deployed against a new database, the application automatically detects the uninitialized state and directs administrators to the **Initial Setup Wizard** (`/setup`).
+
+```text
+  Fresh Deployment / Clean Database
+                 │
+                 ▼
+  System State Guard Detects No Admin Account
+                 │
+                 ▼
+  Redirects to Initial Setup Wizard (/setup)
+                 │
+                 ▼
+  Step 1: System Health & Database Connection Check
+  Step 2: Provision Primary Administrator Credentials
+  Step 3: Configure Institutional Details (NFSU Branding)
+  Step 4: Execute Initial Schema Seed & Initialize State
+                 │
+                 ▼
+  Redirects to Administrative Workspace (/dashboard)
+```
+
+### Emergency Administrator Recovery Mode (`/setup`)
+If administrative access is lost or emergency recovery is required, ISCMS features a secure **Administrator Recovery Mode**:
+* Accessible via `/setup` when recovery parameters are satisfied.
+* Allows restoring primary administrator credentials without dropping or resetting existing student compliance data.
+* Logs the emergency recovery action to the audit trail for security accountability.
+
+---
+
+## 11. Project Structure
+
+```text
+International-Student-Compliance-Management-System/
+├── docs/                        # Architecture decision records, plans & walkthroughs
+├── documentation/               # Detailed QA matrices, security reports & architecture specs
+├── public/                      # Static assets, branding logos & favicons
+│   └── assets/branding/         # NFSU official branding assets
 ├── src/
-│   ├── app/                 # Next.js App Router pages
-│   ├── components/          # Reusable shared UI layout components
-│   ├── config/              # Environment configurations & navigation maps
-│   ├── domain/              # Domain models, repositories, & services
-│   ├── features/            # Feature-oriented UI components (compliance, notifications)
-│   ├── lib/                 # Supabase client utilities & mock data helpers
-│   ├── providers/           # Query, routing, and theme wrapper providers
-│   └── services/            # Legacy system services
+│   ├── app/                     # Next.js App Router structure
+│   │   ├── (app)/               # Staff/Admin Workspace routes (/dashboard, /students, etc.)
+│   │   │   ├── dashboard/       # Executive dashboard & system health (/dashboard/health)
+│   │   │   ├── notifications/   # Staff Notification Center (/notifications)
+│   │   │   ├── reminders/       # Communication & reminder management
+│   │   │   ├── reports/         # Compliance reporting routes
+│   │   │   ├── settings/        # System administration settings
+│   │   │   └── students/        # Student management & document inspection routes
+│   │   ├── api/                 # Server API endpoints & webhooks (/api/webhooks/meta, etc.)
+│   │   ├── student/             # Student Portal routes (/student/dashboard, /student/notifications)
+│   │   │   ├── (authenticated)/ # Passwordless authenticated student views
+│   │   │   └── (public)/        # Student OTP login route
+│   │   ├── setup/               # System Initial Setup Wizard & Recovery Mode
+│   │   └── layout.tsx           # Global application root layout & providers
+│   ├── components/              # Reusable React components
+│   │   ├── header/              # Breadcrumbs, header bell, theme toggle, search
+│   │   ├── notifications/       # Shared NotificationCenterWorkspace & list items
+│   │   ├── settings/            # Settings tab workspaces
+│   │   ├── shell/               # Administrative app shell container
+│   │   └── ui/                  # shadcn/ui design system primitives
+│   ├── config/                  # Institutional branding, environment & route maps
+│   ├── domain/                  # Core domain logic, models, storage & notification providers
+│   ├── features/                # Feature-specific modules & UI elements
+│   ├── hooks/                   # Custom hooks (useNotificationCenter, useRealtime, etc.)
+│   ├── lib/                     # Supabase clients (browser, server, admin) & utilities
+│   ├── providers/               # React Query, Theme, & Realtime context providers
+│   ├── services/                # Legacy domain services & audit logger
+│   └── middleware.ts            # Proxy middleware for authentication & role protection
+├── supabase/
+│   ├── migrations/              # SQL schema migration files (001 through 029)
+│   └── seed/                    # Mock seed data for reference datasets
+├── .env.local.example           # Environment variables configuration template
+├── next.config.js               # Next.js configuration & security headers
+├── package.json                 # Project dependencies & scripts
+└── README.md                    # Institutional repository documentation
 ```
 
 ---
 
-## 🚀 Getting Started
+## 12. Local Development Guide
 
 ### Prerequisites
-*   Node.js (v20+ recommended)
-*   npm or pnpm
-*   A Supabase Project instance
+* **Node.js**: `v20.x` or higher
+* **Package Manager**: `npm` (v10+)
+* **Supabase Project**: An active Supabase PostgreSQL project with Auth enabled
 
 ### Installation
-1. Clone this repository to your local system.
-2. Install npm dependencies:
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/saarthvadalia26/International-Student-Compliance-Management-System.git
+   cd International-Student-Compliance-Management-System
+   ```
+
+2. **Install dependencies**:
    ```bash
    npm install
    ```
 
-### Environment Variables
-Create a `.env.local` file at the project root based on the following template:
+3. **Configure Environment Variables**:
+   Create a `.env.local` file at the root of the project by copying the provided example template:
 
-```env
-# Public Supabase credentials
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+   ```bash
+   cp .env.local.example .env.local
+   ```
 
-# Private Supabase service role key (Never expose to client)
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+   Fill in the required configuration parameters:
 
-# Notification Provider Gateways API keys
-RESEND_API_KEY=re_your_api_key_placeholder
-TWILIO_ACCOUNT_SID=ACyour_account_sid_placeholder
-TWILIO_AUTH_TOKEN=your_auth_token_placeholder
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
-```
+   ```env
+   # -----------------------------------------------------------------------------
+   # Public Supabase Configuration
+   # -----------------------------------------------------------------------------
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-### Running Development Server
+   # -----------------------------------------------------------------------------
+   # Private Server Credentials (NEVER expose to client)
+   # -----------------------------------------------------------------------------
+   SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+   SUPABASE_JWT_SECRET=your-supabase-jwt-secret
+
+   # -----------------------------------------------------------------------------
+   # Object Storage Provider ("cloudflare-r2" or "supabase")
+   # -----------------------------------------------------------------------------
+   STORAGE_PROVIDER=cloudflare-r2
+   R2_ACCOUNT_ID=your-cloudflare-account-id
+   R2_ACCESS_KEY_ID=your-r2-access-key-id
+   R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
+
+   # -----------------------------------------------------------------------------
+   # Email & WhatsApp Gateway Configuration
+   # -----------------------------------------------------------------------------
+   EMAIL_PROVIDER=resend
+   RESEND_API_KEY=your-resend-api-key
+   RESEND_FROM_EMAIL=compliance@nfsu.edu.in
+
+   WHATSAPP_PROVIDER=meta
+   META_ACCESS_TOKEN=your-meta-access-token
+   META_PHONE_NUMBER_ID=your-meta-phone-number-id
+   META_APP_SECRET=your-meta-app-secret
+   META_WEBHOOK_VERIFY_TOKEN=your-meta-webhook-verify-token
+
+   # -----------------------------------------------------------------------------
+   # System Automation & Security Secrets
+   # -----------------------------------------------------------------------------
+   CRON_SECRET=your-cron-execution-secret
+   ```
+
+4. **Apply Database Migrations**:
+   Execute the SQL files in `supabase/migrations/` (001 through 029) in sequential order in your Supabase SQL Editor to provision tables, indexes, triggers, and Row Level Security policies.
+
+5. **Start the Development Server**:
+   ```bash
+   npm run dev
+   ```
+
+   Access the application at [http://localhost:3000](http://localhost:3000).
+
+---
+
+## 13. Production Verification & Build Commands
+
+Before committing changes or deploying to production, execute the standard verification pipeline:
+
 ```bash
-npm run dev
+# 1. Run ESLint code checks
+npm run lint
+
+# 2. Run TypeScript strict type verification
+npx tsc --noEmit
+
+# 3. Execute Next.js production build
+npm run build
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Verification Tasks
-*   **Build Production Bundle**: `npm run build`
-*   **Typecheck code**: `tsc --noEmit`
-*   **Linter checking**: `npm run lint`
 
 ---
 
-## 🗄 Database Migrations
+## 14. Deployment Architecture
 
-Database definitions are managed under **[supabase/migrations/](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/supabase/migrations/)**. Migrations are executed in sequential order:
-*   `001_enable_extensions.sql`: Prepares public extensions.
-*   `002_reference_data.sql`: Seed data for nationalities and academic programs.
-*   `003_students.sql`: Setup table for core student credentials.
-*   `004_student_details.sql`: Setup student address and academic detail tables.
-*   `005_documents.sql`: Setup passport, visa, efrro versioning, and student snapshot tables.
-*   `006_notifications.sql`: Setup template parameters, queues logs, and reminder rules.
+ISCMS is optimized for deployment on **Vercel** or containerized Node.js environments connected to **Supabase Cloud / Managed PostgreSQL** and **Cloudflare R2 Object Storage**.
 
----
-
-## ✉ Notifications
-
-The notification system runs asynchronously using a cron-evaluated database queue:
-*   **Current status**: Implemented using stubbed provider clients for Resend (Email) and Twilio (WhatsApp) to allow verification of delivery flows, retry backoffs, and logs processing.
-*   **Production Integrations**: Future deployments will replace stubs with live APIs for:
-    *   **Email**: Institution-SMTP server or Resend API key activation.
-    *   **WhatsApp**: Twilio Business API client keys integration.
-
----
-
-## 🗺 Roadmap
-
-*   ✅ **Sprint 1 — Foundation**: Directory setup, Supabase environment routing clients, and startup checks.
-*   ✅ **Sprint 2 — Student Management**: Dynamic registration tables, nationality lookups, and validations.
-*   ✅ **Sprint 3 — Compliance Documents**: Versioned document tables, storage signatures, timelines, and audit comments.
-*   ✅ **Sprint 4 — Notification Engine**: Extensible channels, template translators, preferences, and scheduler batches.
-*   🔄 **Sprint 5 — Reporting & Analytics (Planned)**: Detailed export PDF summaries and visual audit tracking statistics.
-*   🔄 **Sprint 6 — Production Readiness (Planned)**: SMTP integration and final regression checks.
+```text
+  GitHub Repository (main branch)
+                 │
+                 ▼
+  Vercel Automatic Deployment / CI Build Pipeline
+                 │
+                 ▼
+  Next.js Production Bundle (Edge Proxy + Serverless Functions)
+                 │
+  ┌──────────────┼──────────────┬──────────────┐
+  │              │              │              │
+  ▼              ▼              ▼              ▼
+Supabase DB   Supabase Auth  Cloudflare R2   Meta / Resend API
+(PostgreSQL)  (Sessions)     (S3 Storage)   (Gateways)
+```
 
 ---
 
-## 🔒 Security
+## 15. File & Document Management
 
-*   **Row Level Security (RLS)**: PostgreSQL tables restrict select, update, and delete access. Only authenticated administrator scopes bypass safety rules.
-*   **Server-Side Validation**: Domain layers enforce strict Zod schemas checks before saving record changes.
-*   **Secure Document Access**: PDFs uploaded to Supabase Storage are private. Access is mediated by server-signed token URLs valid only for short durations.
-
----
-
-## 🏛 Development Standards
-
-*   **Strict TypeScript**: TypeScript strict mode is enabled. No `any` type definitions are permitted.
-*   **Linting**: Strict ESLint rules ensure syntax guidelines remain standard.
-*   **Accessibility (a11y)**: Focus states, screen-reader parameters (`aria-label`), and color contrast ratios conform to WCAG 2.1 specifications.
+* **Supported Document Types**: **Passport**, **Visa**, and **eFRRO** (Extension/Registration) documents.
+* **Allowed MIME Formats**: `application/pdf`, `image/jpeg`, `image/png`.
+* **Maximum File Size**: 10MB per file.
+* **Storage Provider Engine**: Supports Cloudflare R2 (S3-compatible API) or native Supabase Storage buckets.
+* **Access Control**: Uploaded files are private. Client components request presigned S3 URLs generated server-side with strict 15-minute expiration bounds.
 
 ---
 
-## 📄 License
-Private Repository. Developed exclusively for the **National Forensic Science University (NFSU)**. Unauthorized duplication or redistribution of any files is strictly prohibited.
+## 16. Accessibility & UX Standards
+
+* **Responsive Layouts**: Tested across Mobile (`320px - 414px`), Tablet (`768px`), and Desktop (`1024px+`) viewports. Zero horizontal scroll overflow on mobile cards or filter bars.
+* **Theme Support**: Native Light Mode and Dark Mode support with system theme detection via `next-themes`.
+* **Keyboard Accessibility**: Visible focus rings (`focus:ring-2 focus:ring-primary/20`), proper HTML button elements, and `aria-label` attributes on all interactive icon buttons.
+* **WCAG 2.1 Color Contrast**: High-contrast slate typography against light and dark card backgrounds.
 
 ---
 
-## ✍ Author
-Developed by **Saarth**.
-*AI-assisted development powered by Antigravity and ChatGPT.*
+## 17. Operational Considerations
+
+* **Database Backups**: Automated daily PostgreSQL snapshots managed via Supabase Cloud.
+* **Document Retention Policy**: Automated cron job (`/api/cron/retention-cleanup`) evaluating document retention rules based on institutional settings.
+* **Audit Trail Records**: System-wide audit logs available for inspection under `/reports/audit`.
+* **System Diagnostics**: Health status dashboard available at `/dashboard/health` for monitoring memory, storage, and database connection pools.
+
+---
+
+## 18. Data Privacy & Confidentiality Notice
+
+ISCMS processes sensitive institutional and personal data belonging to international students, including passport identifiers, immigration documents, residential addresses, and academic records.
+
+* **Credentials Protection**: API keys, service role tokens, and database passwords must **NEVER** be committed to source control repositories.
+* **Institutional Governance**: Access to student compliance data is strictly governed by National Forensic Sciences University (NFSU) institutional policies and applicable legal privacy frameworks.
+
+---
+
+## 19. Ownership & Licensing
+
+**ISCMS is proprietary institutional software custom-built for National Forensic Sciences University (NFSU).**
+
+The source code, application architecture, database schemas, and associated intellectual property are subject to the deployment and licensing agreement between the developer and the institution. Unauthorized copying, distribution, or external hosting of this repository is prohibited.
+
+---
+
+## 20. Production Project Status
+
+**Current Status:** `Production Deployment Ready (v1.0.0)`
+
+ISCMS has completed full feature development, security hardening, RLS policy standardization, and production build verification for institutional deployment at **National Forensic Sciences University (NFSU)**.
+
+---
+
+## 21. Documentation Index
+
+For detailed architectural specifications and Quality Assurance reports, refer to the project documentation directory:
+
+* **[Unified-Notification-Architecture.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Unified-Notification-Architecture.md)** — Architecture specification for staff and student notifications.
+* **[Student-Notification-Center-QA.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Student-Notification-Center-QA.md)** — QA matrix and viewport testing report for the Student Portal.
+* **[Notification-Security-QA.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Notification-Security-QA.md)** — Security audit and server-side authorization report.
+* **[Authentication-Flow.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Authentication-Flow.md)** — Authentication and middleware route protection design.
+* **[Operational-Runbook.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Operational-Runbook.md)** — System maintenance and operational procedures.
+
+---
+
+## 22. Institutional Acknowledgement
+
+**National Forensic Sciences University (NFSU)**  
+*An Institution of National Importance, Ministry of Home Affairs, Government of India*  
+Sector 9, Gandhinagar, Gujarat 382007, India  
+Website: [https://www.nfsu.ac.in](https://www.nfsu.ac.in)
