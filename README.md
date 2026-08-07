@@ -465,9 +465,29 @@ ISCMS processes sensitive institutional and personal data belonging to internati
 
 ## 19. Ownership & Licensing
 
-**ISCMS is proprietary institutional software custom-built for National Forensic Sciences University (NFSU).**
+This section provides a high-level overview of the software ownership, licensing framework, and data governance model applicable to the International Student Compliance Management System (ISCMS). The definitive rights and obligations of the parties are governed exclusively by the applicable written agreement.
 
-The source code, application architecture, database schemas, and associated intellectual property are subject to the deployment and licensing agreement between the developer and the institution. Unauthorized copying, distribution, or external hosting of this repository is prohibited.
+### 1. Software & Source Code Ownership
+* **Developer Intellectual Property**: ISCMS, including its underlying source code, system architecture, component implementations, database schema design, UI/UX workflows, documentation, and associated software assets, remains the intellectual property of the developer/owner unless otherwise explicitly assigned or transferred through a separate written agreement.
+* **Non-Transfer of Software Title**: Providing National Forensic Sciences University (NFSU) access to the deployed web application does not automatically transfer ownership of the underlying software or source code to the institution.
+
+### 2. NFSU Institutional Usage Rights
+* **Authorized Deployment Access**: NFSU is provided authorized access to the deployed ISCMS application for its operational institutional activities, including international student record management, compliance document verification, expiration monitoring, and eFRRO tracking.
+* **Operational Scope**: Authorized access to and use of the deployed application does not constitute a transfer of ownership of the underlying software codebase or system architecture.
+
+### 3. Source Code Access Terms
+* **Deployment Access**: Institutional deployment grants NFSU access to the operational web application service. Access to the deployed system does not include transfer of source-code repository ownership.
+* **Separate Agreement Required**: Any transfer of source-code ownership, assignment of intellectual property, code modification rights, redistribution permissions, or sublicensing rights requires a separate written agreement executed by the software owner.
+
+### 4. Institutional Data Ownership Distinction
+* **Data Sovereignty**: A strict architectural and legal distinction is maintained between **software infrastructure ownership** and **institutional data ownership**.
+* **NFSU Data Ownership**: The software owner makes **no claim of ownership** over NFSU's institutional records, student profiles, uploaded passport/visa/eFRRO document files, or administrative compliance data. All operational data remains the sole property and responsibility of National Forensic Sciences University (NFSU).
+
+### 5. No Open-Source License Grant
+* **Proprietary Classification**: ISCMS is **proprietary software** and is **not** released under an open-source license (such as MIT, Apache 2.0, GPL, BSD, or ISC).
+* **Repository Visibility**: Public or restricted visibility of this repository (for demonstration, documentation, or technical evaluation purposes) does **not** grant permission to copy, modify, redistribute, sublicense, mirror, sell, or commercially exploit any portion of the source code, database structures, or UI components.
+
+> **Note**: Specific commercial, licensing, intellectual property, hosting, maintenance, support, and operational terms between the developer and NFSU are governed by the applicable written agreement between the parties.
 
 ---
 
