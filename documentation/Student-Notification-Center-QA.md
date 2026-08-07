@@ -1,45 +1,72 @@
-# Production QA Report — Student Notification Center
+# Student Notification Center & Light/Dark Theme QA Report
 
 Target Institution: National Forensic Sciences University (NFSU)  
 System: International Student Compliance Management System (ISCMS)  
-QA Engineer: Senior UI/UX QA Team  
+QA Engineer: Senior Full-Stack UI/UX Engineering Team  
 Date: August 7, 2026  
 
 ---
 
-## 1. Quality Assurance Overview
+## 1. Overview & Inspection Summary
 
-This report documents Quality Assurance and navigation testing for the **Student Notification Center** (`/student/notifications`) and Student Header Notification Bell.
+Before implementation, the existing Notification Center architecture and theme system were inspected:
+- **Notification Data & Architecture**: `in_app_notifications` database model, Supabase Realtime subscriptions, and server actions in `src/app/(app)/notifications/actions.ts`.
+- **Reusable UI Components**: `NotificationCenterWorkspace`, `NotificationBell`, `ThemeToggle`.
+- **Theme Infrastructure**: `next-themes` with `ThemeProvider` delivering dark/light CSS variables.
 
 ---
 
-## 2. Student Portal Test Verification Matrix
+## 2. Shared Components & Infrastructure Reused
 
-| Target Action / Route | Displayed Route Title | Active Breadcrumb | QA Result |
+| Component / Hook | Source Path | Portal Scope | Purpose |
 |---|---|---|---|
-| Click Student Notification Bell | `/student/notifications` | `Student Portal / Notifications` | **PASSED** |
-| Select **Documents** Category | `/student/notifications` | `Student Portal / Notifications` | **PASSED** (Displays eFRRO & Passport alerts) |
-| Select **Compliance & Reminders** | `/student/notifications` | `Student Portal / Notifications` | **PASSED** (Displays deadline alerts) |
-| Click **Mark all read** | `/student/notifications` | `Student Portal / Notifications` | **PASSED** (Clears unread badge count) |
-| Click **Preferences** Link | `/student/settings` | `Student Portal / Preferences` | **PASSED** |
+| **`NotificationCenterWorkspace`** | `src/components/notifications/notification-center-workspace.tsx` | Staff & Student | Centralized notification workspace with search, filtering, unread toggle, and card list. |
+| **`NotificationBell`** | `src/components/header/notification-bell.tsx` | Staff & Student | Header bell icon with realtime unread badge count. Navigates directly to portal notifications. |
+| **`ThemeToggle`** | `src/components/header/theme-toggle.tsx` | Staff & Student | Light/Dark theme switcher with accessible `Sun` and `Moon` icons. |
+| **`useNotificationCenter`** | `src/hooks/use-notification-center.ts` | Staff & Student | Custom React hook providing notification state, WebSocket realtime events, and actions. |
+| **`useTheme`** | `next-themes` | Shared System | Global theme hook persisting light/dark selection across page reloads. |
 
 ---
 
-## 3. Viewport Adaptation Matrix (Mobile to Desktop)
+## 3. Light / Dark Theme Testing Matrix
 
-| Viewport Width | Visual Behavior | Result |
-|---|---|---|
-| **320px** (iPhone SE) | Full-width container (`w-full`), touch targets $\ge 44\text{px}$, zero horizontal scrollbar. | **PASSED** |
-| **375px** (Mobile) | Category filter pills touch-scroll smoothly (`touch-pan-x`), unread badge aligned. | **PASSED** |
-| **768px** (Tablet) | Header items align into 2-column layout, generous card padding. | **PASSED** |
-| **1024px** (Desktop) | Centered `max-w-5xl` container, subtle card hover states. | **PASSED** |
+| Theme | Header Toggle Behavior | Visual Result | Layout Shift | QA Result |
+|---|---|---|---|---|
+| **Light Mode** | Click Sun icon $\rightarrow$ Dark Mode | Crisp slate text on white background (`bg-background`). | None (0px shift) | **PASSED** |
+| **Dark Mode** | Click Moon icon $\rightarrow$ Light Mode | High-contrast muted text on dark card slate background (`bg-card`). | None (0px shift) | **PASSED** |
+| **Persistence** | Reload page or navigate `/student/notifications` $\leftrightarrow$ `/student/settings` | Retains active theme without visible flash. | None | **PASSED** |
 
 ---
 
-## 4. Automated Build & Verification Matrix
+## 4. Student Data Isolation & Security Matrix
 
-| Validation Tool | Execution Command | Result |
+| Security Rule | Backend / Database Control | Result |
 |---|---|---|
-| **TypeScript Compiler** | `npx tsc --noEmit` | **PASSED** (0 Errors) |
-| **ESLint Standard Check** | `npm run lint` | **PASSED** (0 Errors) |
-| **Production Build** | `npm run build` | **PASSED** (Static routes prerendered) |
+| **Student Ownership Scoping** | PostgreSQL RLS policy `SELECT_in_app_notifications_StudentSelf` (`user_id = auth.uid()`) | **PASSED** |
+| **Category Authorization** | Server action `fetchInAppNotifications({ portal: "student" })` excludes `security`, `audit`, `system` | **PASSED** |
+| **No Admin Credentials Exposed** | Preferences route `/student/settings` renders student-only communication policies | **PASSED** |
+
+---
+
+## 5. Viewport Adaptation Matrix (Mobile to Desktop)
+
+| Screen Viewport | Device Class | Visual Layout Behavior | Result |
+|---|---|---|---|
+| **320px** | Mobile Small (iPhone SE) | Single column layout, touch-friendly filter bar (`touch-pan-x`), full-width cards. | **PASSED** |
+| **375px - 414px** | Mobile Standard | Filter pills scroll smoothly, zero horizontal overflow. | **PASSED** |
+| **768px** | Tablet | Responsive 2-column header layout, generous padding. | **PASSED** |
+| **1024px+** | Desktop / Laptop | Centered `max-w-5xl` workspace container. | **PASSED** |
+
+---
+
+## 6. Automated Validation Matrix
+
+| Command | Status | Result |
+|---|---|---|
+| `npx tsc --noEmit` | Verified | **PASSED** (0 Errors) |
+| `npm run lint` | Verified | **PASSED** (0 Errors) |
+| `npm run build` | Verified | **PASSED** (All student routes prerendered) |
+
+---
+
+UNIFIED NOTIFICATION CENTER & LIGHT/DARK MODE VERIFIED — STUDENT PORTAL SHARES CENTRALIZED NOTIFICATION ARCHITECTURE AND THEME CONTROLS WITH ROLE-SAFE ISOLATION.

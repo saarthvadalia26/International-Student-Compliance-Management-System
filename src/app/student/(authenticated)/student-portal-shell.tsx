@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/header/notification-bell";
+import { ThemeToggle } from "@/components/header/theme-toggle";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { Branding } from "@/config/branding";
@@ -109,6 +110,9 @@ export default function StudentPortalShell({
 
         {/* User Action Controls */}
         <div className="flex items-center gap-3">
+          {/* Light/Dark Mode Theme Toggle */}
+          <ThemeToggle />
+
           {/* Realtime Student Notification Bell */}
           <NotificationBell portal="student" href="/student/notifications" />
 
