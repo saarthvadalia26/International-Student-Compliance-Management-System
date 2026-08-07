@@ -7,6 +7,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { AccountMenu } from "./account-menu";
 import { RealtimeIndicator } from "./realtime-indicator";
 import { NotificationBell } from "./notification-bell";
+import { HeaderBreadcrumb } from "./breadcrumb";
 import { Branding } from "@/config/branding";
 
 interface HeaderProps {
@@ -16,12 +17,12 @@ interface HeaderProps {
 export function Header({ onMenuOpen }: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-border bg-background px-4 md:px-6">
-      {/* Left side: Hamburger, Logo, Title, Breadcrumb */}
-      <div className="flex items-center gap-4">
+      {/* Left side: Hamburger, Logo, Title, Dynamic Breadcrumb */}
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="md:hidden shrink-0"
           onClick={onMenuOpen}
           aria-label="Open navigation menu"
         >
@@ -29,7 +30,7 @@ export function Header({ onMenuOpen }: HeaderProps) {
         </Button>
 
         {/* Logo and App Title */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <img src={Branding.logoPaths.logo} alt={Branding.shortName} className="h-8 w-8 object-contain" />
           <span className="hidden font-display text-sm font-semibold tracking-tight text-foreground sm:block">
             {Branding.appShortName} Portal
@@ -37,14 +38,10 @@ export function Header({ onMenuOpen }: HeaderProps) {
         </div>
 
         {/* Separator */}
-        <span className="hidden h-5 w-px bg-border sm:block" />
+        <span className="hidden h-5 w-px bg-border sm:block shrink-0" />
 
-        {/* Breadcrumb Placeholder */}
-        <div className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex font-small">
-          <span>Workspace</span>
-          <span className="text-border">/</span>
-          <span className="font-medium text-foreground">Dashboard</span>
-        </div>
+        {/* Dynamic Route-Aware Breadcrumb */}
+        <HeaderBreadcrumb />
       </div>
 
       {/* Right side: Actions & Profile */}

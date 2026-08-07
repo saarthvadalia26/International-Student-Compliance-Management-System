@@ -1,0 +1,150 @@
+"use client";
+
+export interface BreadcrumbItem {
+  label: string;
+  href?: string;
+  isCurrent?: boolean;
+}
+
+export interface RouteMetadata {
+  section: string;
+  pageTitle: string;
+  breadcrumbs: BreadcrumbItem[];
+}
+
+/**
+ * Route metadata mapping for static and pattern-matched routes across ISCMS.
+ */
+const staticRouteMap: Record<string, { section: string; title: string; parentLabel?: string; parentHref?: string }> = {
+  "/dashboard": { section: "Workspace", title: "Dashboard" },
+  "/dashboard/health": { section: "Workspace", title: "System Health & Diagnostics", parentLabel: "Dashboard", parentHref: "/dashboard" },
+  "/students": { section: "Workspace", title: "Students" },
+  "/students/add": { section: "Workspace", title: "Add Student", parentLabel: "Students", parentHref: "/students" },
+  "/reminders": { section: "Workspace", title: "Reminders & Communication" },
+  "/reports": { section: "Workspace", title: "Reports" },
+  "/reports/audit": { section: "Workspace", title: "Audit Logs Report", parentLabel: "Reports", parentHref: "/reports" },
+  "/reports/students": { section: "Workspace", title: "Student Registry Report", parentLabel: "Reports", parentHref: "/reports" },
+  "/reports/notifications": { section: "Workspace", title: "Notification Delivery Report", parentLabel: "Reports", parentHref: "/reports" },
+  "/reports/efrro": { section: "Workspace", title: "eFRRO Compliance Report", parentLabel: "Reports", parentHref: "/reports" },
+  "/notifications": { section: "Workspace", title: "Notification Center" },
+  "/monitoring": { section: "Workspace", title: "System Monitoring" },
+  "/profile": { section: "Workspace", title: "Administrator Profile" },
+  "/settings": { section: "Workspace", title: "Settings" },
+  "/help": { section: "Workspace", title: "Help & Support" },
+  "/setup": { section: "System", title: "Initial Setup Wizard" },
+  "/student/dashboard": { section: "Student Portal", title: "Dashboard" },
+  "/student/profile": { section: "Student Portal", title: "Profile" },
+  "/student/efrro": { section: "Student Portal", title: "Document Centre" },
+  "/student/history": { section: "Student Portal", title: "Activity History" },
+  "/student/settings": { section: "Student Portal", title: "Preferences" },
+};
+
+/**
+ * Humanize URL slugs (e.g., "passport" -> "Passport", "efrro" -> "eFRRO", "add" -> "Add Student")
+ */
+function humanizeSegment(segment: string): string {
+  if (segment === "efrro") return "eFRRO";
+  if (segment === "passport") return "Passport";
+  if (segment === "visa") return "Visa";
+  if (segment === "audit") return "Audit Logs";
+  if (segment === "health") return "System Health";
+
+  return segment
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+/**
+ * Derive full dynamic route metadata & breadcrumb trail based on current pathname.
+ */
+export function getRouteMetadata(pathname: string): RouteMetadata {
+  // Clean trailing slash
+  const cleanPath = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+
+  // 1. Direct Static Match
+  if (staticRouteMap[cleanPath]) {
+    const route = staticRouteMap[cleanPath];
+    const items: BreadcrumbItem[] = [
+      { label: route.section, href: cleanPath.startsWith("/student/") ? "/student/dashboard" : "/dashboard" },
+    ];
+
+    if (route.parentLabel && route.parentHref) {
+      items.push({ label: route.parentLabel, href: route.parentHref });
+    }
+
+    items.push({ label: route.title, isCurrent: true });
+
+    return {
+      section: route.section,
+      pageTitle: route.title,
+      breadcrumbs: items,
+    };
+  }
+
+  // 2. Dynamic Student Routes (/students/[id], /students/[id]/passport, etc.)
+  if (cleanPath.startsWith("/students/")) {
+    const segments = cleanPath.split("/").filter(Boolean); // e.g. ["students", "123", "passport"]
+    const items: BreadcrumbItem[] = [
+      { label: "Workspace", href: "/dashboard" },
+      { label: "Students", href: "/students" },
+    ];
+
+    if (segments.length === 2 && segments[1] !== "add") {
+      // /students/[id]
+      items.push({ label: "Student Details", isCurrent: true });
+      return {
+        section: "Workspace",
+        pageTitle: "Student Details",
+        breadcrumbs: items,
+      };
+    } else if (segments.length >= 3) {
+      // /students/[id]/[docType] (passport, visa, efrro)
+      const studentId = segments[1];
+      const docType = segments[2];
+      const docLabel = humanizeSegment(docType);
+
+      items.push({ label: "Student Details", href: `/students/${studentId}` });
+      items.push({ label: `${docLabel} Document`, isCurrent: true });
+
+      return {
+        section: "Workspace",
+        pageTitle: `${docLabel} Document`,
+        breadcrumbs: items,
+      };
+    }
+  }
+
+  // 3. Fallback Dynamic Segment Parser for Unmatched Routes
+  const segments = cleanPath.split("/").filter(Boolean);
+  const isStudentPortal = cleanPath.startsWith("/student");
+  const defaultSection = isStudentPortal ? "Student Portal" : "Workspace";
+  const defaultHome = isStudentPortal ? "/student/dashboard" : "/dashboard";
+
+  const items: BreadcrumbItem[] = [{ label: defaultSection, href: defaultHome }];
+
+  let currentPath = "";
+  segments.forEach((seg, idx) => {
+    // Skip internal routing groups like (app) or (authenticated) if present
+    if (seg.startsWith("(") && seg.endsWith(")")) return;
+
+    currentPath += `/${seg}`;
+    const isLast = idx === segments.length - 1;
+    const label = humanizeSegment(seg);
+
+    items.push({
+      label,
+      href: isLast ? undefined : currentPath,
+      isCurrent: isLast,
+    });
+  });
+
+  const lastItem = items[items.length - 1];
+  const pageTitle = lastItem ? lastItem.label : "Dashboard";
+
+  return {
+    section: defaultSection,
+    pageTitle,
+    breadcrumbs: items,
+  };
+}
