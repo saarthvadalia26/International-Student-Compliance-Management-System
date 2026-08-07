@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { AccountMenu } from "./account-menu";
 import { RealtimeIndicator } from "./realtime-indicator";
-import { NotificationCenterDropdown } from "./notification-center-dropdown";
+import { NotificationBell } from "./notification-bell";
 import { Branding } from "@/config/branding";
 
 interface HeaderProps {
@@ -53,8 +53,8 @@ export function Header({ onMenuOpen }: HeaderProps) {
 
         <ThemeToggle />
 
-        {/* Real-time Notification Center Dropdown */}
-        <NotificationCenterDropdown />
+        {/* Real-time Notification Bell trigger */}
+        <NotificationBell />
 
         {/* Account Dropdown Menu */}
         <AccountMenu />
