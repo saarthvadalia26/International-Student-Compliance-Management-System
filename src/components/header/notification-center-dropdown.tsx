@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Bell,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 
 export function NotificationCenterDropdown() {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const sheetRef = React.useRef<HTMLDivElement>(null);
 
@@ -53,6 +55,12 @@ export function NotificationCenterDropdown() {
     clearAll,
     loadMore,
   } = useNotificationCenter();
+
+  // Track hydration mounting state for React Portal rendering
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   // Close popover / bottom sheet on outside click or ESC key
   React.useEffect(() => {
@@ -461,9 +469,9 @@ export function NotificationCenterDropdown() {
       )}
 
       {/* ───────────────────────────────────────────────────────────────────────── */}
-      {/* 2. NATIVE MOBILE IMPLEMENTATION (< 768px) — Touch Bottom Sheet */}
+      {/* 2. NATIVE MOBILE IMPLEMENTATION (< 768px) — Touch Bottom Sheet via React Portal */}
       {/* ───────────────────────────────────────────────────────────────────────── */}
-      {isOpen && (
+      {isOpen && mounted && typeof document !== "undefined" && createPortal(
         <>
           {/* Mobile Dark Backdrop Overlay */}
           <div
@@ -472,7 +480,7 @@ export function NotificationCenterDropdown() {
             aria-hidden="true"
           />
 
-          {/* Mobile Bottom Sheet Container */}
+          {/* Mobile Bottom Sheet Container (Portaled directly to document.body) */}
           <div
             ref={sheetRef}
             id="notification-center-mobile-sheet"
@@ -551,7 +559,8 @@ export function NotificationCenterDropdown() {
             {renderFilterControls()}
             {renderNotificationList()}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
