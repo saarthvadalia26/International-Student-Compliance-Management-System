@@ -56,11 +56,57 @@ function humanizeSegment(segment: string): string {
 }
 
 /**
- * Derive full dynamic route metadata & breadcrumb trail based on current pathname.
+ * Derive full dynamic route metadata & breadcrumb trail based on current pathname & search parameters.
  */
-export function getRouteMetadata(pathname: string): RouteMetadata {
+export function getRouteMetadata(pathname: string, searchParams?: URLSearchParams | null): RouteMetadata {
   // Clean trailing slash
   const cleanPath = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+
+  // Special tab handling for /settings?tab=...
+  if (cleanPath === "/settings" && searchParams) {
+    const tab = searchParams.get("tab");
+    if (tab === "notifications") {
+      return {
+        section: "Workspace",
+        pageTitle: "Notification Preferences",
+        breadcrumbs: [
+          { label: "Workspace", href: "/dashboard" },
+          { label: "Settings", href: "/settings" },
+          { label: "Notification Preferences", isCurrent: true },
+        ],
+      };
+    } else if (tab === "users") {
+      return {
+        section: "Workspace",
+        pageTitle: "User Management",
+        breadcrumbs: [
+          { label: "Workspace", href: "/dashboard" },
+          { label: "Settings", href: "/settings" },
+          { label: "User Management", isCurrent: true },
+        ],
+      };
+    } else if (tab === "programs") {
+      return {
+        section: "Workspace",
+        pageTitle: "Academic Programs",
+        breadcrumbs: [
+          { label: "Workspace", href: "/dashboard" },
+          { label: "Settings", href: "/settings" },
+          { label: "Academic Programs", isCurrent: true },
+        ],
+      };
+    } else if (tab === "retention") {
+      return {
+        section: "Workspace",
+        pageTitle: "Document Retention",
+        breadcrumbs: [
+          { label: "Workspace", href: "/dashboard" },
+          { label: "Settings", href: "/settings" },
+          { label: "Document Retention", isCurrent: true },
+        ],
+      };
+    }
+  }
 
   // 1. Direct Static Match
   if (staticRouteMap[cleanPath]) {
@@ -125,7 +171,6 @@ export function getRouteMetadata(pathname: string): RouteMetadata {
 
   let currentPath = "";
   segments.forEach((seg, idx) => {
-    // Skip internal routing groups like (app) or (authenticated) if present
     if (seg.startsWith("(") && seg.endsWith(")")) return;
 
     currentPath += `/${seg}`;

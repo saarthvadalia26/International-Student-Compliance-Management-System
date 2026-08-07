@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { 
   Building, 
@@ -22,7 +22,8 @@ import {
   AlertTriangle,
   RotateCcw,
   Trash2,
-  GraduationCap
+  GraduationCap,
+  ArrowLeft
 } from "lucide-react";
 import { UserManagementTab } from "@/components/settings/user-management-tab";
 import { AcademicProgramsTab } from "@/components/settings/academic-programs-tab";
@@ -47,7 +48,16 @@ import { Branding } from "@/config/branding";
 
 
 export default function SettingsPage() {
+  return (
+    <React.Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading settings...</div>}>
+      <SettingsPageContent />
+    </React.Suspense>
+  );
+}
+
+function SettingsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = getBrowserSupabase();
   const { theme, setTheme } = useTheme();
   const { isAdministrator } = useUserRole();
@@ -58,6 +68,15 @@ export default function SettingsPage() {
 
   // Active Tab navigation state
   const [activeTab, setActiveTab] = React.useState<"general" | "programs" | "notifications" | "retention" | "system" | "security" | "users">("general");
+
+  const tabParam = searchParams ? searchParams.get("tab") : null;
+
+  React.useEffect(() => {
+    if (tabParam && ["general", "programs", "notifications", "retention", "system", "security", "users"].includes(tabParam)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab(tabParam as "general" | "programs" | "notifications" | "retention" | "system" | "security" | "users");
+    }
+  }, [tabParam]);
 
   // General Settings State
   const [schoolName, setSchoolName] = React.useState(`${Branding.universityName} (${Branding.shortName})`);
@@ -367,6 +386,16 @@ export default function SettingsPage() {
         {/* Tab 2: Notifications */}
         {activeTab === "notifications" && (
           <div className="grid gap-6">
+            <div className="flex items-center justify-between pb-1">
+              <Link
+                href="/notifications"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline group"
+              >
+                <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+                <span>Back to Notification Center</span>
+              </Link>
+            </div>
+
             <Card className="border border-border/60 shadow-sm">
               <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
                 <CardTitle className="text-sm font-semibold flex items-center gap-1.5">

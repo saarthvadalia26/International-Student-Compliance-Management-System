@@ -2,14 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { getRouteMetadata } from "@/config/breadcrumbs";
 import { cn } from "@/lib/utils";
 
-export function HeaderBreadcrumb() {
+function HeaderBreadcrumbInner() {
   const pathname = usePathname();
-  const { breadcrumbs } = getRouteMetadata(pathname || "/dashboard");
+  const searchParams = useSearchParams();
+  const { breadcrumbs } = getRouteMetadata(pathname || "/dashboard", searchParams);
 
   return (
     <nav
@@ -54,5 +55,19 @@ export function HeaderBreadcrumb() {
         );
       })}
     </nav>
+  );
+}
+
+export function HeaderBreadcrumb() {
+  return (
+    <React.Suspense
+      fallback={
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground font-small">
+          <span>Workspace</span>
+        </nav>
+      }
+    >
+      <HeaderBreadcrumbInner />
+    </React.Suspense>
   );
 }
