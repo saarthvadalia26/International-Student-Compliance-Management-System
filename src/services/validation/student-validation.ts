@@ -3,22 +3,24 @@ import { z } from "zod";
 export const RegisterStudentValidationSchema = z.object({
   registrationNumber: z.string().min(3, "Registration number must contain at least 3 characters").max(50),
   fullName: z.string().min(2, "Full name must be at least 2 characters").max(255),
-  nationalityCode: z.string().length(3, "Nationality must be a 3-letter ISO code"),
-  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional(),
+  nationalityCode: z.string().length(3, "Please select a valid nationality"),
+  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"], {
+    message: "Please select a gender"
+  }).optional(),
   dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
     const date = new Date(dob);
-    return date < new Date();
-  }, { message: "Date of birth must be in the past" }),
-  email: z.string().min(1, "Email is required").email("Invalid email address format").max(255),
-  phoneHome: z.string().min(7, "Phone number must contain at least 7 digits").max(20, "Phone number cannot exceed 20 digits"),
+    return !isNaN(date.getTime()) && date < new Date();
+  }, { message: "Date of birth must be a valid date in the past" }),
+  email: z.string().min(1, "Student institutional email is required").email("Please enter a valid email address format").max(255),
+  phoneHome: z.string().min(7, "Home country phone number must contain at least 7 digits").max(20, "Phone number cannot exceed 20 digits"),
   phoneLocal: z.string().optional().refine(val => !val || val.length >= 7, { message: "Local phone must contain at least 7 digits" }),
-  permanentAddress: z.string().min(10, "Permanent address must be descriptive"),
+  permanentAddress: z.string().min(10, "Permanent address must be descriptive (at least 10 characters)"),
   localAddress: z.string().optional(),
-  programCode: z.string().min(1, "Academic program is required").max(20),
+  programCode: z.string().min(1, "Academic program is required").max(100),
   admissionDate: z.string().min(1, "Admission date is required"),
   expectedGraduation: z.string().min(1, "Expected graduation date is required"),
   currentSemester: z.number().int().min(1).max(20).default(1),
-  relationshipType: z.enum(["parent", "guardian", "local_sponsor"], { message: "Emergency contact relationship is required" }),
+  relationshipType: z.enum(["parent", "guardian", "local_sponsor"], { message: "Relationship type is required" }),
   relationshipName: z.string().min(2, "Emergency contact name must be at least 2 characters").max(255),
   relationshipPhone: z.string().min(7, "Emergency contact phone must contain at least 7 digits").max(20),
   relationshipEmail: z.string().email("Invalid email address format").optional().or(z.literal("")),
@@ -33,12 +35,37 @@ export const RegisterStudentValidationSchema = z.object({
   visaNumber: z.string().optional().refine(val => !val || val.length >= 5, { message: "Visa number must contain at least 5 characters" }),
   visaExpiry: z.string().optional()
 }).refine((data) => {
-  const ad = new Date(data.admissionDate);
-  const eg = new Date(data.expectedGraduation);
-  return eg > ad;
+  if (data.admissionDate && data.expectedGraduation) {
+    const ad = new Date(data.admissionDate);
+    const eg = new Date(data.expectedGraduation);
+    return eg > ad;
+  }
+  return true;
 }, {
-  message: "Expected graduation must be after admission date",
+  message: "Expected graduation date must be after admission date",
   path: ["expectedGraduation"]
+}).refine((data) => {
+  if (data.visaExpiry) {
+    const ve = new Date(data.visaExpiry);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return ve >= today;
+  }
+  return true;
+}, {
+  message: "Visa expiration date must be today or in the future",
+  path: ["visaExpiry"]
+}).refine((data) => {
+  if (data.passportExpiry) {
+    const pe = new Date(data.passportExpiry);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return pe >= today;
+  }
+  return true;
+}, {
+  message: "Passport expiration date must be today or in the future",
+  path: ["passportExpiry"]
 });
 
 export const UpdateStudentValidationSchema = z.object({
@@ -51,7 +78,7 @@ export const UpdateStudentValidationSchema = z.object({
   phoneLocal: z.string().min(7).max(20).optional(),
   permanentAddress: z.string().min(10).optional(),
   localAddress: z.string().optional(),
-  programCode: z.string().max(20).optional(),
+  programCode: z.string().max(100).optional(),
   currentSemester: z.number().int().min(1).max(20).optional(),
   academicStatus: z.enum(["good_standing", "probation", "suspended"]).optional()
 });

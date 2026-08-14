@@ -4,8 +4,8 @@ import {
   UpdateStudentInput, 
   StudentFilterOptions 
 } from "./student.types";
-import { IStudentRepository } from "./student.repository";
-import { IValidationService } from "../validation/validation.service";
+import { IStudentRepository, SupabaseStudentRepository } from "./student.repository";
+import { IValidationService, ZodValidationService } from "../validation/validation.service";
 
 export interface IStudentService {
   registerStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile>;
@@ -17,11 +17,21 @@ export interface IStudentService {
 
 export class StudentService implements IStudentService {
   constructor(
-    private repository: IStudentRepository,
-    private validationService: IValidationService
+    private repository: IStudentRepository = new SupabaseStudentRepository(),
+    private validationService: IValidationService = new ZodValidationService()
   ) {}
 
+  private toDateString(val: Date | string | undefined | null): string {
+    if (!val) return "";
+    if (typeof val === "string") return val.includes("T") ? val.split("T")[0] : val;
+    return val.toISOString().split("T")[0];
+  }
+
   async registerStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile> {
+    const dobStr = this.toDateString(input.dateOfBirth);
+    const admStr = this.toDateString(input.admissionDate);
+    const gradStr = this.toDateString(input.expectedGraduation);
+
     // 1. Validate payload using Zod service
     await this.validationService.validateStudent({
       student: {
@@ -32,28 +42,28 @@ export class StudentService implements IStudentService {
         fullName: input.fullName,
         nationalityCode: input.nationalityCode,
         gender: input.gender,
-        dateOfBirth: input.dateOfBirth.toISOString().split("T")[0]
+        dateOfBirth: dobStr
       },
       contact: {
         email: input.email,
         phoneHome: input.phoneHome,
-        phoneLocal: input.phoneLocal,
+        phoneLocal: input.phoneLocal || null,
         permanentAddress: input.permanentAddress,
-        localAddress: input.localAddress
+        localAddress: input.localAddress || null
       },
       academic: {
         programCode: input.programCode,
-        admissionDate: input.admissionDate.toISOString().split("T")[0],
-        expectedGraduation: input.expectedGraduation.toISOString().split("T")[0],
+        admissionDate: admStr,
+        expectedGraduation: gradStr,
         currentSemester: input.currentSemester || 1,
         academicStatus: "good_standing"
       }
     });
 
-    // 2. Perform duplicate check
+    // 2. Perform duplicate registration number check
     const existing = await this.repository.getStudentByRegistrationNumber(input.registrationNumber);
     if (existing) {
-      throw new Error(`Student with registration number ${input.registrationNumber} already exists.`);
+      throw new Error(`Student with registration number "${input.registrationNumber}" is already registered.`);
     }
 
     // 3. Persist record
@@ -61,19 +71,17 @@ export class StudentService implements IStudentService {
   }
 
   async getStudentById(id: string): Promise<FullStudentProfile | null> {
-    if (!id.trim()) {
+    if (!id || !id.trim()) {
       throw new Error("Invalid student ID.");
     }
-    return this.repository.getStudentById(id);
+    return this.repository.getStudentById(id.trim());
   }
 
   async updateStudent(id: string, input: UpdateStudentInput, actorId: string | null): Promise<FullStudentProfile> {
-    if (!id.trim()) {
+    if (!id || !id.trim()) {
       throw new Error("Invalid student ID.");
     }
-    
-    // Zod validation would occur here based on the specific update schemas
-    return this.repository.updateStudent(id, input, actorId);
+    return this.repository.updateStudent(id.trim(), input, actorId);
   }
 
   async listStudents(filters: StudentFilterOptions): Promise<FullStudentProfile[]> {
@@ -81,9 +89,9 @@ export class StudentService implements IStudentService {
   }
 
   async archiveStudent(id: string, actorId: string | null): Promise<boolean> {
-    if (!id.trim()) {
+    if (!id || !id.trim()) {
       throw new Error("Invalid student ID.");
     }
-    return this.repository.softDeleteStudent(id, actorId);
+    return this.repository.softDeleteStudent(id.trim(), actorId);
   }
 }

@@ -9,25 +9,65 @@ import {
   PhoneCall, 
   FileCheck, 
   ChevronLeft, 
-  Loader2, 
-  Save, 
-  AlertCircle
+  AlertCircle,
+  XCircle,
+  ArrowRight
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
 import { AcademicProgram } from "@/domain/academic-programs/types";
 import { RegisterStudentValidationSchema } from "@/services/validation/student-validation";
+import { registerStudentAction } from "@/app/(app)/students/actions";
+import { RegisterStudentInput } from "@/services/student/student.types";
+import { DatePicker } from "@/components/ui/date-picker";
+
+type TabKey = "personal" | "academic" | "contact" | "documents";
+
+interface FieldMeta {
+  tab: TabKey;
+  elementId: string;
+  label: string;
+}
+
+const FIELD_METADATA: Record<string, FieldMeta> = {
+  fullName: { tab: "personal", elementId: "fullName", label: "Full Name" },
+  nationalityCode: { tab: "personal", elementId: "nationality", label: "Nationality" },
+  nationality: { tab: "personal", elementId: "nationality", label: "Nationality" },
+  gender: { tab: "personal", elementId: "gender", label: "Gender" },
+  dateOfBirth: { tab: "personal", elementId: "dateOfBirth", label: "Date of Birth" },
+  programCode: { tab: "academic", elementId: "program", label: "Academic Program" },
+  program: { tab: "academic", elementId: "program", label: "Academic Program" },
+  school: { tab: "academic", elementId: "school", label: "School / Department" },
+  admissionDate: { tab: "academic", elementId: "admissionDate", label: "Admission Date" },
+  expectedGraduation: { tab: "academic", elementId: "expectedGraduation", label: "Expected Graduation Date" },
+  currentSemester: { tab: "academic", elementId: "currentSemester", label: "Current Semester" },
+  phoneHome: { tab: "contact", elementId: "phoneHome", label: "Home Country Phone" },
+  email: { tab: "contact", elementId: "email", label: "Student Email" },
+  phoneLocal: { tab: "contact", elementId: "phoneLocal", label: "Local Contact Phone" },
+  permanentAddress: { tab: "contact", elementId: "permanentAddress", label: "Permanent Address" },
+  localAddress: { tab: "contact", elementId: "localAddress", label: "Local Address" },
+  relationshipName: { tab: "contact", elementId: "emergencyContactName", label: "Emergency Contact Name" },
+  emergencyContactName: { tab: "contact", elementId: "emergencyContactName", label: "Emergency Contact Name" },
+  relationshipType: { tab: "contact", elementId: "emergencyContactRelation", label: "Relationship Type" },
+  emergencyContactRelation: { tab: "contact", elementId: "emergencyContactRelation", label: "Relationship Type" },
+  relationshipPhone: { tab: "contact", elementId: "emergencyContactPhone", label: "Emergency Contact Phone" },
+  emergencyContactPhone: { tab: "contact", elementId: "emergencyContactPhone", label: "Emergency Contact Phone" },
+  passportNumber: { tab: "documents", elementId: "passportNumber", label: "Passport Number" },
+  passportExpiry: { tab: "documents", elementId: "passportExpiry", label: "Passport Expiry Date" },
+  visaNumber: { tab: "documents", elementId: "visaNumber", label: "Visa Number" },
+  visaExpiry: { tab: "documents", elementId: "visaExpiry", label: "Visa Expiry Date" }
+};
 
 export default function StudentRegistrationPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = React.useState<"personal" | "academic" | "contact" | "documents">("personal");
+  const [activeTab, setActiveTab] = React.useState<TabKey>("personal");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submittingSuccess, setSubmittingSuccess] = React.useState(false);
   const [submittingError, setSubmittingError] = React.useState(false);
@@ -65,13 +105,30 @@ export default function StudentRegistrationPage() {
     admissionDate: "",
     expectedGraduation: "",
     emergencyContactName: "",
-    emergencyContactRelation: "",
+    emergencyContactRelation: "parent",
     emergencyContactPhone: "",
     passportNumber: "",
     passportExpiry: "",
     visaNumber: "",
     visaExpiry: "",
   });
+
+  // Calculate error counts per tab
+  const tabErrorCounts = React.useMemo(() => {
+    const counts: Record<TabKey, number> = {
+      personal: 0,
+      academic: 0,
+      contact: 0,
+      documents: 0
+    };
+    Object.keys(validationErrors).forEach((field) => {
+      const meta = FIELD_METADATA[field];
+      if (meta) {
+        counts[meta.tab]++;
+      }
+    });
+    return counts;
+  }, [validationErrors]);
 
   // Helper to calculate expected graduation date dynamically from program duration
   const calculateGraduationDate = (programName: string, admissionDateStr: string) => {
@@ -100,6 +157,18 @@ export default function StudentRegistrationPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
+    
+    // Clear validation error on field change
+    if (validationErrors[id] || validationErrors[id === "emergencyContactName" ? "relationshipName" : id === "emergencyContactPhone" ? "relationshipPhone" : id]) {
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        delete next[id];
+        if (id === "emergencyContactName") delete next.relationshipName;
+        if (id === "emergencyContactPhone") delete next.relationshipPhone;
+        return next;
+      });
+    }
+
     setFormData(prev => {
       const next = { ...prev, [id]: value };
       if (id === "admissionDate" && prev.program) {
@@ -110,6 +179,17 @@ export default function StudentRegistrationPage() {
   };
 
   const handleSelectChange = (field: string, value: string) => {
+    // Clear validation error on select change
+    const relatedKey = field === "nationality" ? "nationalityCode" : field === "program" ? "programCode" : field === "emergencyContactRelation" ? "relationshipType" : field;
+    if (validationErrors[field] || validationErrors[relatedKey]) {
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        delete next[field];
+        delete next[relatedKey];
+        return next;
+      });
+    }
+
     setFormData(prev => {
       const next = { ...prev, [field]: value };
       if (field === "program") {
@@ -127,31 +207,44 @@ export default function StudentRegistrationPage() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Focus a specific field and jump to its tab
+  const focusField = (fieldKey: string) => {
+    const meta = FIELD_METADATA[fieldKey] || { tab: "personal", elementId: fieldKey, label: fieldKey };
+    setActiveTab(meta.tab);
+    setTimeout(() => {
+      const el = document.getElementById(meta.elementId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus();
+      }
+    }, 120);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Zod payload assembly
-    const validationPayload = {
+    const validationPayload: RegisterStudentInput = {
       registrationNumber: `ISCMS-${Date.now().toString().slice(-4)}`,
-      fullName: formData.fullName,
-      nationalityCode: formData.nationality,
-      gender: formData.gender,
+      fullName: formData.fullName.trim(),
+      nationalityCode: formData.nationality.trim(),
+      gender: (formData.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
       dateOfBirth: formData.dateOfBirth,
-      email: formData.email,
-      phoneHome: formData.phoneHome,
-      phoneLocal: formData.phoneLocal || undefined,
-      permanentAddress: formData.permanentAddress,
-      localAddress: formData.localAddress || undefined,
-      programCode: formData.program,
+      email: formData.email.trim(),
+      phoneHome: formData.phoneHome.trim(),
+      phoneLocal: formData.phoneLocal.trim() || undefined,
+      permanentAddress: formData.permanentAddress.trim(),
+      localAddress: formData.localAddress.trim() || undefined,
+      programCode: formData.program.trim(),
       admissionDate: formData.admissionDate,
       expectedGraduation: formData.expectedGraduation,
       currentSemester: 1,
-      relationshipType: formData.emergencyContactRelation || "parent",
-      relationshipName: formData.emergencyContactName,
-      relationshipPhone: formData.emergencyContactPhone,
-      passportNumber: formData.passportNumber || undefined,
+      relationshipType: (formData.emergencyContactRelation as "parent" | "guardian" | "local_sponsor") || "parent",
+      relationshipName: formData.emergencyContactName.trim(),
+      relationshipPhone: formData.emergencyContactPhone.trim(),
+      passportNumber: formData.passportNumber.trim() || undefined,
       passportExpiry: formData.passportExpiry || undefined,
-      visaNumber: formData.visaNumber || undefined,
+      visaNumber: formData.visaNumber.trim() || undefined,
       visaExpiry: formData.visaExpiry || undefined
     };
 
@@ -170,22 +263,17 @@ export default function StudentRegistrationPage() {
       
       setValidationErrors(fieldErrors);
       
+      const errorCount = Object.keys(fieldErrors).length;
+      
+      // Auto-navigate and focus first invalid field
       if (firstErrorField) {
-        // Focus the first invalid field
-        const el = document.getElementById(firstErrorField);
-        if (el) {
-          // If the element is on a different tab, switch tabs first
-          if (["fullName", "nationality", "gender", "dateOfBirth"].includes(firstErrorField)) setActiveTab("personal");
-          else if (["program", "school", "admissionDate", "expectedGraduation"].includes(firstErrorField)) setActiveTab("academic");
-          else if (["email", "phoneLocal", "phoneHome", "permanentAddress", "localAddress", "emergencyContactName", "emergencyContactRelation", "emergencyContactPhone"].includes(firstErrorField)) setActiveTab("contact");
-          else if (["passportNumber", "passportExpiry", "visaNumber", "visaExpiry"].includes(firstErrorField)) setActiveTab("documents");
-          
-          setTimeout(() => el.focus(), 50);
-        }
+        focusField(firstErrorField);
       }
 
-      toast.error("Please correct the highlighted fields.", {
-        description: "Some required information is missing or invalid.",
+      toast.error("Student information is incomplete", {
+        description: errorCount === 1 
+          ? "Please correct the highlighted field before registering the student." 
+          : `Please correct the ${errorCount} highlighted fields before registering the student.`
       });
       return;
     }
@@ -196,13 +284,55 @@ export default function StudentRegistrationPage() {
     setSubmittingError(false);
 
     try {
-      // TODO: Implement actual database insert
+      const res = await registerStudentAction(validationPayload);
+      if (res.success && res.studentId) {
+        setSubmittingSuccess(true);
+        toast.success("Student registered successfully", {
+          description: `${formData.fullName} has been added to the international student directory.`
+        });
+        setTimeout(() => {
+          router.push(`/students/${res.studentId}`);
+        }, 800);
+      } else {
+        setSubmittingError(true);
+        const errMsg = res.error || "An unexpected error occurred while saving the student record.";
+        
+        if (errMsg.toLowerCase().includes("registration number") && errMsg.toLowerCase().includes("already registered")) {
+          toast.error("Student already exists", {
+            description: "A student with this registration number is already registered."
+          });
+        } else if (errMsg.toLowerCase().includes("email") && errMsg.toLowerCase().includes("already registered")) {
+          toast.error("Student already exists", {
+            description: "A student with this email address is already registered."
+          });
+        } else if (errMsg.toLowerCase().includes("permission") || errMsg.toLowerCase().includes("access")) {
+          toast.error("Access Restricted", {
+            description: "You do not have permission to register a student."
+          });
+        } else if (errMsg.toLowerCase().includes("database") || errMsg.toLowerCase().includes("connect")) {
+          toast.error("Unable to save the student", {
+            description: "The system could not connect to the database. Please try again."
+          });
+        } else {
+          toast.error("Unable to register student", {
+            description: errMsg
+          });
+        }
+      }
+    } catch (err) {
       setSubmittingError(true);
-      toast.error("Database integration required to register student.");
+      const raw = err instanceof Error ? err.message : String(err || "");
+      toast.error("Unable to save the student", {
+        description: raw.includes("fetch") || raw.includes("network") 
+          ? "Connection lost. Please check your internet connection." 
+          : "The system could not connect to the database. Please try again."
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const hasValidationErrors = Object.keys(validationErrors).length > 0;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-fade-in pb-12">
@@ -215,62 +345,144 @@ export default function StudentRegistrationPage() {
 
       {/* Header */}
       <div>
-        <h1 className="font-h1 tracking-tight text-foreground text-2xl">Register International Student</h1>
-        <p className="font-caption text-muted-foreground">
+        <h1 className="font-h1 tracking-tight text-foreground text-2xl font-bold">Register International Student</h1>
+        <p className="font-caption text-muted-foreground text-xs mt-1">
           Complete personal records, enrollment criteria, and initialize mandatory document audits.
         </p>
       </div>
+
+      {/* Top-Level Incomplete Form Summary Card */}
+      {hasValidationErrors && (
+        <div 
+          role="alert"
+          aria-live="polite"
+          className="p-4 rounded-xl border border-rose-500/30 bg-rose-50/80 dark:bg-rose-950/20 text-rose-900 dark:text-rose-200 shadow-sm animate-in fade-in-0 slide-in-from-top-2 duration-200"
+        >
+          <div className="flex items-start gap-3">
+            <XCircle className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+            <div className="space-y-2 flex-1">
+              <div>
+                <h3 className="text-sm font-semibold text-rose-900 dark:text-rose-100">
+                  Student information is incomplete
+                </h3>
+                <p className="text-xs text-rose-700 dark:text-rose-300 mt-0.5">
+                  Please correct the {Object.keys(validationErrors).length === 1 ? "highlighted field" : `${Object.keys(validationErrors).length} highlighted fields`} before registering the student. Click any item to jump directly to it:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {Object.entries(validationErrors).map(([fieldKey, errorMsg]) => {
+                  const meta = FIELD_METADATA[fieldKey] || { tab: "personal", elementId: fieldKey, label: fieldKey };
+                  return (
+                    <button
+                      key={fieldKey}
+                      type="button"
+                      onClick={() => focusField(fieldKey)}
+                      className="group flex items-start gap-2 p-2 rounded-lg bg-white/70 dark:bg-zinc-900/60 border border-rose-200 dark:border-rose-900/50 text-left hover:border-rose-400 dark:hover:border-rose-700 transition-all shadow-2xs"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-rose-500 mt-1.5 shrink-0 group-hover:scale-125 transition-transform" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-rose-950 dark:text-rose-100 flex items-center justify-between">
+                          <span>{meta.label}</span>
+                          <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300">
+                            {meta.tab}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-rose-700 dark:text-rose-300 leading-tight mt-0.5">
+                          {errorMsg}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-4">
         {/* Sidebar Tabs navigation */}
         <div className="md:col-span-1 space-y-1.5">
           <button
+            type="button"
             onClick={() => setActiveTab("personal")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === "personal" 
-                ? "bg-primary text-primary-foreground shadow-sm" 
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             }`}
           >
-            <User className="h-4 w-4 shrink-0" /> Personal Identity
+            <div className="flex items-center gap-2.5">
+              <User className="h-4 w-4 shrink-0" /> Personal Identity
+            </div>
+            {tabErrorCounts.personal > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
+                {tabErrorCounts.personal}
+              </span>
+            )}
           </button>
           
           <button
+            type="button"
             onClick={() => setActiveTab("academic")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === "academic" 
-                ? "bg-primary text-primary-foreground shadow-sm" 
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             }`}
           >
-            <GraduationCap className="h-4 w-4 shrink-0" /> Academic Profile
+            <div className="flex items-center gap-2.5">
+              <GraduationCap className="h-4 w-4 shrink-0" /> Academic Profile
+            </div>
+            {tabErrorCounts.academic > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
+                {tabErrorCounts.academic}
+              </span>
+            )}
           </button>
           
           <button
+            type="button"
             onClick={() => setActiveTab("contact")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === "contact" 
-                ? "bg-primary text-primary-foreground shadow-sm" 
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             }`}
           >
-            <PhoneCall className="h-4 w-4 shrink-0" /> Emergency Contact
+            <div className="flex items-center gap-2.5">
+              <PhoneCall className="h-4 w-4 shrink-0" /> Emergency Contact
+            </div>
+            {tabErrorCounts.contact > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
+                {tabErrorCounts.contact}
+              </span>
+            )}
           </button>
           
           <button
+            type="button"
             onClick={() => setActiveTab("documents")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === "documents" 
-                ? "bg-primary text-primary-foreground shadow-sm" 
+                ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             }`}
           >
-            <FileCheck className="h-4 w-4 shrink-0" /> Document Checklist
+            <div className="flex items-center gap-2.5">
+              <FileCheck className="h-4 w-4 shrink-0" /> Document Checklist
+            </div>
+            {tabErrorCounts.documents > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
+                {tabErrorCounts.documents}
+              </span>
+            )}
           </button>
 
-          <div className="mt-8 p-3 rounded-lg border border-amber-500/10 bg-amber-500/5 text-[11px] text-amber-600 dark:text-amber-400 font-caption space-y-1">
-            <div className="flex items-center gap-1 font-semibold">
-              <AlertCircle className="h-3.5 w-3.5 text-amber-500" /> Statutory Audit Warning
+          <div className="mt-8 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] text-amber-700 dark:text-amber-300 font-caption space-y-1">
+            <div className="flex items-center gap-1 font-semibold text-amber-800 dark:text-amber-200">
+              <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" /> Statutory Audit Notice
             </div>
             <p className="leading-relaxed">
               Verify passport details directly from official documents. Names must match passport spelling exactly to pass eFRRO verification audits.
@@ -279,8 +491,8 @@ export default function StudentRegistrationPage() {
         </div>
 
         {/* Form Container */}
-        <Card className="md:col-span-3 border border-border/60 shadow-sm overflow-hidden">
-          <form onSubmit={handleSubmit}>
+        <Card className="md:col-span-3 border border-border/60 shadow-sm overflow-visible">
+          <form onSubmit={handleSubmit} noValidate>
             {/* Personal Details Tab */}
             {activeTab === "personal" && (
               <CardContent className="p-6 space-y-4">
@@ -304,7 +516,9 @@ export default function StudentRegistrationPage() {
                       className={validationErrors.fullName ? "border-rose-500 focus-visible:ring-rose-500" : ""}
                     />
                     {validationErrors.fullName && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.fullName}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.fullName}
+                      </p>
                     )}
                   </div>
 
@@ -316,8 +530,10 @@ export default function StudentRegistrationPage() {
                       value={formData.nationality} 
                       onChange={(v) => handleSelectChange("nationality", v)} 
                     />
-                    {validationErrors.nationalityCode && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.nationalityCode}</p>
+                    {(validationErrors.nationalityCode || validationErrors.nationality) && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.nationalityCode || validationErrors.nationality}
+                      </p>
                     )}
                   </div>
 
@@ -326,7 +542,10 @@ export default function StudentRegistrationPage() {
                       Gender <span className="text-rose-500">*</span>
                     </label>
                     <Select value={formData.gender} onValueChange={(v) => handleSelectChange("gender", v || "")}>
-                      <SelectTrigger className={validationErrors.gender ? "border-rose-500 focus-visible:ring-rose-500" : ""}>
+                      <SelectTrigger 
+                        id="gender"
+                        className={validationErrors.gender ? "border-rose-500 focus-visible:ring-rose-500" : ""}
+                      >
                         <SelectValue placeholder="Choose Gender" />
                       </SelectTrigger>
                       <SelectContent>
@@ -337,7 +556,9 @@ export default function StudentRegistrationPage() {
                       </SelectContent>
                     </Select>
                     {validationErrors.gender && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.gender}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.gender}
+                      </p>
                     )}
                   </div>
 
@@ -345,17 +566,18 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground" htmlFor="dateOfBirth">
                       Date of Birth <span className="text-rose-500">*</span>
                     </label>
-                    <Input
+                    <DatePicker
                       id="dateOfBirth"
-                      type="date"
                       value={formData.dateOfBirth}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                      onValueChange={(v) => handleSelectChange("dateOfBirth", v)}
                       disabled={isSubmitting}
-                      className={validationErrors.dateOfBirth ? "border-rose-500 focus-visible:ring-rose-500" : ""}
+                      disableFuture={true}
+                      maxDate={new Date()}
+                      startYear={1940}
+                      placeholder="Select date of birth..."
+                      error={validationErrors.dateOfBirth}
                     />
-                    {validationErrors.dateOfBirth && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.dateOfBirth}</p>
-                    )}
                   </div>
                 </div>
               </CardContent>
@@ -375,9 +597,16 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground" htmlFor="program">
                       Academic Program <span className="text-rose-500">*</span>
                     </label>
-                    <Select value={formData.program} onValueChange={(v) => handleSelectChange("program", v || "")} disabled={isLoadingPrograms || academicPrograms.length === 0}>
-                      <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select Program"} />
+                    <Select 
+                      value={formData.program} 
+                      onValueChange={(v) => handleSelectChange("program", v || "")} 
+                      disabled={isLoadingPrograms || academicPrograms.length === 0}
+                    >
+                      <SelectTrigger 
+                        id="program"
+                        className={`h-10 text-xs ${(validationErrors.programCode || validationErrors.program) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      >
+                        <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select Academic Program"} />
                       </SelectTrigger>
                       <SelectContent>
                         {academicPrograms.map((prog) => (
@@ -392,8 +621,10 @@ export default function StudentRegistrationPage() {
                         No academic programs have been configured. Please contact the system administrator.
                       </p>
                     )}
-                    {validationErrors.programCode && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.programCode}</p>
+                    {(validationErrors.programCode || validationErrors.program) && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.programCode || validationErrors.program}
+                      </p>
                     )}
                   </div>
 
@@ -407,13 +638,13 @@ export default function StudentRegistrationPage() {
                       value={formData.school}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className="h-9 text-sm"
+                      className="h-10 text-sm"
                     />
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="admissionDate">
-                      Admission Date
+                      Admission Date <span className="text-rose-500">*</span>
                     </label>
                     <Input
                       id="admissionDate"
@@ -421,16 +652,18 @@ export default function StudentRegistrationPage() {
                       value={formData.admissionDate}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.admissionDate ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.admissionDate ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.admissionDate && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.admissionDate}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.admissionDate}
+                      </p>
                     )}
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="expectedGraduation">
-                      Expected Graduation Date
+                      Expected Graduation Date <span className="text-rose-500">*</span>
                     </label>
                     <Input
                       id="expectedGraduation"
@@ -438,10 +671,12 @@ export default function StudentRegistrationPage() {
                       value={formData.expectedGraduation}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.expectedGraduation ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.expectedGraduation ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.expectedGraduation && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.expectedGraduation}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.expectedGraduation}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -468,10 +703,12 @@ export default function StudentRegistrationPage() {
                       value={formData.phoneHome}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.phoneHome ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.phoneHome ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.phoneHome && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.phoneHome}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.phoneHome}
+                      </p>
                     )}
                   </div>
 
@@ -486,10 +723,12 @@ export default function StudentRegistrationPage() {
                       value={formData.email}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.email ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.email ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.email && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.email}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.email}
+                      </p>
                     )}
                   </div>
 
@@ -503,10 +742,12 @@ export default function StudentRegistrationPage() {
                       value={formData.phoneLocal}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.phoneLocal ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.phoneLocal ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.phoneLocal && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.phoneLocal}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.phoneLocal}
+                      </p>
                     )}
                   </div>
 
@@ -516,14 +757,16 @@ export default function StudentRegistrationPage() {
                     </label>
                     <Input
                       id="permanentAddress"
-                      placeholder="Full residential address in home country"
+                      placeholder="Full residential address in home country (at least 10 characters)"
                       value={formData.permanentAddress}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.permanentAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.permanentAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.permanentAddress && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.permanentAddress}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.permanentAddress}
+                      </p>
                     )}
                   </div>
 
@@ -537,20 +780,20 @@ export default function StudentRegistrationPage() {
                       value={formData.localAddress}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.localAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.localAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.localAddress && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.localAddress}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.localAddress}
+                      </p>
                     )}
                   </div>
                   
                   <Separator className="my-2 sm:col-span-2" />
 
-
-
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactName">
-                      Emergency Contact Name
+                      Emergency Contact Name <span className="text-rose-500">*</span>
                     </label>
                     <Input
                       id="emergencyContactName"
@@ -558,19 +801,27 @@ export default function StudentRegistrationPage() {
                       value={formData.emergencyContactName}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.relationshipName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${(validationErrors.relationshipName || validationErrors.emergencyContactName) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
-                    {validationErrors.relationshipName && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.relationshipName}</p>
+                    {(validationErrors.relationshipName || validationErrors.emergencyContactName) && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.relationshipName || validationErrors.emergencyContactName}
+                      </p>
                     )}
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactRelation">
-                      Relationship Type
+                      Relationship Type <span className="text-rose-500">*</span>
                     </label>
-                    <Select value={formData.emergencyContactRelation} onValueChange={(v) => handleSelectChange("emergencyContactRelation", v || "")}>
-                      <SelectTrigger className="h-9 text-xs">
+                    <Select 
+                      value={formData.emergencyContactRelation} 
+                      onValueChange={(v) => handleSelectChange("emergencyContactRelation", v || "")}
+                    >
+                      <SelectTrigger 
+                        id="emergencyContactRelation"
+                        className={`h-10 text-xs ${(validationErrors.relationshipType || validationErrors.emergencyContactRelation) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      >
                         <SelectValue placeholder="Select Relationship" />
                       </SelectTrigger>
                       <SelectContent>
@@ -579,25 +830,29 @@ export default function StudentRegistrationPage() {
                         <SelectItem value="local_sponsor">Local Sponsor</SelectItem>
                       </SelectContent>
                     </Select>
-                    {validationErrors.relationshipType && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.relationshipType}</p>
+                    {(validationErrors.relationshipType || validationErrors.emergencyContactRelation) && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.relationshipType || validationErrors.emergencyContactRelation}
+                      </p>
                     )}
                   </div>
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactPhone">
-                      Emergency Contact Phone Number
+                      Emergency Contact Phone Number <span className="text-rose-500">*</span>
                     </label>
                     <Input
                       id="emergencyContactPhone"
-                      placeholder="Country code prefixed"
+                      placeholder="Country code prefixed phone number"
                       value={formData.emergencyContactPhone}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.relationshipPhone ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${(validationErrors.relationshipPhone || validationErrors.emergencyContactPhone) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
-                    {validationErrors.relationshipPhone && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.relationshipPhone}</p>
+                    {(validationErrors.relationshipPhone || validationErrors.emergencyContactPhone) && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.relationshipPhone || validationErrors.emergencyContactPhone}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -624,10 +879,12 @@ export default function StudentRegistrationPage() {
                       value={formData.passportNumber}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.passportNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.passportNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.passportNumber && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.passportNumber}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.passportNumber}
+                      </p>
                     )}
                   </div>
 
@@ -641,10 +898,12 @@ export default function StudentRegistrationPage() {
                       value={formData.passportExpiry}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.passportExpiry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.passportExpiry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.passportExpiry && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.passportExpiry}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.passportExpiry}
+                      </p>
                     )}
                   </div>
 
@@ -658,10 +917,12 @@ export default function StudentRegistrationPage() {
                       value={formData.visaNumber}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.visaNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.visaNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.visaNumber && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.visaNumber}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.visaNumber}
+                      </p>
                     )}
                   </div>
 
@@ -675,10 +936,12 @@ export default function StudentRegistrationPage() {
                       value={formData.visaExpiry}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
-                      className={`h-9 text-sm ${validationErrors.visaExpiry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      className={`h-10 text-sm ${validationErrors.visaExpiry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     {validationErrors.visaExpiry && (
-                      <p className="text-[11px] text-rose-500 font-medium">{validationErrors.visaExpiry}</p>
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.visaExpiry}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -697,34 +960,35 @@ export default function StudentRegistrationPage() {
                 </Button>
               </Link>
               
-              <div className="flex items-center gap-2">
-                {activeTab !== "documents" ? (
+              <div className="flex items-center gap-2.5">
+                {activeTab !== "documents" && (
                   <Button 
                     type="button" 
+                    variant="outline"
                     size="sm" 
-                    className="h-9 text-xs"
+                    className="h-9 text-xs flex items-center gap-1.5"
                     onClick={() => {
                       if (activeTab === "personal") setActiveTab("academic");
                       else if (activeTab === "academic") setActiveTab("contact");
                       else if (activeTab === "contact") setActiveTab("documents");
                     }}
                   >
-                    Next Section
+                    Next Section <ArrowRight className="h-3.5 w-3.5" />
                   </Button>
-                ) : (
-                  <AsyncActionButton
-                    type="submit"
-                    size="sm"
-                    className="h-9 text-xs"
-                    isLoading={isSubmitting}
-                    isSuccess={submittingSuccess}
-                    isError={submittingError}
-                    idleText="Save & Register"
-                    loadingText="Saving Student..."
-                    successText="Changes saved"
-                    errorText="Try Again"
-                  />
                 )}
+
+                <AsyncActionButton
+                  type="submit"
+                  size="sm"
+                  className="h-9 text-xs px-4 font-semibold"
+                  isLoading={isSubmitting}
+                  isSuccess={submittingSuccess}
+                  isError={submittingError}
+                  idleText="Save & Register"
+                  loadingText="Saving Student..."
+                  successText="Student Registered"
+                  errorText="Try Again"
+                />
               </div>
             </CardFooter>
           </form>

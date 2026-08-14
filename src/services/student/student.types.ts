@@ -99,15 +99,15 @@ export interface RegisterStudentInput {
   fullName: string;
   nationalityCode: string;
   gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
-  dateOfBirth: Date;
+  dateOfBirth: Date | string;
   email: string;
   phoneHome: string;
   phoneLocal?: string;
   permanentAddress: string;
   localAddress?: string;
   programCode: string;
-  admissionDate: Date;
-  expectedGraduation: Date;
+  admissionDate: Date | string;
+  expectedGraduation: Date | string;
   currentSemester?: number;
   relationshipType: RelationshipType;
   relationshipName: string;
@@ -119,6 +119,10 @@ export interface RegisterStudentInput {
   embassyPhone?: string;
   embassyEmail?: string;
   embassyContactPerson?: string;
+  passportNumber?: string;
+  passportExpiry?: Date | string;
+  visaNumber?: string;
+  visaExpiry?: Date | string;
 }
 
 export interface UpdateStudentInput {

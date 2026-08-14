@@ -1,0 +1,527 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { getServerSupabase } from "@/lib/supabase/server";
+import { getAdminSupabase } from "@/lib/supabase/admin";
+import { StudentService } from "@/services/student/student.service";
+import { RegisterStudentInput, UpdateStudentInput, StudentFilterOptions } from "@/services/student/student.types";
+import { getCountryByCode } from "@/utils/countries";
+import { sanitizeError } from "@/lib/errors/error-sanitizer";
+
+const studentService = new StudentService();
+
+export interface StudentListItem {
+  id: string;
+  fullName: string;
+  registrationNumber: string;
+  nationalityCode: string;
+  nationalityName: string;
+  programName: string;
+  school: string;
+  passport: { number: string };
+  visa: { number: string };
+  email: string;
+  complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
+  academicStatus: "good_standing" | "probation" | "suspended";
+}
+
+export interface StudentDetailProfile {
+  id: string;
+  fullName: string;
+  email: string;
+  phoneHome: string;
+  phoneLocal: string;
+  permanentAddress: string;
+  localAddress: string;
+  currentSemester: number;
+  academicStatus: "good_standing" | "probation" | "suspended";
+  status: "active" | "suspended" | "graduated" | "withdrawn";
+  registrationNumber: string;
+  nationalityCode: string;
+  nationalityName: string;
+  programName: string;
+  programCode: string;
+  school: string;
+  admissionDate: string;
+  expectedGraduation: string;
+  complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
+  passport: {
+    number: string;
+    issueDate: string;
+    expiryDate: string;
+    verificationStatus: "pending" | "verified" | "rejected";
+  };
+  visa: {
+    number: string;
+    issueDate: string;
+    expiryDate: string;
+    verificationStatus: "pending" | "verified" | "rejected";
+  };
+  efrro?: {
+    number: string;
+    issueDate: string;
+    expiryDate: string;
+    verificationStatus: "pending" | "verified" | "rejected";
+  };
+  emergencyContact: {
+    name: string;
+    relationship: string;
+    phone: string;
+    email: string;
+  };
+  embassy: {
+    name: string;
+    phone: string;
+    address: string;
+  };
+}
+
+export interface DocumentVersionItem {
+  id: string;
+  versionNumber: number;
+  isActive: boolean;
+  documentNumber: string;
+  issueDate: string;
+  expiryDate: string;
+  verificationStatus: "pending" | "verified" | "rejected";
+  rejectionReason: string | null;
+  uploadedAt: string;
+}
+
+interface VersionDatabaseRow {
+  id: string;
+  version_number?: number;
+  is_active?: boolean;
+  document_number: string;
+  issue_date: string;
+  expiry_date: string;
+  verification_status: "pending" | "verified" | "rejected";
+  rejection_reason?: string | null;
+  created_at: string;
+}
+
+/**
+ * Server Action: Register a new international student
+ */
+export async function registerStudentAction(input: RegisterStudentInput): Promise<{
+  success: boolean;
+  studentId?: string;
+  error?: string;
+}> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "Authentication required. Please log in to complete registration."
+      };
+    }
+
+    const created = await studentService.registerStudent(input, user.id);
+
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
+    revalidatePath("/reports");
+
+    return {
+      success: true,
+      studentId: created.student.id
+    };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "registerStudentAction", route: "/students/add" });
+    return {
+      success: false,
+      error: sanitized.message
+    };
+  }
+}
+
+/**
+ * Server Action: Fetch international student directory list with search and filters
+ */
+export async function getStudentsListAction(filters: StudentFilterOptions = {}): Promise<{
+  success: boolean;
+  students: StudentListItem[];
+  error?: string;
+}> {
+  try {
+    const adminSupabase = getAdminSupabase();
+
+    let query = adminSupabase
+      .from("students")
+      .select(`
+        id,
+        registration_number,
+        status,
+        created_at,
+        student_personal!inner(full_name, nationality_code),
+        student_contact!inner(email, phone_home),
+        student_academic!inner(program_code, academic_status),
+        student_snapshot(compliance_status, passport_number, visa_number)
+      `)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (filters.limit) {
+      query = query.limit(filters.limit);
+    }
+    if (filters.offset) {
+      query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+    }
+
+    const { data: records, error } = await query;
+
+    if (error) {
+      console.error("[GET_STUDENTS_LIST_ERROR]", error);
+      return {
+        success: false,
+        students: [],
+        error: "Unable to retrieve student records from database."
+      };
+    }
+
+    // Also fetch academic program lookup map for friendly display names
+    const { data: programsData } = await adminSupabase
+      .from("academic_programs")
+      .select("program_code, program_name, school_name");
+
+    const programMap = new Map<string, { name: string; school: string }>();
+    if (programsData) {
+      programsData.forEach(p => {
+        if (p.program_code) programMap.set(p.program_code, { name: p.program_name, school: p.school_name || "Academic Department" });
+        programMap.set(p.program_name, { name: p.program_name, school: p.school_name || "Academic Department" });
+      });
+    }
+
+    const students: StudentListItem[] = (records || []).map(r => {
+      const personal = Array.isArray(r.student_personal) ? r.student_personal[0] : r.student_personal;
+      const contact = Array.isArray(r.student_contact) ? r.student_contact[0] : r.student_contact;
+      const academic = Array.isArray(r.student_academic) ? r.student_academic[0] : r.student_academic;
+      const snapshot = Array.isArray(r.student_snapshot) ? r.student_snapshot[0] : r.student_snapshot;
+
+      const natCode = personal?.nationality_code || "IND";
+      const countryObj = getCountryByCode(natCode);
+      const nationalityName = countryObj?.name || natCode;
+
+      const progInfo = programMap.get(academic?.program_code || "") || {
+        name: academic?.program_code || "General Studies",
+        school: "Academic Affairs"
+      };
+
+      // Map raw compliance status to UI badge enum
+      let mappedCompliance: StudentListItem["complianceStatus"] = "compliant";
+      const rawStatus = (snapshot?.compliance_status || "").toUpperCase();
+      if (rawStatus === "WARNING" || rawStatus === "PENDING_VERIFICATION") mappedCompliance = "warning";
+      else if (rawStatus === "EXPIRED") mappedCompliance = "expired";
+      else if (rawStatus === "MISSING" || rawStatus === "REJECTED") mappedCompliance = "non_compliant";
+
+      return {
+        id: r.id,
+        fullName: personal?.full_name || "Unknown Student",
+        registrationNumber: r.registration_number,
+        nationalityCode: natCode,
+        nationalityName,
+        programName: progInfo.name,
+        school: progInfo.school,
+        passport: { number: snapshot?.passport_number || "Pending" },
+        visa: { number: snapshot?.visa_number || "Pending" },
+        email: contact?.email || "",
+        complianceStatus: mappedCompliance,
+        academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing"
+      };
+    });
+
+    return {
+      success: true,
+      students
+    };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "getStudentsListAction", route: "/students" });
+    return {
+      success: false,
+      students: [],
+      error: sanitized.message
+    };
+  }
+}
+
+/**
+ * Server Action: Fetch complete student details for profile page /students/[id]
+ */
+export async function getStudentDetailsAction(studentId: string): Promise<{
+  success: boolean;
+  student?: StudentDetailProfile;
+  error?: string;
+}> {
+  try {
+    const adminSupabase = getAdminSupabase();
+
+    const { data: record, error } = await adminSupabase
+      .from("students")
+      .select(`
+        id,
+        registration_number,
+        status,
+        created_at,
+        student_personal(*),
+        student_contact(*),
+        student_academic(*),
+        student_relationships(*),
+        student_embassy(*),
+        student_snapshot(*),
+        passport_versions(*),
+        visa_versions(*),
+        efrro_versions(*)
+      `)
+      .eq("id", studentId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error || !record) {
+      return {
+        success: false,
+        error: "Student profile record not found."
+      };
+    }
+
+    const personal = record.student_personal?.[0] || record.student_personal;
+    const contact = record.student_contact?.[0] || record.student_contact;
+    const academic = record.student_academic?.[0] || record.student_academic;
+    const relationships = record.student_relationships || [];
+    const primaryContact = relationships[0] || {};
+    const embassy = record.student_embassy?.[0] || record.student_embassy || {};
+    const snapshot = record.student_snapshot?.[0] || record.student_snapshot || {};
+
+    const activePassport = (record.passport_versions || []).find((p: VersionDatabaseRow) => p.is_active && !('deleted_at' in p && (p as Record<string, unknown>).deleted_at));
+    const activeVisa = (record.visa_versions || []).find((v: VersionDatabaseRow) => v.is_active && !('deleted_at' in v && (v as Record<string, unknown>).deleted_at));
+    const activeEfrro = (record.efrro_versions || []).find((e: VersionDatabaseRow) => e.is_active && !('deleted_at' in e && (e as Record<string, unknown>).deleted_at));
+
+    const countryObj = getCountryByCode(personal?.nationality_code || "IND");
+
+    // Retrieve academic program metadata
+    const { data: progData } = await adminSupabase
+      .from("academic_programs")
+      .select("program_name, school_name")
+      .or(`program_code.eq.${academic?.program_code},program_name.eq.${academic?.program_code}`)
+      .maybeSingle();
+
+    const studentProfile: StudentDetailProfile = {
+      id: record.id,
+      fullName: personal?.full_name || "Unknown Student",
+      email: contact?.email || "",
+      phoneHome: contact?.phone_home || "",
+      phoneLocal: contact?.phone_local || "",
+      permanentAddress: contact?.permanent_address || "",
+      localAddress: contact?.local_address || "",
+      currentSemester: academic?.current_semester || 1,
+      academicStatus: academic?.academic_status || "good_standing",
+      status: record.status || "active",
+      registrationNumber: record.registration_number,
+      nationalityCode: personal?.nationality_code || "IND",
+      nationalityName: countryObj?.name || personal?.nationality_code || "India",
+      programName: progData?.program_name || academic?.program_code || "General Studies",
+      programCode: academic?.program_code || "",
+      school: progData?.school_name || "Academic Department",
+      admissionDate: academic?.admission_date || "",
+      expectedGraduation: academic?.expected_graduation || "",
+      complianceStatus: (() => {
+        const raw = (snapshot?.compliance_status || "").toUpperCase();
+        if (raw === "WARNING" || raw === "PENDING_VERIFICATION") return "warning";
+        if (raw === "EXPIRED") return "expired";
+        if (raw === "MISSING" || raw === "REJECTED") return "non_compliant";
+        return "compliant";
+      })(),
+      passport: {
+        number: activePassport?.document_number || snapshot?.passport_number || "Not Recorded",
+        issueDate: activePassport?.issue_date || "",
+        expiryDate: activePassport?.expiry_date || snapshot?.passport_expiry || "",
+        verificationStatus: activePassport?.verification_status || "pending"
+      },
+      visa: {
+        number: activeVisa?.document_number || snapshot?.visa_number || "Not Recorded",
+        issueDate: activeVisa?.issue_date || "",
+        expiryDate: activeVisa?.expiry_date || snapshot?.visa_expiry || "",
+        verificationStatus: activeVisa?.verification_status || "pending"
+      },
+      efrro: activeEfrro ? {
+        number: activeEfrro.document_number,
+        issueDate: activeEfrro.issue_date,
+        expiryDate: activeEfrro.expiry_date,
+        verificationStatus: activeEfrro.verification_status
+      } : undefined,
+      emergencyContact: {
+        name: primaryContact.name || "Not Specified",
+        relationship: primaryContact.relationship_type || "parent",
+        phone: primaryContact.phone || "Not Specified",
+        email: primaryContact.email || ""
+      },
+      embassy: {
+        name: embassy.embassy_name || "Not Specified",
+        phone: embassy.phone || "",
+        address: embassy.address || "Not Specified"
+      }
+    };
+
+    return {
+      success: true,
+      student: studentProfile
+    };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "getStudentDetailsAction", route: `/students/${studentId}` });
+    return {
+      success: false,
+      error: sanitized.message
+    };
+  }
+}
+
+/**
+ * Server Action: Update student profile
+ */
+export async function updateStudentAction(
+  studentId: string, 
+  data: UpdateStudentInput
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "Authentication required to update student profile."
+      };
+    }
+
+    await studentService.updateStudent(studentId, data, user.id);
+
+    revalidatePath("/students");
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath("/dashboard");
+
+    return { success: true };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "updateStudentAction", route: `/students/${studentId}` });
+    return {
+      success: false,
+      error: sanitized.message
+    };
+  }
+}
+
+/**
+ * Server Action: Soft delete / archive student profile
+ */
+export async function archiveStudentAction(studentId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "Authentication required to archive student profile."
+      };
+    }
+
+    const archived = await studentService.archiveStudent(studentId, user.id);
+    if (!archived) {
+      return { success: false, error: "Failed to archive student record." };
+    }
+
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
+
+    return { success: true };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "archiveStudentAction", route: `/students/${studentId}` });
+    return {
+      success: false,
+      error: sanitized.message
+    };
+  }
+}
+
+/**
+ * Server Action: Fetch compliance document versions for a student (passport, visa, or eFRRO)
+ */
+export async function getDocumentVersionsAction(
+  studentId: string,
+  documentType: "passport" | "visa" | "efrro"
+): Promise<{
+  success: boolean;
+  versions: DocumentVersionItem[];
+  status: string;
+  error?: string;
+}> {
+  try {
+    const adminSupabase = getAdminSupabase();
+    const tableName = documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+    const { data: rows, error } = await adminSupabase
+      .from(tableName)
+      .select("*")
+      .eq("student_id", studentId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error(`[GET_DOC_VERSIONS_ERROR] ${tableName}:`, error);
+      return { success: false, versions: [], status: "MISSING", error: error.message };
+    }
+
+    const typedRows: VersionDatabaseRow[] = rows || [];
+    const versions: DocumentVersionItem[] = typedRows.map((row: VersionDatabaseRow, index: number) => ({
+      id: row.id,
+      versionNumber: row.version_number || (typedRows.length - index),
+      isActive: Boolean(row.is_active),
+      documentNumber: row.document_number,
+      issueDate: row.issue_date,
+      expiryDate: row.expiry_date,
+      verificationStatus: row.verification_status || "pending",
+      rejectionReason: row.rejection_reason || null,
+      uploadedAt: row.created_at
+    }));
+
+    // Derive compliance status
+    let status = "MISSING";
+    const activeDoc = versions.find(v => v.isActive) || versions[0];
+    if (activeDoc) {
+      if (activeDoc.verificationStatus === "rejected") {
+        status = "REJECTED";
+      } else if (activeDoc.verificationStatus === "pending") {
+        status = "PENDING_VERIFICATION";
+      } else if (activeDoc.verificationStatus === "verified") {
+        const exp = new Date(activeDoc.expiryDate).getTime();
+        const now = Date.now();
+        const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 0) {
+          status = "EXPIRED";
+        } else if (diffDays <= 30) {
+          status = "EXPIRING_SOON";
+        } else {
+          status = "VERIFIED";
+        }
+      }
+    }
+
+    return {
+      success: true,
+      versions,
+      status
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      versions: [],
+      status: "MISSING",
+      error: err instanceof Error ? err.message : "Failed to load document records."
+    };
+  }
+}

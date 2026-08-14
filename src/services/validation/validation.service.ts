@@ -30,7 +30,7 @@ export const StudentContactSchema = z.object({
 
 // 4. Academic Details Schema
 export const StudentAcademicSchema = z.object({
-  programCode: z.string().max(20),
+  programCode: z.string().min(1, "Academic program is required").max(100),
   admissionDate: z.string(),
   expectedGraduation: z.string(),
   currentSemester: z.number().int().min(1).max(20),

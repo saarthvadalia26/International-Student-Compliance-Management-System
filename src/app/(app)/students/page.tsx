@@ -9,7 +9,8 @@ import {
   MoreHorizontal,
   Eye,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardContent } from "@/components/ui/card";
@@ -51,6 +52,7 @@ export interface Student {
 
 import { useRouter } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+import { getStudentsListAction } from "@/app/(app)/students/actions";
 
 export default function StudentListPage() {
   const router = useRouter();
@@ -60,11 +62,56 @@ export default function StudentListPage() {
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
   const [students, setStudents] = React.useState<Student[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  const loadStudents = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await getStudentsListAction();
+      if (res.success && res.students) {
+        setStudents(res.students);
+      }
+    } catch (err) {
+      console.error("[STUDENT_DIRECTORY] Failed loading students:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadStudents();
+  }, [loadStudents]);
 
   // Realtime Live Sync: Refresh server component data when students, passports, or visas change
-  useRealtimeSubscription({ table: "students", onEvent: () => router.refresh() });
-  useRealtimeSubscription({ table: "student_personal", onEvent: () => router.refresh() });
-  useRealtimeSubscription({ table: "student_academic", onEvent: () => router.refresh() });
+  useRealtimeSubscription({ 
+    table: "students", 
+    onEvent: () => {
+      loadStudents();
+      router.refresh();
+    } 
+  });
+  useRealtimeSubscription({ 
+    table: "student_personal", 
+    onEvent: () => {
+      loadStudents();
+      router.refresh();
+    } 
+  });
+  useRealtimeSubscription({ 
+    table: "student_academic", 
+    onEvent: () => {
+      loadStudents();
+      router.refresh();
+    } 
+  });
+  useRealtimeSubscription({ 
+    table: "student_snapshot", 
+    onEvent: () => {
+      loadStudents();
+      router.refresh();
+    } 
+  });
 
   // Filter logic
   const filteredStudents = React.useMemo(() => {
@@ -256,7 +303,16 @@ export default function StudentListPage() {
             </TableHeader>
             
             <TableBody>
-              {paginatedStudents.length === 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-36 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground space-y-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <p className="font-medium text-xs">Loading international student records...</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : paginatedStudents.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-36 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground space-y-2">

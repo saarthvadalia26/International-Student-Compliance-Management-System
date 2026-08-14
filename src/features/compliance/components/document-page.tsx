@@ -12,6 +12,7 @@ import { ComplianceDocumentTable, ComplianceDocumentTimeline, DocumentVersion } 
 import { DocumentViewer, LoadingState } from "./document-states";
 
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+import { getDocumentVersionsAction } from "@/app/(app)/students/actions";
 
 interface DocumentPageProps {
   documentType: ComplianceDocumentType;
@@ -23,23 +24,32 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
   const [loading, setLoading] = React.useState(true);
   const [status, setStatus] = React.useState<ComplianceStatus>("MISSING");
   
-  // Versions history state from database (Empty array by default in production until fetched)
+  // Versions history state from database
   const [versions, setVersions] = React.useState<DocumentVersion[]>([]);
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = React.useState(false);
   const [selectedPdfUrl, setSelectedPdfUrl] = React.useState<string | null>(null);
 
   const fetchDocuments = React.useCallback(async () => {
+    if (!studentId) return;
     try {
       setLoading(true);
-      setVersions([]); // Explicitly empty for production release until data exists
-      setStatus("MISSING");
+      const res = await getDocumentVersionsAction(studentId, documentType);
+      if (res.success) {
+        setVersions(res.versions);
+        setStatus(res.status as ComplianceStatus);
+      } else {
+        setVersions([]);
+        setStatus("MISSING");
+      }
     } catch (err) {
       console.error("Failed to load documents", err);
+      setVersions([]);
+      setStatus("MISSING");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [studentId, documentType]);
 
   const targetTable = 
     documentType === "passport" 

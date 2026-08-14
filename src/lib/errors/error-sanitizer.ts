@@ -96,11 +96,12 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
     normalized.includes("permission denied") ||
     normalized.includes("access denied") ||
     normalized.includes("restricted") ||
-    normalized.includes("administrator access required")
+    normalized.includes("administrator access required") ||
+    normalized.includes("authentication required")
   ) {
     return {
       title: "Access Restricted",
-      message: "You don't have permission to perform this action.",
+      message: "You do not have permission to perform this action.",
       category: "permission",
       errorId,
       diagnostics: {
@@ -109,6 +110,43 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
         timestamp,
         route,
         statusCode: 403,
+      },
+    };
+  }
+
+  // 2.1 Specific Duplicate Entity Errors (Status: 409)
+  if (
+    (normalized.includes("registration") && (normalized.includes("already registered") || normalized.includes("already exists") || normalized.includes("registration_number_key") || normalized.includes("registration_number")))
+  ) {
+    return {
+      title: "Student already exists",
+      message: "A student with this registration number is already registered.",
+      category: "validation",
+      errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "validation",
+        timestamp,
+        route,
+        statusCode: 409,
+      },
+    };
+  }
+
+  if (
+    normalized.includes("email") && (normalized.includes("already registered") || normalized.includes("already exists") || normalized.includes("unique constraint") || (normalized.includes("duplicate key") && normalized.includes("email")))
+  ) {
+    return {
+      title: "Student already exists",
+      message: "A student with this email address is already registered.",
+      category: "validation",
+      errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "validation",
+        timestamp,
+        route,
+        statusCode: 409,
       },
     };
   }
@@ -149,9 +187,10 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
     normalized.includes("violates foreign key") ||
     normalized.includes("duplicate key")
   ) {
+    const isSaveAction = context?.action?.includes("register") || context?.action?.includes("create") || context?.action?.includes("save");
     return {
-      title: "Unable to Load Data",
-      message: "Unable to load data. Please try again.",
+      title: isSaveAction ? "Unable to save the student" : "Unable to Load Data",
+      message: "The system could not connect to the database. Please try again.",
       category: "database",
       errorId,
       diagnostics: {
