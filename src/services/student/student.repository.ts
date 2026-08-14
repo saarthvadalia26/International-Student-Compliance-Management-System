@@ -33,10 +33,33 @@ interface RelationshipRow {
 export class SupabaseStudentRepository implements IStudentRepository {
   private formatDate(dateVal: Date | string | undefined | null): string | null {
     if (!dateVal) return null;
-    if (typeof dateVal === "string") {
-      return dateVal.includes("T") ? dateVal.split("T")[0] : dateVal;
+    if (dateVal instanceof Date) {
+      if (isNaN(dateVal.getTime())) return null;
+      const y = dateVal.getFullYear();
+      const m = String(dateVal.getMonth() + 1).padStart(2, "0");
+      const d = String(dateVal.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
     }
-    return dateVal.toISOString().split("T")[0];
+    const str = String(dateVal).trim();
+    if (!str) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    if (str.includes("T")) return str.split("T")[0];
+    const slashParts = str.split("/");
+    if (slashParts.length === 3) {
+      if (slashParts[0].length === 4) {
+        return `${slashParts[0]}-${slashParts[1].padStart(2, "0")}-${slashParts[2].padStart(2, "0")}`;
+      } else if (slashParts[2].length === 4) {
+        return `${slashParts[2]}-${slashParts[0].padStart(2, "0")}-${slashParts[1].padStart(2, "0")}`;
+      }
+    }
+    const dt = new Date(str);
+    if (!isNaN(dt.getTime())) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+    return str;
   }
 
   async createStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile> {

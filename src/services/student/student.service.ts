@@ -23,8 +23,33 @@ export class StudentService implements IStudentService {
 
   private toDateString(val: Date | string | undefined | null): string {
     if (!val) return "";
-    if (typeof val === "string") return val.includes("T") ? val.split("T")[0] : val;
-    return val.toISOString().split("T")[0];
+    if (val instanceof Date) {
+      if (isNaN(val.getTime())) return "";
+      const y = val.getFullYear();
+      const m = String(val.getMonth() + 1).padStart(2, "0");
+      const d = String(val.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+    const str = String(val).trim();
+    if (!str) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    if (str.includes("T")) return str.split("T")[0];
+    const slashParts = str.split("/");
+    if (slashParts.length === 3) {
+      if (slashParts[0].length === 4) {
+        return `${slashParts[0]}-${slashParts[1].padStart(2, "0")}-${slashParts[2].padStart(2, "0")}`;
+      } else if (slashParts[2].length === 4) {
+        return `${slashParts[2]}-${slashParts[0].padStart(2, "0")}-${slashParts[1].padStart(2, "0")}`;
+      }
+    }
+    const dt = new Date(str);
+    if (!isNaN(dt.getTime())) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+    return str;
   }
 
   async registerStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile> {

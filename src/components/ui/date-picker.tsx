@@ -69,16 +69,47 @@ export const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
 
     React.useImperativeHandle(ref, () => containerRef.current as HTMLDivElement);
 
-    // Parse incoming YYYY-MM-DD date safely
+    // Parse incoming date safely (supports YYYY-MM-DD, MM/DD/YYYY, DD/MM/YYYY, ISO strings)
     const parsedDate = React.useMemo(() => {
       if (!value) return null;
-      const parts = value.split("-");
-      if (parts.length !== 3) return null;
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const d = parseInt(parts[2], 10);
-      const dt = new Date(y, m, d);
-      return isNaN(dt.getTime()) ? null : { year: y, month: m, day: d, date: dt };
+      let y = 0, m = 0, d = 0;
+      const strVal = String(value).trim();
+
+      if (strVal.includes("-")) {
+        const clean = strVal.includes("T") ? strVal.split("T")[0] : strVal;
+        const parts = clean.split("-");
+        if (parts.length === 3) {
+          y = parseInt(parts[0], 10);
+          m = parseInt(parts[1], 10) - 1;
+          d = parseInt(parts[2], 10);
+        }
+      } else if (strVal.includes("/")) {
+        const parts = strVal.split("/");
+        if (parts.length === 3) {
+          if (parts[0].length === 4) {
+            y = parseInt(parts[0], 10);
+            m = parseInt(parts[1], 10) - 1;
+            d = parseInt(parts[2], 10);
+          } else if (parts[2].length === 4) {
+            m = parseInt(parts[0], 10) - 1;
+            d = parseInt(parts[1], 10);
+            y = parseInt(parts[2], 10);
+          }
+        }
+      } else {
+        const dt = new Date(strVal);
+        if (!isNaN(dt.getTime())) {
+          y = dt.getFullYear();
+          m = dt.getMonth();
+          d = dt.getDate();
+        }
+      }
+
+      if (y > 0 && d > 0 && m >= 0 && m <= 11) {
+        const dt = new Date(y, m, d);
+        return isNaN(dt.getTime()) ? null : { year: y, month: m, day: d, date: dt };
+      }
+      return null;
     }, [value]);
 
     // Internal calendar view navigation state

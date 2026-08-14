@@ -65,6 +65,40 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   visaExpiry: { tab: "documents", elementId: "visaExpiry", label: "Visa Expiry Date" }
 };
 
+/**
+ * Normalizes any incoming date string or Date instance to a strict local YYYY-MM-DD format
+ */
+function normalizeDateToISO(val: Date | string | undefined | null): string {
+  if (!val) return "";
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return "";
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, "0");
+    const d = String(val.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  const str = String(val).trim();
+  if (!str) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  if (str.includes("T")) return str.split("T")[0];
+  const slashParts = str.split("/");
+  if (slashParts.length === 3) {
+    if (slashParts[0].length === 4) {
+      return `${slashParts[0]}-${slashParts[1].padStart(2, "0")}-${slashParts[2].padStart(2, "0")}`;
+    } else if (slashParts[2].length === 4) {
+      return `${slashParts[2]}-${slashParts[0].padStart(2, "0")}-${slashParts[1].padStart(2, "0")}`;
+    }
+  }
+  const dt = new Date(str);
+  if (!isNaN(dt.getTime())) {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, "0");
+    const d = String(dt.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  return str;
+}
+
 export default function StudentRegistrationPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<TabKey>("personal");
@@ -89,7 +123,7 @@ export default function StudentRegistrationPage() {
     loadPrograms();
   }, []);
 
-  // Form State
+  // Form State (persisted across all tab transitions)
   const [formData, setFormData] = React.useState({
     fullName: "",
     nationality: "",
@@ -152,7 +186,7 @@ export default function StudentRegistrationPage() {
       gradDate.setFullYear(gradDate.getFullYear() + durationVal);
     }
 
-    return gradDate.toISOString().split("T")[0];
+    return normalizeDateToISO(gradDate);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -179,7 +213,9 @@ export default function StudentRegistrationPage() {
   };
 
   const handleSelectChange = (field: string, value: string) => {
-    // Clear validation error on select change
+    const normalizedVal = normalizeDateToISO(value) || value;
+
+    // Clear validation error on select/date change
     const relatedKey = field === "nationality" ? "nationalityCode" : field === "program" ? "programCode" : field === "emergencyContactRelation" ? "relationshipType" : field;
     if (validationErrors[field] || validationErrors[relatedKey]) {
       setValidationErrors(prev => {
@@ -191,7 +227,7 @@ export default function StudentRegistrationPage() {
     }
 
     setFormData(prev => {
-      const next = { ...prev, [field]: value };
+      const next = { ...prev, [field]: normalizedVal };
       if (field === "program") {
         const selectedProg = academicPrograms.find(p => p.programName === value);
         if (selectedProg) {
@@ -202,6 +238,9 @@ export default function StudentRegistrationPage() {
             next.expectedGraduation = calculateGraduationDate(value, prev.admissionDate);
           }
         }
+      }
+      if (field === "admissionDate" && prev.program) {
+        next.expectedGraduation = calculateGraduationDate(prev.program, normalizedVal);
       }
       return next;
     });
@@ -222,36 +261,70 @@ export default function StudentRegistrationPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const sanitizedDob = normalizeDateToISO(formData.dateOfBirth);
+    const sanitizedAdm = normalizeDateToISO(formData.admissionDate);
+    const sanitizedGrad = normalizeDateToISO(formData.expectedGraduation);
+    const sanitizedPassExp = normalizeDateToISO(formData.passportExpiry);
+    const sanitizedVisaExp = normalizeDateToISO(formData.visaExpiry);
+
     // Zod payload assembly
     const validationPayload: RegisterStudentInput = {
       registrationNumber: `ISCMS-${Date.now().toString().slice(-4)}`,
       fullName: formData.fullName.trim(),
-      nationalityCode: formData.nationality.trim(),
+      nationalityCode: formData.nationality.trim().toUpperCase(),
       gender: (formData.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
-      dateOfBirth: formData.dateOfBirth,
-      email: formData.email.trim(),
+      dateOfBirth: sanitizedDob,
+      email: formData.email.trim().toLowerCase(),
       phoneHome: formData.phoneHome.trim(),
       phoneLocal: formData.phoneLocal.trim() || undefined,
       permanentAddress: formData.permanentAddress.trim(),
       localAddress: formData.localAddress.trim() || undefined,
       programCode: formData.program.trim(),
-      admissionDate: formData.admissionDate,
-      expectedGraduation: formData.expectedGraduation,
+      admissionDate: sanitizedAdm,
+      expectedGraduation: sanitizedGrad,
       currentSemester: 1,
       relationshipType: (formData.emergencyContactRelation as "parent" | "guardian" | "local_sponsor") || "parent",
       relationshipName: formData.emergencyContactName.trim(),
       relationshipPhone: formData.emergencyContactPhone.trim(),
       passportNumber: formData.passportNumber.trim() || undefined,
-      passportExpiry: formData.passportExpiry || undefined,
+      passportExpiry: sanitizedPassExp || undefined,
       visaNumber: formData.visaNumber.trim() || undefined,
-      visaExpiry: formData.visaExpiry || undefined
+      visaExpiry: sanitizedVisaExp || undefined
     };
+
+    // Safe development diagnostics
+    if (process.env.NODE_ENV === "development" || typeof window !== "undefined") {
+      console.log("[STUDENT_REGISTRATION_SUBMIT_PAYLOAD]", {
+        registrationNumber: validationPayload.registrationNumber,
+        fullName: validationPayload.fullName,
+        nationalityCode: validationPayload.nationalityCode,
+        gender: validationPayload.gender,
+        dateOfBirth: validationPayload.dateOfBirth,
+        email: validationPayload.email,
+        phoneHome: validationPayload.phoneHome ? `${validationPayload.phoneHome.slice(0, 3)}***` : undefined,
+        programCode: validationPayload.programCode,
+        admissionDate: validationPayload.admissionDate,
+        expectedGraduation: validationPayload.expectedGraduation,
+        relationshipType: validationPayload.relationshipType,
+        relationshipName: validationPayload.relationshipName,
+        passportNumber: validationPayload.passportNumber ? `${validationPayload.passportNumber.slice(0, 2)}***` : undefined,
+        passportExpiry: validationPayload.passportExpiry,
+        visaNumber: validationPayload.visaNumber ? `${validationPayload.visaNumber.slice(0, 2)}***` : undefined,
+        visaExpiry: validationPayload.visaExpiry
+      });
+    }
 
     const result = RegisterStudentValidationSchema.safeParse(validationPayload);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       let firstErrorField = "";
+
+      console.warn("[STUDENT_REGISTRATION_VALIDATION_FAILED]", result.error.issues.map(iss => ({
+        field: iss.path.join("."),
+        code: iss.code,
+        message: iss.message
+      })));
       
       result.error.issues.forEach((issue) => {
         const path = String(issue.path[0] || "");
@@ -295,29 +368,20 @@ export default function StudentRegistrationPage() {
         }, 800);
       } else {
         setSubmittingError(true);
+        
+        // Handle server-side validation error map
+        if (res.fieldErrors && Object.keys(res.fieldErrors).length > 0) {
+          setValidationErrors(res.fieldErrors);
+          const firstKey = Object.keys(res.fieldErrors)[0];
+          if (firstKey) focusField(firstKey);
+        }
+
+        const errTitle = res.errorTitle || "Unable to register student";
         const errMsg = res.error || "An unexpected error occurred while saving the student record.";
         
-        if (errMsg.toLowerCase().includes("registration number") && errMsg.toLowerCase().includes("already registered")) {
-          toast.error("Student already exists", {
-            description: "A student with this registration number is already registered."
-          });
-        } else if (errMsg.toLowerCase().includes("email") && errMsg.toLowerCase().includes("already registered")) {
-          toast.error("Student already exists", {
-            description: "A student with this email address is already registered."
-          });
-        } else if (errMsg.toLowerCase().includes("permission") || errMsg.toLowerCase().includes("access")) {
-          toast.error("Access Restricted", {
-            description: "You do not have permission to register a student."
-          });
-        } else if (errMsg.toLowerCase().includes("database") || errMsg.toLowerCase().includes("connect")) {
-          toast.error("Unable to save the student", {
-            description: "The system could not connect to the database. Please try again."
-          });
-        } else {
-          toast.error("Unable to register student", {
-            description: errMsg
-          });
-        }
+        toast.error(errTitle, {
+          description: errMsg
+        });
       }
     } catch (err) {
       setSubmittingError(true);
@@ -646,38 +710,34 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground" htmlFor="admissionDate">
                       Admission Date <span className="text-rose-500">*</span>
                     </label>
-                    <Input
+                    <DatePicker
                       id="admissionDate"
-                      type="date"
                       value={formData.admissionDate}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                      onValueChange={(v) => handleSelectChange("admissionDate", v)}
                       disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.admissionDate ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      startYear={2015}
+                      endYear={new Date().getFullYear() + 2}
+                      placeholder="Select admission date..."
+                      error={validationErrors.admissionDate}
                     />
-                    {validationErrors.admissionDate && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.admissionDate}
-                      </p>
-                    )}
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="expectedGraduation">
                       Expected Graduation Date <span className="text-rose-500">*</span>
                     </label>
-                    <Input
+                    <DatePicker
                       id="expectedGraduation"
-                      type="date"
                       value={formData.expectedGraduation}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                      onValueChange={(v) => handleSelectChange("expectedGraduation", v)}
                       disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.expectedGraduation ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      startYear={2015}
+                      endYear={new Date().getFullYear() + 10}
+                      placeholder="Select expected graduation..."
+                      error={validationErrors.expectedGraduation}
                     />
-                    {validationErrors.expectedGraduation && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.expectedGraduation}
-                      </p>
-                    )}
                   </div>
                 </div>
               </CardContent>
@@ -892,19 +952,18 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground" htmlFor="passportExpiry">
                       Passport Expiration Date
                     </label>
-                    <Input
+                    <DatePicker
                       id="passportExpiry"
-                      type="date"
                       value={formData.passportExpiry}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                      onValueChange={(v) => handleSelectChange("passportExpiry", v)}
                       disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.passportExpiry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      minDate={new Date()}
+                      startYear={new Date().getFullYear()}
+                      endYear={new Date().getFullYear() + 20}
+                      placeholder="Select passport expiry date..."
+                      error={validationErrors.passportExpiry}
                     />
-                    {validationErrors.passportExpiry && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.passportExpiry}
-                      </p>
-                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -930,19 +989,18 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground" htmlFor="visaExpiry">
                       Visa Expiration Date
                     </label>
-                    <Input
+                    <DatePicker
                       id="visaExpiry"
-                      type="date"
                       value={formData.visaExpiry}
-                      onChange={handleInputChange}
+                      onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                      onValueChange={(v) => handleSelectChange("visaExpiry", v)}
                       disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.visaExpiry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      minDate={new Date()}
+                      startYear={new Date().getFullYear()}
+                      endYear={new Date().getFullYear() + 15}
+                      placeholder="Select visa expiry date..."
+                      error={validationErrors.visaExpiry}
                     />
-                    {validationErrors.visaExpiry && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.visaExpiry}
-                      </p>
-                    )}
                   </div>
                 </div>
 

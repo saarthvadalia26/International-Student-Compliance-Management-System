@@ -5,6 +5,7 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { StudentService } from "@/services/student/student.service";
 import { RegisterStudentInput, UpdateStudentInput, StudentFilterOptions } from "@/services/student/student.types";
+import { z } from "zod";
 import { getCountryByCode } from "@/utils/countries";
 import { sanitizeError } from "@/lib/errors/error-sanitizer";
 
@@ -100,14 +101,19 @@ interface VersionDatabaseRow {
   created_at: string;
 }
 
+export type RegisterStudentActionResult = {
+  success: boolean;
+  studentId?: string;
+  errorCode?: "VALIDATION_ERROR" | "DATABASE_CONNECTION_ERROR" | "DATABASE_CONSTRAINT_ERROR" | "DUPLICATE_STUDENT" | "AUTHORIZATION_ERROR" | "SERVER_ERROR";
+  errorTitle?: string;
+  error?: string;
+  fieldErrors?: Record<string, string>;
+};
+
 /**
  * Server Action: Register a new international student
  */
-export async function registerStudentAction(input: RegisterStudentInput): Promise<{
-  success: boolean;
-  studentId?: string;
-  error?: string;
-}> {
+export async function registerStudentAction(input: RegisterStudentInput): Promise<RegisterStudentActionResult> {
   try {
     const supabase = await getServerSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -115,7 +121,9 @@ export async function registerStudentAction(input: RegisterStudentInput): Promis
     if (authError || !user) {
       return {
         success: false,
-        error: "Authentication required. Please log in to complete registration."
+        errorCode: "AUTHORIZATION_ERROR",
+        errorTitle: "Access Restricted",
+        error: "You do not have permission to register a student. Please log in as an authorized administrator."
       };
     }
 
@@ -130,10 +138,59 @@ export async function registerStudentAction(input: RegisterStudentInput): Promis
       studentId: created.student.id
     };
   } catch (err: unknown) {
+    if (err instanceof z.ZodError) {
+      const fieldErrors: Record<string, string> = {};
+      err.issues.forEach(issue => {
+        const path = String(issue.path[issue.path.length - 1] || issue.path[0] || "");
+        if (path && !fieldErrors[path]) {
+          fieldErrors[path] = issue.message;
+        }
+      });
+      return {
+        success: false,
+        errorCode: "VALIDATION_ERROR",
+        errorTitle: "Student information is incomplete",
+        error: "Please correct the highlighted fields before registering the student.",
+        fieldErrors
+      };
+    }
+
+    const rawMsg = err instanceof Error ? err.message : String(err || "");
+    const rawLower = rawMsg.toLowerCase();
+
+    if (rawLower.includes("registration number") && (rawLower.includes("already registered") || rawLower.includes("already exists"))) {
+      return {
+        success: false,
+        errorCode: "DUPLICATE_STUDENT",
+        errorTitle: "Student already exists",
+        error: `A student with registration number "${input.registrationNumber}" is already registered.`
+      };
+    }
+
+    if (rawLower.includes("email") && (rawLower.includes("already registered") || rawLower.includes("already exists") || rawLower.includes("unique"))) {
+      return {
+        success: false,
+        errorCode: "DUPLICATE_STUDENT",
+        errorTitle: "Student already exists",
+        error: `A student with email address "${input.email}" is already registered.`
+      };
+    }
+
+    if (rawLower.includes("database") || rawLower.includes("connect") || rawLower.includes("timeout") || rawLower.includes("pgrst")) {
+      return {
+        success: false,
+        errorCode: "DATABASE_CONNECTION_ERROR",
+        errorTitle: "Unable to save the student",
+        error: "The system could not connect to the database. Please try again."
+      };
+    }
+
     const sanitized = sanitizeError(err, { action: "registerStudentAction", route: "/students/add" });
     return {
       success: false,
-      error: sanitized.message
+      errorCode: "SERVER_ERROR",
+      errorTitle: sanitized.title || "Unable to save student",
+      error: sanitized.message || "Something went wrong while saving the student record."
     };
   }
 }
