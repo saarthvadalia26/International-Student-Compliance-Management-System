@@ -1,5 +1,5 @@
 export type ComplianceDocumentType = "passport" | "visa" | "efrro";
-export type ComplianceStatus = "COMPLIANT" | "WARNING" | "EXPIRED" | "PENDING_VERIFICATION" | "REJECTED" | "MISSING";
+export type ComplianceStatus = "COMPLIANT" | "WARNING" | "EXPIRED" | "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "NOT_UPLOADED" | "MISSING";
 
 export interface ComplianceDocument {
   id: string;

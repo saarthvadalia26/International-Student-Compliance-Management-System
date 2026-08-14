@@ -24,15 +24,16 @@ export class ExpiryCalculationService {
 export class ComplianceStatusService {
   private static warningThresholdDays = 60;
 
-  static calculateStatus(expiryDate: Date | null, verificationStatus: "pending" | "verified" | "rejected" | null): ComplianceStatus {
-    if (!verificationStatus) return "MISSING";
+  static calculateStatus(expiryDate: Date | null, verificationStatus: "pending" | "verified" | "rejected" | null, hasUploadedDocument?: boolean): ComplianceStatus {
+    if (!hasUploadedDocument && hasUploadedDocument !== undefined) return "NOT_UPLOADED";
+    if (!verificationStatus) return "NOT_UPLOADED";
     if (verificationStatus === "rejected") return "REJECTED";
     if (verificationStatus === "pending") return "PENDING_VERIFICATION";
     
-    if (!expiryDate) return "MISSING";
+    if (!expiryDate) return "NOT_UPLOADED";
     
     const daysLeft = ExpiryCalculationService.getDaysUntilExpiry(expiryDate);
-    if (daysLeft === null) return "MISSING";
+    if (daysLeft === null) return "NOT_UPLOADED";
     if (daysLeft <= 0) return "EXPIRED";
     if (daysLeft < this.warningThresholdDays) return "WARNING";
     

@@ -26,6 +26,21 @@ export interface StudentListItem {
   academicStatus: "good_standing" | "probation" | "suspended";
 }
 
+export interface StudentDocumentDetail {
+  number: string;
+  issueDate: string;
+  expiryDate: string;
+  verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
+  hasUploadedDocument: boolean;
+  uploadedAt?: string | null;
+  verifiedAt?: string | null;
+  verifiedBy?: string | null;
+  rejectionReason?: string | null;
+  filePath?: string | null;
+  visaType?: string;
+  issuePlace?: string;
+}
+
 export interface StudentDetailProfile {
   id: string;
   fullName: string;
@@ -46,24 +61,9 @@ export interface StudentDetailProfile {
   admissionDate: string;
   expectedGraduation: string;
   complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
-  passport: {
-    number: string;
-    issueDate: string;
-    expiryDate: string;
-    verificationStatus: "pending" | "verified" | "rejected";
-  };
-  visa: {
-    number: string;
-    issueDate: string;
-    expiryDate: string;
-    verificationStatus: "pending" | "verified" | "rejected";
-  };
-  efrro?: {
-    number: string;
-    issueDate: string;
-    expiryDate: string;
-    verificationStatus: "pending" | "verified" | "rejected";
-  };
+  passport: StudentDocumentDetail;
+  visa: StudentDocumentDetail;
+  efrro?: StudentDocumentDetail;
   emergencyContact: {
     name: string;
     relationship: string;
@@ -96,9 +96,13 @@ interface VersionDatabaseRow {
   document_number: string;
   issue_date: string;
   expiry_date: string;
+  file_path?: string | null;
   verification_status: "pending" | "verified" | "rejected";
+  verified_by?: string | null;
+  verified_at?: string | null;
   rejection_reason?: string | null;
   created_at: string;
+  deleted_at?: string | null;
 }
 
 export type RegisterStudentActionResult = {
@@ -351,9 +355,20 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     const embassy = record.student_embassy?.[0] || record.student_embassy || {};
     const snapshot = record.student_snapshot?.[0] || record.student_snapshot || {};
 
-    const activePassport = (record.passport_versions || []).find((p: VersionDatabaseRow) => p.is_active && !('deleted_at' in p && (p as Record<string, unknown>).deleted_at));
-    const activeVisa = (record.visa_versions || []).find((v: VersionDatabaseRow) => v.is_active && !('deleted_at' in v && (v as Record<string, unknown>).deleted_at));
-    const activeEfrro = (record.efrro_versions || []).find((e: VersionDatabaseRow) => e.is_active && !('deleted_at' in e && (e as Record<string, unknown>).deleted_at));
+    const hasValidFile = (row?: VersionDatabaseRow | null) => {
+      if (!row || !row.file_path) return false;
+      const fp = row.file_path.trim().toLowerCase();
+      return fp !== "" && fp !== "pending_upload" && fp !== "null";
+    };
+
+    const activePassport = (record.passport_versions || []).find((p: VersionDatabaseRow) => p.is_active && !p.deleted_at);
+    const isPassportUploaded = hasValidFile(activePassport);
+
+    const activeVisa = (record.visa_versions || []).find((v: VersionDatabaseRow) => v.is_active && !v.deleted_at);
+    const isVisaUploaded = hasValidFile(activeVisa);
+
+    const activeEfrro = (record.efrro_versions || []).find((e: VersionDatabaseRow) => e.is_active && !e.deleted_at);
+    const isEfrroUploaded = hasValidFile(activeEfrro);
 
     const countryObj = getCountryByCode(personal?.nationality_code || "IND");
 
@@ -387,27 +402,45 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         const raw = (snapshot?.compliance_status || "").toUpperCase();
         if (raw === "WARNING" || raw === "PENDING_VERIFICATION") return "warning";
         if (raw === "EXPIRED") return "expired";
-        if (raw === "MISSING" || raw === "REJECTED") return "non_compliant";
+        if (raw === "MISSING" || raw === "REJECTED" || raw === "NOT_UPLOADED") return "non_compliant";
         return "compliant";
       })(),
       passport: {
-        number: activePassport?.document_number || snapshot?.passport_number || "Not Recorded",
-        issueDate: activePassport?.issue_date || "",
-        expiryDate: activePassport?.expiry_date || snapshot?.passport_expiry || "",
-        verificationStatus: activePassport?.verification_status || "pending"
+        number: isPassportUploaded ? (activePassport?.document_number || snapshot?.passport_number || "Not Recorded") : (snapshot?.passport_number || "Not Recorded"),
+        issueDate: isPassportUploaded ? (activePassport?.issue_date || "") : "",
+        expiryDate: isPassportUploaded ? (activePassport?.expiry_date || snapshot?.passport_expiry || "") : (snapshot?.passport_expiry || ""),
+        verificationStatus: isPassportUploaded ? (activePassport?.verification_status || "pending") : "not_uploaded",
+        hasUploadedDocument: isPassportUploaded,
+        uploadedAt: isPassportUploaded ? activePassport?.created_at : null,
+        verifiedAt: isPassportUploaded ? (activePassport?.verified_at || null) : null,
+        verifiedBy: isPassportUploaded ? (activePassport?.verified_by || null) : null,
+        rejectionReason: isPassportUploaded ? (activePassport?.rejection_reason || null) : null,
+        filePath: isPassportUploaded ? (activePassport?.file_path || null) : null
       },
       visa: {
-        number: activeVisa?.document_number || snapshot?.visa_number || "Not Recorded",
-        issueDate: activeVisa?.issue_date || "",
-        expiryDate: activeVisa?.expiry_date || snapshot?.visa_expiry || "",
-        verificationStatus: activeVisa?.verification_status || "pending"
+        number: isVisaUploaded ? (activeVisa?.document_number || snapshot?.visa_number || "Not Recorded") : (snapshot?.visa_number || "Not Recorded"),
+        issueDate: isVisaUploaded ? (activeVisa?.issue_date || "") : "",
+        expiryDate: isVisaUploaded ? (activeVisa?.expiry_date || snapshot?.visa_expiry || "") : (snapshot?.visa_expiry || ""),
+        verificationStatus: isVisaUploaded ? (activeVisa?.verification_status || "pending") : "not_uploaded",
+        hasUploadedDocument: isVisaUploaded,
+        uploadedAt: isVisaUploaded ? activeVisa?.created_at : null,
+        verifiedAt: isVisaUploaded ? (activeVisa?.verified_at || null) : null,
+        verifiedBy: isVisaUploaded ? (activeVisa?.verified_by || null) : null,
+        rejectionReason: isVisaUploaded ? (activeVisa?.rejection_reason || null) : null,
+        filePath: isVisaUploaded ? (activeVisa?.file_path || null) : null
       },
-      efrro: activeEfrro ? {
-        number: activeEfrro.document_number,
-        issueDate: activeEfrro.issue_date,
-        expiryDate: activeEfrro.expiry_date,
-        verificationStatus: activeEfrro.verification_status
-      } : undefined,
+      efrro: {
+        number: isEfrroUploaded ? (activeEfrro?.document_number || snapshot?.efrro_number || "Not Recorded") : (snapshot?.efrro_number || "Not Recorded"),
+        issueDate: isEfrroUploaded ? (activeEfrro?.issue_date || "") : "",
+        expiryDate: isEfrroUploaded ? (activeEfrro?.expiry_date || snapshot?.efrro_expiry || "") : (snapshot?.efrro_expiry || ""),
+        verificationStatus: isEfrroUploaded ? (activeEfrro?.verification_status || "pending") : "not_uploaded",
+        hasUploadedDocument: isEfrroUploaded,
+        uploadedAt: isEfrroUploaded ? activeEfrro?.created_at : null,
+        verifiedAt: isEfrroUploaded ? (activeEfrro?.verified_at || null) : null,
+        verifiedBy: isEfrroUploaded ? (activeEfrro?.verified_by || null) : null,
+        rejectionReason: isEfrroUploaded ? (activeEfrro?.rejection_reason || null) : null,
+        filePath: isEfrroUploaded ? (activeEfrro?.file_path || null) : null
+      },
       emergencyContact: {
         name: primaryContact.name || "Not Specified",
         relationship: primaryContact.relationship_type || "parent",
@@ -439,7 +472,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
  */
 export async function updateStudentAction(
   studentId: string, 
-  data: UpdateStudentInput
+  updates: UpdateStudentInput
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await getServerSupabase();
@@ -452,10 +485,10 @@ export async function updateStudentAction(
       };
     }
 
-    await studentService.updateStudent(studentId, data, user.id);
+    await studentService.updateStudent(studentId, updates, user.id);
 
-    revalidatePath("/students");
     revalidatePath(`/students/${studentId}`);
+    revalidatePath("/students");
     revalidatePath("/dashboard");
 
     return { success: true };
@@ -530,10 +563,24 @@ export async function getDocumentVersionsAction(
 
     if (error) {
       console.error(`[GET_DOC_VERSIONS_ERROR] ${tableName}:`, error);
-      return { success: false, versions: [], status: "MISSING", error: error.message };
+      return { success: false, versions: [], status: "NOT_UPLOADED", error: error.message };
     }
 
-    const typedRows: VersionDatabaseRow[] = rows || [];
+    // Filter out rows without genuine physical uploaded file paths
+    const typedRows: VersionDatabaseRow[] = (rows || []).filter((row: VersionDatabaseRow) => {
+      if (!row.file_path) return false;
+      const fp = row.file_path.trim().toLowerCase();
+      return fp !== "" && fp !== "pending_upload" && fp !== "null";
+    });
+
+    if (typedRows.length === 0) {
+      return {
+        success: true,
+        versions: [],
+        status: "NOT_UPLOADED"
+      };
+    }
+
     const versions: DocumentVersionItem[] = typedRows.map((row: VersionDatabaseRow, index: number) => ({
       id: row.id,
       versionNumber: row.version_number || (typedRows.length - index),
@@ -547,7 +594,7 @@ export async function getDocumentVersionsAction(
     }));
 
     // Derive compliance status
-    let status = "MISSING";
+    let status = "NOT_UPLOADED";
     const activeDoc = versions.find(v => v.isActive) || versions[0];
     if (activeDoc) {
       if (activeDoc.verificationStatus === "rejected") {
@@ -577,8 +624,100 @@ export async function getDocumentVersionsAction(
     return {
       success: false,
       versions: [],
-      status: "MISSING",
+      status: "NOT_UPLOADED",
       error: err instanceof Error ? err.message : "Failed to load document records."
+    };
+  }
+}
+
+/**
+ * Server Action: Update verification status for a document version
+ */
+export async function updateDocumentVerificationAction(
+  studentId: string,
+  documentType: "passport" | "visa" | "efrro",
+  versionId?: string | null,
+  status: "verified" | "rejected" = "verified",
+  rejectionReason?: string,
+  notes?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "Authentication required to perform document verification."
+      };
+    }
+
+    const adminSupabase = getAdminSupabase();
+    const tableName = documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+    const updatePayload: Record<string, unknown> = {
+      verification_status: status,
+      verified_by: user.id,
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      notes: notes || null
+    };
+
+    if (status === "rejected") {
+      updatePayload.rejection_reason = rejectionReason || "Document rejected by administrator";
+    }
+
+    let query = adminSupabase
+      .from(tableName)
+      .update(updatePayload)
+      .eq("student_id", studentId);
+
+    if (versionId) {
+      query = query.eq("id", versionId);
+    } else {
+      query = query.eq("is_active", true);
+    }
+
+    const { error: updateError } = await query;
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    // Refresh student_snapshot
+    const statusCol = `${documentType}_status`;
+    const snapshotStatus = status === "verified" ? "COMPLIANT" : "REJECTED";
+    await adminSupabase
+      .from("student_snapshot")
+      .update({
+        [statusCol]: snapshotStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq("student_id", studentId);
+
+    // Audit log
+    await adminSupabase.from("audit_log").insert({
+      actor_id: user.id,
+      action: status === "verified" ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED",
+      resource: `${documentType}_versions/${versionId}`,
+      filters_applied: { studentId, documentType, status, rejectionReason }
+    });
+
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath(`/students/${studentId}/${documentType}`);
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
+
+    return { success: true };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "updateDocumentVerificationAction", route: `/students/${studentId}/${documentType}` });
+    return {
+      success: false,
+      error: sanitized.message
     };
   }
 }

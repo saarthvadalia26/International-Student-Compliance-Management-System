@@ -6,7 +6,6 @@ import {
   ArrowLeft, 
   Globe, 
   GraduationCap, 
-  Calendar, 
   Phone, 
   Mail, 
   FileText, 
@@ -15,11 +14,10 @@ import {
   XCircle, 
   Check, 
   X,
-  Send,
   Building,
   Loader2
 } from "lucide-react";
-import { getStudentDetailsAction, updateStudentAction } from "@/app/(app)/students/actions";
+import { getStudentDetailsAction, updateStudentAction, updateDocumentVerificationAction } from "@/app/(app)/students/actions";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +38,13 @@ export interface StudentDocument {
   expiryDate: string;
   issuePlace?: string;
   visaType?: string;
-  verificationStatus: "pending" | "verified" | "rejected";
+  verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
+  hasUploadedDocument?: boolean;
+  uploadedAt?: string | null;
+  verifiedAt?: string | null;
+  verifiedBy?: string | null;
+  rejectionReason?: string | null;
+  filePath?: string | null;
 }
 
 export interface StudentProfile {
@@ -180,29 +184,6 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [saveError, setSaveError] = React.useState(false);
 
-  // States and handler for manual warning alert sending
-  const [isSendingAlert, setIsSendingAlert] = React.useState(false);
-  const [sendAlertSuccess, setSendAlertSuccess] = React.useState(false);
-  const [sendAlertError, setSendAlertError] = React.useState(false);
-
-  const handleSendWarningAlert = () => {
-    setIsSendingAlert(true);
-    setSendAlertSuccess(false);
-    setSendAlertError(false);
-
-    try {
-      toast.info("Notification dispatched", {
-        description: `Compliance warning reminder queued for ${student?.fullName || "student"}.`
-      });
-      setSendAlertSuccess(true);
-    } catch {
-      setSendAlertError(true);
-      toast.error("Failed to dispatch compliance alert.");
-    } finally {
-      setIsSendingAlert(false);
-    }
-  };
-
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editForm.fullName.trim() || !editForm.email.trim()) {
@@ -287,78 +268,41 @@ export default function StudentDetailsPage({ params }: PageProps) {
     );
   }
 
-  // Update compliance snapshot on-the-fly based on document states
-  const recalculateCompliance = (
-    passport: StudentDocument, 
-    visa: StudentDocument, 
-    efrro?: StudentDocument
-  ): StudentProfile["complianceStatus"] => {
-    // 1. Check if expired or rejected
-    const isPassportExpired = student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry < 0;
-    const isVisaExpired = student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry < 0;
-    const isEfrroExpired = student.daysToEfrroExpiry !== undefined && student.daysToEfrroExpiry < 0;
 
-    if (
-      passport.verificationStatus === "rejected" || 
-      visa.verificationStatus === "rejected" || 
-      efrro?.verificationStatus === "rejected" ||
-      isPassportExpired || 
-      isVisaExpired || 
-      isEfrroExpired
-    ) {
-      return "non_compliant";
+
+  // Document verification handler
+  const handleVerifyDocument = async (docType: "passport" | "visa" | "efrro", status: "verified" | "rejected") => {
+    let rejectionReason: string | undefined;
+    if (status === "rejected") {
+      const reason = window.prompt("Enter reason for document rejection:");
+      if (reason === null) return; // cancelled
+      rejectionReason = reason.trim() || "Document rejected by administrator during compliance check";
     }
 
-    // 2. Check if pending or near expiry (< 30 days)
-    const isPassportWarning = student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry <= 30;
-    const isVisaWarning = student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry <= 30;
-    const isEfrroWarning = student.daysToEfrroExpiry !== undefined && student.daysToEfrroExpiry <= 30;
+    try {
+      const res = await updateDocumentVerificationAction(
+        studentId,
+        docType,
+        null,
+        status,
+        rejectionReason
+      );
 
-    if (
-      passport.verificationStatus === "pending" || 
-      visa.verificationStatus === "pending" || 
-      efrro?.verificationStatus === "pending" ||
-      isPassportWarning || 
-      isVisaWarning || 
-      isEfrroWarning
-    ) {
-      return "warning";
-    }
-
-    return "compliant";
-  };
-
-  // Document verification toggle handler
-  const handleVerifyDocument = (docType: "passport" | "visa" | "efrro", status: "verified" | "rejected") => {
-    setStudent(prev => {
-      if (!prev) return prev;
-      
-      const updatedPassport = { ...prev.passport };
-      const updatedVisa = { ...prev.visa };
-      const updatedEfrro = prev.efrro ? { ...prev.efrro } : undefined;
-
-      if (docType === "passport") {
-        updatedPassport.verificationStatus = status;
-      } else if (docType === "visa") {
-        updatedVisa.verificationStatus = status;
-      } else if (docType === "efrro" && updatedEfrro) {
-        updatedEfrro.verificationStatus = status;
+      if (res.success) {
+        toast.success(`Document marked as ${status}`, {
+          description: `Compliance standing updated successfully.`
+        });
+        await loadStudentData();
+      } else {
+        toast.error("Verification Update Failed", {
+          description: res.error || "Unable to update document verification status."
+        });
       }
-
-      const newCompliance = recalculateCompliance(updatedPassport, updatedVisa, updatedEfrro);
-      
-      toast.success(`Document marked as ${status}`, {
-        description: `Compliance standing updated to: ${newCompliance.toUpperCase()}`,
+    } catch (err) {
+      toast.error("Database Error", {
+        description: err instanceof Error ? err.message : "Unable to communicate with database."
       });
-
-      return {
-        ...prev,
-        passport: updatedPassport,
-        visa: updatedVisa,
-        efrro: updatedEfrro,
-        complianceStatus: newCompliance
-      };
-    });
+    }
   };
 
   const getComplianceHeaderBadge = (status: StudentProfile["complianceStatus"]) => {
@@ -375,7 +319,9 @@ export default function StudentDetailsPage({ params }: PageProps) {
   };
 
   const getDocStatusIcon = (doc: StudentDocument | undefined, daysLeft?: number) => {
-    if (!doc) return <XCircle className="h-5 w-5 text-muted-foreground" />;
+    if (!doc || !doc.hasUploadedDocument || doc.verificationStatus === "not_uploaded") {
+      return <FileText className="h-5 w-5 text-muted-foreground/60" />;
+    }
     
     const isExpired = daysLeft !== undefined && daysLeft < 0;
     if (isExpired) return <XCircle className="h-5 w-5 text-rose-500" />;
@@ -387,109 +333,94 @@ export default function StudentDetailsPage({ params }: PageProps) {
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-fade-in pb-12">
       {/* Top Breadcrumb Navigation */}
-      <div className="flex items-center">
-        <Link href="/students" className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground font-small transition-colors">
-          <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Student Directory
+      <div className="flex items-center justify-between">
+        <Link 
+          href="/students" 
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Students Directory
         </Link>
       </div>
 
-      {/* Primary Profile Header */}
-      <Card className="border border-border/60 shadow-sm bg-card/65 backdrop-blur-sm overflow-hidden">
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-            <div className="flex items-start gap-4">
-              {/* Profile Initials box */}
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold text-lg font-display">
-                {student.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-xl font-h1 font-bold text-foreground leading-none">{student.fullName}</h1>
-                  {getComplianceHeaderBadge(student.complianceStatus)}
-                </div>
-                
-                <p className="text-xs text-muted-foreground font-caption leading-tight">
-                  Registration ID: <span className="font-semibold text-foreground">{student.registrationNumber}</span>
-                </p>
-
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1.5 font-small">
-                  <span className="flex items-center gap-1.5 font-medium text-foreground">
-                    <CountryFlag countryCode={student.nationalityCode} size="md" /> {student.nationalityName} ({student.nationalityCode})
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <GraduationCap className="h-3.5 w-3.5 text-muted-foreground/80" /> {student.programName}
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-muted-foreground/80" /> Sem {student.currentSemester}
-                  </span>
-                </div>
-              </div>
+      {/* Hero Profile Header */}
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 p-6 rounded-xl border border-border/80 bg-card/60 backdrop-blur-sm shadow-sm">
+        <div className="flex items-start gap-4">
+          <CountryFlag countryCode={student.nationalityCode} size="lg" className="mt-1 shrink-0 rounded-md border" />
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-h1 font-bold text-foreground">{student.fullName}</h1>
+              <Badge variant="outline" className="text-xs font-mono">
+                {student.registrationNumber}
+              </Badge>
             </div>
 
-            {/* Quick action buttons */}
-            <div className="flex flex-wrap gap-2 pt-2 md:pt-0">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-9 text-xs"
-                onClick={openEditDialog}
-              >
-                Edit Profile
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-9 text-xs"
-                onClick={() => toast.info("Manual Check Triggered", { description: "Compliance snapshot calculations synchronized successfully." })}
-              >
-                Sync compliance
-              </Button>
-              <AsyncActionButton
-                size="sm"
-                className="h-9 text-xs"
-                onClick={handleSendWarningAlert}
-                isLoading={isSendingAlert}
-                isSuccess={sendAlertSuccess}
-                isError={sendAlertError}
-                idleText={<><Send className="mr-2 h-3.5 w-3.5 inline" /> Send warning alert</>}
-                loadingText="Sending..."
-                successText="Changes saved"
-                errorText="Try Again"
-              />
+            <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-muted-foreground font-caption">
+              <span className="flex items-center gap-1">
+                <Globe className="h-3.5 w-3.5" />
+                {student.nationalityName}
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <GraduationCap className="h-3.5 w-3.5" />
+                {student.programName}
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1 capitalize">
+                Semester {student.currentSemester} ({student.academicStatus.replace("_", " ")})
+              </span>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Tab select block */}
-      <div className="flex border-b border-border/40 gap-6 text-sm">
+        {/* Global Compliance Status & Actions */}
+        <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-caption">Compliance Standing:</span>
+            {getComplianceHeaderBadge(student.complianceStatus)}
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-xs h-8"
+              onClick={openEditDialog}
+            >
+              Edit Profile
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tab Navigation Controls */}
+      <div className="flex border-b border-border/60 gap-4 text-xs font-medium">
         <button
           onClick={() => setActiveSubTab("immigration")}
-          className={`pb-2.5 font-medium border-b-2 transition-all ${
+          className={`pb-3 relative transition-colors ${
             activeSubTab === "immigration" 
-              ? "border-primary text-foreground" 
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary" 
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          Immigration Documents
+          Immigration & Documents
         </button>
         <button
           onClick={() => setActiveSubTab("academic")}
-          className={`pb-2.5 font-medium border-b-2 transition-all ${
+          className={`pb-3 relative transition-colors ${
             activeSubTab === "academic" 
-              ? "border-primary text-foreground" 
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary" 
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          AcademicStanding Details
+          Academic Details
         </button>
         <button
           onClick={() => setActiveSubTab("contact")}
-          className={`pb-2.5 font-medium border-b-2 transition-all ${
+          className={`pb-3 relative transition-colors ${
             activeSubTab === "contact" 
-              ? "border-primary text-foreground" 
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary" 
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Contact & Addresses
@@ -510,20 +441,33 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     {getDocStatusIcon(student.passport, student.daysToPassportExpiry)}
                     <div>
                       <CardTitle className="text-sm font-semibold">Passport Document Information</CardTitle>
-                      <CardDescription className="text-[10px] font-caption">Verified passport details match identity details.</CardDescription>
+                      <CardDescription className="text-[10px] font-caption">Identity verification and international travel documentation.</CardDescription>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <Badge variant="outline" className="text-[10px] h-5 capitalize">
-                      {student.passport.verificationStatus}
-                    </Badge>
+                    {student.passport.hasUploadedDocument && student.passport.verificationStatus !== "not_uploaded" ? (
+                      <Badge 
+                        variant={student.passport.verificationStatus === "verified" ? "secondary" : student.passport.verificationStatus === "rejected" ? "destructive" : "secondary"}
+                        className={`text-[10px] h-5 capitalize ${
+                          student.passport.verificationStatus === "verified" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                          student.passport.verificationStatus === "rejected" ? "bg-red-500/10 text-red-600 border-red-500/20" :
+                          "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                        }`}
+                      >
+                        {student.passport.verificationStatus === "pending" ? "Pending Verification" : student.passport.verificationStatus}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60">
+                        Not Uploaded
+                      </Badge>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 grid gap-4 sm:grid-cols-2 text-xs">
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Passport Number</span>
-                    <span className="font-semibold text-foreground block">{student.passport.number}</span>
+                    <span className="font-semibold text-foreground block">{student.passport.number || "Not Recorded"}</span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Place of Issuance</span>
@@ -531,13 +475,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   </div>
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Issue Date</span>
-                    <span className="font-semibold text-foreground block">{student.passport.issueDate}</span>
+                    <span className="font-semibold text-foreground block">{student.passport.issueDate || "Not Recorded"}</span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Expiration Date</span>
                     <span className={`font-semibold block ${student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry < 0 ? "text-rose-600" : "text-foreground"}`}>
-                      {student.passport.expiryDate}{" "}
-                      {student.daysToPassportExpiry !== undefined && (
+                      {student.passport.expiryDate || "Not Recorded"}{" "}
+                      {student.passport.expiryDate && student.daysToPassportExpiry !== undefined && (
                         <span className="text-[10px] font-medium font-caption">
                           ({student.daysToPassportExpiry < 0 ? "Expired" : `${student.daysToPassportExpiry} days left`})
                         </span>
@@ -545,24 +489,43 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     </span>
                   </div>
 
-                  {/* Audit Actions */}
-                  {student.passport.verificationStatus === "pending" && (
-                    <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-end gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                        onClick={() => handleVerifyDocument("passport", "rejected")}
+                  {student.passport.hasUploadedDocument ? (
+                    <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-between">
+                      <Link 
+                        href={`/students/${student.id}/passport`} 
+                        className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
                       >
-                        <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        className="h-7 text-[11px] px-2"
-                        onClick={() => handleVerifyDocument("passport", "verified")}
-                      >
-                        <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
-                      </Button>
+                        <FileText className="h-3.5 w-3.5" /> View Uploaded Passport Document
+                      </Link>
+
+                      {student.passport.verificationStatus === "pending" && (
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
+                            onClick={() => handleVerifyDocument("passport", "rejected")}
+                          >
+                            <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="h-7 text-[11px] px-2"
+                            onClick={() => handleVerifyDocument("passport", "verified")}
+                          >
+                            <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">No physical document scan uploaded yet.</span>
+                      <Link href={`/students/${student.id}/passport`} passHref>
+                        <Button size="sm" variant="outline" className="h-7 text-[11px]">
+                          Upload Passport PDF
+                        </Button>
+                      </Link>
                     </div>
                   )}
                 </CardContent>
@@ -580,29 +543,42 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <Badge variant="outline" className="text-[10px] h-5 capitalize">
-                      {student.visa.verificationStatus}
-                    </Badge>
+                    {student.visa.hasUploadedDocument && student.visa.verificationStatus !== "not_uploaded" ? (
+                      <Badge 
+                        variant={student.visa.verificationStatus === "verified" ? "secondary" : student.visa.verificationStatus === "rejected" ? "destructive" : "secondary"}
+                        className={`text-[10px] h-5 capitalize ${
+                          student.visa.verificationStatus === "verified" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                          student.visa.verificationStatus === "rejected" ? "bg-red-500/10 text-red-600 border-red-500/20" :
+                          "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                        }`}
+                      >
+                        {student.visa.verificationStatus === "pending" ? "Pending Verification" : student.visa.verificationStatus}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60">
+                        Not Uploaded
+                      </Badge>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 grid gap-4 sm:grid-cols-2 text-xs">
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Visa Number</span>
-                    <span className="font-semibold text-foreground block">{student.visa.number}</span>
+                    <span className="font-semibold text-foreground block">{student.visa.number || "Not Recorded"}</span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Visa Type Classification</span>
-                    <span className="font-semibold text-foreground block">{student.visa.visaType || "N/A"}</span>
+                    <span className="font-semibold text-foreground block">{student.visa.visaType || "Student (S-1)"}</span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Issue Date</span>
-                    <span className="font-semibold text-foreground block">{student.visa.issueDate}</span>
+                    <span className="font-semibold text-foreground block">{student.visa.issueDate || "Not Recorded"}</span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Expiration Date</span>
                     <span className={`font-semibold block ${student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry < 0 ? "text-rose-600" : "text-foreground"}`}>
-                      {student.visa.expiryDate}{" "}
-                      {student.daysToVisaExpiry !== undefined && (
+                      {student.visa.expiryDate || "Not Recorded"}{" "}
+                      {student.visa.expiryDate && student.daysToVisaExpiry !== undefined && (
                         <span className="text-[10px] font-medium font-caption">
                           ({student.daysToVisaExpiry < 0 ? `Expired ${Math.abs(student.daysToVisaExpiry)} days ago` : `${student.daysToVisaExpiry} days left`})
                         </span>
@@ -610,30 +586,49 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     </span>
                   </div>
 
-                  {/* Audit Actions */}
-                  {student.visa.verificationStatus === "pending" && (
-                    <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-end gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                        onClick={() => handleVerifyDocument("visa", "rejected")}
+                  {student.visa.hasUploadedDocument ? (
+                    <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-between">
+                      <Link 
+                        href={`/students/${student.id}/visa`} 
+                        className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
                       >
-                        <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        className="h-7 text-[11px] px-2"
-                        onClick={() => handleVerifyDocument("visa", "verified")}
-                      >
-                        <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
-                      </Button>
+                        <FileText className="h-3.5 w-3.5" /> View Uploaded Visa Document
+                      </Link>
+
+                      {student.visa.verificationStatus === "pending" && (
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
+                            onClick={() => handleVerifyDocument("visa", "rejected")}
+                          >
+                            <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="h-7 text-[11px] px-2"
+                            onClick={() => handleVerifyDocument("visa", "verified")}
+                          >
+                            <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">No physical document scan uploaded yet.</span>
+                      <Link href={`/students/${student.id}/visa`} passHref>
+                        <Button size="sm" variant="outline" className="h-7 text-[11px]">
+                          Upload Visa PDF
+                        </Button>
+                      </Link>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* EFRRO REGISTRATION CARD (MANDATORY EXCEPT FOR EXEMPTED NATIONALS BR-006) */}
+              {/* EFRRO REGISTRATION CARD */}
               {student.efrro ? (
                 <Card className="border border-border/60 shadow-sm overflow-hidden">
                   <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20">
@@ -646,31 +641,38 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <Badge variant="outline" className="text-[10px] h-5 capitalize">
-                        {student.efrro.verificationStatus}
-                      </Badge>
+                      {student.efrro.hasUploadedDocument && student.efrro.verificationStatus !== "not_uploaded" ? (
+                        <Badge 
+                          variant={student.efrro.verificationStatus === "verified" ? "secondary" : student.efrro.verificationStatus === "rejected" ? "destructive" : "secondary"}
+                          className={`text-[10px] h-5 capitalize ${
+                            student.efrro.verificationStatus === "verified" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                            student.efrro.verificationStatus === "rejected" ? "bg-red-500/10 text-red-600 border-red-500/20" :
+                            "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                          }`}
+                        >
+                          {student.efrro.verificationStatus === "pending" ? "Pending Verification" : student.efrro.verificationStatus}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60">
+                          Not Uploaded
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="p-4 grid gap-4 sm:grid-cols-2 text-xs">
                     <div className="space-y-1">
                       <span className="text-muted-foreground block font-caption">Certificate Number</span>
-                      <span className="font-semibold text-foreground block">{student.efrro.number}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-muted-foreground block font-caption">File Storage Reference</span>
-                      <span className="font-medium text-foreground hover:underline flex items-center gap-1 cursor-pointer">
-                        <FileText className="h-3.5 w-3.5 text-primary" /> view_document.pdf
-                      </span>
+                      <span className="font-semibold text-foreground block">{student.efrro.number || "Not Recorded"}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="text-muted-foreground block font-caption">Issue Date</span>
-                      <span className="font-semibold text-foreground block">{student.efrro.issueDate}</span>
+                      <span className="font-semibold text-foreground block">{student.efrro.issueDate || "Not Recorded"}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="text-muted-foreground block font-caption">Expiration Date</span>
                       <span className={`font-semibold block ${student.daysToEfrroExpiry !== undefined && student.daysToEfrroExpiry < 0 ? "text-rose-600" : "text-foreground"}`}>
-                        {student.efrro.expiryDate}{" "}
-                        {student.daysToEfrroExpiry !== undefined && (
+                        {student.efrro.expiryDate || "Not Recorded"}{" "}
+                        {student.efrro.expiryDate && student.daysToEfrroExpiry !== undefined && (
                           <span className="text-[10px] font-medium font-caption">
                             ({student.daysToEfrroExpiry < 0 ? "Expired" : `${student.daysToEfrroExpiry} days left`})
                           </span>
@@ -678,24 +680,43 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       </span>
                     </div>
 
-                    {/* Audit Actions */}
-                    {student.efrro.verificationStatus === "pending" && (
-                      <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-end gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                          onClick={() => handleVerifyDocument("efrro", "rejected")}
+                    {student.efrro.hasUploadedDocument ? (
+                      <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-between">
+                        <Link 
+                          href={`/students/${student.id}/efrro`} 
+                          className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
                         >
-                          <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          className="h-7 text-[11px] px-2"
-                          onClick={() => handleVerifyDocument("efrro", "verified")}
-                        >
-                          <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
-                        </Button>
+                          <FileText className="h-3.5 w-3.5" /> View Uploaded eFRRO Document
+                        </Link>
+
+                        {student.efrro.verificationStatus === "pending" && (
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
+                              onClick={() => handleVerifyDocument("efrro", "rejected")}
+                            >
+                              <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              className="h-7 text-[11px] px-2"
+                              onClick={() => handleVerifyDocument("efrro", "verified")}
+                            >
+                              <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="sm:col-span-2 pt-3 border-t border-border/40 flex items-center justify-between">
+                        <span className="text-[11px] text-muted-foreground">No physical document scan uploaded yet.</span>
+                        <Link href={`/students/${student.id}/efrro`} passHref>
+                          <Button size="sm" variant="outline" className="h-7 text-[11px]">
+                            Upload eFRRO PDF
+                          </Button>
+                        </Link>
                       </div>
                     )}
                   </CardContent>

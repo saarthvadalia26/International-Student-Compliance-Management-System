@@ -29,7 +29,7 @@ export function ComplianceDocumentCard({
   onViewPdfClick
 }: DocumentCardProps): React.JSX.Element {
   const DocumentIcon = config.icon;
-  const isDocumentUploaded = status !== "MISSING";
+  const isDocumentUploaded = status !== "MISSING" && status !== "NOT_UPLOADED";
 
   return (
     <Card className="border border-border/60 shadow-sm bg-card/65 backdrop-blur-xs overflow-hidden">

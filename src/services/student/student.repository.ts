@@ -192,54 +192,23 @@ export class SupabaseStudentRepository implements IStudentRepository {
         embassyData = embResult;
       }
 
-      // 7. Optional Initial Document Versions & Snapshot initialization
+      // 7. Student Snapshot initialization (Stores metadata; document status is NOT_UPLOADED / MISSING until physical file is uploaded)
       const passportExp = this.formatDate(input.passportExpiry);
       const visaExp = this.formatDate(input.visaExpiry);
 
-      if (input.passportNumber && passportExp) {
-        await supabase.from("passport_versions").insert({
-          student_id: studentId,
-          document_number: input.passportNumber.trim(),
-          issue_date: admFormatted || "2020-01-01",
-          expiry_date: passportExp,
-          file_path: "pending_upload",
-          verification_status: "pending",
-          is_active: true,
-          created_by: actorId,
-          updated_by: actorId
-        });
-      }
-
-      if (input.visaNumber && visaExp) {
-        await supabase.from("visa_versions").insert({
-          student_id: studentId,
-          document_number: input.visaNumber.trim(),
-          issue_date: admFormatted || "2020-01-01",
-          expiry_date: visaExp,
-          file_path: "pending_upload",
-          verification_status: "pending",
-          is_active: true,
-          created_by: actorId,
-          updated_by: actorId
-        });
-      }
-
       // 8. Insert student_snapshot row for instant compliance and directory queries
-      const passportStatus = input.passportNumber ? "PENDING_VERIFICATION" : "MISSING";
-      const visaStatus = input.visaNumber ? "PENDING_VERIFICATION" : "MISSING";
-      const overallStatus = (input.passportNumber && input.visaNumber) ? "WARNING" : "MISSING";
-
+      // Note: Entering passport/visa metadata numbers does NOT mean a document is uploaded or pending verification.
       await supabase.from("student_snapshot").insert({
         student_id: studentId,
-        passport_status: passportStatus,
+        passport_status: "MISSING",
         passport_expiry: passportExp,
         passport_number: input.passportNumber?.trim() || null,
-        visa_status: visaStatus,
+        visa_status: "MISSING",
         visa_expiry: visaExp,
         visa_number: input.visaNumber?.trim() || null,
         efrro_status: "MISSING",
-        compliance_score: (input.passportNumber && input.visaNumber) ? 50 : 25,
-        compliance_status: overallStatus
+        compliance_score: 0,
+        compliance_status: "MISSING"
       });
 
       // 9. Record entry in audit_log
