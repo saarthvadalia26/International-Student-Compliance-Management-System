@@ -40,6 +40,12 @@ export function ComplianceStatusBadge({ status }: BadgeProps): React.JSX.Element
           <Ban className="h-3.5 w-3.5" /> Rejected
         </Badge>
       );
+    case "METADATA_ONLY":
+      return (
+        <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 font-semibold px-2 py-0.5 rounded-md flex items-center gap-1.5 w-fit">
+          <HelpCircle className="h-3.5 w-3.5" /> Metadata Available
+        </Badge>
+      );
     case "NOT_UPLOADED":
     case "MISSING":
     default:

@@ -26,6 +26,13 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
   
   // Versions history state from database
   const [versions, setVersions] = React.useState<DocumentVersion[]>([]);
+  const [metadata, setMetadata] = React.useState<{
+    documentNumber?: string | null;
+    issueDate?: string | null;
+    expiryDate?: string | null;
+    placeOfIssue?: string | null;
+    visaType?: string | null;
+  } | null>(null);
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
   const [isCorrectOpen, setIsCorrectOpen] = React.useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = React.useState(false);
@@ -39,14 +46,17 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
       if (res.success) {
         setVersions(res.versions);
         setStatus(res.status as ComplianceStatus);
+        setMetadata(res.metadata || null);
       } else {
         setVersions([]);
         setStatus("MISSING");
+        setMetadata(null);
       }
     } catch (err) {
       console.error("Failed to load documents", err);
       setVersions([]);
       setStatus("MISSING");
+      setMetadata(null);
     } finally {
       setLoading(false);
     }
@@ -104,7 +114,8 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
 
   const activeDoc = versions.find(v => v.isActive) || (versions.length > 0 ? versions[0] : null);
   const pendingDoc = versions.find(v => v.verificationStatus === "pending");
-  const daysLeft = activeDoc?.expiryDate ? Math.ceil((new Date(activeDoc.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+  const effectiveExpiry = activeDoc?.expiryDate || metadata?.expiryDate || null;
+  const daysLeft = effectiveExpiry ? Math.ceil((new Date(effectiveExpiry).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
 
   return (
     <div className="space-y-6 animate-fade-in pb-12 text-xs">
@@ -127,12 +138,12 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
           <ComplianceDocumentCard 
             config={config}
             status={status}
-            documentNumber={activeDoc ? activeDoc.documentNumber : null}
-            issueDate={activeDoc ? activeDoc.issueDate : null}
-            expiryDate={activeDoc ? activeDoc.expiryDate : null}
+            documentNumber={activeDoc ? activeDoc.documentNumber : (metadata?.documentNumber || null)}
+            issueDate={activeDoc ? activeDoc.issueDate : (metadata?.issueDate || null)}
+            expiryDate={effectiveExpiry}
             daysLeft={daysLeft}
             onReplaceClick={() => setIsUploadOpen(true)}
-            onCorrectClick={activeDoc ? () => setIsCorrectOpen(true) : undefined}
+            onCorrectClick={activeDoc || metadata ? () => setIsCorrectOpen(true) : undefined}
             onVerifyClick={pendingDoc || (activeDoc && status === "PENDING_VERIFICATION") ? () => setIsVerifyOpen(true) : undefined}
             onViewPdfClick={selectedPdfUrl ? () => {} : undefined}
           />

@@ -43,6 +43,15 @@ export interface StudentDocumentDetail {
   rejectionReason?: string | null;
   filePath?: string | null;
   notes?: string | null;
+  activeEarlyAuthorization?: {
+    id: string;
+    reason: string;
+    reasonDetails: string;
+    validFrom: string;
+    validUntil: string;
+    status: string;
+    createdAt: string;
+  } | null;
 }
 
 export interface StudentDetailProfile {
@@ -438,6 +447,21 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       createdAt: a.created_at
     }));
 
+    // Retrieve active early upload authorizations for this student
+    const nowIso = new Date().toISOString();
+    const { data: authorizationsData } = await adminSupabase
+      .from("student_document_upload_authorizations")
+      .select("*")
+      .eq("student_id", studentId)
+      .eq("status", "active")
+      .lte("valid_from", nowIso)
+      .gte("valid_until", nowIso)
+      .order("created_at", { ascending: false });
+
+    const activePassportAuth = (authorizationsData || []).find(a => a.document_type === "passport");
+    const activeVisaAuth = (authorizationsData || []).find(a => a.document_type === "visa");
+    const activeEfrroAuth = (authorizationsData || []).find(a => a.document_type === "efrro");
+
     const totalSemesters = Number(progData?.total_semesters) || 8;
     const semesterDuration = Number(progData?.semester_duration) || 6;
     const semesterDurationUnit = progData?.semester_duration_unit || "months";
@@ -501,7 +525,16 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         verifiedBy: isPassportUploaded ? (activePassport?.verified_by || null) : null,
         rejectionReason: isPassportUploaded ? (activePassport?.rejection_reason || null) : null,
         notes: isPassportUploaded ? (activePassport?.notes || null) : null,
-        filePath: isPassportUploaded ? (activePassport?.file_path || null) : null
+        filePath: isPassportUploaded ? (activePassport?.file_path || null) : null,
+        activeEarlyAuthorization: activePassportAuth ? {
+          id: activePassportAuth.id,
+          reason: activePassportAuth.reason,
+          reasonDetails: activePassportAuth.reason_details,
+          validFrom: activePassportAuth.valid_from,
+          validUntil: activePassportAuth.valid_until,
+          status: activePassportAuth.status,
+          createdAt: activePassportAuth.created_at
+        } : null
       },
       visa: {
         number: activeVisa?.document_number || snapshot?.visa_number || "Not provided",
@@ -516,7 +549,16 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         verifiedBy: isVisaUploaded ? (activeVisa?.verified_by || null) : null,
         rejectionReason: isVisaUploaded ? (activeVisa?.rejection_reason || null) : null,
         notes: isVisaUploaded ? (activeVisa?.notes || null) : null,
-        filePath: isVisaUploaded ? (activeVisa?.file_path || null) : null
+        filePath: isVisaUploaded ? (activeVisa?.file_path || null) : null,
+        activeEarlyAuthorization: activeVisaAuth ? {
+          id: activeVisaAuth.id,
+          reason: activeVisaAuth.reason,
+          reasonDetails: activeVisaAuth.reason_details,
+          validFrom: activeVisaAuth.valid_from,
+          validUntil: activeVisaAuth.valid_until,
+          status: activeVisaAuth.status,
+          createdAt: activeVisaAuth.created_at
+        } : null
       },
       efrro: {
         number: activeEfrro?.document_number || snapshot?.efrro_number || "Not provided",
@@ -530,7 +572,16 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         verifiedBy: isEfrroUploaded ? (activeEfrro?.verified_by || null) : null,
         rejectionReason: isEfrroUploaded ? (activeEfrro?.rejection_reason || null) : null,
         notes: isEfrroUploaded ? (activeEfrro?.notes || null) : null,
-        filePath: isEfrroUploaded ? (activeEfrro?.file_path || null) : null
+        filePath: isEfrroUploaded ? (activeEfrro?.file_path || null) : null,
+        activeEarlyAuthorization: activeEfrroAuth ? {
+          id: activeEfrroAuth.id,
+          reason: activeEfrroAuth.reason,
+          reasonDetails: activeEfrroAuth.reason_details,
+          validFrom: activeEfrroAuth.valid_from,
+          validUntil: activeEfrroAuth.valid_until,
+          status: activeEfrroAuth.status,
+          createdAt: activeEfrroAuth.created_at
+        } : null
       },
       emergencyContact: {
         name: primaryContact.name || "Not Specified",
@@ -640,6 +691,13 @@ export async function getDocumentVersionsAction(
   success: boolean;
   versions: DocumentVersionItem[];
   status: string;
+  metadata?: {
+    documentNumber?: string | null;
+    issueDate?: string | null;
+    expiryDate?: string | null;
+    placeOfIssue?: string | null;
+    visaType?: string | null;
+  };
   error?: string;
 }> {
   try {
@@ -670,10 +728,39 @@ export async function getDocumentVersionsAction(
     });
 
     if (typedRows.length === 0) {
+      // Fetch metadata from student_snapshot to support metadata-only records
+      const { data: snapshot } = await adminSupabase
+        .from("student_snapshot")
+        .select("*")
+        .eq("student_id", studentId)
+        .maybeSingle();
+
+      const docNum = documentType === "passport" ? snapshot?.passport_number :
+        documentType === "visa" ? snapshot?.visa_number : snapshot?.efrro_number;
+      const docExpiry = documentType === "passport" ? snapshot?.passport_expiry :
+        documentType === "visa" ? snapshot?.visa_expiry : snapshot?.efrro_expiry;
+      const docIssue = documentType === "passport" ? snapshot?.passport_issue_date :
+        documentType === "visa" ? snapshot?.visa_issue_date : snapshot?.efrro_issue_date;
+      const docPlace = documentType === "passport" ? snapshot?.passport_place_of_issue : null;
+      const docVisaType = documentType === "visa" ? snapshot?.visa_type : null;
+
+      const hasMetadata = Boolean(
+        (docNum && docNum !== "Not provided" && docNum !== "Not Recorded" && docNum !== "Pending") || 
+        docExpiry || 
+        docIssue
+      );
+
       return {
         success: true,
         versions: [],
-        status: "NOT_UPLOADED"
+        status: hasMetadata ? "METADATA_ONLY" : "NOT_UPLOADED",
+        metadata: hasMetadata ? {
+          documentNumber: docNum || null,
+          issueDate: docIssue || null,
+          expiryDate: docExpiry || null,
+          placeOfIssue: docPlace || null,
+          visaType: docVisaType || null
+        } : undefined
       };
     }
 
@@ -909,6 +996,10 @@ export async function updateDocumentVerificationAction(
         const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
         await ExpiryReminderEngine.evaluateAndQueueStudentDueReminders(studentId);
       }
+
+      // Automatically consume/close any active early upload authorization for this document type
+      const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+      await DocumentUploadEligibilityEngine.consumeActiveAuthorization(studentId, documentType, targetVersionId).catch(() => null);
 
       // Audit log
       await adminSupabase.from("audit_log").insert({
@@ -1717,4 +1808,132 @@ export async function getAcademicAdjustmentsAction(
   }
 }
 
+// ── Early Document Upload Exceptions (Staff Authorizations) ─────────────────
 
+export interface AuthorizeEarlyUploadInput {
+  documentType: "passport" | "visa" | "efrro";
+  reason: "document_lost" | "document_damaged" | "document_replaced" | "government_reissue" | "data_correction" | "other";
+  reasonDetails: string;
+  validFrom?: string;
+  validUntil?: string;
+}
+
+export async function authorizeEarlyDocumentUploadAction(
+  studentId: string,
+  input: AuthorizeEarlyUploadInput
+): Promise<{ success: boolean; authorizationId?: string; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to authorize early uploads." };
+    }
+
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: Only compliance officers and staff may authorize early document uploads." };
+    }
+
+    if (!input.reasonDetails || !input.reasonDetails.trim()) {
+      return { success: false, error: "A detailed explanation/reason is mandatory for institutional audit compliance." };
+    }
+
+    const adminSupabase = getAdminSupabase();
+    const now = new Date();
+    const fromDate = input.validFrom ? new Date(input.validFrom) : now;
+    const untilDate = input.validUntil ? new Date(input.validUntil) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    if (untilDate <= fromDate) {
+      return { success: false, error: "Authorization expiration date must be strictly after the start date." };
+    }
+
+    // Revoke/supersede any existing active authorization for this student and document type
+    await adminSupabase
+      .from("student_document_upload_authorizations")
+      .update({ status: "revoked", updated_at: now.toISOString() })
+      .eq("student_id", studentId)
+      .eq("document_type", input.documentType)
+      .eq("status", "active");
+
+    // Insert new authorization
+    const { data: authRecord, error: insertError } = await adminSupabase
+      .from("student_document_upload_authorizations")
+      .insert({
+        student_id: studentId,
+        document_type: input.documentType,
+        reason: input.reason,
+        reason_details: input.reasonDetails.trim(),
+        valid_from: fromDate.toISOString(),
+        valid_until: untilDate.toISOString(),
+        status: "active",
+        authorized_by: user.id
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !authRecord) {
+      return { success: false, error: `Failed to create authorization: ${insertError?.message}` };
+    }
+
+    // Audit log
+    await adminSupabase.from("audit_log").insert({
+      actor_id: user.id,
+      action: "EARLY_UPLOAD_AUTHORIZED",
+      resource: `student_document_upload_authorizations/${authRecord.id}`,
+      filters_applied: {
+        studentId,
+        documentType: input.documentType,
+        reason: input.reason,
+        reasonDetails: input.reasonDetails.trim(),
+        validFrom: fromDate.toISOString(),
+        validUntil: untilDate.toISOString(),
+        authorizedBy: user.email || user.id
+      }
+    });
+
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath(`/students/${studentId}/${input.documentType}`);
+    revalidatePath("/students");
+
+    return { success: true, authorizationId: authRecord.id };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "authorizeEarlyDocumentUploadAction", route: `/students/${studentId}` });
+    return { success: false, error: sanitized.message };
+  }
+}
+
+export async function getStudentUploadAuthorizationsAction(
+  studentId: string
+): Promise<{ success: boolean; authorizations?: import("@/domain/compliance/services/upload-eligibility.service").StudentUploadAuthorization[]; error?: string }> {
+  try {
+    const adminSupabase = getAdminSupabase();
+    const { data, error } = await adminSupabase
+      .from("student_document_upload_authorizations")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const authorizations = (data || []).map((row) => ({
+      id: row.id,
+      studentId: row.student_id,
+      documentType: row.document_type as "passport" | "visa" | "efrro",
+      reason: row.reason,
+      reasonDetails: row.reason_details,
+      validFrom: row.valid_from,
+      validUntil: row.valid_until,
+      status: row.status,
+      authorizedBy: row.authorized_by,
+      consumedAt: row.consumed_at,
+      consumedVersionId: row.consumed_version_id,
+      createdAt: row.created_at
+    }));
+
+    return { success: true, authorizations };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "getStudentUploadAuthorizationsAction", route: `/students/${studentId}` });
+    return { success: false, error: sanitized.message, authorizations: [] };
+  }
+}

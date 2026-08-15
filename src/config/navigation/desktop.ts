@@ -20,6 +20,10 @@ export const desktopNavigation: NavigationConfig = {
           title: "Add Student",
           href: "/students/add",
         },
+        {
+          title: "Bulk Import",
+          href: "/students/import",
+        },
       ],
     },
     {
@@ -40,6 +44,11 @@ export const desktopNavigation: NavigationConfig = {
           href: "/students/:id/efrro",
         },
       ],
+    },
+    {
+      title: "Replacement Requests",
+      href: "/replacement-requests",
+      icon: "FileCheck2",
     },
     {
       title: "Reminders",

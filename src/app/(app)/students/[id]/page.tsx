@@ -63,7 +63,7 @@ import {
   StudentReminderScheduleResponse, 
   ReminderStatus 
 } from "@/domain/notifications/types/reminder.types";
-import { DocumentUploadDialog } from "@/features/compliance/components/document-dialogs";
+import { DocumentUploadDialog, AllowEarlyUploadDialog } from "@/features/compliance/components/document-dialogs";
 import { DOCUMENT_CONFIGS } from "@/features/compliance/constants/constants";
 import { StudentDocumentCard } from "@/features/compliance/components/student-document-card";
 
@@ -82,6 +82,15 @@ export interface StudentDocument {
   rejectionReason?: string | null;
   notes?: string | null;
   filePath?: string | null;
+  activeEarlyAuthorization?: {
+    id: string;
+    reason: string;
+    reasonDetails: string;
+    validFrom: string;
+    validUntil: string;
+    status: string;
+    createdAt: string;
+  } | null;
 }
 
 export interface StudentProfile {
@@ -185,6 +194,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setRenewalDocType(docType);
     setIsRenewalUploadOpen(true);
   };
+
+  // Staff Early Document Upload Exception Dialog State
+  const [isEarlyUploadDialogOpen, setIsEarlyUploadDialogOpen] = React.useState(false);
+  const [earlyUploadDocType, setEarlyUploadDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
 
   // First-Class "Update Expiry Date" Dialog State
   const [isExpiryDialogOpen, setIsExpiryDialogOpen] = React.useState(false);
@@ -948,9 +961,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 verifiedBy={student.passport.verifiedBy}
                 rejectionReason={student.passport.rejectionReason}
                 daysToExpiry={student.daysToPassportExpiry}
+                activeEarlyAuthorization={student.passport.activeEarlyAuthorization}
                 onUploadRenewalClick={() => openRenewalDialog("passport")}
                 onCorrectExpiryClick={() => openExpiryDialog("passport")}
                 onCorrectMetadataClick={() => openDocMetadataDialog("passport")}
+                onAllowEarlyUploadClick={() => {
+                  setEarlyUploadDocType("passport");
+                  setIsEarlyUploadDialogOpen(true);
+                }}
                 onApproveClick={() => handleApproveDocument("passport")}
                 onRejectClick={() => handleOpenRejectDialog("passport")}
                 isApproving={approvingDocType === "passport"}
@@ -974,9 +992,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 verifiedBy={student.visa.verifiedBy}
                 rejectionReason={student.visa.rejectionReason}
                 daysToExpiry={student.daysToVisaExpiry}
+                activeEarlyAuthorization={student.visa.activeEarlyAuthorization}
                 onUploadRenewalClick={() => openRenewalDialog("visa")}
                 onCorrectExpiryClick={() => openExpiryDialog("visa")}
                 onCorrectMetadataClick={() => openDocMetadataDialog("visa")}
+                onAllowEarlyUploadClick={() => {
+                  setEarlyUploadDocType("visa");
+                  setIsEarlyUploadDialogOpen(true);
+                }}
                 onApproveClick={() => handleApproveDocument("visa")}
                 onRejectClick={() => handleOpenRejectDialog("visa")}
                 isApproving={approvingDocType === "visa"}
@@ -1000,9 +1023,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   verifiedBy={student.efrro.verifiedBy}
                   rejectionReason={student.efrro.rejectionReason}
                   daysToExpiry={student.daysToEfrroExpiry}
+                  activeEarlyAuthorization={student.efrro.activeEarlyAuthorization}
                   onUploadRenewalClick={() => openRenewalDialog("efrro")}
                   onCorrectExpiryClick={() => openExpiryDialog("efrro")}
                   onCorrectMetadataClick={() => openDocMetadataDialog("efrro")}
+                  onAllowEarlyUploadClick={() => {
+                    setEarlyUploadDocType("efrro");
+                    setIsEarlyUploadDialogOpen(true);
+                  }}
                   onApproveClick={() => handleApproveDocument("efrro")}
                   onRejectClick={() => handleOpenRejectDialog("efrro")}
                   isApproving={approvingDocType === "efrro"}
@@ -2097,6 +2125,23 @@ export default function StudentDetailsPage({ params }: PageProps) {
         }}
         onConfirm={handleConfirmRejection}
       />
+
+      {/* Staff Early Document Upload Exception Modal */}
+      {earlyUploadDocType && (
+        <AllowEarlyUploadDialog
+          isOpen={isEarlyUploadDialogOpen}
+          onOpenChange={(open) => {
+            setIsEarlyUploadDialogOpen(open);
+            if (!open) setEarlyUploadDocType(null);
+          }}
+          documentType={earlyUploadDocType}
+          documentTitle={earlyUploadDocType === "passport" ? "Passport" : earlyUploadDocType === "visa" ? "Visa" : "eFRRO"}
+          studentId={studentId}
+          onSuccess={async () => {
+            await loadStudentData();
+          }}
+        />
+      )}
     </div>
   );
 }

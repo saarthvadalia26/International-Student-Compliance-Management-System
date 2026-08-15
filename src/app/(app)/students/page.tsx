@@ -10,7 +10,8 @@ import {
   Eye,
   Trash2,
   AlertCircle,
-  Loader2
+  Loader2,
+  FileSpreadsheet
 } from "lucide-react";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardContent } from "@/components/ui/card";
@@ -198,11 +199,18 @@ export default function StudentListPage() {
           </p>
         </div>
         
-        <Link href="/students/add" passHref>
-          <Button size="sm" className="h-9 shrink-0">
-            <UserPlus className="mr-2 h-4 w-4" /> Register New Student
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href="/students/import" passHref>
+            <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border hover:bg-muted/50">
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Bulk Import
+            </Button>
+          </Link>
+          <Link href="/students/add" passHref>
+            <Button size="sm" className="h-9 shrink-0">
+              <UserPlus className="mr-2 h-4 w-4" /> Register New Student
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filters and Search controls */}

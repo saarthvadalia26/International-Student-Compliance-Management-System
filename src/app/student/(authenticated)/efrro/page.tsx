@@ -1,36 +1,117 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { 
   Upload, 
   FileText, 
-  Loader2 
+  Loader2, 
+  CheckCircle2, 
+  Clock, 
+  AlertCircle, 
+  Calendar, 
+  Sparkles, 
+  ShieldCheck, 
+  ShieldAlert,
+  Lock,
+  FileCheck2,
+  Globe2,
+  Award,
+  XCircle,
+  HelpCircle,
+  ArrowRight
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { uploadStudentDocumentAction, fetchStudentProfile } from "../../actions";
+import { 
+  uploadStudentDocumentAction, 
+  fetchStudentProfile, 
+  fetchDocumentUploadEligibilityAction,
+  submitDocumentReplacementRequestAction,
+  cancelDocumentReplacementRequestAction
+} from "../../actions";
 import { toast } from "sonner";
 import { StudentPortalProfile } from "@/domain/student-portal/types";
+import { 
+  DocumentReplacementReason, 
+  REASON_LABELS 
+} from "@/domain/compliance/types/replacement-request.types";
+import { cn } from "@/lib/utils";
 
 export default function DocumentCentrePage() {
+  return (
+    <React.Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading Document Centre...</div>}>
+      <DocumentCentreContent />
+    </React.Suspense>
+  );
+}
+
+function DocumentCentreContent() {
   const supabase = getBrowserSupabase();
+  const searchParams = useSearchParams();
+  const typeParam = searchParams ? searchParams.get("type") : null;
+
   const [profile, setProfile] = React.useState<StudentPortalProfile | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [activeDocType, setActiveDocType] = React.useState<"passport" | "visa" | "efrro">("efrro");
   const [isUploading, setIsUploading] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [eligibilityData, setEligibilityData] = React.useState<Record<string, any>>({});
 
-  const refreshProfile = async () => {
+  // Replacement Request Dialog state
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = React.useState(false);
+  const [requestReason, setRequestReason] = React.useState<DocumentReplacementReason>("passport_renewed_early");
+  const [requestDetails, setRequestDetails] = React.useState("");
+  const [isSubmittingRequest, setIsSubmittingRequest] = React.useState(false);
+  const [isCancellingRequest, setIsCancellingRequest] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeParam && ["passport", "visa", "efrro"].includes(typeParam)) {
+      setActiveDocType(typeParam as "passport" | "visa" | "efrro");
+    }
+  }, [typeParam]);
+
+  // Default reason tailored to active document type
+  React.useEffect(() => {
+    if (activeDocType === "passport") setRequestReason("passport_renewed_early");
+    else if (activeDocType === "visa") setRequestReason("visa_renewed_reissued");
+    else setRequestReason("efrro_reissued");
+  }, [activeDocType]);
+
+  const refreshProfileAndEligibility = React.useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const jwt = session?.access_token || "test_token";
-      const data = await fetchStudentProfile(jwt);
-      setProfile(data);
+      const [profileData, elig] = await Promise.all([
+        fetchStudentProfile(jwt),
+        fetchDocumentUploadEligibilityAction(jwt, activeDocType)
+      ]);
+      if (profileData) setProfile(profileData);
+      if (elig) {
+        setEligibilityData(prev => ({ ...prev, [activeDocType]: elig }));
+      }
     } catch {
       // ignore
     }
-  };
+  }, [supabase, activeDocType]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -38,9 +119,15 @@ export default function DocumentCentrePage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const jwt = session?.access_token || "test_token";
-        const data = await fetchStudentProfile(jwt);
+        const [profileData, elig] = await Promise.all([
+          fetchStudentProfile(jwt),
+          fetchDocumentUploadEligibilityAction(jwt, activeDocType)
+        ]);
         if (mounted) {
-          setProfile(data);
+          if (profileData) setProfile(profileData);
+          if (elig) {
+            setEligibilityData(prev => ({ ...prev, [activeDocType]: elig }));
+          }
           setIsLoading(false);
         }
       } catch {
@@ -51,19 +138,17 @@ export default function DocumentCentrePage() {
     return () => {
       mounted = false;
     };
-  }, [supabase]);
+  }, [supabase, activeDocType]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("File size exceeds maximum limit of 10MB.");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size exceeds maximum limit of 5MB.");
       return;
     }
 
-    // Validate type
     const validTypes = ["application/pdf", "image/jpeg", "image/png"];
     if (!validTypes.includes(file.type)) {
       toast.error("Unsupported file format. Please upload PDF, JPG, or PNG.");
@@ -95,9 +180,9 @@ export default function DocumentCentrePage() {
         );
 
         if (res.success) {
-          toast.success(`${activeDocType.toUpperCase()} document uploaded successfully!`);
+          toast.success(`${activeDocType.toUpperCase()} document submitted for verification!`);
           setSelectedFile(null);
-          await refreshProfile();
+          await refreshProfileAndEligibility();
         } else {
           toast.error(res.error || "Upload failed. Please try again.");
         }
@@ -109,6 +194,58 @@ export default function DocumentCentrePage() {
     }
   };
 
+  const handleSubmitReplacementRequest = async () => {
+    if (!requestDetails.trim()) {
+      toast.error("Please provide an explanation for the replacement request.");
+      return;
+    }
+
+    try {
+      setIsSubmittingRequest(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const jwt = session?.access_token || "test_token";
+
+      const res = await submitDocumentReplacementRequestAction(jwt, {
+        documentType: activeDocType,
+        reason: requestReason,
+        reasonDetails: requestDetails.trim()
+      });
+
+      if (res.success) {
+        toast.success(`Replacement request for ${activeDocType.toUpperCase()} submitted for compliance review.`);
+        setIsRequestDialogOpen(false);
+        setRequestDetails("");
+        await refreshProfileAndEligibility();
+      } else {
+        toast.error(res.error || "Failed to submit replacement request.");
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Submission failed.");
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
+  const handleCancelRequest = async (requestId: string) => {
+    try {
+      setIsCancellingRequest(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const jwt = session?.access_token || "test_token";
+
+      const res = await cancelDocumentReplacementRequestAction(jwt, requestId);
+      if (res.success) {
+        toast.success("Replacement request cancelled.");
+        await refreshProfileAndEligibility();
+      } else {
+        toast.error(res.error || "Failed to cancel request.");
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to cancel request.");
+    } finally {
+      setIsCancellingRequest(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-64 w-full items-center justify-center">
@@ -117,122 +254,412 @@ export default function DocumentCentrePage() {
     );
   }
 
+  // Resolve current active doc eligibility
+  const currentEligibility = eligibilityData[activeDocType] || (
+    activeDocType === "passport" ? profile?.passportEligibility :
+    activeDocType === "visa" ? profile?.visaEligibility : profile?.efrroEligibility
+  ) || {
+    canUpload: true,
+    reasonCode: "FIRST_UPLOAD",
+    userTitle: "Document Required",
+    userMessage: `Please upload your ${activeDocType.toUpperCase()} document.`
+  };
+
+  const isUploadAllowed = Boolean(currentEligibility.canUpload);
+  const activeReplRequest = currentEligibility.activeReplacementRequest;
+
+  const activeDocExpiry = activeDocType === "passport" ? profile?.passportExpiry :
+    activeDocType === "visa" ? profile?.visaExpiry : profile?.efrroExpiry;
+
+  const activeDocNumber = activeDocType === "passport" ? profile?.passportNumber :
+    activeDocType === "visa" ? profile?.visaNumber : profile?.efrroNumber;
+
+  const activeDocStatus = activeDocType === "passport" ? profile?.passportStatus :
+    activeDocType === "visa" ? profile?.visaStatus : profile?.efrroStatus;
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Title Header */}
       <div>
         <h1 className="text-xl font-bold text-foreground tracking-tight">Document Centre</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Upload and verify your Passport, Visa, and eFRRO certificates.</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Secure document upload and compliance management for your Passport, Visa, and eFRRO certificates.
+        </p>
       </div>
 
       {/* Document Type Selector Tabs */}
       <div className="flex items-center gap-2 border-b border-border/60 pb-3">
-        {(["efrro", "passport", "visa"] as const).map((type) => (
+        {(["passport", "visa", "efrro"] as const).map((type) => (
           <Button
             key={type}
             variant={activeDocType === type ? "default" : "outline"}
             size="sm"
             onClick={() => { setActiveDocType(type); setSelectedFile(null); }}
-            className="text-xs font-semibold uppercase tracking-wider h-8 rounded-xl px-4"
+            className="text-xs font-semibold uppercase tracking-wider h-8 rounded-xl px-4 flex items-center gap-1.5"
           >
-            {type}
+            {type === "passport" && <FileCheck2 className="h-3.5 w-3.5" />}
+            {type === "visa" && <Globe2 className="h-3.5 w-3.5" />}
+            {type === "efrro" && <Award className="h-3.5 w-3.5" />}
+            <span>{type}</span>
           </Button>
         ))}
       </div>
 
-      {/* Main Upload Dropzone & Status Card */}
+      {/* Main Upload / Eligibility Area & Status Card */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-4">
-          <Card className="border-border/80 rounded-2xl p-6 shadow-xs bg-card space-y-4">
-            <CardHeader className="p-0 pb-3 border-b border-border/50">
-              <CardTitle className="text-sm font-semibold flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Upload className="h-4 w-4 text-primary" />
-                  Upload {activeDocType.toUpperCase()} Document
-                </span>
-                <span className="text-[10px] text-muted-foreground">PDF, JPG, PNG (Max 10MB)</span>
-              </CardTitle>
-            </CardHeader>
+          
+          {/* STATE 1: UPLOAD DISABLED */}
+          {!isUploadAllowed ? (
+            <Card className="border-border/80 rounded-2xl p-6 shadow-xs bg-card space-y-5">
+              
+              {/* Header Icon & Title */}
+              <div className="flex items-start gap-3.5">
+                <div className={`p-2.5 rounded-xl shrink-0 ${
+                  currentEligibility.reasonCode === "PENDING_VERIFICATION" 
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                    : currentEligibility.reasonCode === "REPLACEMENT_REQUEST_PENDING"
+                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                }`}>
+                  {currentEligibility.reasonCode === "PENDING_VERIFICATION" ? (
+                    <Clock className="h-6 w-6 animate-pulse" />
+                  ) : currentEligibility.reasonCode === "REPLACEMENT_REQUEST_PENDING" ? (
+                    <Clock className="h-6 w-6 text-blue-500" />
+                  ) : (
+                    <ShieldCheck className="h-6 w-6" />
+                  )}
+                </div>
 
-            <CardContent className="p-0 pt-2 space-y-4">
-              <div className="border-2 border-dashed border-border/80 hover:border-primary/50 rounded-2xl p-8 text-center bg-accent/20 transition-colors">
-                <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                <p className="text-xs font-semibold text-foreground">
-                  {selectedFile ? selectedFile.name : `Select your ${activeDocType.toUpperCase()} document file`}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : "Click below to browse from your device"}
-                </p>
-                
-                <input
-                  type="file"
-                  id="doc-file-input"
-                  className="hidden"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={handleFileChange}
-                />
-                
-                <label htmlFor="doc-file-input" className="inline-block mt-4">
-                  <Button variant="outline" size="sm" type="button" className="text-xs pointer-events-none rounded-xl">
-                    Browse File
-                  </Button>
-                </label>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-foreground">
+                      {currentEligibility.userTitle}
+                    </h2>
+                    <Badge variant="outline" className={`text-[10px] uppercase font-bold ${
+                      currentEligibility.reasonCode === "PENDING_VERIFICATION"
+                        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                        : currentEligibility.reasonCode === "REPLACEMENT_REQUEST_PENDING"
+                        ? "bg-blue-500/10 text-blue-600 border-blue-500/30"
+                        : "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                    }`}>
+                      {currentEligibility.reasonCode === "PENDING_VERIFICATION" ? "Pending Review" :
+                       currentEligibility.reasonCode === "REPLACEMENT_REQUEST_PENDING" ? "Request Under Review" : "Valid & Active"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {currentEligibility.userMessage}
+                  </p>
+                </div>
               </div>
 
-              {selectedFile && (
-                <div className="flex items-center justify-end gap-2 pt-2">
+              {/* Informative Status Box */}
+              <div className="p-4 rounded-xl bg-muted/40 border border-border/60 space-y-2.5 text-xs">
+                {activeDocExpiry && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-primary" />
+                      Document Expiry Date
+                    </span>
+                    <span className="font-semibold text-foreground font-mono">{activeDocExpiry}</span>
+                  </div>
+                )}
+
+                {currentEligibility.uploadWindowOpensDate && (
+                  <div className="flex justify-between items-center border-t border-border/40 pt-2">
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-primary" />
+                      Automatic Upload Window Opens
+                    </span>
+                    <span className="font-semibold text-primary font-mono">{currentEligibility.uploadWindowOpensDate}</span>
+                  </div>
+                )}
+
+                {currentEligibility.daysUntilWindowOpens !== null && currentEligibility.daysUntilWindowOpens !== undefined && currentEligibility.daysUntilWindowOpens > 0 && (
+                  <div className="flex justify-between items-center border-t border-border/40 pt-2 text-muted-foreground">
+                    <span>Window Opens In</span>
+                    <span className="font-medium text-foreground">{currentEligibility.daysUntilWindowOpens} days</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Rejected Request Notice if applicable */}
+              {activeReplRequest?.status === "rejected" && activeReplRequest.rejectionReason && (
+                <div className="p-3.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-xs space-y-1.5 text-rose-700 dark:text-rose-400">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <XCircle className="h-4 w-4 shrink-0" />
+                    Previous Replacement Request Declined
+                  </div>
+                  <p className="text-[11px] leading-relaxed pl-5">
+                    <strong>Reason:</strong> {activeReplRequest.rejectionReason}
+                  </p>
+                </div>
+              )}
+
+              {/* PENDING REPLACEMENT REQUEST STATUS */}
+              {currentEligibility.reasonCode === "REPLACEMENT_REQUEST_PENDING" && activeReplRequest && (
+                <div className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/10 text-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                      <Clock className="h-4 w-4" />
+                      Replacement Request Under Review
+                    </div>
+                    <Badge variant="outline" className="text-[10px] bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/40">
+                      Pending
+                    </Badge>
+                  </div>
+                  <div className="text-muted-foreground space-y-1 pl-5.5">
+                    <div><strong>Reason:</strong> {REASON_LABELS[activeReplRequest.reason as DocumentReplacementReason] || activeReplRequest.reason}</div>
+                    <div><strong>Details:</strong> &ldquo;{activeReplRequest.reasonDetails}&rdquo;</div>
+                  </div>
+                  <div className="pt-1 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                      onClick={() => handleCancelRequest(activeReplRequest.id)}
+                      disabled={isCancellingRequest}
+                    >
+                      {isCancellingRequest ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                      Cancel Request
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* EARLY REPLACEMENT PROMPT (Only when outside window and no pending request) */}
+              {currentEligibility.reasonCode === "OUTSIDE_WINDOW" && (
+                <div className="p-4 rounded-xl border border-border/80 bg-accent/20 space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                    <HelpCircle className="h-4 w-4 text-primary" />
+                    Need to replace this document early?
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    If your {activeDocType.toUpperCase()} was lost, damaged, renewed early, or reissued by authorities before the standard expiry window, you can submit a replacement request for compliance approval.
+                  </p>
                   <Button
+                    size="sm"
                     variant="outline"
-                    size="sm"
-                    className="text-xs rounded-xl"
-                    disabled={isUploading}
-                    onClick={() => setSelectedFile(null)}
+                    className="text-xs rounded-xl font-semibold gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                    onClick={() => setIsRequestDialogOpen(true)}
                   >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="text-xs font-semibold rounded-xl gap-2"
-                    disabled={isUploading}
-                    onClick={handleUploadSubmit}
-                  >
-                    {isUploading ? (
-                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading...</>
-                    ) : (
-                      <><Upload className="h-3.5 w-3.5" /> Submit Document</>
-                    )}
+                    <FileText className="h-3.5 w-3.5" />
+                    Request Document Replacement
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
+
+              {/* Disabled Dropzone Visual Indicator */}
+              <div className="border-2 border-dashed border-border/60 rounded-2xl p-6 text-center bg-accent/10 opacity-70">
+                <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-xs font-semibold text-foreground">Upload Currently Unavailable</p>
+                <p className="text-[11px] text-muted-foreground mt-1 max-w-sm mx-auto">
+                  {currentEligibility.reasonCode === "PENDING_VERIFICATION"
+                    ? "A submission is currently under review. Additional uploads are disabled until compliance staff review this version."
+                    : "You can upload a replacement once the automatic expiry window opens or an early replacement request is approved."}
+                </p>
+                <Button variant="outline" size="sm" disabled className="mt-4 text-xs rounded-xl cursor-not-allowed">
+                  Upload Locked
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            /* STATE 2: UPLOAD ENABLED */
+            <Card className="border-border/80 rounded-2xl p-6 shadow-xs bg-card space-y-4">
+              <CardHeader className="p-0 pb-3 border-b border-border/50">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Upload className="h-4 w-4 text-primary" />
+                      Upload New {activeDocType.toUpperCase()} Document
+                    </CardTitle>
+                    <p className="text-[11px] text-muted-foreground">
+                      {currentEligibility.userMessage}
+                    </p>
+                  </div>
+                  {(currentEligibility.reasonCode === "REPLACEMENT_REQUEST_APPROVED" || currentEligibility.reasonCode === "EARLY_AUTHORIZATION_ACTIVE") && (
+                    <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 font-bold">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      Replacement Approved
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-0 pt-2 space-y-4">
+                <div className="border-2 border-dashed border-primary/40 hover:border-primary rounded-2xl p-8 text-center bg-primary/5 transition-colors">
+                  <FileText className="h-10 w-10 text-primary mx-auto mb-3" />
+                  <p className="text-xs font-semibold text-foreground">
+                    {selectedFile ? selectedFile.name : `Select your ${activeDocType.toUpperCase()} document file`}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : "PDF, JPG, or PNG (Max 5MB)"}
+                  </p>
+                  
+                  <input
+                    type="file"
+                    id="doc-file-input"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleFileChange}
+                    disabled={isUploading}
+                  />
+                  
+                  <label htmlFor="doc-file-input" className="inline-block mt-4">
+                    <Button variant="outline" size="sm" type="button" className="text-xs pointer-events-none rounded-xl">
+                      Browse File
+                    </Button>
+                  </label>
+                </div>
+
+                {selectedFile && (
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs rounded-xl"
+                      disabled={isUploading}
+                      onClick={() => setSelectedFile(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="text-xs font-semibold rounded-xl gap-2"
+                      disabled={isUploading}
+                      onClick={handleUploadSubmit}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-3.5 w-3.5" />
+                          <span>Submit {activeDocType.toUpperCase()}</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* Current Document Verification Status Sidebar */}
+        {/* Right Sidebar: Active Document Overview */}
         <div className="space-y-4">
-          <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card space-y-3">
-            <CardHeader className="p-0 pb-3 border-b border-border/50">
-              <CardTitle className="text-sm font-semibold">Current Verification Status</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 pt-2 space-y-3 text-xs">
-              <div className="flex justify-between items-center py-1">
-                <span className="text-muted-foreground">Document</span>
-                <span className="font-semibold text-foreground uppercase">{activeDocType}</span>
+          <Card className="border-border/80 rounded-2xl p-5 shadow-xs bg-card space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Current Document Status
+            </h3>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between items-center py-1 border-b border-border/40">
+                <span className="text-muted-foreground">Type</span>
+                <span className="font-semibold uppercase text-foreground">{activeDocType}</span>
               </div>
-              <div className="flex justify-between items-center py-1 border-t border-border/40">
-                <span className="text-muted-foreground">Status</span>
-                <span className="font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded text-[10px] uppercase">
-                  VERIFIED / ACTIVE
+              <div className="flex justify-between items-center py-1 border-b border-border/40">
+                <span className="text-muted-foreground">Document Number</span>
+                <span className="font-mono font-semibold text-foreground">{activeDocNumber || "Not on file"}</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-border/40">
+                <span className="text-muted-foreground">Expiry Date</span>
+                <span className="font-mono font-semibold text-foreground">{activeDocExpiry || "Not set"}</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-border/40">
+                <span className="text-muted-foreground">Document Version</span>
+                <span className="font-mono font-semibold text-foreground">
+                  {currentEligibility.isFirstUpload ? "—" : "v1"}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-1 border-t border-border/40">
-                <span className="text-muted-foreground">Last Updated</span>
-                <span className="font-mono text-foreground">{profile?.lastUploadDate ? new Date(profile.lastUploadDate).toLocaleDateString() : "N/A"}</span>
+              <div className="flex justify-between items-center py-1">
+                <span className="text-muted-foreground">Status</span>
+                <Badge variant="outline" className={cn(
+                  "text-[10px] uppercase font-bold",
+                  activeDocStatus === "NOT_SUBMITTED" && activeDocExpiry
+                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30"
+                    : activeDocStatus === "APPROVED" || activeDocStatus === "COMPLIANT"
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                    : ""
+                )}>
+                  {activeDocStatus === "NOT_SUBMITTED" && activeDocExpiry ? "Metadata Only (Copy Pending)" : (activeDocStatus || "Unverified")}
+                </Badge>
               </div>
-            </CardContent>
+            </div>
           </Card>
+
+          {/* Compliance Help Notice */}
+          <div className="p-4 rounded-2xl bg-muted/20 border border-border/60 text-xs text-muted-foreground space-y-2">
+            <div className="font-semibold text-foreground flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+              Compliance Note
+            </div>
+            <p className="text-[11px] leading-relaxed">
+              All international students must maintain valid Passport, Visa, and eFRRO documents. Replacement submissions are reviewed by the compliance office within 1–2 business days.
+            </p>
+          </div>
         </div>
       </div>
+
+      {/* Modal: Request Document Replacement */}
+      <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              Request Early {activeDocType.toUpperCase()} Replacement
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Submit an early replacement request to the compliance office. Once approved, you will be granted a temporary window to upload your new document.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Reason for Replacement</label>
+              <Select value={requestReason} onValueChange={(val) => setRequestReason(val as DocumentReplacementReason)}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Select reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="passport_lost">Passport Lost / Stolen</SelectItem>
+                  <SelectItem value="passport_damaged">Passport Damaged</SelectItem>
+                  <SelectItem value="passport_renewed_early">Passport Renewed Early</SelectItem>
+                  <SelectItem value="visa_renewed_reissued">Visa Renewed / Reissued</SelectItem>
+                  <SelectItem value="efrro_reissued">eFRRO / Permit Reissued</SelectItem>
+                  <SelectItem value="government_replacement">Government Replaced / New Booklet</SelectItem>
+                  <SelectItem value="incorrect_document">Incorrect Document Uploaded</SelectItem>
+                  <SelectItem value="other">Other Legitimate Reason</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Explanation / Details (Mandatory)</label>
+              <Textarea
+                required
+                rows={3}
+                placeholder="Explain why an early replacement is necessary (e.g. Received new visa endorsement from embassy, or lost old passport)..."
+                value={requestDetails}
+                onChange={e => setRequestDetails(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setIsRequestDialogOpen(false)} disabled={isSubmittingRequest}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSubmitReplacementRequest} disabled={isSubmittingRequest || !requestDetails.trim()}>
+              {isSubmittingRequest ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+              Submit Replacement Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

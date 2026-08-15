@@ -294,33 +294,46 @@ export async function fetchStudentProfile(jwt: string): Promise<StudentPortalPro
   }
 }
 
+export async function fetchDocumentUploadEligibilityAction(
+  jwt: string,
+  documentType: "passport" | "visa" | "efrro"
+) {
+  try {
+    const studentId = await verifyUserAndGetStudentId(jwt);
+    const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+    return await DocumentUploadEligibilityEngine.evaluateEligibility(studentId, documentType);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[ELIGIBILITY_ACTION_ERROR] Failed to fetch eligibility for ${documentType}:`, msg);
+    return null;
+  }
+}
+
+export async function fetchAllDocumentUploadEligibilityAction(jwt: string) {
+  try {
+    const studentId = await verifyUserAndGetStudentId(jwt);
+    const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+    const [passport, visa, efrro] = await Promise.all([
+      DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "passport"),
+      DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "visa"),
+      DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "efrro")
+    ]);
+    return { passport, visa, efrro };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[ELIGIBILITY_ACTION_ERROR] Failed to fetch all eligibility:", msg);
+    return null;
+  }
+}
+
 export async function uploadEfrro(
   jwt: string,
   filename: string,
   fileBase64: string,
   ipAddress: string | null,
   userAgent: string | null
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const studentId = await verifyUserAndGetStudentId(jwt);
-    const fileBuffer = Buffer.from(fileBase64, "base64");
-
-    await portalService.uploadEfrroDocument(
-      studentId,
-      filename,
-      fileBuffer,
-      ipAddress,
-      userAgent
-    );
-
-    return { success: true };
-  } catch (err: unknown) {
-    if (isStudentPortalTestMode()) {
-      return { success: true };
-    }
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, error: msg };
-  }
+): Promise<{ success: boolean; versionId?: string; versionNumber?: number; error?: string }> {
+  return uploadStudentDocumentAction(jwt, "efrro", filename, fileBase64, ipAddress, userAgent);
 }
 
 export async function uploadStudentDocumentAction(
@@ -330,29 +343,113 @@ export async function uploadStudentDocumentAction(
   fileBase64: string,
   ipAddress: string | null,
   userAgent: string | null
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; versionId?: string; versionNumber?: number; error?: string }> {
   try {
     const studentId = await verifyUserAndGetStudentId(jwt);
     const fileBuffer = Buffer.from(fileBase64, "base64");
 
-    if (documentType === "efrro") {
-      await portalService.uploadEfrroDocument(
-        studentId,
-        filename,
-        fileBuffer,
-        ipAddress,
-        userAgent
-      );
-    } else {
-      await portalRepo.logActivity(studentId, `UPLOAD_${documentType.toUpperCase()}`, ipAddress, userAgent, { filename });
-    }
+    const res = await portalService.uploadDocument(
+      studentId,
+      documentType,
+      filename,
+      fileBuffer,
+      ipAddress,
+      userAgent
+    );
 
-    return { success: true };
+    return { 
+      success: true, 
+      versionId: res.versionId, 
+      versionNumber: res.versionNumber 
+    };
   } catch (err: unknown) {
     if (isStudentPortalTestMode()) {
-      return { success: true };
+      return { success: true, versionNumber: 1 };
     }
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: msg };
   }
 }
+
+/**
+ * Server action: Submit an early document replacement request
+ */
+export async function submitDocumentReplacementRequestAction(
+  jwt: string,
+  input: {
+    documentType: "passport" | "visa" | "efrro";
+    reason: import("@/domain/compliance/services/replacement-request.service").DocumentReplacementReason;
+    reasonDetails: string;
+  }
+): Promise<{ success: boolean; request?: import("@/domain/compliance/services/replacement-request.service").DocumentReplacementRequestRecord; error?: string }> {
+  try {
+    const studentId = await verifyUserAndGetStudentId(jwt);
+    const { DocumentReplacementRequestService } = await import("@/domain/compliance/services/replacement-request.service");
+
+    return await DocumentReplacementRequestService.submitRequest(studentId, input);
+  } catch (err: unknown) {
+    if (isStudentPortalTestMode()) {
+      return {
+        success: true,
+        request: {
+          id: "mock-req-001",
+          studentId: "mock-student-id",
+          documentType: input.documentType,
+          currentDocumentVersion: 1,
+          currentExpiryDate: "2026-12-20",
+          reason: input.reason,
+          reasonDetails: input.reasonDetails,
+          status: "pending",
+          submittedAt: new Date().toISOString(),
+          reviewedBy: null,
+          reviewedAt: null,
+          rejectionReason: null,
+          authorizationId: null,
+          authorizationExpiresAt: null,
+          completedAt: null,
+          completedVersionId: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      };
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Server action: Fetch all replacement requests submitted by authenticated student
+ */
+export async function fetchStudentReplacementRequestsAction(
+  jwt: string
+): Promise<import("@/domain/compliance/services/replacement-request.service").DocumentReplacementRequestRecord[]> {
+  try {
+    const studentId = await verifyUserAndGetStudentId(jwt);
+    const { DocumentReplacementRequestService } = await import("@/domain/compliance/services/replacement-request.service");
+
+    return await DocumentReplacementRequestService.listStudentRequests(studentId);
+  } catch (err: unknown) {
+    console.error("[FETCH_STUDENT_REPLACEMENT_REQUESTS_ERROR]", err);
+    return [];
+  }
+}
+
+/**
+ * Server action: Cancel a pending replacement request
+ */
+export async function cancelDocumentReplacementRequestAction(
+  jwt: string,
+  requestId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const studentId = await verifyUserAndGetStudentId(jwt);
+    const { DocumentReplacementRequestService } = await import("@/domain/compliance/services/replacement-request.service");
+
+    return await DocumentReplacementRequestService.cancelRequest(requestId, studentId);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+

@@ -11,8 +11,8 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { DocumentConfig } from "../constants/constants";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { uploadDocumentRenewalAction, correctDocumentMetadataAction } from "@/app/(app)/students/actions";
-import { UploadCloud, Edit3, ShieldAlert } from "lucide-react";
+import { uploadDocumentRenewalAction, correctDocumentMetadataAction, authorizeEarlyDocumentUploadAction } from "@/app/(app)/students/actions";
+import { UploadCloud, Edit3, ShieldAlert, Sparkles, Loader2 } from "lucide-react";
 
 interface UploadDialogProps {
   config: DocumentConfig;
@@ -567,6 +567,140 @@ export function VerificationPanel({ isOpen, onOpenChange, onVerify }: Verificati
             />
           </DialogFooter>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export interface AllowEarlyUploadDialogProps {
+  documentType: "passport" | "visa" | "efrro";
+  documentTitle: string;
+  studentId: string;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+export function AllowEarlyUploadDialog({
+  documentType,
+  documentTitle,
+  studentId,
+  isOpen,
+  onOpenChange,
+  onSuccess
+}: AllowEarlyUploadDialogProps): React.JSX.Element {
+  const [reason, setReason] = React.useState<"document_lost" | "document_damaged" | "document_replaced" | "government_reissue" | "data_correction" | "other">("document_replaced");
+  const [reasonDetails, setReasonDetails] = React.useState("");
+  const [validDays, setValidDays] = React.useState("7");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reasonDetails.trim()) {
+      toast.error("Reason details required", {
+        description: "Please provide a detailed explanation for authorizing an early upload."
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const validUntil = new Date(Date.now() + parseInt(validDays, 10) * 24 * 60 * 60 * 1000).toISOString();
+      const res = await authorizeEarlyDocumentUploadAction(studentId, {
+        documentType,
+        reason,
+        reasonDetails: reasonDetails.trim(),
+        validUntil
+      });
+
+      if (res.success) {
+        toast.success(`Early Upload Authorized for ${documentTitle}`, {
+          description: `The student can now upload their replacement ${documentTitle} in the Student Portal.`
+        });
+        setReasonDetails("");
+        onOpenChange(false);
+        if (onSuccess) onSuccess();
+      } else {
+        toast.error("Authorization Failed", { description: res.error });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error("Authorization Failed", { description: msg });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md w-full">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-bold flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            Allow Early {documentTitle} Upload
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 py-2 text-xs">
+          <p className="text-muted-foreground">
+            Authorizes an exception allowing the student to upload a new {documentTitle} from the Student Portal even if their current document is not within the normal expiry window.
+          </p>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">Exception Reason</label>
+            <Select value={reason} onValueChange={(val: any) => setReason(val)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select reason" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="document_replaced">Document Replaced (New Book/Visa)</SelectItem>
+                <SelectItem value="document_lost">Document Lost / Stolen</SelectItem>
+                <SelectItem value="document_damaged">Document Damaged</SelectItem>
+                <SelectItem value="government_reissue">Government Reissue / Renewal</SelectItem>
+                <SelectItem value="data_correction">Official Data Correction</SelectItem>
+                <SelectItem value="other">Other Administrative Exception</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">
+              Institutional Reason Details <span className="text-rose-500">*</span>
+            </label>
+            <Textarea
+              required
+              rows={3}
+              placeholder="Explain why this early upload is authorized (e.g. Student reported passport was lost and reissued by embassy)..."
+              value={reasonDetails}
+              onChange={(e) => setReasonDetails(e.target.value)}
+              className="text-xs"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">Authorization Validity Window</label>
+            <Select value={validDays} onValueChange={(val) => setValidDays(val || "7")}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select validity" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">3 Days</SelectItem>
+                <SelectItem value="7">7 Days (Standard)</SelectItem>
+                <SelectItem value="14">14 Days</SelectItem>
+                <SelectItem value="30">30 Days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={isSubmitting} className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5">
+              {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              Grant Authorization
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -183,6 +183,21 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       daysRemaining: efrroDaysRemaining,
       efrroDaysRemaining,
 
+      passportEligibility: await (async () => {
+        const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+        return DocumentUploadEligibilityEngine.evaluateEligibility(student.id, "passport");
+      })().catch(() => undefined),
+
+      visaEligibility: await (async () => {
+        const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+        return DocumentUploadEligibilityEngine.evaluateEligibility(student.id, "visa");
+      })().catch(() => undefined),
+
+      efrroEligibility: await (async () => {
+        const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+        return DocumentUploadEligibilityEngine.evaluateEligibility(student.id, "efrro");
+      })().catch(() => undefined),
+
       lastUploadDate: lastUpload
     };
   }

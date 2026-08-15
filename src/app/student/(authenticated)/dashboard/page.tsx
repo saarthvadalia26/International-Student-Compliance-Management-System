@@ -187,84 +187,122 @@ export default function StudentDashboardPage() {
       {/* Compliance Status Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Passport Status */}
-        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Passport Status</span>
-            <FileCheck2 className="h-4 w-4 text-blue-500" />
+        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Passport Status</span>
+              <FileCheck2 className="h-4 w-4 text-blue-500" />
+            </div>
+            <div className="mt-3 space-y-1.5">
+              <span className={cn(
+                "inline-block px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase",
+                profile.passportStatus === "APPROVED" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                profile.passportStatus === "REJECTED" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" :
+                profile.passportStatus === "NOT_SUBMITTED" && profile.passportExpiry ? "bg-blue-500/10 text-blue-700 dark:text-blue-400" :
+                "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              )}>
+                {profile.passportStatus === "NOT_SUBMITTED" && profile.passportExpiry ? "METADATA ONLY" : profile.passportStatus.replace("_", " ")}
+              </span>
+              <p className="text-[11px] text-muted-foreground">
+                {profile.passportExpiry ? `Expires: ${profile.passportExpiry}` : "No passport on file"}
+              </p>
+            </div>
           </div>
-          <div className="mt-3">
-            <span className={cn(
-              "inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase",
-              profile.passportStatus === "APPROVED" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
-              profile.passportStatus === "REJECTED" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            )}>
-              {profile.passportStatus.replace("_", " ")}
-            </span>
-            <p className="text-[11px] text-muted-foreground mt-2">
-              {profile.passportExpiry ? (
-                profile.passportDaysRemaining !== null && profile.passportDaysRemaining !== undefined ? (
-                  profile.passportDaysRemaining < -1 ? `Expired ${Math.abs(profile.passportDaysRemaining)} days ago` :
-                  profile.passportDaysRemaining === -1 ? "Expired yesterday" :
-                  profile.passportDaysRemaining === 0 ? "Expires today" :
-                  profile.passportDaysRemaining === 1 ? "Expires tomorrow" :
-                  `Expires in ${profile.passportDaysRemaining} days`
-                ) : `Expires: ${profile.passportExpiry}`
-              ) : "No passport on file"}
-            </p>
+          <div className="pt-3 mt-2 border-t border-border/50 text-[11px]">
+            {profile.passportEligibility?.canUpload ? (
+              <Link href="/student/efrro?type=passport" className="text-primary font-semibold hover:underline flex items-center gap-1">
+                <span>{profile.passportEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Replacement Approved" : "Upload Open"}</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            ) : profile.passportEligibility?.reasonCode === "PENDING_VERIFICATION" ? (
+              <span className="text-amber-600 dark:text-amber-400 font-medium">Under Verification</span>
+            ) : profile.passportEligibility?.reasonCode === "REPLACEMENT_REQUEST_PENDING" ? (
+              <span className="text-blue-600 dark:text-blue-400 font-medium">Request Pending</span>
+            ) : profile.passportEligibility?.uploadWindowOpensDate ? (
+              <span className="text-muted-foreground">Next upload: {profile.passportEligibility.uploadWindowOpensDate}</span>
+            ) : (
+              <span className="text-muted-foreground">Upload locked</span>
+            )}
           </div>
         </Card>
 
         {/* Visa Status */}
-        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Visa Status</span>
-            <Globe2 className="h-4 w-4 text-indigo-500" />
+        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Visa Status</span>
+              <Globe2 className="h-4 w-4 text-indigo-500" />
+            </div>
+            <div className="mt-3 space-y-1.5">
+              <span className={cn(
+                "inline-block px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase",
+                profile.visaStatus === "APPROVED" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                profile.visaStatus === "REJECTED" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" :
+                profile.visaStatus === "NOT_SUBMITTED" && profile.visaExpiry ? "bg-blue-500/10 text-blue-700 dark:text-blue-400" :
+                "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              )}>
+                {profile.visaStatus === "NOT_SUBMITTED" && profile.visaExpiry ? "METADATA ONLY" : profile.visaStatus.replace("_", " ")}
+              </span>
+              <p className="text-[11px] text-muted-foreground">
+                {profile.visaExpiry ? `Expires: ${profile.visaExpiry}` : "No visa on file"}
+              </p>
+            </div>
           </div>
-          <div className="mt-3">
-            <span className={cn(
-              "inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase",
-              profile.visaStatus === "APPROVED" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
-              profile.visaStatus === "REJECTED" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            )}>
-              {profile.visaStatus.replace("_", " ")}
-            </span>
-            <p className="text-[11px] text-muted-foreground mt-2">
-              {profile.visaExpiry ? (
-                profile.visaDaysRemaining !== null && profile.visaDaysRemaining !== undefined ? (
-                  profile.visaDaysRemaining < -1 ? `Expired ${Math.abs(profile.visaDaysRemaining)} days ago` :
-                  profile.visaDaysRemaining === -1 ? "Expired yesterday" :
-                  profile.visaDaysRemaining === 0 ? "Expires today" :
-                  profile.visaDaysRemaining === 1 ? "Expires tomorrow" :
-                  `Expires in ${profile.visaDaysRemaining} days`
-                ) : `Expires: ${profile.visaExpiry}`
-              ) : "No visa on file"}
-            </p>
+          <div className="pt-3 mt-2 border-t border-border/50 text-[11px]">
+            {profile.visaEligibility?.canUpload ? (
+              <Link href="/student/efrro?type=visa" className="text-primary font-semibold hover:underline flex items-center gap-1">
+                <span>{profile.visaEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Replacement Approved" : "Upload Open"}</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            ) : profile.visaEligibility?.reasonCode === "PENDING_VERIFICATION" ? (
+              <span className="text-amber-600 dark:text-amber-400 font-medium">Under Verification</span>
+            ) : profile.visaEligibility?.reasonCode === "REPLACEMENT_REQUEST_PENDING" ? (
+              <span className="text-blue-600 dark:text-blue-400 font-medium">Request Pending</span>
+            ) : profile.visaEligibility?.uploadWindowOpensDate ? (
+              <span className="text-muted-foreground">Next upload: {profile.visaEligibility.uploadWindowOpensDate}</span>
+            ) : (
+              <span className="text-muted-foreground">Upload locked</span>
+            )}
           </div>
         </Card>
 
         {/* eFRRO Status */}
-        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">eFRRO Registration</span>
-            <Award className="h-4 w-4 text-purple-500" />
+        <Card className="border-border/80 rounded-2xl p-4 shadow-xs bg-card flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">eFRRO Registration</span>
+              <Award className="h-4 w-4 text-purple-500" />
+            </div>
+            <div className="mt-3 space-y-1.5">
+              <span className={cn(
+                "inline-block px-2.5 py-0.5 rounded-lg text-[11px] font-bold uppercase",
+                profile.efrroStatus === "COMPLIANT" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
+                profile.efrroStatus === "WARNING" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" :
+                profile.efrroStatus === "NOT_SUBMITTED" && profile.efrroExpiry ? "bg-blue-500/10 text-blue-700 dark:text-blue-400" :
+                "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+              )}>
+                {profile.efrroStatus === "NOT_SUBMITTED" && profile.efrroExpiry ? "METADATA ONLY" : profile.efrroStatus.replace("_", " ")}
+              </span>
+              <p className="text-[11px] text-muted-foreground">
+                {profile.efrroExpiry ? `Expires: ${profile.efrroExpiry}` : "Pending compliance"}
+              </p>
+            </div>
           </div>
-          <div className="mt-3">
-            <span className={cn(
-              "inline-block px-2.5 py-1 rounded-lg text-xs font-bold uppercase",
-              profile.efrroStatus === "COMPLIANT" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" :
-              profile.efrroStatus === "WARNING" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-            )}>
-              {profile.efrroStatus.replace("_", " ")}
-            </span>
-            <p className="text-[11px] text-muted-foreground mt-2">
-              {profile.daysRemaining !== null && profile.daysRemaining !== undefined ? (
-                profile.daysRemaining < -1 ? `Expired ${Math.abs(profile.daysRemaining)} days ago` :
-                profile.daysRemaining === -1 ? "Expired yesterday" :
-                profile.daysRemaining === 0 ? "Expires today" :
-                profile.daysRemaining === 1 ? "Expires tomorrow" :
-                `Expires in ${profile.daysRemaining} days`
-              ) : "Pending compliance"}
-            </p>
+          <div className="pt-3 mt-2 border-t border-border/50 text-[11px]">
+            {profile.efrroEligibility?.canUpload ? (
+              <Link href="/student/efrro?type=efrro" className="text-primary font-semibold hover:underline flex items-center gap-1">
+                <span>{profile.efrroEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Replacement Approved" : "Upload Open"}</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            ) : profile.efrroEligibility?.reasonCode === "PENDING_VERIFICATION" ? (
+              <span className="text-amber-600 dark:text-amber-400 font-medium">Under Verification</span>
+            ) : profile.efrroEligibility?.reasonCode === "REPLACEMENT_REQUEST_PENDING" ? (
+              <span className="text-blue-600 dark:text-blue-400 font-medium">Request Pending</span>
+            ) : profile.efrroEligibility?.uploadWindowOpensDate ? (
+              <span className="text-muted-foreground">Next upload: {profile.efrroEligibility.uploadWindowOpensDate}</span>
+            ) : (
+              <span className="text-muted-foreground">Upload locked</span>
+            )}
           </div>
         </Card>
 

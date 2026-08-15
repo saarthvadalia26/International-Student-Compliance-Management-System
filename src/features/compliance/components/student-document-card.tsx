@@ -15,7 +15,9 @@ import {
   CalendarDays, 
   Check, 
   X, 
-  Loader2 
+  Loader2,
+  Sparkles,
+  Info
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,14 @@ export interface StudentDocumentCardProps {
   onUploadRenewalClick: () => void;
   onCorrectExpiryClick: () => void;
   onCorrectMetadataClick: () => void;
+  onAllowEarlyUploadClick?: () => void;
+  activeEarlyAuthorization?: {
+    id: string;
+    reason: string;
+    reasonDetails: string;
+    validFrom: string;
+    validUntil: string;
+  } | null;
   onApproveClick?: () => void;
   onRejectClick?: () => void;
   isApproving?: boolean;
@@ -79,11 +89,13 @@ export function StudentDocumentCard({
   onUploadRenewalClick,
   onCorrectExpiryClick,
   onCorrectMetadataClick,
+  onAllowEarlyUploadClick,
+  activeEarlyAuthorization,
   onApproveClick,
   onRejectClick,
   isApproving = false,
   isRejecting = false,
-  customFields
+  customFields = []
 }: StudentDocumentCardProps): React.JSX.Element {
   // 1. Authoritative Expiry & Health Computation
   const cleanExpiry = expiryDate ? expiryDate.split("T")[0].trim() : "";
@@ -171,8 +183,16 @@ export function StudentDocumentCard({
   }, [hasValidExpiry, resolvedDaysLeft]);
 
   // 2. Semantic Status Icon
+  const hasMetadataOnly = !hasUploadedDocument && Boolean(
+    hasValidExpiry || 
+    (documentNumber && documentNumber !== "Not provided" && documentNumber !== "Not Recorded" && documentNumber !== "Pending")
+  );
+
   const renderStatusIcon = () => {
     if (!hasUploadedDocument || verificationStatus === "not_uploaded") {
+      if (hasMetadataOnly) {
+        return <div className="h-3.5 w-3.5 rounded-full bg-blue-500 shrink-0" />;
+      }
       return <div className="h-3.5 w-3.5 rounded-full bg-muted-foreground/30 shrink-0" />;
     }
     if (verificationStatus === "rejected") {
@@ -193,6 +213,13 @@ export function StudentDocumentCard({
   // 3. Semantic Verification Badge
   const renderVerificationBadge = () => {
     if (!hasUploadedDocument || verificationStatus === "not_uploaded") {
+      if (hasMetadataOnly) {
+        return (
+          <Badge variant="outline" className="text-[10px] h-5 font-semibold text-blue-700 dark:text-blue-400 border-blue-500/30 bg-blue-500/10 flex items-center gap-1">
+            <Info className="h-3 w-3" /> Metadata Only
+          </Badge>
+        );
+      }
       return (
         <Badge variant="outline" className="text-[10px] h-5 font-medium text-muted-foreground border-border/60 bg-muted/10">
           Not Uploaded
@@ -311,6 +338,19 @@ export function StudentDocumentCard({
           })}
         </div>
 
+        {/* Metadata Available Notice when physical document file is pending upload */}
+        {hasMetadataOnly && (
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-900 dark:text-blue-200">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <span className="font-semibold text-xs text-blue-800 dark:text-blue-300">Metadata Available — Document Copy Not Uploaded</span>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Compliance expiry tracking and reminders are active from recorded registration data. Physical document copy is pending student upload and verification.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* 3. INTEGRATED EXPIRATION & VALIDITY SUMMARY REGION */}
         <div className="rounded-lg border border-border/70 bg-muted/30 dark:bg-muted/15 p-3 sm:p-3.5 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -377,7 +417,20 @@ export function StudentDocumentCard({
           </div>
         </div>
 
-        {/* 4. VERIFICATION / AUDIT METADATA LINE */}
+        {/* 4. EARLY UPLOAD AUTHORIZATION & VERIFICATION / AUDIT METADATA LINE */}
+        {activeEarlyAuthorization && (
+          <div className="flex items-start gap-2 text-[11px] text-amber-800 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5">
+            <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <span className="font-semibold">Student Early Upload Authorized:</span>
+              <span className="block text-[11px] text-muted-foreground">{activeEarlyAuthorization.reasonDetails || activeEarlyAuthorization.reason}</span>
+              <span className="block text-[10px] text-muted-foreground/80 font-mono">
+                Valid until {new Date(activeEarlyAuthorization.validUntil).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        )}
+
         {verifiedAt && (
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground pt-0.5">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -411,6 +464,17 @@ export function StudentDocumentCard({
             >
               <Edit3 className="mr-1 h-3 w-3" /> Correct Information
             </Button>
+            {onAllowEarlyUploadClick && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs px-2 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                onClick={onAllowEarlyUploadClick}
+              >
+                <Sparkles className="mr-1 h-3 w-3 text-amber-600 dark:text-amber-400" /> Allow Early Upload
+              </Button>
+            )}
           </div>
 
           {verificationStatus === "pending" && (

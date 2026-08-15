@@ -105,19 +105,34 @@ export class StudentPortalService {
   }
 
   /**
-   * Safe renewal upload workflow
+   * Safe document renewal upload workflow with strict eligibility validation and R2 storage protection
    */
-  async uploadEfrroDocument(
+  async uploadDocument(
     studentId: string,
+    documentType: "passport" | "visa" | "efrro",
     filename: string,
     fileBuffer: Buffer,
     ipAddress: string | null,
     userAgent: string | null
-  ): Promise<void> {
-    console.log(`[STUDENT_PORTAL_SERVICE] Initiating renewal upload pipeline for student: ${studentId}`);
+  ): Promise<{ versionId: string; versionNumber: number }> {
+    console.log(`[STUDENT_PORTAL_SERVICE] Initiating upload pipeline for student: ${studentId}, type: ${documentType}`);
 
-    // 1. PDF Type Check
-    if (!filename.toLowerCase().endsWith(".pdf")) {
+    const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+
+    // 1. CRITICAL: Evaluate upload eligibility BEFORE touching storage or creating files
+    const eligibility = await DocumentUploadEligibilityEngine.evaluateEligibility(studentId, documentType);
+    if (!eligibility.canUpload) {
+      console.warn(`[STUDENT_PORTAL_SECURITY] Blocked unauthorized upload attempt for student ${studentId}, type ${documentType}. Reason: ${eligibility.reasonCode}`);
+      throw new Error(eligibility.userMessage || "Document upload is currently unavailable. Your current document is still valid.");
+    }
+
+    // 2. File Type Check (PDF, JPG, PNG)
+    const lowerName = filename.toLowerCase();
+    const isPdf = lowerName.endsWith(".pdf");
+    const isJpg = lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg");
+    const isPng = lowerName.endsWith(".png");
+
+    if (!isPdf && !isJpg && !isPng) {
       await this.portalRepo.logUploadAudit({
         studentId,
         filename,
@@ -127,10 +142,10 @@ export class StudentPortalService {
         ipAddress,
         userAgent
       });
-      throw new Error("Allowed file type: PDF only.");
+      throw new Error("Allowed file types: PDF, JPG, and PNG.");
     }
 
-    // 2. File Size Validation (Max 5MB)
+    // 3. File Size Validation (Max 5MB)
     const MAX_SIZE = 5 * 1024 * 1024;
     if (fileBuffer.length > MAX_SIZE) {
       await this.portalRepo.logUploadAudit({
@@ -144,13 +159,6 @@ export class StudentPortalService {
       });
       throw new Error("Maximum file size exceeded (limit: 5MB).");
     }
-
-    // 3. Virus Scan Placeholder
-    // In production, integration calls ClamAV daemon via clamd connection:
-    // const scanner = clamav.createScanner(3310, 'localhost');
-    // const scanResult = await scanner.scan(fileBuffer);
-    // if (!scanResult.clean) throw new Error("Security threat detected: Virus scan failed.");
-    console.log("[VIRUS_SCANNER_INTEGRATION] Scanning file stream... PASS");
 
     // 4. Duplicate Checksum Verification (SHA-256)
     const checksum = crypto.createHash("sha256").update(fileBuffer).digest("hex");
@@ -168,19 +176,23 @@ export class StudentPortalService {
       throw new Error("This document has already been uploaded previously.");
     }
 
+    const { getAdminSupabase } = await import("@/lib/supabase/admin");
     const supabase = getAdminSupabase();
 
-    // 5. Upload file buffer to Supabase Storage
+    const ext = isPdf ? "pdf" : isPng ? "png" : "jpg";
+    const mimeType = isPdf ? "application/pdf" : isPng ? "image/png" : "image/jpeg";
+    const bucketName = `${documentType}-documents`;
     const year = new Date().getFullYear();
     const versionUuid = crypto.randomUUID();
-    const storagePath = `efrro/${studentId}/${year}/${versionUuid}.pdf`;
+    const storagePath = `${documentType}/${studentId}/${year}/${versionUuid}.${ext}`;
 
+    // 5. Upload file buffer to Storage Provider (R2 / Supabase Storage)
     try {
       await this.storageProvider.upload(
-        "efrro-documents",
+        bucketName,
         storagePath,
         fileBuffer,
-        "application/pdf"
+        mimeType
       );
     } catch (error: unknown) {
       const storageError = error as Error;
@@ -189,27 +201,59 @@ export class StudentPortalService {
     }
 
     try {
-      // 6. Complete active reminders: Cancel future notifications scheduled for the old eFRRO
-      await this.notifRepo.cancelScheduledNotifications(studentId, "efrro");
+      // 6. Query existing genuine versions to resolve sequence number
+      const tableName = documentType === "passport" 
+        ? "passport_versions" 
+        : documentType === "visa" 
+        ? "visa_versions" 
+        : "efrro_versions";
 
-      // 7. Write eFRRO version record
-      const { data: efrroVer, error: verError } = await supabase
-        .from("efrro_versions")
-        .insert({
-          student_id: studentId,
-          file_path: storagePath,
-          verification_status: "pending",
-          is_active: true,
-          comments: "Student uploaded renewal copy via Portal"
-        })
-        .select("id")
-        .single();
+      const { data: existingVersions } = await supabase
+        .from(tableName)
+        .select("version_number, is_active, file_path")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("version_number", { ascending: false });
 
-      if (verError || !efrroVer) {
-        throw new Error(`[DB_INSERT_FAILED] Failed to record efrro version: ${verError?.message}`);
+      const validExisting = existingVersions?.filter(v => v.file_path && v.file_path !== "pending_upload" && v.file_path !== "null") || [];
+      const highestVer = validExisting.length > 0 ? Math.max(...validExisting.map(v => v.version_number || 0)) : 0;
+      const nextVersion = highestVer + 1;
+
+      // Cancel future notifications scheduled for old eFRRO if this is an eFRRO upload
+      if (documentType === "efrro") {
+        await this.notifRepo.cancelScheduledNotifications(studentId, "efrro");
       }
 
-      // 8. Log upload audit
+      // 7. Write version record (pending verification, preserving active v1 if exists)
+      const nowStr = new Date().toISOString().split("T")[0];
+      const { data: insertedVer, error: verError } = await supabase
+        .from(tableName)
+        .insert({
+          student_id: studentId,
+          version_number: nextVersion,
+          document_number: "PENDING_VERIFICATION",
+          issue_date: nowStr,
+          expiry_date: nowStr,
+          file_path: storagePath,
+          verification_status: "pending",
+          is_active: false,
+          notes: "Student uploaded document renewal copy via Portal"
+        })
+        .select("id, version_number")
+        .single();
+
+      if (verError || !insertedVer) {
+        throw new Error(`[DB_INSERT_FAILED] Failed to record ${documentType} version: ${verError?.message}`);
+      }
+
+      // 8. If an early upload authorization was used or replacement request was active, complete & consume it
+      await DocumentUploadEligibilityEngine.consumeActiveAuthorization(
+        studentId,
+        documentType,
+        insertedVer.id
+      );
+
+      // 9. Log upload audit
       await this.portalRepo.logUploadAudit({
         studentId,
         filename,
@@ -220,55 +264,75 @@ export class StudentPortalService {
         userAgent
       });
 
-      // 9. Refresh student snapshot compliance status to warning/pending review
-      // The snapshot is recalculating so that the compliance cell sees it as PENDING_VERIFICATION
+      // 10. Update student snapshot status to PENDING_VERIFICATION
+      const snapshotUpdate: Record<string, unknown> = {
+        updated_at: new Date().toISOString()
+      };
+      if (documentType === "efrro") {
+        snapshotUpdate.efrro_status = "PENDING_VERIFICATION";
+      }
+
       await supabase
         .from("student_snapshot")
-        .update({
-          efrro_status: "PENDING_VERIFICATION",
-          efrro_number: null,
-          updated_at: new Date().toISOString()
-        })
+        .update(snapshotUpdate)
         .eq("student_id", studentId);
 
-      // 10. Log student activity view action
+      // 11. Log student activity
       await this.portalRepo.logActivity(
         studentId,
-        "UPLOADED_EFRRO_RENEWAL",
+        `UPLOADED_${documentType.toUpperCase()}_RENEWAL`,
         ipAddress,
         userAgent,
-        { versionId: efrroVer.id, filename }
+        { versionId: insertedVer.id, versionNumber: nextVersion, filename }
       );
 
-      // 11. Notify staff: Immediate compliance notification queued for administrators review
+      // 12. Notify compliance staff for review
       const profile = await this.portalRepo.getStudentProfile(studentId);
       if (profile) {
         const adminEmail = Branding.supportEmail;
-        const reviewLink = `/reports/efrro`; // direct review page
+        const reviewLink = documentType === "efrro" ? `/reports/efrro` : `/students/${studentId}`;
         
         await this.notifRepo.queueNotification({
           studentId,
-          documentType: "efrro",
+          documentType,
           status: "queued",
           channel: "email",
           recipientAddress: adminEmail,
           triggerSource: "portal_upload_event",
-          idempotencyKey: `staff_alert:${studentId}:${efrroVer.id}`,
+          idempotencyKey: `staff_alert:${studentId}:${documentType}:${insertedVer.id}`,
           notificationContext: {
             student_name: profile.fullName,
             registration_number: profile.registrationNumber,
             country: profile.nationality,
             upload_time: new Date().toLocaleTimeString(),
-            secure_upload_link: reviewLink // direct review link
+            secure_upload_link: reviewLink
           }
         });
       }
 
+      return {
+        versionId: insertedVer.id,
+        versionNumber: nextVersion
+      };
+
     } catch (dbErr) {
-      // Roll back storage file if database inserts fail (Manual rollback)
+      // Roll back storage file if database operations fail
       console.error("[PORTAL_UPLOAD_ROLLBACK] Database write failed. Rolling back storage file path:", storagePath);
-      await this.storageProvider.delete("efrro-documents", storagePath);
+      await this.storageProvider.delete(bucketName, storagePath);
       throw dbErr;
     }
+  }
+
+  /**
+   * Compatibility wrapper for eFRRO renewal uploads
+   */
+  async uploadEfrroDocument(
+    studentId: string,
+    filename: string,
+    fileBuffer: Buffer,
+    ipAddress: string | null,
+    userAgent: string | null
+  ): Promise<void> {
+    await this.uploadDocument(studentId, "efrro", filename, fileBuffer, ipAddress, userAgent);
   }
 }

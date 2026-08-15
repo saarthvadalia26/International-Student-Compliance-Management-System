@@ -39,6 +39,11 @@ export interface StudentPortalProfile {
   daysRemaining: number | null;
   efrroDaysRemaining?: number | null;
 
+  // Real-time Upload Eligibility States
+  passportEligibility?: import("@/domain/compliance/services/upload-eligibility.service").DocumentUploadEligibilityResult;
+  visaEligibility?: import("@/domain/compliance/services/upload-eligibility.service").DocumentUploadEligibilityResult;
+  efrroEligibility?: import("@/domain/compliance/services/upload-eligibility.service").DocumentUploadEligibilityResult;
+
   lastUploadDate: string | null;
 }
 

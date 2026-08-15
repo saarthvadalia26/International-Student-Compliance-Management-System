@@ -40,11 +40,15 @@ import {
   updateRetentionPolicyAction, 
   runDocumentCleanupAction,
   globalSignOutAction,
-  factoryResetAction
+  factoryResetAction,
+  fetchDocumentUploadPoliciesAction,
+  updateDocumentUploadPoliciesAction,
+  DocumentUploadPolicyConfig
 } from "./actions";
 import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
 import { EmergencyLogoutDialog } from "@/components/settings/emergency-logout-dialog";
 import { Branding } from "@/config/branding";
+import { ShieldCheck, FileCheck2, Globe2, Award } from "lucide-react";
 
 
 export default function SettingsPage() {
@@ -100,6 +104,16 @@ function SettingsPageContent() {
   const [isLoadingPolicies, setIsLoadingPolicies] = React.useState(true);
   const [isUpdatingPolicyId, setIsUpdatingPolicyId] = React.useState<string | null>(null);
   
+  // Document Upload Window Policies State
+  const [uploadPolicies, setUploadPolicies] = React.useState<DocumentUploadPolicyConfig[]>([
+    { documentType: "passport", uploadWindowDays: 30, isActive: true },
+    { documentType: "visa", uploadWindowDays: 30, isActive: true },
+    { documentType: "efrro", uploadWindowDays: 30, isActive: true }
+  ]);
+  const [isSavingUploadPolicies, setIsSavingUploadPolicies] = React.useState(false);
+  const [uploadPolicySuccess, setUploadPolicySuccess] = React.useState(false);
+  const [uploadPolicyError, setUploadPolicyError] = React.useState(false);
+
   // Manual Cleanup overrides state
   const [cleanupReport, setCleanupReport] = React.useState<CleanupExecutionReport | null>(null);
   const [isRunningCleanup, setIsRunningCleanup] = React.useState(false);
@@ -133,6 +147,40 @@ function SettingsPageContent() {
     }
   };
 
+  const loadUploadPolicies = async () => {
+    try {
+      const res = await fetchDocumentUploadPoliciesAction();
+      if (res.success && res.policies.length > 0) {
+        setUploadPolicies(res.policies);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSaveUploadPolicies = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingUploadPolicies(true);
+    setUploadPolicySuccess(false);
+    setUploadPolicyError(false);
+
+    try {
+      const res = await updateDocumentUploadPoliciesAction(uploadPolicies);
+      if (res.success) {
+        setUploadPolicySuccess(true);
+        toast.success("Document upload pre-expiry windows updated successfully.");
+      } else {
+        setUploadPolicyError(true);
+        toast.error(res.error || "Failed to update upload policies.");
+      }
+    } catch (err: unknown) {
+      setUploadPolicyError(true);
+      toast.error(err instanceof Error ? err.message : "Failed to update upload policies.");
+    } finally {
+      setIsSavingUploadPolicies(false);
+    }
+  };
+
   // Hydrate configurations state
   React.useEffect(() => {
     // Sync notifications triggers config
@@ -147,6 +195,7 @@ function SettingsPageContent() {
     // Fetch retention policies
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPolicies();
+    loadUploadPolicies();
   }, []);
 
   // Preview Language Template changer
@@ -375,6 +424,97 @@ function SettingsPageContent() {
                     idleText="Save Details"
                     loadingText="Saving changes..."
                     successText="Changes saved"
+                    errorText="Try Again"
+                  />
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Document Upload Pre-Expiry Windows Policy Configuration */}
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Document Upload Pre-Expiry Windows
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <form onSubmit={handleSaveUploadPolicies} className="space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    Configure the pre-expiry window (in days) during which students are permitted to upload renewed documents via the Student Portal. Outside this window, student uploads are disabled to prevent unnecessary Cloudflare R2 storage usage.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    {/* Passport Window */}
+                    <div className="space-y-1.5 p-3.5 rounded-xl border border-border/60 bg-muted/5">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <FileCheck2 className="h-3.5 w-3.5 text-blue-500" />
+                        Passport Upload Window
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Days before passport expiry</p>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={uploadPolicies.find(p => p.documentType === "passport")?.uploadWindowDays ?? 30}
+                        onChange={e => {
+                          const val = Math.max(1, Math.min(365, parseInt(e.target.value, 10) || 1));
+                          setUploadPolicies(prev => prev.map(p => p.documentType === "passport" ? { ...p, uploadWindowDays: val } : p));
+                        }}
+                        className="h-9 text-xs mt-1"
+                      />
+                    </div>
+
+                    {/* Visa Window */}
+                    <div className="space-y-1.5 p-3.5 rounded-xl border border-border/60 bg-muted/5">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Globe2 className="h-3.5 w-3.5 text-indigo-500" />
+                        Visa Upload Window
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Days before visa expiry</p>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={uploadPolicies.find(p => p.documentType === "visa")?.uploadWindowDays ?? 30}
+                        onChange={e => {
+                          const val = Math.max(1, Math.min(365, parseInt(e.target.value, 10) || 1));
+                          setUploadPolicies(prev => prev.map(p => p.documentType === "visa" ? { ...p, uploadWindowDays: val } : p));
+                        }}
+                        className="h-9 text-xs mt-1"
+                      />
+                    </div>
+
+                    {/* eFRRO Window */}
+                    <div className="space-y-1.5 p-3.5 rounded-xl border border-border/60 bg-muted/5">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Award className="h-3.5 w-3.5 text-purple-500" />
+                        eFRRO Upload Window
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Days before eFRRO expiry</p>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={uploadPolicies.find(p => p.documentType === "efrro")?.uploadWindowDays ?? 30}
+                        onChange={e => {
+                          const val = Math.max(1, Math.min(365, parseInt(e.target.value, 10) || 1));
+                          setUploadPolicies(prev => prev.map(p => p.documentType === "efrro" ? { ...p, uploadWindowDays: val } : p));
+                        }}
+                        className="h-9 text-xs mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <AsyncActionButton
+                    type="submit"
+                    size="sm"
+                    className="h-8 text-xs"
+                    isLoading={isSavingUploadPolicies}
+                    isSuccess={uploadPolicySuccess}
+                    isError={uploadPolicyError}
+                    idleText="Save Upload Policies"
+                    loadingText="Saving policies..."
+                    successText="Policies saved"
                     errorText="Try Again"
                   />
                 </form>

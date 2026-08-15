@@ -2,7 +2,7 @@ import { Shield, CreditCard, ClipboardList } from "lucide-react";
 import * as React from "react";
 
 export type ComplianceDocumentType = "passport" | "visa" | "efrro";
-export type ComplianceStatus = "COMPLIANT" | "WARNING" | "EXPIRED" | "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "NOT_UPLOADED" | "MISSING";
+export type ComplianceStatus = "COMPLIANT" | "WARNING" | "EXPIRED" | "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED" | "NOT_UPLOADED" | "METADATA_ONLY" | "MISSING";
 
 export interface DocumentConfig {
   type: ComplianceDocumentType;
