@@ -59,6 +59,7 @@ import {
 } from "@/domain/notifications/types/reminder.types";
 import { DocumentUploadDialog } from "@/features/compliance/components/document-dialogs";
 import { DOCUMENT_CONFIGS } from "@/features/compliance/constants/constants";
+import { StudentDocumentCard } from "@/features/compliance/components/student-document-card";
 
 export interface StudentDocument {
   number: string;
@@ -139,7 +140,6 @@ export default function StudentDetailsPage({ params }: PageProps) {
   // Expiry-Driven Reminder Schedule State
   const [reminderSchedule, setReminderSchedule] = React.useState<StudentReminderScheduleResponse | null>(null);
   const [isLoadingReminders, setIsLoadingReminders] = React.useState(true);
-  const [selectedReminderDoc, setSelectedReminderDoc] = React.useState<"visa" | "passport" | "efrro">("visa");
   const [isDispatchingReminder, setIsDispatchingReminder] = React.useState<string | null>(null);
 
   // Unsaved Changes Confirmation Dialog State
@@ -149,6 +149,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = React.useState(false);
   const [rejectDocType, setRejectDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
   const [isRejecting, setIsRejecting] = React.useState(false);
+  const [approvingDocType, setApprovingDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
 
   // Renewal / New Version Upload Dialog State
   const [isRenewalUploadOpen, setIsRenewalUploadOpen] = React.useState(false);
@@ -588,6 +589,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
   };
 
   const handleApproveDocument = async (docType: "passport" | "visa" | "efrro") => {
+    setApprovingDocType(docType);
     try {
       const res = await updateDocumentVerificationAction(
         studentId,
@@ -611,6 +613,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
       toast.error("Database Error", {
         description: err instanceof Error ? err.message : "Unable to communicate with database."
       });
+    } finally {
+      setApprovingDocType(null);
     }
   };
 
@@ -817,473 +821,82 @@ export default function StudentDetailsPage({ params }: PageProps) {
           {activeSubTab === "immigration" && (
             <div className="space-y-5">
               {/* PASSPORT DOCUMENT CARD */}
-              <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20 border-b border-border/40">
-                  <div className="flex items-center gap-2.5">
-                    {getDocStatusIcon(student.passport, student.daysToPassportExpiry)}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-sm font-bold tracking-tight uppercase">PASSPORT DOCUMENT</CardTitle>
-                        <Badge variant="outline" className="text-[10px] h-4 font-mono text-muted-foreground border-border/60">
-                          Current Version (v{student.passport.versionNumber || 1})
-                        </Badge>
-                      </div>
-                      <CardDescription className="text-[10px] font-caption">Official primary international identity document.</CardDescription>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {student.passport.hasUploadedDocument && student.passport.verificationStatus !== "not_uploaded" ? (
-                      <Badge 
-                        variant={student.passport.verificationStatus === "verified" ? "secondary" : student.passport.verificationStatus === "rejected" ? "destructive" : "secondary"}
-                        className={`text-[10px] h-5 capitalize ${
-                          student.passport.verificationStatus === "verified" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
-                          student.passport.verificationStatus === "rejected" ? "bg-red-500/10 text-red-600 border-red-500/20" :
-                          "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                        }`}
-                      >
-                        {student.passport.verificationStatus === "pending" ? "Pending Verification" : student.passport.verificationStatus}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60">
-                        Not Uploaded
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-
-                <CardContent className="p-4 space-y-4 text-xs">
-                  {/* Basic Metadata Grid */}
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Passport Number</span>
-                      <span className="font-semibold text-foreground block font-mono text-sm">
-                        {student.passport.number && student.passport.number !== "Not provided" ? student.passport.number : <span className="text-muted-foreground font-sans font-normal text-xs">Not provided</span>}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Place of Issue</span>
-                      <span className="font-medium text-foreground block text-xs">
-                        {student.passport.placeOfIssue || <span className="text-muted-foreground font-normal">Not provided</span>}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Issue Date</span>
-                      <span className="font-medium text-foreground block text-xs">
-                        {student.passport.issueDate ? formatDisplayDate(student.passport.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* FIRST-CLASS EXPIRATION DATE & VALIDITY HIGHLIGHT CONTAINER */}
-                  <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-caption flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3 text-primary" /> Expiration Date & Validity
-                        </span>
-                        {renderExpiryHealthBadge(student.passport.expiryDate, student.daysToPassportExpiry)}
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-base font-bold text-foreground font-mono">
-                          {formatDisplayDate(student.passport.expiryDate)}
-                        </span>
-                        {student.passport.expiryDate && (
-                          <span className={`text-xs font-semibold ${
-                            student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry < 0 
-                              ? "text-rose-600 dark:text-rose-400" 
-                              : student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry <= 30
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                          }`}>
-                            ({CalendarDateEngine.formatRelativeDays(student.daysToPassportExpiry)})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs font-semibold px-3 shadow-xs border-primary/30 hover:bg-primary/5 text-primary"
-                        onClick={() => openRenewalDialog("passport")}
-                      >
-                        <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload New Document
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="default"
-                        size="sm"
-                        className="h-8 text-xs font-semibold px-3 shadow-xs"
-                        onClick={() => openExpiryDialog("passport")}
-                      >
-                        <Calendar className="mr-1.5 h-3.5 w-3.5" /> Correct Expiry Date
-                      </Button>
-                    </div>
-                  </div>
-
-                  {student.passport.verifiedAt && (
-                    <div className="pt-2 border-t border-border/30 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                      <span>Verified on {new Date(student.passport.verifiedAt).toLocaleDateString()}</span>
-                    </div>
-                  )}
-
-                  {/* Document Card Action Footer */}
-                  <div className="pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Link 
-                        href={`/students/${student.id}/passport`} 
-                        className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
-                      >
-                        <FileText className="h-3.5 w-3.5" /> View Document & History
-                      </Link>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
-                        onClick={() => openDocMetadataDialog("passport")}
-                      >
-                        <Edit3 className="mr-1 h-3 w-3" /> Correct Information
-                      </Button>
-                    </div>
-
-                    {student.passport.verificationStatus === "pending" && (
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                          onClick={() => handleOpenRejectDialog("passport")}
-                        >
-                          <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          className="h-7 text-[11px] px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={() => handleApproveDocument("passport")}
-                        >
-                          <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              <StudentDocumentCard
+                documentType="passport"
+                title="PASSPORT DOCUMENT"
+                description="Official primary international identity document."
+                studentId={student.id}
+                documentNumber={student.passport.number}
+                issueDate={student.passport.issueDate}
+                expiryDate={student.passport.expiryDate}
+                placeOfIssue={student.passport.placeOfIssue}
+                versionNumber={student.passport.versionNumber}
+                verificationStatus={student.passport.verificationStatus}
+                hasUploadedDocument={student.passport.hasUploadedDocument}
+                verifiedAt={student.passport.verifiedAt}
+                verifiedBy={student.passport.verifiedBy}
+                rejectionReason={student.passport.rejectionReason}
+                daysToExpiry={student.daysToPassportExpiry}
+                onUploadRenewalClick={() => openRenewalDialog("passport")}
+                onCorrectExpiryClick={() => openExpiryDialog("passport")}
+                onCorrectMetadataClick={() => openDocMetadataDialog("passport")}
+                onApproveClick={() => handleApproveDocument("passport")}
+                onRejectClick={() => handleOpenRejectDialog("passport")}
+                isApproving={approvingDocType === "passport"}
+                isRejecting={isRejecting && rejectDocType === "passport"}
+              />
 
               {/* VISA DOCUMENT CARD */}
-              <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20 border-b border-border/40">
-                  <div className="flex items-center gap-2.5">
-                    {getDocStatusIcon(student.visa, student.daysToVisaExpiry)}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-sm font-bold tracking-tight uppercase">VISA DOCUMENT</CardTitle>
-                        <Badge variant="outline" className="text-[10px] h-4 font-mono text-muted-foreground border-border/60">
-                          Current Version (v{student.visa.versionNumber || 1})
-                        </Badge>
-                      </div>
-                      <CardDescription className="text-[10px] font-caption">Verification of active Student Visa validity.</CardDescription>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {student.visa.hasUploadedDocument && student.visa.verificationStatus !== "not_uploaded" ? (
-                      <Badge 
-                        variant={student.visa.verificationStatus === "verified" ? "secondary" : student.visa.verificationStatus === "rejected" ? "destructive" : "secondary"}
-                        className={`text-[10px] h-5 capitalize ${
-                          student.visa.verificationStatus === "verified" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
-                          student.visa.verificationStatus === "rejected" ? "bg-red-500/10 text-red-600 border-red-500/20" :
-                          "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                        }`}
-                      >
-                        {student.visa.verificationStatus === "pending" ? "Pending Verification" : student.visa.verificationStatus}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60">
-                        Not Uploaded
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-
-                <CardContent className="p-4 space-y-4 text-xs">
-                  {/* Basic Metadata Grid */}
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Visa Number</span>
-                      <span className="font-semibold text-foreground block font-mono text-sm">
-                        {student.visa.number && student.visa.number !== "Not provided" ? student.visa.number : <span className="text-muted-foreground font-sans font-normal text-xs">Not provided</span>}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Visa Classification</span>
-                      <span className="font-medium text-foreground block text-xs">
-                        {student.visa.visaType || <span className="text-muted-foreground font-normal">Not provided</span>}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Issue Date</span>
-                      <span className="font-medium text-foreground block text-xs">
-                        {student.visa.issueDate ? formatDisplayDate(student.visa.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* FIRST-CLASS EXPIRATION DATE & VALIDITY HIGHLIGHT CONTAINER */}
-                  <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-caption flex items-center gap-1">
-                          <CalendarDays className="h-3 w-3 text-primary" /> Expiration Date & Validity
-                        </span>
-                        {renderExpiryHealthBadge(student.visa.expiryDate, student.daysToVisaExpiry)}
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-base font-bold text-foreground font-mono">
-                          {formatDisplayDate(student.visa.expiryDate)}
-                        </span>
-                        {student.visa.expiryDate && (
-                          <span className={`text-xs font-semibold ${
-                            student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry < 0 
-                              ? "text-rose-600 dark:text-rose-400" 
-                              : student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry <= 30
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                          }`}>
-                            ({CalendarDateEngine.formatRelativeDays(student.daysToVisaExpiry)})
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs font-semibold px-3 shadow-xs border-primary/30 hover:bg-primary/5 text-primary"
-                        onClick={() => openRenewalDialog("visa")}
-                      >
-                        <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload New Document
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="default"
-                        size="sm"
-                        className="h-8 text-xs font-semibold px-3 shadow-xs"
-                        onClick={() => openExpiryDialog("visa")}
-                      >
-                        <Calendar className="mr-1.5 h-3.5 w-3.5" /> Correct Expiry Date
-                      </Button>
-                    </div>
-                  </div>
-
-                  {student.visa.verifiedAt && (
-                    <div className="pt-2 border-t border-border/30 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                      <span>Verified on {new Date(student.visa.verifiedAt).toLocaleDateString()}</span>
-                    </div>
-                  )}
-
-                  {/* Document Card Action Footer */}
-                  <div className="pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Link 
-                        href={`/students/${student.id}/visa`} 
-                        className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
-                      >
-                        <FileText className="h-3.5 w-3.5" /> View Document & History
-                      </Link>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
-                        onClick={() => openDocMetadataDialog("visa")}
-                      >
-                        <Edit3 className="mr-1 h-3 w-3" /> Correct Information
-                      </Button>
-                    </div>
-
-                    {student.visa.verificationStatus === "pending" && (
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                          onClick={() => handleOpenRejectDialog("visa")}
-                        >
-                          <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          className="h-7 text-[11px] px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={() => handleApproveDocument("visa")}
-                        >
-                          <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              <StudentDocumentCard
+                documentType="visa"
+                title="VISA DOCUMENT"
+                description="Verification of active Student Visa validity."
+                studentId={student.id}
+                documentNumber={student.visa.number}
+                issueDate={student.visa.issueDate}
+                expiryDate={student.visa.expiryDate}
+                visaType={student.visa.visaType}
+                versionNumber={student.visa.versionNumber}
+                verificationStatus={student.visa.verificationStatus}
+                hasUploadedDocument={student.visa.hasUploadedDocument}
+                verifiedAt={student.visa.verifiedAt}
+                verifiedBy={student.visa.verifiedBy}
+                rejectionReason={student.visa.rejectionReason}
+                daysToExpiry={student.daysToVisaExpiry}
+                onUploadRenewalClick={() => openRenewalDialog("visa")}
+                onCorrectExpiryClick={() => openExpiryDialog("visa")}
+                onCorrectMetadataClick={() => openDocMetadataDialog("visa")}
+                onApproveClick={() => handleApproveDocument("visa")}
+                onRejectClick={() => handleOpenRejectDialog("visa")}
+                isApproving={approvingDocType === "visa"}
+                isRejecting={isRejecting && rejectDocType === "visa"}
+              />
 
               {/* EFRRO REGISTRATION CARD */}
               {student.efrro ? (
-                <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
-                  <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20 border-b border-border/40">
-                    <div className="flex items-center gap-2.5">
-                      {getDocStatusIcon(student.efrro, student.daysToEfrroExpiry)}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-sm font-bold tracking-tight uppercase">eFRRO / RESIDENTIAL PERMIT</CardTitle>
-                          <Badge variant="outline" className="text-[10px] h-4 font-mono text-muted-foreground border-border/60">
-                            Current Version (v{student.efrro.versionNumber || 1})
-                          </Badge>
-                        </div>
-                        <CardDescription className="text-[10px] font-caption">Local registration status with Indian Immigration services.</CardDescription>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      {student.efrro.hasUploadedDocument && student.efrro.verificationStatus !== "not_uploaded" ? (
-                        <Badge 
-                          variant={student.efrro.verificationStatus === "verified" ? "secondary" : student.efrro.verificationStatus === "rejected" ? "destructive" : "secondary"}
-                          className={`text-[10px] h-5 capitalize ${
-                            student.efrro.verificationStatus === "verified" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
-                            student.efrro.verificationStatus === "rejected" ? "bg-red-500/10 text-red-600 border-red-500/20" :
-                            "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                          }`}
-                        >
-                          {student.efrro.verificationStatus === "pending" ? "Pending Verification" : student.efrro.verificationStatus}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60">
-                          Not Uploaded
-                        </Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="p-4 space-y-4 text-xs">
-                    {/* Basic Metadata Grid */}
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Certificate Number</span>
-                        <span className="font-semibold text-foreground block font-mono text-sm">
-                          {student.efrro.number && student.efrro.number !== "Not provided" ? student.efrro.number : <span className="text-muted-foreground font-sans font-normal text-xs">Not provided</span>}
-                        </span>
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Issue Date</span>
-                        <span className="font-medium text-foreground block text-xs">
-                          {student.efrro.issueDate ? formatDisplayDate(student.efrro.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* FIRST-CLASS EXPIRATION DATE & VALIDITY HIGHLIGHT CONTAINER */}
-                    <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-caption flex items-center gap-1">
-                            <CalendarDays className="h-3 w-3 text-primary" /> Expiration Date & Validity
-                          </span>
-                          {renderExpiryHealthBadge(student.efrro.expiryDate, student.daysToEfrroExpiry)}
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-base font-bold text-foreground font-mono">
-                            {formatDisplayDate(student.efrro.expiryDate)}
-                          </span>
-                          {student.efrro.expiryDate && (
-                            <span className={`text-xs font-semibold ${
-                              student.daysToEfrroExpiry !== undefined && student.daysToEfrroExpiry < 0 
-                                ? "text-rose-600 dark:text-rose-400" 
-                                : student.daysToEfrroExpiry !== undefined && student.daysToEfrroExpiry <= 30
-                                ? "text-amber-600 dark:text-amber-400"
-                                : "text-emerald-600 dark:text-emerald-400"
-                            }`}>
-                              ({CalendarDateEngine.formatRelativeDays(student.daysToEfrroExpiry)})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs font-semibold px-3 shadow-xs border-primary/30 hover:bg-primary/5 text-primary"
-                          onClick={() => openRenewalDialog("efrro")}
-                        >
-                          <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload New Document
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="default"
-                          size="sm"
-                          className="h-8 text-xs font-semibold px-3 shadow-xs"
-                          onClick={() => openExpiryDialog("efrro")}
-                        >
-                          <Calendar className="mr-1.5 h-3.5 w-3.5" /> Correct Expiry Date
-                        </Button>
-                      </div>
-                    </div>
-
-                    {student.efrro.verifiedAt && (
-                      <div className="pt-2 border-t border-border/30 flex items-center gap-2 text-[11px] text-muted-foreground">
-                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                        <span>Verified on {new Date(student.efrro.verifiedAt).toLocaleDateString()}</span>
-                      </div>
-                    )}
-
-                    {/* Document Card Action Footer */}
-                    <div className="pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Link 
-                          href={`/students/${student.id}/efrro`} 
-                          className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
-                        >
-                          <FileText className="h-3.5 w-3.5" /> View Document & History
-                        </Link>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
-                          onClick={() => openDocMetadataDialog("efrro")}
-                        >
-                          <Edit3 className="mr-1 h-3 w-3" /> Correct Information
-                        </Button>
-                      </div>
-
-                      {student.efrro.verificationStatus === "pending" && (
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                            onClick={() => handleOpenRejectDialog("efrro")}
-                          >
-                            <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="h-7 text-[11px] px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => handleApproveDocument("efrro")}
-                          >
-                            <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                <StudentDocumentCard
+                  documentType="efrro"
+                  title="eFRRO / RESIDENTIAL PERMIT"
+                  description="Local registration status with Indian Immigration services."
+                  studentId={student.id}
+                  documentNumber={student.efrro.number}
+                  issueDate={student.efrro.issueDate}
+                  expiryDate={student.efrro.expiryDate}
+                  versionNumber={student.efrro.versionNumber}
+                  verificationStatus={student.efrro.verificationStatus}
+                  hasUploadedDocument={student.efrro.hasUploadedDocument}
+                  verifiedAt={student.efrro.verifiedAt}
+                  verifiedBy={student.efrro.verifiedBy}
+                  rejectionReason={student.efrro.rejectionReason}
+                  daysToExpiry={student.daysToEfrroExpiry}
+                  onUploadRenewalClick={() => openRenewalDialog("efrro")}
+                  onCorrectExpiryClick={() => openExpiryDialog("efrro")}
+                  onCorrectMetadataClick={() => openDocMetadataDialog("efrro")}
+                  onApproveClick={() => handleApproveDocument("efrro")}
+                  onRejectClick={() => handleOpenRejectDialog("efrro")}
+                  isApproving={approvingDocType === "efrro"}
+                  isRejecting={isRejecting && rejectDocType === "efrro"}
+                />
               ) : (
                 <Card className="border border-border/60 shadow-sm bg-muted/10 p-6 text-center">
                   <Globe className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2" />
@@ -1502,151 +1115,121 @@ export default function StudentDetailsPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* DEDICATED REMINDER SCHEDULE SECTION (FIRST-CLASS FEATURE) */}
+          {/* DEDICATED EFRRO REMINDER SCHEDULE SECTION */}
           <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
             <CardHeader className="pb-3 border-b border-border/40 bg-muted/10 flex flex-row items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4 text-primary" />
                 <div>
-                  <CardTitle className="text-xs font-bold text-foreground uppercase tracking-wider">Reminder Schedule</CardTitle>
-                  <CardDescription className="text-[10px] font-caption">Automated expiry-driven notification timetable</CardDescription>
+                  <CardTitle className="text-xs font-bold text-foreground uppercase tracking-wider">eFRRO Reminder Schedule</CardTitle>
+                  <CardDescription className="text-[10px] font-caption">Automated eFRRO expiry notification timetable</CardDescription>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={loadReminderSchedule} disabled={isLoadingReminders} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={loadReminderSchedule} 
+                disabled={isLoadingReminders} 
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                title="Refresh eFRRO reminder schedule"
+              >
                 <RotateCw className={`h-3.5 w-3.5 ${isLoadingReminders ? "animate-spin" : ""}`} />
               </Button>
             </CardHeader>
 
             <CardContent className="p-4 space-y-4 text-xs">
-              {/* Document Switcher Tabs */}
-              <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/40">
-                {(["visa", "passport", "efrro"] as const).map((docKey) => {
-                  const group = reminderSchedule?.documents[docKey];
-                  const docLabel = docKey === "visa" ? "Visa" : docKey === "passport" ? "Passport" : "eFRRO";
-                  const isSelected = selectedReminderDoc === docKey;
-                  const isExp = group?.isExpired;
-                  const hasExpiry = Boolean(group?.expiryDate);
+              {isLoadingReminders ? (
+                <div className="py-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading eFRRO reminder schedule...
+                </div>
+              ) : !reminderSchedule?.efrro?.expiryDate ? (
+                <div className="py-6 text-center space-y-2 rounded-lg border border-dashed border-border/70 p-4 bg-muted/5">
+                  <CalendarDays className="h-8 w-8 text-muted-foreground/60 mx-auto" />
+                  <p className="font-semibold text-xs text-foreground">eFRRO expiry date not available</p>
+                  <p className="text-[11px] text-muted-foreground max-w-xs mx-auto font-caption">
+                    Add or verify the student&apos;s eFRRO expiry date to generate the reminder schedule.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {/* Active Source eFRRO Expiry Date Banner */}
+                  <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold font-caption">
+                        Active eFRRO Expiry
+                      </span>
+                      <div className="text-xs font-semibold text-foreground flex items-center gap-1.5 font-mono">
+                        <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span>{reminderSchedule.efrro.expiryDateFormatted}</span>
+                      </div>
+                    </div>
 
-                  return (
-                    <button
-                      key={docKey}
-                      type="button"
-                      onClick={() => setSelectedReminderDoc(docKey)}
-                      className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
-                        isSelected 
-                          ? "bg-card text-foreground shadow-xs font-semibold border border-border/60" 
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
-                      }`}
-                    >
-                      <span>{docLabel}</span>
-                      {hasExpiry ? (
-                        <span className={`h-1.5 w-1.5 rounded-full ${isExp ? "bg-rose-500" : "bg-emerald-500"}`} />
+                    <div>
+                      {reminderSchedule.efrro.isExpired ? (
+                        <Badge variant="destructive" className="text-[10px] h-5">Expired</Badge>
                       ) : (
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                        <Badge variant="outline" className="text-[10px] h-5 font-mono bg-primary/5 text-primary border-primary/20">
+                          {reminderSchedule.efrro.daysRemaining} days left
+                        </Badge>
                       )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Active Driving Expiry Schedule */}
-              {(() => {
-                const activeGroup = reminderSchedule?.documents[selectedReminderDoc];
-                if (!activeGroup) {
-                  return (
-                    <div className="py-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" /> Calculating reminder schedules...
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-3.5">
-                    {/* Active Source Expiry Date Banner */}
-                    <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60 flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold font-caption">
-                          {activeGroup.documentTitle} Expiry
-                        </span>
-                        <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
-                          {activeGroup.expiryDate ? (
-                            <span>{activeGroup.expiryDateFormatted}</span>
-                          ) : (
-                            <span className="text-muted-foreground font-normal italic">Expiry date has not been recorded</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div>
-                        {activeGroup.expiryDate ? (
-                          activeGroup.isExpired ? (
-                            <Badge variant="destructive" className="text-[10px] h-5">Expired</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px] h-5 font-mono bg-primary/5 text-primary border-primary/20">
-                              {activeGroup.daysRemaining} days left
-                            </Badge>
-                          )
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60">
-                            No Expiry
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Interactive Reminder Milestones Table */}
-                    <div className="rounded-lg border border-border/60 overflow-hidden bg-card">
-                      <table className="w-full text-[11px] text-left">
-                        <thead className="bg-muted/40 text-[10px] text-muted-foreground uppercase border-b border-border/50">
-                          <tr>
-                            <th className="py-2 px-2.5 font-semibold">Reminder</th>
-                            <th className="py-2 px-2 font-semibold">Date</th>
-                            <th className="py-2 px-2 font-semibold text-right">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/30">
-                          {activeGroup.schedule.map((item) => (
-                            <tr key={item.ruleId} className="hover:bg-muted/20 transition-colors">
-                              <td className="py-2.5 px-2.5">
-                                <span className="font-semibold text-foreground block">{item.ruleName}</span>
-                                <span className="text-[9px] text-muted-foreground font-caption capitalize">
-                                  via {item.channel}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-2 font-medium text-foreground whitespace-nowrap">
-                                {item.scheduledDate || <span className="text-muted-foreground font-normal">N/A</span>}
-                              </td>
-                              <td className="py-2.5 px-2 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {getReminderStatusBadge(item.status)}
-                                  {item.status === "DUE" && (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleManualDispatch(activeGroup.documentType, item.thresholdDays, item.ruleId)}
-                                      disabled={isDispatchingReminder === item.ruleId}
-                                      className="h-5 px-1 text-[9px] bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
-                                      title="Dispatch notification now"
-                                    >
-                                      {isDispatchingReminder === item.ruleId ? (
-                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                      ) : (
-                                        <Send className="h-2.5 w-2.5" />
-                                      )}
-                                    </Button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
                     </div>
                   </div>
-                );
-              })()}
+
+                  {/* Interactive eFRRO Reminder Milestones Table */}
+                  <div className="rounded-lg border border-border/60 overflow-hidden bg-card">
+                    <table className="w-full text-[11px] text-left">
+                      <thead className="bg-muted/40 text-[10px] text-muted-foreground uppercase border-b border-border/50">
+                        <tr>
+                          <th className="py-2 px-2.5 font-semibold">Reminder</th>
+                          <th className="py-2 px-2 font-semibold">Trigger</th>
+                          <th className="py-2 px-2 font-semibold">Scheduled Date</th>
+                          <th className="py-2 px-2 font-semibold text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {reminderSchedule.efrro.schedule.map((item) => (
+                          <tr key={item.ruleId} className="hover:bg-muted/20 transition-colors">
+                            <td className="py-2.5 px-2.5">
+                              <span className="font-semibold text-foreground block">{item.ruleName}</span>
+                              <span className="text-[9px] text-muted-foreground font-caption capitalize">
+                                via {item.channel}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-2 text-muted-foreground whitespace-nowrap">
+                              {item.thresholdDays} days before eFRRO expiry
+                            </td>
+                            <td className="py-2.5 px-2 font-medium text-foreground whitespace-nowrap font-mono">
+                              {item.scheduledDate || <span className="text-muted-foreground font-normal font-sans">N/A</span>}
+                            </td>
+                            <td className="py-2.5 px-2 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {getReminderStatusBadge(item.status)}
+                                {item.status === "DUE" && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleManualDispatch("efrro", item.thresholdDays, item.ruleId)}
+                                    disabled={isDispatchingReminder === item.ruleId}
+                                    className="h-5 px-1 text-[9px] bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
+                                    title="Dispatch notification now"
+                                  >
+                                    {isDispatchingReminder === item.ruleId ? (
+                                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                    ) : (
+                                      <Send className="h-2.5 w-2.5" />
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

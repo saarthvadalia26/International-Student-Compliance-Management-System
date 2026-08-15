@@ -1430,12 +1430,6 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
 
     const hasValidFile = (fp?: string | null) => Boolean(fp && fp.trim() !== "" && fp !== "pending_upload" && fp !== "null");
 
-    const activePass = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null; file_path?: string | null }) => p.is_active && !p.deleted_at);
-    const isPassUp = hasValidFile(activePass?.file_path);
-
-    const activeVisa = (student.visa_versions || []).find((v: { is_active?: boolean; deleted_at?: string | null; file_path?: string | null }) => v.is_active && !v.deleted_at);
-    const isVisaUp = hasValidFile(activeVisa?.file_path);
-
     const activeEfrro = (student.efrro_versions || []).find((e: { is_active?: boolean; deleted_at?: string | null; file_path?: string | null }) => e.is_active && !e.deleted_at);
     const isEfrroUp = hasValidFile(activeEfrro?.file_path);
 
@@ -1445,18 +1439,6 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
 
     const calculatedSchedule = ExpiryReminderEngine.calculateStudentReminders({
       studentId,
-      passport: {
-        number: isPassUp ? (activePass?.document_number || snapshot?.passport_number || "") : (snapshot?.passport_number || ""),
-        expiryDate: isPassUp ? (activePass?.expiry_date || snapshot?.passport_expiry) : (snapshot?.passport_expiry || null),
-        isUploaded: isPassUp,
-        verificationStatus: isPassUp ? (activePass?.verification_status || "pending") : "not_uploaded"
-      },
-      visa: {
-        number: isVisaUp ? (activeVisa?.document_number || snapshot?.visa_number || "") : (snapshot?.visa_number || ""),
-        expiryDate: isVisaUp ? (activeVisa?.expiry_date || snapshot?.visa_expiry) : (snapshot?.visa_expiry || null),
-        isUploaded: isVisaUp,
-        verificationStatus: isVisaUp ? (activeVisa?.verification_status || "pending") : "not_uploaded"
-      },
       efrro: {
         number: isEfrroUp ? (activeEfrro?.document_number || snapshot?.efrro_number || "") : (snapshot?.efrro_number || ""),
         expiryDate: isEfrroUp ? (activeEfrro?.expiry_date || snapshot?.efrro_expiry) : (snapshot?.efrro_expiry || null),
@@ -1480,11 +1462,11 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
 }
 
 /**
- * Server Action: Manually trigger reminder dispatch for testing or immediate notification
+ * Server Action: Manually trigger eFRRO reminder dispatch for testing or immediate notification
  */
 export async function triggerReminderDispatchAction(
   studentId: string,
-  docType: "passport" | "visa" | "efrro",
+  docType: "efrro" | "passport" | "visa",
   thresholdDays: number
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -1499,7 +1481,7 @@ export async function triggerReminderDispatchAction(
 
     const { data: student } = await adminSupabase
       .from("students")
-      .select("id, email, phone, student_personal(full_name), student_snapshot(passport_expiry, visa_expiry, efrro_expiry)")
+      .select("id, email, phone, student_personal(full_name), student_snapshot(efrro_expiry)")
       .eq("id", studentId)
       .single();
 
@@ -1510,23 +1492,20 @@ export async function triggerReminderDispatchAction(
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
 
-    const expiryDate = 
-      docType === "passport" ? snapshot?.passport_expiry :
-      docType === "visa" ? snapshot?.visa_expiry :
-      snapshot?.efrro_expiry;
+    const expiryDate = snapshot?.efrro_expiry;
 
     if (!expiryDate) {
-      return { success: false, error: `Cannot dispatch reminder: No expiry date recorded for ${docType}.` };
+      return { success: false, error: "Cannot dispatch reminder: No eFRRO expiry date recorded." };
     }
 
-    const idempotencyKey = `${studentId}:${docType}:${thresholdDays}:both:${expiryDate}`;
+    const idempotencyKey = `${studentId}:efrro:${thresholdDays}:both:${expiryDate}`;
     const recipientAddress = student.email || student.phone || "compliance@university.edu";
 
     const { data: notif, error: notifErr } = await adminSupabase
       .from("notifications")
       .insert({
         student_id: studentId,
-        document_type: docType,
+        document_type: "efrro",
         status: "sent",
         channel: "email",
         recipient_address: recipientAddress,
@@ -1535,9 +1514,10 @@ export async function triggerReminderDispatchAction(
         idempotency_key: idempotencyKey,
         notification_context: {
           student_name: personal?.full_name || "Student",
-          document_type: docType.toUpperCase(),
+          document_type: "eFRRO / Residential Permit",
           days_left: String(thresholdDays),
           expiry_date: expiryDate,
+          scheduled_date: new Date().toISOString(),
           dispatched_by: user.id
         }
       })

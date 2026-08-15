@@ -5,7 +5,7 @@ import {
 } from "../src/domain/notifications/services/reminder-engine.service";
 
 /**
- * ISCMS Expiry-Driven Reminder Engine Automated Test Suite
+ * ISCMS Expiry-Driven Reminder Engine Automated Test Suite (eFRRO Only Model)
  */
 function runTests() {
   let passed = 0;
@@ -22,28 +22,28 @@ function runTests() {
   }
 
   console.log("\n=======================================================");
-  console.log("  ISCMS EXPIRY-DRIVEN REMINDER ENGINE TEST SUITE");
+  console.log("  ISCMS EFRRO-ONLY REMINDER ENGINE TEST SUITE");
   console.log("=======================================================\n");
 
-  // TEST 1: Date arithmetic accuracy (Prompt example: Expiry = 2027-08-26)
+  // TEST 1: Date arithmetic accuracy (Prompt example: Expiry = 2026-12-30)
   console.log("--- Group 1: Calendar Date Arithmetic ---");
-  const expiry = "2027-08-26";
+  const expiry = "2026-12-30";
   const r90 = CalendarDateEngine.subtractDays(expiry, 90);
   const r60 = CalendarDateEngine.subtractDays(expiry, 60);
   const r30 = CalendarDateEngine.subtractDays(expiry, 30);
   const r15 = CalendarDateEngine.subtractDays(expiry, 15);
 
-  assert(r90 === "2027-05-28", "90-day calculation from 2027-08-26 = 2027-05-28", `Got: ${r90}`);
-  assert(r60 === "2027-06-27", "60-day calculation from 2027-08-26 = 2027-06-27", `Got: ${r60}`);
-  assert(r30 === "2027-07-27", "30-day calculation from 2027-08-26 = 2027-07-27", `Got: ${r30}`);
-  assert(r15 === "2027-08-11", "15-day calculation from 2027-08-26 = 2027-08-11", `Got: ${r15}`);
+  assert(r90 === "2026-10-01", "90-day calculation from 2026-12-30 = 2026-10-01", `Got: ${r90}`);
+  assert(r60 === "2026-10-31", "60-day calculation from 2026-12-30 = 2026-10-31", `Got: ${r60}`);
+  assert(r30 === "2026-11-30", "30-day calculation from 2026-12-30 = 2026-11-30", `Got: ${r30}`);
+  assert(r15 === "2026-12-15", "15-day calculation from 2026-12-30 = 2026-12-15", `Got: ${r15}`);
 
-  // TEST 2: No expiry date (NULL / Empty)
-  console.log("\n--- Group 2: No Expiry Date Handling ---");
+  // TEST 2: No eFRRO expiry date (NULL / Empty)
+  console.log("\n--- Group 2: No eFRRO Expiry Date Handling ---");
   const nullExpiryResult = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
-    documentNumber: "V-12345",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E-12345",
     expiryDate: null,
     isUploaded: false,
     verificationStatus: "not_uploaded",
@@ -52,16 +52,16 @@ function runTests() {
   });
 
   assert(nullExpiryResult.daysRemaining === null, "Days remaining is null when no expiry");
-  assert(nullExpiryResult.schedule.length === 4, "4 milestone rules created");
+  assert(nullExpiryResult.schedule.length === 4, "4 milestone rules created (90, 60, 30, 15)");
   assert(nullExpiryResult.schedule.every(s => s.status === "NOT_APPLICABLE"), "All rules NOT_APPLICABLE when no expiry date");
   assert(nullExpiryResult.schedule[0].statusLabel === "Not Available", "Status label says 'Not Available'");
 
-  // TEST 3: Expiry far in future (All NOT_DUE)
-  console.log("\n--- Group 3: Future Expiry (NOT_DUE) ---");
+  // TEST 3: Expiry far in future (All Scheduled / NOT_DUE)
+  console.log("\n--- Group 3: Future eFRRO Expiry (Scheduled) ---");
   const futureResult = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
-    documentNumber: "V-99999",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E-99999",
     expiryDate: "2027-08-26",
     isUploaded: true,
     verificationStatus: "verified",
@@ -73,13 +73,14 @@ function runTests() {
   assert(futureResult.daysRemaining === 376, "Calculated 376 days remaining", `Got: ${futureResult.daysRemaining}`);
   assert(futureResult.schedule.every(s => s.status === "NOT_DUE"), "All milestones NOT_DUE when far in future");
   assert(futureResult.schedule[0].scheduledDateISO === "2027-05-28", "90-day scheduled for 2027-05-28");
+  assert(futureResult.schedule[0].statusLabel === "Scheduled", "Status label displays 'Scheduled'");
 
-  // TEST 4: Exactly 30 days before expiry (30-day is DUE)
+  // TEST 4: Exactly 30 days before expiry (30-day milestone reached)
   console.log("\n--- Group 4: Threshold Arrived (DUE) ---");
   const dueResult = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
-    documentNumber: "V-88888",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E-88888",
     expiryDate: "2027-08-26",
     isUploaded: true,
     verificationStatus: "verified",
@@ -97,20 +98,20 @@ function runTests() {
   const mockSentNotif: RawNotificationRecord = {
     id: "notif-1",
     student_id: "student-1",
-    document_type: "visa",
+    document_type: "efrro",
     status: "sent",
     channel: "both",
     scheduled_for: "2027-07-27T10:00:00Z",
-    idempotency_key: "student-1:visa:30:both:2027-08-26",
+    idempotency_key: "student-1:efrro:30:both:2027-08-26",
     notification_context: { days_left: 30 },
     created_at: "2027-07-27T10:00:00Z",
     updated_at: "2027-07-27T10:15:00Z"
   };
 
   const dispatchedResult = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
-    documentNumber: "V-88888",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E-88888",
     expiryDate: "2027-08-26",
     isUploaded: true,
     verificationStatus: "verified",
@@ -127,11 +128,11 @@ function runTests() {
   const mockFailedNotif: RawNotificationRecord = {
     id: "notif-2",
     student_id: "student-1",
-    document_type: "visa",
+    document_type: "efrro",
     status: "failed",
     channel: "whatsapp",
     scheduled_for: "2027-07-27T10:00:00Z",
-    idempotency_key: "student-1:visa:30:whatsapp:2027-08-26",
+    idempotency_key: "student-1:efrro:30:whatsapp:2027-08-26",
     notification_context: { days_left: 30 },
     created_at: "2027-07-27T10:00:00Z",
     updated_at: "2027-07-27T10:05:00Z",
@@ -144,9 +145,9 @@ function runTests() {
   };
 
   const failedResult = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
-    documentNumber: "V-88888",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E-88888",
     expiryDate: "2027-08-26",
     isUploaded: true,
     verificationStatus: "verified",
@@ -158,12 +159,12 @@ function runTests() {
   assert(failed30?.status === "FAILED", "30-day reminder is marked FAILED", `Got: ${failed30?.status}`);
   assert(failed30?.failureReason === "WhatsApp Gateway connection timeout", "failureReason matches gateway log");
 
-  // TEST 7: Expired Document (EXPIRED)
-  console.log("\n--- Group 7: Expired Document ---");
+  // TEST 7: Expired eFRRO Document (EXPIRED)
+  console.log("\n--- Group 7: Expired eFRRO Document ---");
   const expiredResult = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "passport",
-    documentTitle: "Passport Document",
-    documentNumber: "P-11111",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E-11111",
     expiryDate: "2025-01-01",
     isUploaded: true,
     verificationStatus: "verified",
@@ -174,33 +175,41 @@ function runTests() {
   assert(expiredResult.isExpired === true, "Document marked isExpired = true");
   assert(expiredResult.daysRemaining !== null && expiredResult.daysRemaining < 0, "Days remaining is negative");
   assert(expiredResult.schedule[0].status === "EXPIRED", "Status reflects EXPIRED");
+  assert(expiredResult.schedule[0].statusLabel === "Expired", "Status label displays 'Expired'");
 
-  // TEST 8: Multi-document independence (Passport vs Visa)
-  console.log("\n--- Group 8: Multi-document Independence ---");
+  // TEST 8: Student eFRRO Single Subject Reminders
+  console.log("\n--- Group 8: Single Subject eFRRO Student Reminders ---");
   const studentSchedule = ExpiryReminderEngine.calculateStudentReminders({
     studentId: "student-123",
-    passport: {
-      number: "P-PASS-01",
-      expiryDate: "2028-12-31", // Far in future
+    efrro: {
+      number: "EFRRO-882200",
+      expiryDate: "2026-12-30",
       isUploaded: true,
       verificationStatus: "verified"
     },
-    visa: {
-      number: "V-VISA-01",
-      expiryDate: "2026-09-14", // 30 days from 2026-08-15
-      isUploaded: true,
-      verificationStatus: "verified"
-    },
-    efrro: null, // Not uploaded
     notifications: [],
     todayISO: "2026-08-15"
   });
 
-  assert(studentSchedule.documents.passport.schedule.every(s => s.status === "NOT_DUE"), "Passport schedule is all NOT_DUE");
-  const visa30 = studentSchedule.documents.visa.schedule.find(s => s.thresholdDays === 30);
-  assert(visa30?.status === "DUE", "Visa 30-day schedule is DUE independently");
-  assert(studentSchedule.documents.efrro.schedule.every(s => s.status === "NOT_APPLICABLE"), "eFRRO schedule is NOT_APPLICABLE");
-  assert(studentSchedule.summary.dueCount > 0, "Summary aggregates due count properly");
+  assert(studentSchedule.efrro !== undefined, "eFRRO reminder group is returned directly");
+  assert(studentSchedule.efrro.schedule.length === 4, "4 milestone rules configured (90, 60, 30, 15)");
+  assert(studentSchedule.efrro.schedule[0].ruleName === "90-Day Early Warning", "Milestone 1 is 90-Day Early Warning");
+  assert(studentSchedule.efrro.schedule[1].ruleName === "60-Day Administrative Reminder", "Milestone 2 is 60-Day Administrative Reminder");
+  assert(studentSchedule.efrro.schedule[2].ruleName === "30-Day Urgent Renewal", "Milestone 3 is 30-Day Urgent Renewal");
+  assert(studentSchedule.efrro.schedule[3].ruleName === "15-Day Critical Warning", "Milestone 4 is 15-Day Critical Warning");
+  assert(studentSchedule.summary.totalRules === 4, "Summary total rules is 4");
+
+  // TEST 9: Empty eFRRO
+  console.log("\n--- Group 9: Missing eFRRO Expiry ---");
+  const emptyStudentSchedule = ExpiryReminderEngine.calculateStudentReminders({
+    studentId: "student-empty",
+    efrro: null,
+    notifications: [],
+    todayISO: "2026-08-15"
+  });
+
+  assert(emptyStudentSchedule.efrro.expiryDate === null, "eFRRO expiry date is null");
+  assert(emptyStudentSchedule.efrro.schedule.every(s => s.status === "NOT_APPLICABLE"), "All milestones NOT_APPLICABLE");
 
   console.log("\n=======================================================");
   console.log(`  TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);

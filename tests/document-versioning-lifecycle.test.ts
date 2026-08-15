@@ -529,9 +529,9 @@ async function runLifecycleTests() {
   const todayISO = "2026-08-15";
 
   const oldSchedule = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "passport",
-    documentTitle: "Passport",
-    documentNumber: "P12345678",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E12345678",
     expiryDate: oldExpiry,
     isUploaded: true,
     verificationStatus: "verified",
@@ -540,9 +540,9 @@ async function runLifecycleTests() {
   });
 
   const newSchedule = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "passport",
-    documentTitle: "Passport",
-    documentNumber: "P99990001",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E99990001",
     expiryDate: newExpiry,
     isUploaded: true,
     verificationStatus: "verified",

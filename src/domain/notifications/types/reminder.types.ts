@@ -37,11 +37,7 @@ export interface DocumentReminderGroup {
 export interface StudentReminderScheduleResponse {
   studentId: string;
   evaluatedAt: string;
-  documents: {
-    passport: DocumentReminderGroup;
-    visa: DocumentReminderGroup;
-    efrro: DocumentReminderGroup;
-  };
+  efrro: DocumentReminderGroup;
   summary: {
     totalRules: number;
     dueCount: number;

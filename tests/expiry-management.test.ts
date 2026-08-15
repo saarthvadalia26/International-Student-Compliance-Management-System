@@ -30,8 +30,8 @@ function runTests() {
   const newExpiry = "2028-03-20";
 
   const initialSchedule = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
     documentNumber: "E52819040",
     expiryDate: oldExpiry,
     isUploaded: true,
@@ -41,8 +41,8 @@ function runTests() {
   });
 
   const updatedSchedule = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
     documentNumber: "E52819040",
     expiryDate: newExpiry,
     isUploaded: true,
@@ -77,8 +77,8 @@ function runTests() {
   assert(nearHealth.relativeText === "Expires in 15 days", "15 days relative text is 'Expires in 15 days'");
 
   const nearSchedule = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
     documentNumber: "E52819040",
     expiryDate: nearExpiry,
     isUploaded: true,
@@ -105,8 +105,8 @@ function runTests() {
   assert(CalendarDateEngine.formatRelativeDays(diffThree) === "Expired 3 days ago", "Formatted -3 is 'Expired 3 days ago'");
 
   const expiredSchedule = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
     documentNumber: "E52819040",
     expiryDate: expiredYesterday,
     isUploaded: true,

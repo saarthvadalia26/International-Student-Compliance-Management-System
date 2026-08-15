@@ -56,20 +56,12 @@ export class ReminderEngine {
 
       if (sError || saError || !student || !studentAccount) continue;
 
-      // Evaluate rules against document status dates
+      // Evaluate rules against document status dates - automated expiry reminders are only generated for eFRRO
       for (const rule of rules) {
-        let expiryDate: string | null = null;
-        let documentStatus: string | null = null;
-        if (rule.documentType === "passport") {
-          expiryDate = snap.passport_expiry;
-          documentStatus = snap.passport_status;
-        } else if (rule.documentType === "visa") {
-          expiryDate = snap.visa_expiry;
-          documentStatus = snap.visa_status;
-        } else if (rule.documentType === "efrro") {
-          expiryDate = snap.efrro_expiry;
-          documentStatus = snap.efrro_status;
-        }
+        if (rule.documentType !== "efrro") continue;
+
+        const expiryDate: string | null = snap.efrro_expiry;
+        const documentStatus: string | null = snap.efrro_status;
 
         if (!expiryDate || documentStatus === "COMPLIANT") continue;
 

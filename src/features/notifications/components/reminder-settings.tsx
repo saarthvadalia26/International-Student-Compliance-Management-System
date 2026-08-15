@@ -68,7 +68,7 @@ export function ReminderSettings(): React.JSX.Element {
   const handleAddRule = () => {
     const newRule: ReminderRule = {
       id: `r-${Math.random().toString(36).substring(7)}`, // Note: Temp ID generator until real DB save
-      documentType: "passport",
+      documentType: "efrro",
       alertThresholdDays: 30,
       channel: "email",
       isActive: true

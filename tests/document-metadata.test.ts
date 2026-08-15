@@ -73,9 +73,9 @@ function runTests() {
 
   // Initial schedule based on 2027-12-13
   const initialSchedule = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
-    documentNumber: "V-9999",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E-9999",
     expiryDate: oldExpiry,
     isUploaded: true,
     verificationStatus: "verified",
@@ -88,9 +88,9 @@ function runTests() {
 
   // Updated schedule after staff changes expiry to 2028-03-20
   const updatedSchedule = ExpiryReminderEngine.calculateDocumentReminders({
-    documentType: "visa",
-    documentTitle: "Student Visa",
-    documentNumber: "V-9999",
+    documentType: "efrro",
+    documentTitle: "eFRRO / Residential Permit",
+    documentNumber: "E-9999",
     expiryDate: newExpiry,
     isUploaded: true,
     verificationStatus: "verified",
