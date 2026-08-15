@@ -44,6 +44,11 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
           phone_local
         ),
         student_snapshot(
+          passport_number,
+          passport_expiry,
+          visa_number,
+          visa_type,
+          visa_expiry,
           efrro_status,
           efrro_expiry,
           days_until_efrro_expiry
@@ -73,7 +78,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
     // Load latest Passport document version
     const { data: passportVer } = await supabase
       .from("passport_versions")
-      .select("id, passport_number, expiry_date, verification_status, comments, created_at")
+      .select("id, document_number, expiry_date, verification_status, notes, rejection_reason, created_at")
       .eq("student_id", studentId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -83,7 +88,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
     // Load latest Visa document version
     const { data: visaVer } = await supabase
       .from("visa_versions")
-      .select("id, visa_number, visa_type, expiry_date, verification_status, comments, created_at")
+      .select("id, document_number, visa_type, expiry_date, verification_status, notes, rejection_reason, created_at")
       .eq("student_id", studentId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -93,7 +98,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
     // Load latest eFRRO document version
     const { data: efrroVer } = await supabase
       .from("efrro_versions")
-      .select("id, created_at, verification_status, comments")
+      .select("id, created_at, verification_status, notes, rejection_reason")
       .eq("student_id", studentId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -147,22 +152,22 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
 
       overallCompliance,
 
-      passportNumber: passportVer?.passport_number || null,
-      passportExpiry: passportVer?.expiry_date || null,
+      passportNumber: passportVer?.document_number || snapshot?.passport_number || null,
+      passportExpiry: passportVer?.expiry_date || snapshot?.passport_expiry || null,
       passportStatus,
-      passportRemarks: passportVer?.comments || null,
+      passportRemarks: passportVer?.rejection_reason || passportVer?.notes || null,
       passportUploadDate: passportVer?.created_at || null,
 
-      visaNumber: visaVer?.visa_number || null,
-      visaType: visaVer?.visa_type || null,
-      visaExpiry: visaVer?.expiry_date || null,
+      visaNumber: visaVer?.document_number || snapshot?.visa_number || null,
+      visaType: visaVer?.visa_type || snapshot?.visa_type || null,
+      visaExpiry: visaVer?.expiry_date || snapshot?.visa_expiry || null,
       visaStatus,
-      visaRemarks: visaVer?.comments || null,
+      visaRemarks: visaVer?.rejection_reason || visaVer?.notes || null,
       visaUploadDate: visaVer?.created_at || null,
 
       efrroStatus,
       efrroExpiry: snapshot?.efrro_expiry || null,
-      efrroRemarks: efrroVer?.comments || null,
+      efrroRemarks: efrroVer?.rejection_reason || efrroVer?.notes || null,
       efrroUploadDate: efrroVer?.created_at || null,
       daysRemaining: snapshot?.days_until_efrro_expiry !== undefined ? snapshot.days_until_efrro_expiry : null,
 
@@ -295,17 +300,17 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
     const [efrroRes, passportRes, visaRes] = await Promise.all([
       supabase
         .from("efrro_versions")
-        .select("id, file_path, created_at, verification_status, comments, verified_at")
+        .select("id, file_path, created_at, verification_status, notes, rejection_reason, verified_at")
         .eq("student_id", studentId)
         .is("deleted_at", null),
       supabase
         .from("passport_versions")
-        .select("id, file_path, created_at, verification_status, comments, verified_at")
+        .select("id, file_path, created_at, verification_status, notes, rejection_reason, verified_at")
         .eq("student_id", studentId)
         .is("deleted_at", null),
       supabase
         .from("visa_versions")
-        .select("id, file_path, created_at, verification_status, comments, verified_at")
+        .select("id, file_path, created_at, verification_status, notes, rejection_reason, verified_at")
         .eq("student_id", studentId)
         .is("deleted_at", null)
     ]);
@@ -320,7 +325,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
           filename: row.file_path.split("/").pop() || "efrro_document.pdf",
           uploadDate: row.created_at,
           verificationStatus: row.verification_status,
-          reviewerComments: row.comments || null,
+          reviewerComments: row.rejection_reason || row.notes || null,
           reviewedAt: row.verified_at || null
         });
       });
@@ -334,7 +339,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
           filename: row.file_path.split("/").pop() || "passport_document.pdf",
           uploadDate: row.created_at,
           verificationStatus: row.verification_status,
-          reviewerComments: row.comments || null,
+          reviewerComments: row.rejection_reason || row.notes || null,
           reviewedAt: row.verified_at || null
         });
       });
@@ -348,7 +353,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
           filename: row.file_path.split("/").pop() || "visa_document.pdf",
           uploadDate: row.created_at,
           verificationStatus: row.verification_status,
-          reviewerComments: row.comments || null,
+          reviewerComments: row.rejection_reason || row.notes || null,
           reviewedAt: row.verified_at || null
         });
       });

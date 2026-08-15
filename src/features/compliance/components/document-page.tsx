@@ -74,12 +74,31 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
   }, [studentId, documentType, fetchDocuments]);
 
   const handleUploadSubmit = (_data: { docNumber: string; issueDate: string; expiryDate: string; file: File | null }) => {
-    // This will hit an API route securely
     toast.info("Upload initiated", { description: "Sending secure payload to storage layer..." });
   };
 
-  const handleVerificationAction = (_data: { status: "verified" | "rejected"; reason: string }) => {
-    toast.info("Verification action submitted", { description: "Updating document status..." });
+  const handleVerificationAction = async (data: { status: "verified" | "rejected"; reason: string }) => {
+    try {
+      const { updateDocumentVerificationAction } = await import("@/app/(app)/students/actions");
+      const activeDoc = versions.find(v => v.isActive);
+      const res = await updateDocumentVerificationAction(
+        studentId,
+        documentType,
+        activeDoc?.id || null,
+        data.status,
+        data.reason
+      );
+      if (res.success) {
+        toast.success(`Document ${data.status === "verified" ? "Approved" : "Rejected"}`, {
+          description: "Document verification status updated successfully."
+        });
+        await fetchDocuments();
+      } else {
+        toast.error("Action Failed", { description: res.error || "Unable to update document verification." });
+      }
+    } catch (err) {
+      toast.error("Error", { description: err instanceof Error ? err.message : "Failed to execute verification action." });
+    }
   };
 
   if (loading) {
