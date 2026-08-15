@@ -1,5 +1,5 @@
 import * as React from "react";
-import { RefreshCw, Eye, FileText } from "lucide-react";
+import { UploadCloud, Eye, FileText, Edit3, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ComplianceStatusBadge, ExpiryStatusBadge } from "./compliance-status";
@@ -13,6 +13,7 @@ interface DocumentCardProps {
   issueDate: string | null;
   daysLeft: number | null;
   onReplaceClick: () => void;
+  onCorrectClick?: () => void;
   onVerifyClick?: () => void;
   onViewPdfClick?: () => void;
 }
@@ -25,6 +26,7 @@ export function ComplianceDocumentCard({
   issueDate,
   daysLeft,
   onReplaceClick,
+  onCorrectClick,
   onVerifyClick,
   onViewPdfClick
 }: DocumentCardProps): React.JSX.Element {
@@ -54,16 +56,16 @@ export function ComplianceDocumentCard({
             <div className="space-y-3">
               <div>
                 <span className="text-muted-foreground block font-caption">Document Identifier</span>
-                <span className="font-semibold text-foreground block">{documentNumber}</span>
+                <span className="font-semibold text-foreground block">{documentNumber || "Not Recorded"}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <span className="text-muted-foreground block font-caption">Issue Date</span>
-                  <span className="font-medium text-foreground block">{issueDate}</span>
+                  <span className="font-medium text-foreground block">{issueDate || "Not Recorded"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block font-caption">Expiry Date</span>
-                  <span className="font-semibold text-foreground block">{expiryDate}</span>
+                  <span className="font-semibold text-foreground block">{expiryDate || "Not Recorded"}</span>
                 </div>
               </div>
             </div>
@@ -80,12 +82,17 @@ export function ComplianceDocumentCard({
                     <Eye className="mr-1.5 h-3.5 w-3.5" /> View PDF
                   </Button>
                 )}
+                {onCorrectClick && (
+                  <Button variant="outline" size="sm" className="h-8 text-xs flex-1 md:flex-initial" onClick={onCorrectClick}>
+                    <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Correct Info
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" className="h-8 text-xs flex-1 md:flex-initial" onClick={onReplaceClick}>
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Replace PDF
+                  <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload New Version
                 </Button>
                 {status === "PENDING_VERIFICATION" && onVerifyClick && (
-                  <Button size="sm" className="h-8 text-xs flex-1 md:flex-initial" onClick={onVerifyClick}>
-                    Verify Document
+                  <Button size="sm" className="h-8 text-xs flex-1 md:flex-initial bg-emerald-600 hover:bg-emerald-700 text-white" onClick={onVerifyClick}>
+                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Verify Document
                   </Button>
                 )}
               </div>
@@ -96,7 +103,7 @@ export function ComplianceDocumentCard({
             <FileText className="h-8 w-8 text-muted-foreground/50 mb-2" />
             <p className="text-xs text-muted-foreground font-caption mb-3">No active document uploaded for this student.</p>
             <Button size="sm" className="h-8 text-xs" onClick={onReplaceClick}>
-              Upload {config.title} PDF
+              <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload {config.title} File
             </Button>
           </div>
         )}

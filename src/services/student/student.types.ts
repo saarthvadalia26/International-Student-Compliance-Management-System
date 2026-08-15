@@ -126,9 +126,13 @@ export interface RegisterStudentInput {
   embassyWebsite?: string;
   embassyContactPerson?: string;
   passportNumber?: string;
+  passportIssueDate?: Date | string;
   passportExpiry?: Date | string;
+  passportPlaceOfIssue?: string;
   visaNumber?: string;
+  visaIssueDate?: Date | string;
   visaExpiry?: Date | string;
+  visaType?: string;
 }
 
 export interface UpdateStudentInput {

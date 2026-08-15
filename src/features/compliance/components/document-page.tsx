@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { DOCUMENT_CONFIGS, ComplianceDocumentType, ComplianceStatus } from "../constants/constants";
 import { ComplianceDocumentCard } from "./document-card";
-import { DocumentUploadDialog, VerificationPanel } from "./document-dialogs";
+import { DocumentUploadDialog, CorrectMetadataDialog, VerificationPanel } from "./document-dialogs";
 import { ComplianceDocumentTable, ComplianceDocumentTimeline, DocumentVersion } from "./document-history";
 import { DocumentViewer, LoadingState } from "./document-states";
 
@@ -27,6 +27,7 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
   // Versions history state from database
   const [versions, setVersions] = React.useState<DocumentVersion[]>([]);
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
+  const [isCorrectOpen, setIsCorrectOpen] = React.useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = React.useState(false);
   const [selectedPdfUrl] = React.useState<string | null>(null);
 
@@ -66,31 +67,27 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
     },
   });
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => {
     if (studentId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchDocuments();
     }
   }, [studentId, documentType, fetchDocuments]);
 
-  const handleUploadSubmit = (_data: { docNumber: string; issueDate: string; expiryDate: string; file: File | null }) => {
-    toast.info("Upload initiated", { description: "Sending secure payload to storage layer..." });
-  };
-
   const handleVerificationAction = async (data: { status: "verified" | "rejected"; reason: string }) => {
     try {
       const { updateDocumentVerificationAction } = await import("@/app/(app)/students/actions");
-      const activeDoc = versions.find(v => v.isActive);
+      const pendingDoc = versions.find(v => v.verificationStatus === "pending") || versions.find(v => v.isActive);
       const res = await updateDocumentVerificationAction(
         studentId,
         documentType,
-        activeDoc?.id || null,
+        pendingDoc?.id || null,
         data.status,
         data.reason
       );
       if (res.success) {
-        toast.success(`Document ${data.status === "verified" ? "Approved" : "Rejected"}`, {
-          description: "Document verification status updated successfully."
+        toast.success(`Document ${data.status === "verified" ? "Approved & Activated" : "Rejected"}`, {
+          description: "Document verification state updated and reminder timelines synchronized."
         });
         await fetchDocuments();
       } else {
@@ -105,8 +102,9 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
     return <LoadingState label={`Loading ${config.title} parameters...`} />;
   }
 
-  const activeDoc = versions.find(v => v.isActive);
-  const daysLeft = activeDoc ? Math.ceil((new Date(activeDoc.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+  const activeDoc = versions.find(v => v.isActive) || (versions.length > 0 ? versions[0] : null);
+  const pendingDoc = versions.find(v => v.verificationStatus === "pending");
+  const daysLeft = activeDoc?.expiryDate ? Math.ceil((new Date(activeDoc.expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
 
   return (
     <div className="space-y-6 animate-fade-in pb-12 text-xs">
@@ -134,7 +132,8 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
             expiryDate={activeDoc ? activeDoc.expiryDate : null}
             daysLeft={daysLeft}
             onReplaceClick={() => setIsUploadOpen(true)}
-            onVerifyClick={activeDoc && status === "PENDING_VERIFICATION" ? () => setIsVerifyOpen(true) : undefined}
+            onCorrectClick={activeDoc ? () => setIsCorrectOpen(true) : undefined}
+            onVerifyClick={pendingDoc || (activeDoc && status === "PENDING_VERIFICATION") ? () => setIsVerifyOpen(true) : undefined}
             onViewPdfClick={selectedPdfUrl ? () => {} : undefined}
           />
 
@@ -169,12 +168,27 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
         </div>
       </div>
 
-      {/* Upload document Modal */}
+      {/* Genuine Renewal Upload Modal */}
       <DocumentUploadDialog 
         config={config}
+        studentId={studentId}
         isOpen={isUploadOpen}
         onOpenChange={setIsUploadOpen}
-        onSubmit={handleUploadSubmit}
+        onSuccess={fetchDocuments}
+      />
+
+      {/* In-Place Metadata Correction Modal */}
+      <CorrectMetadataDialog
+        config={config}
+        studentId={studentId}
+        initialValues={{
+          documentNumber: activeDoc?.documentNumber || "",
+          issueDate: activeDoc?.issueDate || "",
+          expiryDate: activeDoc?.expiryDate || ""
+        }}
+        isOpen={isCorrectOpen}
+        onOpenChange={setIsCorrectOpen}
+        onSuccess={fetchDocuments}
       />
 
       {/* Verification modal */}
@@ -186,3 +200,4 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
     </div>
   );
 }
+

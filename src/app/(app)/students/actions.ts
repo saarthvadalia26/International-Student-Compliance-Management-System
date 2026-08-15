@@ -8,6 +8,7 @@ import { RegisterStudentInput, UpdateStudentInput, StudentFilterOptions } from "
 import { z } from "zod";
 import { getCountryByCode } from "@/utils/countries";
 import { sanitizeError } from "@/lib/errors/error-sanitizer";
+import { StorageProviderFactory } from "@/domain/storage/factory";
 
 const studentService = new StudentService();
 
@@ -667,6 +668,13 @@ export async function getDocumentVersionsAction(
 
 /**
  * Server Action: Update verification status for a document version
+ * 
+ * Implements strict approval timing:
+ * - When approved ('verified'): The target version (vN+1) becomes active (is_active: true),
+ *   while all previous versions (v1..vN) become historical (is_active: false).
+ *   Snapshot is updated with the new verified document metadata and compliance schedules recalculate.
+ * - When rejected ('rejected'): The target version becomes rejected (is_active: false).
+ *   The previously active verified document (v1..vN) remains active and untouched.
  */
 export async function updateDocumentVerificationAction(
   studentId: string,
@@ -694,12 +702,42 @@ export async function updateDocumentVerificationAction(
       };
     }
 
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: You do not have permission to verify documents." };
+    }
+
     const adminSupabase = getAdminSupabase();
     const tableName = documentType === "passport" 
       ? "passport_versions" 
       : documentType === "visa" 
       ? "visa_versions" 
       : "efrro_versions";
+
+    // 1. Resolve targeted version
+    let targetVersionId = versionId;
+    if (!targetVersionId) {
+      const { data: pendingVer } = await adminSupabase
+        .from(tableName)
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("verification_status", "pending")
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      targetVersionId = pendingVer?.id;
+    }
+
+    if (!targetVersionId) {
+      const { data: activeVer } = await adminSupabase
+        .from(tableName)
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("is_active", true)
+        .maybeSingle();
+      targetVersionId = activeVer?.id;
+    }
 
     const updatePayload: Record<string, unknown> = {
       verification_status: status,
@@ -708,10 +746,6 @@ export async function updateDocumentVerificationAction(
       updated_at: new Date().toISOString(),
       notes: notes || null
     };
-
-    if (status === "rejected") {
-      updatePayload.rejection_reason = rejectionReason || "Document rejected by administrator";
-    }
 
     if (metadata) {
       if (metadata.documentNumber?.trim()) updatePayload.document_number = metadata.documentNumber.trim();
@@ -725,61 +759,118 @@ export async function updateDocumentVerificationAction(
       }
     }
 
-    let query = adminSupabase
-      .from(tableName)
-      .update(updatePayload)
-      .eq("student_id", studentId);
+    if (status === "verified") {
+      updatePayload.is_active = true;
+      updatePayload.rejection_reason = null;
 
-    if (versionId) {
-      query = query.eq("id", versionId);
-    } else {
-      query = query.eq("is_active", true);
-    }
+      if (targetVersionId) {
+        // Activate target approved version
+        const { error: appErr } = await adminSupabase
+          .from(tableName)
+          .update(updatePayload)
+          .eq("id", targetVersionId);
 
-    const { error: updateError } = await query;
+        if (appErr) return { success: false, error: appErr.message };
 
-    if (updateError) {
-      return { success: false, error: updateError.message };
-    }
-
-    // Refresh student_snapshot
-    const statusCol = `${documentType}_status`;
-    const snapshotStatus = status === "verified" ? "COMPLIANT" : "REJECTED";
-    const snapshotUpdate: Record<string, unknown> = {
-      [statusCol]: snapshotStatus,
-      updated_at: new Date().toISOString()
-    };
-
-    if (metadata) {
-      if (documentType === "passport") {
-        if (metadata.documentNumber) snapshotUpdate.passport_number = metadata.documentNumber.trim();
-        if (metadata.issueDate) snapshotUpdate.passport_issue_date = metadata.issueDate.trim().split("T")[0];
-        if (metadata.expiryDate) snapshotUpdate.passport_expiry = metadata.expiryDate.trim().split("T")[0];
-        if (metadata.placeOfIssue) snapshotUpdate.passport_place_of_issue = metadata.placeOfIssue.trim();
-      } else if (documentType === "visa") {
-        if (metadata.documentNumber) snapshotUpdate.visa_number = metadata.documentNumber.trim();
-        if (metadata.issueDate) snapshotUpdate.visa_issue_date = metadata.issueDate.trim().split("T")[0];
-        if (metadata.expiryDate) snapshotUpdate.visa_expiry = metadata.expiryDate.trim().split("T")[0];
-        if (metadata.visaType) snapshotUpdate.visa_type = metadata.visaType.trim();
+        // Deactivate all previous versions
+        await adminSupabase
+          .from(tableName)
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq("student_id", studentId)
+          .neq("id", targetVersionId);
       } else {
-        if (metadata.documentNumber) snapshotUpdate.efrro_number = metadata.documentNumber.trim();
-        if (metadata.issueDate) snapshotUpdate.efrro_issue_date = metadata.issueDate.trim().split("T")[0];
-        if (metadata.expiryDate) snapshotUpdate.efrro_expiry = metadata.expiryDate.trim().split("T")[0];
+        await adminSupabase
+          .from(tableName)
+          .update(updatePayload)
+          .eq("student_id", studentId)
+          .eq("is_active", true);
       }
+
+      // Fetch approved version data to update student_snapshot
+      const { data: approvedDoc } = await adminSupabase
+        .from(tableName)
+        .select("*")
+        .eq("id", targetVersionId)
+        .single();
+
+      const docExpiry = (approvedDoc?.expiry_date || metadata?.expiryDate)?.split("T")[0];
+      const docIssue = (approvedDoc?.issue_date || metadata?.issueDate)?.split("T")[0];
+      const docNum = approvedDoc?.document_number || metadata?.documentNumber;
+
+      const now = new Date();
+      const expDateObj = docExpiry ? new Date(docExpiry) : null;
+      const diffDays = expDateObj ? Math.round((expDateObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const calculatedDocStatus = diffDays !== null ? (diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT") : "COMPLIANT";
+
+      const snapshotUpdates: Record<string, unknown> = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (documentType === "passport") {
+        if (docNum) snapshotUpdates.passport_number = docNum;
+        if (docIssue) snapshotUpdates.passport_issue_date = docIssue;
+        if (docExpiry) snapshotUpdates.passport_expiry = docExpiry;
+        if (approvedDoc?.place_of_issue) snapshotUpdates.passport_place_of_issue = approvedDoc.place_of_issue;
+        snapshotUpdates.passport_status = calculatedDocStatus;
+      } else if (documentType === "visa") {
+        if (docNum) snapshotUpdates.visa_number = docNum;
+        if (docIssue) snapshotUpdates.visa_issue_date = docIssue;
+        if (docExpiry) snapshotUpdates.visa_expiry = docExpiry;
+        if (approvedDoc?.visa_type) snapshotUpdates.visa_type = approvedDoc.visa_type;
+        snapshotUpdates.visa_status = calculatedDocStatus;
+      } else {
+        if (docNum) snapshotUpdates.efrro_number = docNum;
+        if (docIssue) snapshotUpdates.efrro_issue_date = docIssue;
+        if (docExpiry) snapshotUpdates.efrro_expiry = docExpiry;
+        snapshotUpdates.efrro_status = calculatedDocStatus;
+        if (diffDays !== null) snapshotUpdates.days_until_efrro_expiry = diffDays;
+      }
+
+      await adminSupabase
+        .from("student_snapshot")
+        .update(snapshotUpdates)
+        .eq("student_id", studentId);
+
+      // Invalidate obsolete reminders & recalculate for new active expiry
+      if (docExpiry) {
+        await adminSupabase
+          .from("notifications")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("student_id", studentId)
+          .eq("document_type", documentType)
+          .in("status", ["queued", "sending", "processing"]);
+
+        const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
+        await ExpiryReminderEngine.evaluateAndQueueStudentDueReminders(studentId);
+      }
+
+      // Audit log
+      await adminSupabase.from("audit_log").insert({
+        actor_id: user.id,
+        action: "DOCUMENT_RENEWAL_APPROVED",
+        resource: `${tableName}/${targetVersionId || "active"}`,
+        filters_applied: { studentId, documentType, versionId: targetVersionId, status: "verified", notes }
+      });
+    } else {
+      // Rejection: Target version is marked rejected and remains inactive
+      updatePayload.is_active = false;
+      updatePayload.rejection_reason = rejectionReason || "Document rejected by administrator";
+
+      if (targetVersionId) {
+        await adminSupabase
+          .from(tableName)
+          .update(updatePayload)
+          .eq("id", targetVersionId);
+      }
+
+      // Audit log
+      await adminSupabase.from("audit_log").insert({
+        actor_id: user.id,
+        action: "DOCUMENT_RENEWAL_REJECTED",
+        resource: `${tableName}/${targetVersionId || "unknown"}`,
+        filters_applied: { studentId, documentType, versionId: targetVersionId, status: "rejected", rejectionReason }
+      });
     }
-
-    await adminSupabase
-      .from("student_snapshot")
-      .update(snapshotUpdate)
-      .eq("student_id", studentId);
-
-    // Audit log
-    await adminSupabase.from("audit_log").insert({
-      actor_id: user.id,
-      action: status === "verified" ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED",
-      resource: `${documentType}_versions/${versionId || "active"}`,
-      filters_applied: { studentId, documentType, status, rejectionReason, metadata }
-    });
 
     revalidatePath(`/students/${studentId}`);
     revalidatePath(`/students/${studentId}/${documentType}`);
@@ -796,7 +887,185 @@ export async function updateDocumentVerificationAction(
   }
 }
 
-export interface UpdateDocumentMetadataInput {
+/**
+ * Server Action: Upload New / Renewed Document File (Genuine Version N+1 Creation)
+ *
+ * Implements the strict document lifecycle:
+ * Upload -> Pending Verification -> Staff Approval -> Active Version
+ *
+ * 1. Validates physical file (PDF / PNG / JPEG <= 5MB)
+ * 2. Saves file buffer to immutable storage: students/${studentId}/${type}/v${nextVersion}/${fileName}
+ * 3. Creates next version (vN+1) with verification_status: 'pending' and is_active: false
+ * 4. Preserves previous active version as active until approval
+ * 5. Logs DOCUMENT_VERSION_UPLOADED audit trail
+ */
+export async function uploadDocumentRenewalAction(
+  formData: FormData
+): Promise<{ success: boolean; versionNumber?: number; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to upload document." };
+    }
+
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: Only authorized staff may upload renewed document records." };
+    }
+
+    const studentId = formData.get("studentId") as string;
+    const documentType = formData.get("documentType") as "passport" | "visa" | "efrro";
+    const documentNumber = formData.get("documentNumber") as string;
+    const issueDate = formData.get("issueDate") as string;
+    const expiryDate = formData.get("expiryDate") as string;
+    const placeOfIssue = (formData.get("placeOfIssue") as string) || null;
+    const visaType = (formData.get("visaType") as string) || "Student (S-1)";
+    const notes = (formData.get("notes") as string) || "New document renewal upload";
+    const file = formData.get("file") as File | null;
+
+    if (!studentId || !documentType) {
+      return { success: false, error: "Student ID and document type are required." };
+    }
+
+    if (!documentNumber || !documentNumber.trim()) {
+      return { success: false, error: "Document number is required." };
+    }
+
+    if (!issueDate || !issueDate.trim()) {
+      return { success: false, error: "Issue date is required." };
+    }
+
+    if (!expiryDate || !expiryDate.trim()) {
+      return { success: false, error: "Expiration date is required." };
+    }
+
+    if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
+      return { success: false, error: "A valid physical document file (PDF or Image) is required for version renewal." };
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return { success: false, error: "File size exceeds 5MB limit." };
+    }
+
+    const cleanDocNum = documentNumber.trim();
+    const cleanIssue = issueDate.trim().split("T")[0];
+    const cleanExpiry = expiryDate.trim().split("T")[0];
+    const issueD = new Date(cleanIssue);
+    const expiryD = new Date(cleanExpiry);
+
+    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
+      return { success: false, error: "Invalid date format. Please use YYYY-MM-DD." };
+    }
+
+    if (expiryD <= issueD) {
+      return { success: false, error: `The new expiration date (${cleanExpiry}) must be strictly after the document issue date (${cleanIssue}).` };
+    }
+
+    const adminSupabase = getAdminSupabase();
+    const tableName = documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+    // Fetch existing versions to resolve next version number
+    const { data: currentVersions, error: fetchErr } = await adminSupabase
+      .from(tableName)
+      .select("version_number, is_active")
+      .eq("student_id", studentId)
+      .is("deleted_at", null)
+      .order("version_number", { ascending: false });
+
+    if (fetchErr) {
+      return { success: false, error: `Failed to query existing versions: ${fetchErr.message}` };
+    }
+
+    const highestVersionNum = currentVersions && currentVersions.length > 0
+      ? Math.max(...currentVersions.map(v => v.version_number || 1))
+      : 0;
+    const nextVersionNumber = highestVersionNum + 1;
+
+    // Upload to storage provider with immutable version path
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storagePath = `students/${studentId}/${documentType}/v${nextVersionNumber}/${Date.now()}_${safeFileName}`;
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+    try {
+      const storage = StorageProviderFactory.getProvider();
+      await storage.upload("student-documents", storagePath, fileBuffer, file.type || "application/pdf");
+    } catch (uploadErr: unknown) {
+      console.error("[STORAGE_UPLOAD_ERROR]", uploadErr);
+      return { success: false, error: `Failed to upload document file to storage: ${uploadErr instanceof Error ? uploadErr.message : "Storage error"}` };
+    }
+
+    // Insert new version with verification_status: 'pending' and is_active: false
+    const insertPayload: Record<string, unknown> = {
+      student_id: studentId,
+      version_number: nextVersionNumber,
+      is_active: false, // CRITICAL: remains inactive until approved!
+      document_number: cleanDocNum,
+      issue_date: cleanIssue,
+      expiry_date: cleanExpiry,
+      file_path: storagePath,
+      verification_status: "pending",
+      notes: notes.trim(),
+      created_by: user.id,
+      updated_by: user.id
+    };
+
+    if (documentType === "passport") {
+      insertPayload.place_of_issue = placeOfIssue?.trim() || null;
+    } else if (documentType === "visa") {
+      insertPayload.visa_type = visaType?.trim() || "Student (S-1)";
+    }
+
+    const { data: newVer, error: insertErr } = await adminSupabase
+      .from(tableName)
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (insertErr || !newVer) {
+      if (insertErr?.code === "23514" || insertErr?.message?.includes("chk_")) {
+        return { success: false, error: "The new expiration date must be strictly after the document issue date." };
+      }
+      return { success: false, error: `Database insert failed: ${insertErr?.message}` };
+    }
+
+    // Audit log
+    await adminSupabase.from("audit_log").insert({
+      actor_id: user.id,
+      action: "DOCUMENT_VERSION_UPLOADED",
+      resource: `${tableName}/${newVer.id}`,
+      filters_applied: {
+        studentId,
+        documentType,
+        versionNumber: nextVersionNumber,
+        storagePath,
+        documentNumber: cleanDocNum,
+        issueDate: cleanIssue,
+        expiryDate: cleanExpiry,
+        fileName: file.name,
+        uploadedBy: user.email || user.id,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath(`/students/${studentId}/${documentType}`);
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
+
+    return { success: true, versionNumber: nextVersionNumber };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "uploadDocumentRenewalAction" });
+    return { success: false, error: sanitized.message };
+  }
+}
+
+export interface CorrectDocumentMetadataInput {
   studentId: string;
   documentType: "passport" | "visa" | "efrro";
   documentNumber: string;
@@ -804,26 +1073,37 @@ export interface UpdateDocumentMetadataInput {
   expiryDate: string;
   placeOfIssue?: string;
   visaType?: string;
-  changeReason?: string;
+  reason: string;
 }
 
 /**
- * Server Action: Update Document Metadata with Versioning, Reminder Recalculation & Audit Log
+ * Server Action: Correct Existing Document Information (Metadata Correction)
+ *
+ * Used when staff entered incorrect metadata for the existing physical document.
+ * Modifies the active version in-place without creating a new version or pretending
+ * it is a newly issued document.
  */
-export async function updateDocumentMetadataAction(
-  input: UpdateDocumentMetadataInput
+export async function correctDocumentMetadataAction(
+  input: CorrectDocumentMetadataInput
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await getServerSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return { success: false, error: "Authentication required to update document details." };
+      return { success: false, error: "Authentication required to correct document information." };
     }
 
-    const { studentId, documentType, documentNumber, issueDate, expiryDate, placeOfIssue, visaType, changeReason } = input;
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: You do not have permission to correct document metadata." };
+    }
 
-    // 1. Strict validation
+    const { studentId, documentType, documentNumber, issueDate, expiryDate, placeOfIssue, visaType, reason } = input;
+
+    if (!reason || !reason.trim()) {
+      return { success: false, error: "A mandatory reason for correction is required for compliance audit trails." };
+    }
     if (!documentNumber || !documentNumber.trim()) {
       return { success: false, error: "Document number is required." };
     }
@@ -834,21 +1114,23 @@ export async function updateDocumentMetadataAction(
       return { success: false, error: "Expiration date is required." };
     }
 
-    const issueD = new Date(issueDate.trim());
-    const expiryD = new Date(expiryDate.trim());
-    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
-      return { success: false, error: "Invalid date format provided." };
-    }
-    if (expiryD <= issueD) {
-      return { success: false, error: "Expiration date must be strictly after the issue date." };
-    }
-
     const cleanDocNum = documentNumber.trim();
     const cleanIssue = issueDate.trim().split("T")[0];
     const cleanExpiry = expiryDate.trim().split("T")[0];
     const cleanPlace = placeOfIssue?.trim() || null;
     const cleanVisaType = visaType?.trim() || "Student (S-1)";
-    const cleanReason = changeReason?.trim() || "Administrative metadata update";
+    const cleanReason = reason.trim();
+
+    const issueD = new Date(cleanIssue);
+    const expiryD = new Date(cleanExpiry);
+
+    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
+      return { success: false, error: "Invalid date format provided. Use YYYY-MM-DD." };
+    }
+
+    if (expiryD <= issueD) {
+      return { success: false, error: `The expiration date must be strictly after the document issue date (${cleanIssue}).` };
+    }
 
     const adminSupabase = getAdminSupabase();
     const tableName = documentType === "passport" 
@@ -857,82 +1139,70 @@ export async function updateDocumentMetadataAction(
       ? "visa_versions" 
       : "efrro_versions";
 
-    // 2. Fetch current versions
-    const { data: currentVersions, error: fetchErr } = await adminSupabase
-      .from(tableName)
-      .select("*")
-      .eq("student_id", studentId)
-      .is("deleted_at", null)
-      .order("version_number", { ascending: false });
-
-    if (fetchErr) {
-      return { success: false, error: `Failed to retrieve current document versions: ${fetchErr.message}` };
-    }
-
-    const activeVersion = (currentVersions || []).find((v: VersionDatabaseRow) => v.is_active);
-    const highestVersionNum = currentVersions && currentVersions.length > 0 
-      ? Math.max(...currentVersions.map((v: VersionDatabaseRow) => v.version_number || 1)) 
-      : 0;
+    // 1. Fetch current active version and snapshot
+    const [{ data: activeVersion }, { data: currentSnapshot }] = await Promise.all([
+      adminSupabase
+        .from(tableName)
+        .select("*")
+        .eq("student_id", studentId)
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      adminSupabase
+        .from("student_snapshot")
+        .select("*")
+        .eq("student_id", studentId)
+        .maybeSingle()
+    ]);
 
     const previousValues = {
-      documentNumber: activeVersion?.document_number || null,
-      issueDate: activeVersion?.issue_date || null,
-      expiryDate: activeVersion?.expiry_date || null,
-      placeOfIssue: activeVersion?.place_of_issue || null,
-      visaType: activeVersion?.visa_type || null,
-      versionNumber: activeVersion?.version_number || null,
-      verificationStatus: activeVersion?.verification_status || null
+      documentNumber: activeVersion?.document_number || (
+        documentType === "passport" ? currentSnapshot?.passport_number :
+        documentType === "visa" ? currentSnapshot?.visa_number : currentSnapshot?.efrro_number
+      ) || null,
+      issueDate: activeVersion?.issue_date || (
+        documentType === "passport" ? currentSnapshot?.passport_issue_date :
+        documentType === "visa" ? currentSnapshot?.visa_issue_date : currentSnapshot?.efrro_issue_date
+      ) || null,
+      expiryDate: activeVersion?.expiry_date || (
+        documentType === "passport" ? currentSnapshot?.passport_expiry :
+        documentType === "visa" ? currentSnapshot?.visa_expiry : currentSnapshot?.efrro_expiry
+      ) || null,
+      placeOfIssue: activeVersion?.place_of_issue || currentSnapshot?.passport_place_of_issue || null,
+      visaType: activeVersion?.visa_type || currentSnapshot?.visa_type || null,
+      versionNumber: activeVersion?.version_number || 1
     };
 
-    const newVersionNumber = highestVersionNum + 1;
-    const filePath = activeVersion?.file_path || "managed_record";
-
-    // 3. Mark existing active versions as inactive
+    // 2. Update existing active version in-place
     if (activeVersion) {
-      await adminSupabase
-        .from(tableName)
-        .update({ is_active: false, updated_at: new Date().toISOString(), updated_by: user.id })
-        .eq("student_id", studentId)
-        .eq("is_active", true);
-    }
-
-    // 4. Insert new version record
-    const insertPayload: Record<string, unknown> = {
-      student_id: studentId,
-      version_number: newVersionNumber,
-      is_active: true,
-      document_number: cleanDocNum,
-      issue_date: cleanIssue,
-      expiry_date: cleanExpiry,
-      file_path: filePath,
-      verification_status: "verified",
-      verified_by: user.id,
-      verified_at: new Date().toISOString(),
-      notes: cleanReason,
-      created_by: user.id,
-      updated_by: user.id
-    };
-
-    if (documentType === "passport") {
-      insertPayload.place_of_issue = cleanPlace;
-    } else if (documentType === "visa") {
-      insertPayload.visa_type = cleanVisaType;
-    }
-
-    const { data: newVer, error: insertErr } = await adminSupabase
-      .from(tableName)
-      .insert(insertPayload)
-      .select()
-      .single();
-
-    if (insertErr || !newVer) {
-      if (activeVersion) {
-        await adminSupabase.from(tableName).update({ is_active: true }).eq("id", activeVersion.id);
+      const updatePayload: Record<string, unknown> = {
+        document_number: cleanDocNum,
+        issue_date: cleanIssue,
+        expiry_date: cleanExpiry,
+        notes: `Correction: ${cleanReason}`,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id
+      };
+      if (documentType === "passport") {
+        updatePayload.place_of_issue = cleanPlace;
+      } else if (documentType === "visa") {
+        updatePayload.visa_type = cleanVisaType;
       }
-      return { success: false, error: `Failed to create new document version: ${insertErr?.message}` };
+
+      const { error: updateVerErr } = await adminSupabase
+        .from(tableName)
+        .update(updatePayload)
+        .eq("id", activeVersion.id);
+
+      if (updateVerErr) {
+        if (updateVerErr.code === "23514" || updateVerErr.message?.includes("chk_")) {
+          return { success: false, error: "The expiration date must be strictly after the document issue date." };
+        }
+        return { success: false, error: `Failed to update document record: ${updateVerErr.message}` };
+      }
     }
 
-    // 5. Update student_snapshot
+    // 3. Update student_snapshot
     const now = new Date();
     const expDateObj = new Date(cleanExpiry);
     const diffDays = Math.round((expDateObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -959,13 +1229,8 @@ export async function updateDocumentMetadataAction(
       snapshotUpdates.efrro_issue_date = cleanIssue;
       snapshotUpdates.efrro_expiry = cleanExpiry;
       snapshotUpdates.efrro_status = calculatedDocStatus;
+      snapshotUpdates.days_until_efrro_expiry = diffDays;
     }
-
-    const { data: currentSnapshot } = await adminSupabase
-      .from("student_snapshot")
-      .select("*")
-      .eq("student_id", studentId)
-      .maybeSingle();
 
     const passStatus = documentType === "passport" ? calculatedDocStatus : (currentSnapshot?.passport_status || "MISSING");
     const visaStatus = documentType === "visa" ? calculatedDocStatus : (currentSnapshot?.visa_status || "MISSING");
@@ -986,7 +1251,7 @@ export async function updateDocumentMetadataAction(
       .update(snapshotUpdates)
       .eq("student_id", studentId);
 
-    // 6. Invalidate obsolete future scheduled notifications if expiry date changed
+    // 4. Invalidate obsolete notifications & recalculate reminders if expiry changed
     if (previousValues.expiryDate && previousValues.expiryDate !== cleanExpiry) {
       await adminSupabase
         .from("notifications")
@@ -996,252 +1261,28 @@ export async function updateDocumentMetadataAction(
         .in("status", ["queued", "sending", "processing"]);
     }
 
-    // 7. Recalculate and queue new due reminders
     const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
     await ExpiryReminderEngine.evaluateAndQueueStudentDueReminders(studentId);
 
-    // 8. Audit trail
+    // 5. Audit log
     await adminSupabase.from("audit_log").insert({
       actor_id: user.id,
-      action: "DOCUMENT_METADATA_UPDATED",
-      resource: `${documentType}_versions/${newVer.id}`,
+      action: "DOCUMENT_METADATA_CORRECTED",
+      resource: `${tableName}/${activeVersion?.id || "snapshot"}`,
       filters_applied: {
         studentId,
         documentType,
-        versionNumber: newVersionNumber,
+        versionNumber: previousValues.versionNumber,
         previousValues,
-        newValues: {
+        correctedValues: {
           documentNumber: cleanDocNum,
           issueDate: cleanIssue,
           expiryDate: cleanExpiry,
           placeOfIssue: cleanPlace,
           visaType: cleanVisaType,
           reason: cleanReason
-        }
-      }
-    });
-
-    revalidatePath(`/students/${studentId}`);
-    revalidatePath(`/students/${studentId}/${documentType}`);
-    revalidatePath("/students");
-    revalidatePath("/dashboard");
-
-    return { success: true };
-  } catch (err: unknown) {
-    const sanitized = sanitizeError(err, { action: "updateDocumentMetadataAction", route: `/students/${input.studentId}` });
-    return {
-      success: false,
-      error: sanitized.message
-    };
-  }
-}
-
-export interface UpdateExpiryDateInput {
-  studentId: string;
-  documentType: "passport" | "visa" | "efrro";
-  newExpiryDate: string;
-  reason: string;
-}
-
-/**
- * Server Action: First-Class Expiry Date Update
- * 
- * Creates a new active document version (vN+1), preserves previous version in history,
- * updates compliance snapshot, recalculates days remaining and compliance standing,
- * invalidates obsolete future reminders, triggers recalculation of reminder milestones,
- * and writes a deterministic EXPIRY_DATE_UPDATED audit record.
- */
-export async function updateExpiryDateAction(
-  input: UpdateExpiryDateInput
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const supabase = await getServerSupabase();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return { success: false, error: "Authentication required to update expiry date." };
-    }
-
-    const { isInternalUser } = await import("@/lib/auth/permissions");
-    if (!isInternalUser(user)) {
-      return { success: false, error: "Forbidden: You do not have permission to modify document expiry dates." };
-    }
-
-    const { studentId, documentType, newExpiryDate, reason } = input;
-
-    // 1. Strict input validation
-    if (!newExpiryDate || !newExpiryDate.trim()) {
-      return { success: false, error: "New expiration date is required." };
-    }
-    if (!reason || !reason.trim()) {
-      return { success: false, error: "A valid reason for modifying the expiration date is required." };
-    }
-
-    const cleanExpiry = newExpiryDate.trim().split("T")[0];
-    const expiryD = new Date(cleanExpiry);
-    if (isNaN(expiryD.getTime()) || !/^\d{4}-\d{2}-\d{2}$/.test(cleanExpiry)) {
-      return { success: false, error: "Invalid date format. Please use YYYY-MM-DD." };
-    }
-
-    const adminSupabase = getAdminSupabase();
-    const tableName = documentType === "passport" 
-      ? "passport_versions" 
-      : documentType === "visa" 
-      ? "visa_versions" 
-      : "efrro_versions";
-
-    // 2. Fetch student details for registration number & current versions
-    const [{ data: studentRecord }, { data: currentVersions, error: fetchErr }] = await Promise.all([
-      adminSupabase.from("students").select("id, registration_number").eq("id", studentId).single(),
-      adminSupabase.from(tableName).select("*").eq("student_id", studentId).is("deleted_at", null).order("version_number", { ascending: false })
-    ]);
-
-    if (fetchErr) {
-      return { success: false, error: `Failed to retrieve current document versions: ${fetchErr.message}` };
-    }
-
-    const activeVersion = (currentVersions || []).find((v: VersionDatabaseRow) => v.is_active);
-    const highestVersionNum = currentVersions && currentVersions.length > 0 
-      ? Math.max(...currentVersions.map((v: VersionDatabaseRow) => v.version_number || 1)) 
-      : 0;
-
-    // Validate against issue date if present
-    const issueDateStr = activeVersion?.issue_date;
-    if (issueDateStr) {
-      const issueD = new Date(issueDateStr.split("T")[0]);
-      if (!isNaN(issueD.getTime()) && expiryD <= issueD) {
-        return { 
-          success: false, 
-          error: `New expiration date must be strictly after the document issue date (${issueDateStr.split("T")[0]}).` 
-        };
-      }
-    }
-
-    const previousExpiryDate = activeVersion?.expiry_date || null;
-    const newVersionNumber = highestVersionNum + 1;
-    const filePath = activeVersion?.file_path || "managed_record";
-    const cleanReason = reason.trim();
-
-    // 3. Mark existing active version as inactive
-    if (activeVersion) {
-      await adminSupabase
-        .from(tableName)
-        .update({ is_active: false, updated_at: new Date().toISOString(), updated_by: user.id })
-        .eq("student_id", studentId)
-        .eq("is_active", true);
-    }
-
-    // 4. Insert new version record
-    const insertPayload: Record<string, unknown> = {
-      student_id: studentId,
-      version_number: newVersionNumber,
-      is_active: true,
-      document_number: activeVersion?.document_number || "Not provided",
-      issue_date: activeVersion?.issue_date || cleanExpiry,
-      expiry_date: cleanExpiry,
-      file_path: filePath,
-      verification_status: "verified",
-      verified_by: user.id,
-      verified_at: new Date().toISOString(),
-      notes: cleanReason,
-      created_by: user.id,
-      updated_by: user.id
-    };
-
-    if (documentType === "passport") {
-      insertPayload.place_of_issue = activeVersion?.place_of_issue || null;
-    } else if (documentType === "visa") {
-      insertPayload.visa_type = activeVersion?.visa_type || "Student (S-1)";
-    }
-
-    const { data: newVer, error: insertErr } = await adminSupabase
-      .from(tableName)
-      .insert(insertPayload)
-      .select()
-      .single();
-
-    if (insertErr || !newVer) {
-      if (activeVersion) {
-        await adminSupabase.from(tableName).update({ is_active: true }).eq("id", activeVersion.id);
-      }
-      return { success: false, error: `Failed to create new document version: ${insertErr?.message}` };
-    }
-
-    // 5. Recalculate days remaining and compliance status
-    const now = new Date();
-    const expDateObj = new Date(cleanExpiry);
-    const diffDays = Math.round((expDateObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
-
-    const snapshotUpdates: Record<string, unknown> = {
-      updated_at: new Date().toISOString()
-    };
-
-    if (documentType === "passport") {
-      snapshotUpdates.passport_expiry = cleanExpiry;
-      snapshotUpdates.passport_status = calculatedDocStatus;
-    } else if (documentType === "visa") {
-      snapshotUpdates.visa_expiry = cleanExpiry;
-      snapshotUpdates.visa_status = calculatedDocStatus;
-    } else {
-      snapshotUpdates.efrro_expiry = cleanExpiry;
-      snapshotUpdates.efrro_status = calculatedDocStatus;
-      snapshotUpdates.days_until_efrro_expiry = diffDays;
-    }
-
-    const { data: currentSnapshot } = await adminSupabase
-      .from("student_snapshot")
-      .select("*")
-      .eq("student_id", studentId)
-      .maybeSingle();
-
-    const passStatus = documentType === "passport" ? calculatedDocStatus : (currentSnapshot?.passport_status || "MISSING");
-    const visaStatus = documentType === "visa" ? calculatedDocStatus : (currentSnapshot?.visa_status || "MISSING");
-    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (currentSnapshot?.efrro_status || "COMPLIANT");
-
-    let overallCompliance = "COMPLIANT";
-    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
-      overallCompliance = "EXPIRED";
-    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING" || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION") {
-      overallCompliance = "WARNING";
-    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || passStatus === "MISSING" || visaStatus === "MISSING") {
-      overallCompliance = "MISSING";
-    }
-    snapshotUpdates.compliance_status = overallCompliance;
-
-    await adminSupabase
-      .from("student_snapshot")
-      .update(snapshotUpdates)
-      .eq("student_id", studentId);
-
-    // 6. Invalidate obsolete future scheduled notifications if expiry changed
-    if (previousExpiryDate && previousExpiryDate !== cleanExpiry) {
-      await adminSupabase
-        .from("notifications")
-        .update({ status: "cancelled", updated_at: new Date().toISOString() })
-        .eq("student_id", studentId)
-        .eq("document_type", documentType)
-        .in("status", ["queued", "sending", "processing"]);
-    }
-
-    // 7. Recalculate and queue new due reminders
-    const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
-    await ExpiryReminderEngine.evaluateAndQueueStudentDueReminders(studentId);
-
-    // 8. Deterministic Audit Log Entry
-    await adminSupabase.from("audit_log").insert({
-      actor_id: user.id,
-      action: "EXPIRY_DATE_UPDATED",
-      resource: `${documentType}_versions/${newVer.id}`,
-      filters_applied: {
-        studentId,
-        registrationNumber: studentRecord?.registration_number || null,
-        documentType,
-        versionNumber: newVersionNumber,
-        previousExpiryDate,
-        newExpiryDate: cleanExpiry,
-        reason: cleanReason,
-        changedBy: user.email || user.id,
+        },
+        correctedBy: user.email || user.id,
         timestamp: new Date().toISOString()
       }
     });
@@ -1250,17 +1291,102 @@ export async function updateExpiryDateAction(
     revalidatePath(`/students/${studentId}/${documentType}`);
     revalidatePath("/students");
     revalidatePath("/dashboard");
-    revalidatePath("/student/dashboard");
-    revalidatePath("/student/profile");
 
     return { success: true };
   } catch (err: unknown) {
-    const sanitized = sanitizeError(err, { action: "updateExpiryDateAction", route: `/students/${input.studentId}` });
+    const sanitized = sanitizeError(err, { action: "correctDocumentMetadataAction", route: `/students/${input.studentId}` });
+    return { success: false, error: sanitized.message };
+  }
+}
+
+export interface UpdateDocumentMetadataInput {
+  studentId: string;
+  documentType: "passport" | "visa" | "efrro";
+  documentNumber: string;
+  issueDate: string;
+  expiryDate: string;
+  placeOfIssue?: string;
+  visaType?: string;
+  changeReason?: string;
+}
+
+/**
+ * Server Action: Update Document Metadata (Alias for Metadata Correction)
+ */
+export async function updateDocumentMetadataAction(
+  input: UpdateDocumentMetadataInput
+): Promise<{ success: boolean; error?: string }> {
+  return correctDocumentMetadataAction({
+    ...input,
+    reason: input.changeReason || "Administrative metadata correction"
+  });
+}
+
+export interface UpdateExpiryDateInput {
+  studentId: string;
+  documentType: "passport" | "visa" | "efrro";
+  newExpiryDate: string;
+  issueDate?: string;
+  reason: string;
+}
+
+/**
+ * Server Action: Expiry Date Metadata Correction
+ * 
+ * Performs an in-place metadata correction of the active document expiry date without
+ * falsely creating a new version record.
+ */
+export async function updateExpiryDateAction(
+  input: UpdateExpiryDateInput
+): Promise<{ success: boolean; error?: string }> {
+  const adminSupabase = getAdminSupabase();
+  const tableName = input.documentType === "passport" 
+    ? "passport_versions" 
+    : input.documentType === "visa" 
+    ? "visa_versions" 
+    : "efrro_versions";
+
+  const [{ data: activeVersion }, { data: snapshot }] = await Promise.all([
+    adminSupabase
+      .from(tableName)
+      .select("*")
+      .eq("student_id", input.studentId)
+      .eq("is_active", true)
+      .maybeSingle(),
+    adminSupabase
+      .from("student_snapshot")
+      .select("*")
+      .eq("student_id", input.studentId)
+      .maybeSingle()
+  ]);
+
+  const docNumber = activeVersion?.document_number || (
+    input.documentType === "passport" ? snapshot?.passport_number :
+    input.documentType === "visa" ? snapshot?.visa_number : snapshot?.efrro_number
+  ) || "Not Recorded";
+
+  const rawIssue = input.issueDate?.trim() || activeVersion?.issue_date || (
+    input.documentType === "passport" ? snapshot?.passport_issue_date :
+    input.documentType === "visa" ? snapshot?.visa_issue_date : snapshot?.efrro_issue_date
+  );
+
+  if (!rawIssue) {
     return {
       success: false,
-      error: sanitized.message
+      error: "This document does not have an issue date recorded. Please provide the issue date before updating the expiration date."
     };
   }
+
+  return correctDocumentMetadataAction({
+    studentId: input.studentId,
+    documentType: input.documentType,
+    documentNumber: docNumber,
+    issueDate: String(rawIssue).split("T")[0],
+    expiryDate: input.newExpiryDate,
+    placeOfIssue: activeVersion?.place_of_issue || snapshot?.passport_place_of_issue || undefined,
+    visaType: activeVersion?.visa_type || snapshot?.visa_type || undefined,
+    reason: input.reason
+  });
 }
 
 /**

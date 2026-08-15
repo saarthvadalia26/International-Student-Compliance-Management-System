@@ -60,9 +60,13 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   relationshipPhone: { tab: "contact", elementId: "emergencyContactPhone", label: "Emergency Contact Phone" },
   emergencyContactPhone: { tab: "contact", elementId: "emergencyContactPhone", label: "Emergency Contact Phone" },
   passportNumber: { tab: "documents", elementId: "passportNumber", label: "Passport Number" },
+  passportIssueDate: { tab: "documents", elementId: "passportIssueDate", label: "Passport Issue Date" },
   passportExpiry: { tab: "documents", elementId: "passportExpiry", label: "Passport Expiry Date" },
+  passportPlaceOfIssue: { tab: "documents", elementId: "passportPlaceOfIssue", label: "Passport Place of Issue" },
   visaNumber: { tab: "documents", elementId: "visaNumber", label: "Visa Number" },
-  visaExpiry: { tab: "documents", elementId: "visaExpiry", label: "Visa Expiry Date" }
+  visaIssueDate: { tab: "documents", elementId: "visaIssueDate", label: "Visa Issue Date" },
+  visaExpiry: { tab: "documents", elementId: "visaExpiry", label: "Visa Expiry Date" },
+  visaType: { tab: "documents", elementId: "visaType", label: "Visa Classification" }
 };
 
 /**
@@ -142,9 +146,13 @@ export default function StudentRegistrationPage() {
     emergencyContactRelation: "parent",
     emergencyContactPhone: "",
     passportNumber: "",
+    passportIssueDate: "",
     passportExpiry: "",
+    passportPlaceOfIssue: "",
     visaNumber: "",
+    visaIssueDate: "",
     visaExpiry: "",
+    visaType: "Student (S-1)",
   });
 
   // Calculate error counts per tab
@@ -265,7 +273,9 @@ export default function StudentRegistrationPage() {
     const sanitizedDob = normalizeDateToISO(formData.dateOfBirth);
     const sanitizedAdm = normalizeDateToISO(formData.admissionDate);
     const sanitizedGrad = normalizeDateToISO(formData.expectedGraduation);
+    const sanitizedPassIssue = normalizeDateToISO(formData.passportIssueDate);
     const sanitizedPassExp = normalizeDateToISO(formData.passportExpiry);
+    const sanitizedVisaIssue = normalizeDateToISO(formData.visaIssueDate);
     const sanitizedVisaExp = normalizeDateToISO(formData.visaExpiry);
 
     // Zod payload assembly
@@ -288,9 +298,13 @@ export default function StudentRegistrationPage() {
       relationshipName: formData.emergencyContactName.trim(),
       relationshipPhone: formData.emergencyContactPhone.trim(),
       passportNumber: formData.passportNumber.trim() || undefined,
+      passportIssueDate: sanitizedPassIssue || undefined,
       passportExpiry: sanitizedPassExp || undefined,
+      passportPlaceOfIssue: formData.passportPlaceOfIssue.trim() || undefined,
       visaNumber: formData.visaNumber.trim() || undefined,
-      visaExpiry: sanitizedVisaExp || undefined
+      visaIssueDate: sanitizedVisaIssue || undefined,
+      visaExpiry: sanitizedVisaExp || undefined,
+      visaType: formData.visaType.trim() || undefined
     };
 
     // Safe development diagnostics
@@ -921,86 +935,166 @@ export default function StudentRegistrationPage() {
 
             {/* Document Verification Tab */}
             {activeTab === "documents" && (
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="p-6 space-y-6">
                 <div>
                   <h2 className="text-sm font-h2 font-semibold">Immigration Document Auditing (Metadata Initialization)</h2>
-                  <p className="text-[11px] text-muted-foreground font-caption">Pre-initialize passport and visa profiles to trigger compliance warnings.</p>
+                  <p className="text-[11px] text-muted-foreground font-caption">Pre-initialize passport and visa profiles with valid issue and expiry dates to establish compliance baselines.</p>
                 </div>
                 <Separator className="my-2" />
                 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="passportNumber">
-                      Passport Number
-                    </label>
-                    <Input
-                      id="passportNumber"
-                      placeholder="e.g. JP998877"
-                      value={formData.passportNumber}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.passportNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
-                    {validationErrors.passportNumber && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.passportNumber}
-                      </p>
-                    )}
-                  </div>
+                {/* Passport Information Group */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Passport Details</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="passportNumber">
+                        Passport Number
+                      </label>
+                      <Input
+                        id="passportNumber"
+                        placeholder="e.g. JP998877"
+                        value={formData.passportNumber}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.passportNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {validationErrors.passportNumber && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.passportNumber}
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="passportExpiry">
-                      Passport Expiration Date
-                    </label>
-                    <DatePicker
-                      id="passportExpiry"
-                      value={formData.passportExpiry}
-                      onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
-                      onValueChange={(v) => handleSelectChange("passportExpiry", v)}
-                      disabled={isSubmitting}
-                      minDate={new Date()}
-                      startYear={new Date().getFullYear()}
-                      endYear={new Date().getFullYear() + 20}
-                      placeholder="Select passport expiry date..."
-                      error={validationErrors.passportExpiry}
-                    />
-                  </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="passportPlaceOfIssue">
+                        Place of Issue
+                      </label>
+                      <Input
+                        id="passportPlaceOfIssue"
+                        placeholder="e.g. Tokyo / Berlin"
+                        value={formData.passportPlaceOfIssue}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className="h-10 text-sm"
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="visaNumber">
-                      Visa Number
-                    </label>
-                    <Input
-                      id="visaNumber"
-                      placeholder="e.g. V99887766"
-                      value={formData.visaNumber}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.visaNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
-                    {validationErrors.visaNumber && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.visaNumber}
-                      </p>
-                    )}
-                  </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="passportIssueDate">
+                        Passport Issue Date
+                      </label>
+                      <DatePicker
+                        id="passportIssueDate"
+                        value={formData.passportIssueDate}
+                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                        onValueChange={(v) => handleSelectChange("passportIssueDate", v)}
+                        disabled={isSubmitting}
+                        placeholder="Select passport issue date..."
+                        error={validationErrors.passportIssueDate}
+                      />
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="visaExpiry">
-                      Visa Expiration Date
-                    </label>
-                    <DatePicker
-                      id="visaExpiry"
-                      value={formData.visaExpiry}
-                      onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
-                      onValueChange={(v) => handleSelectChange("visaExpiry", v)}
-                      disabled={isSubmitting}
-                      minDate={new Date()}
-                      startYear={new Date().getFullYear()}
-                      endYear={new Date().getFullYear() + 15}
-                      placeholder="Select visa expiry date..."
-                      error={validationErrors.visaExpiry}
-                    />
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="passportExpiry">
+                        Passport Expiration Date
+                      </label>
+                      <DatePicker
+                        id="passportExpiry"
+                        value={formData.passportExpiry}
+                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                        onValueChange={(v) => handleSelectChange("passportExpiry", v)}
+                        disabled={isSubmitting}
+                        placeholder="Select passport expiry date..."
+                        error={validationErrors.passportExpiry}
+                      />
+                      {validationErrors.passportExpiry && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.passportExpiry}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Visa Information Group */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Visa Details</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="visaNumber">
+                        Visa Number
+                      </label>
+                      <Input
+                        id="visaNumber"
+                        placeholder="e.g. V99887766"
+                        value={formData.visaNumber}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.visaNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {validationErrors.visaNumber && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.visaNumber}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="visaType">
+                        Visa Classification
+                      </label>
+                      <Select 
+                        value={formData.visaType} 
+                        onValueChange={(v) => handleSelectChange("visaType", v || "Student (S-1)")}
+                      >
+                        <SelectTrigger id="visaType" className="h-10 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Student (S-1)">Student (S-1)</SelectItem>
+                          <SelectItem value="Student (S-2)">Student (S-2)</SelectItem>
+                          <SelectItem value="Research (R-1)">Research (R-1)</SelectItem>
+                          <SelectItem value="Intern (I-1)">Intern (I-1)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="visaIssueDate">
+                        Visa Issue Date
+                      </label>
+                      <DatePicker
+                        id="visaIssueDate"
+                        value={formData.visaIssueDate}
+                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                        onValueChange={(v) => handleSelectChange("visaIssueDate", v)}
+                        disabled={isSubmitting}
+                        placeholder="Select visa issue date..."
+                        error={validationErrors.visaIssueDate}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="visaExpiry">
+                        Visa Expiration Date
+                      </label>
+                      <DatePicker
+                        id="visaExpiry"
+                        value={formData.visaExpiry}
+                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                        onValueChange={(v) => handleSelectChange("visaExpiry", v)}
+                        disabled={isSubmitting}
+                        placeholder="Select visa expiry date..."
+                        error={validationErrors.visaExpiry}
+                      />
+                      {validationErrors.visaExpiry && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.visaExpiry}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 

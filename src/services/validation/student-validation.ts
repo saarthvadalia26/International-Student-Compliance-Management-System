@@ -31,9 +31,33 @@ export const RegisterStudentValidationSchema = z.object({
   embassyEmail: z.string().optional().or(z.literal("")),
   embassyContactPerson: z.string().optional(),
   passportNumber: z.string().optional().refine(val => !val || val.length >= 5, { message: "Passport number must contain at least 5 characters" }),
+  passportIssueDate: z.string().optional(),
   passportExpiry: z.string().optional(),
+  passportPlaceOfIssue: z.string().optional(),
   visaNumber: z.string().optional().refine(val => !val || val.length >= 5, { message: "Visa number must contain at least 5 characters" }),
-  visaExpiry: z.string().optional()
+  visaIssueDate: z.string().optional(),
+  visaExpiry: z.string().optional(),
+  visaType: z.string().optional()
+}).refine((data) => {
+  if (data.passportIssueDate && data.passportExpiry) {
+    const pi = new Date(data.passportIssueDate);
+    const pe = new Date(data.passportExpiry);
+    return pe > pi;
+  }
+  return true;
+}, {
+  message: "Passport expiration date must be strictly after the issue date",
+  path: ["passportExpiry"]
+}).refine((data) => {
+  if (data.visaIssueDate && data.visaExpiry) {
+    const vi = new Date(data.visaIssueDate);
+    const ve = new Date(data.visaExpiry);
+    return ve > vi;
+  }
+  return true;
+}, {
+  message: "Visa expiration date must be strictly after the issue date",
+  path: ["visaExpiry"]
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation) {
     const ad = new Date(data.admissionDate);

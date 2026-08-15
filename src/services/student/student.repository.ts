@@ -195,24 +195,70 @@ export class SupabaseStudentRepository implements IStudentRepository {
         embassyData = embResult;
       }
 
-      // 7. Student Snapshot initialization (Stores metadata; document status is NOT_UPLOADED / MISSING until physical file is uploaded)
+      // 7. Student Snapshot & Document Metadata initialization
       const passportExp = this.formatDate(input.passportExpiry);
+      const passportIssue = this.formatDate(input.passportIssueDate);
+      const passportNum = input.passportNumber?.trim() || null;
+      const passportPlace = input.passportPlaceOfIssue?.trim() || null;
+
       const visaExp = this.formatDate(input.visaExpiry);
+      const visaIssue = this.formatDate(input.visaIssueDate);
+      const visaNum = input.visaNumber?.trim() || null;
+      const visaType = input.visaType?.trim() || "Student (S-1)";
 
       // 8. Insert student_snapshot row for instant compliance and directory queries
-      // Note: Entering passport/visa metadata numbers does NOT mean a document is uploaded or pending verification.
       await supabase.from("student_snapshot").insert({
         student_id: studentId,
         passport_status: "MISSING",
+        passport_number: passportNum,
+        passport_issue_date: passportIssue,
         passport_expiry: passportExp,
-        passport_number: input.passportNumber?.trim() || null,
+        passport_place_of_issue: passportPlace,
         visa_status: "MISSING",
+        visa_number: visaNum,
+        visa_issue_date: visaIssue,
         visa_expiry: visaExp,
-        visa_number: input.visaNumber?.trim() || null,
+        visa_type: visaType,
         efrro_status: "MISSING",
         compliance_score: 0,
         compliance_status: "MISSING"
       });
+
+      // If valid passport metadata is provided with valid issue and expiry dates, create baseline version
+      if (passportNum && passportIssue && passportExp && new Date(passportExp) > new Date(passportIssue)) {
+        await supabase.from("passport_versions").insert({
+          student_id: studentId,
+          version_number: 1,
+          is_active: true,
+          document_number: passportNum,
+          issue_date: passportIssue,
+          expiry_date: passportExp,
+          place_of_issue: passportPlace,
+          file_path: "pending_upload",
+          verification_status: "pending",
+          notes: "Initial registration record",
+          created_by: actorId,
+          updated_by: actorId
+        });
+      }
+
+      // If valid visa metadata is provided with valid issue and expiry dates, create baseline version
+      if (visaNum && visaIssue && visaExp && new Date(visaExp) > new Date(visaIssue)) {
+        await supabase.from("visa_versions").insert({
+          student_id: studentId,
+          version_number: 1,
+          is_active: true,
+          document_number: visaNum,
+          issue_date: visaIssue,
+          expiry_date: visaExp,
+          visa_type: visaType,
+          file_path: "pending_upload",
+          verification_status: "pending",
+          notes: "Initial registration record",
+          created_by: actorId,
+          updated_by: actorId
+        });
+      }
 
       // 9. Record entry in audit_log
       await supabase.from("audit_log").insert({

@@ -24,7 +24,8 @@ import {
   ShieldCheck,
   CalendarDays,
   Clock,
-  History
+  History,
+  UploadCloud
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
@@ -56,6 +57,8 @@ import {
   StudentReminderScheduleResponse, 
   ReminderStatus 
 } from "@/domain/notifications/types/reminder.types";
+import { DocumentUploadDialog } from "@/features/compliance/components/document-dialogs";
+import { DOCUMENT_CONFIGS } from "@/features/compliance/constants/constants";
 
 export interface StudentDocument {
   number: string;
@@ -147,10 +150,23 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [rejectDocType, setRejectDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
   const [isRejecting, setIsRejecting] = React.useState(false);
 
+  // Renewal / New Version Upload Dialog State
+  const [isRenewalUploadOpen, setIsRenewalUploadOpen] = React.useState(false);
+  const [renewalDocType, setRenewalDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
+
+  const openRenewalDialog = (docType: "passport" | "visa" | "efrro") => {
+    setRenewalDocType(docType);
+    setIsRenewalUploadOpen(true);
+  };
+
   // First-Class "Update Expiry Date" Dialog State
   const [isExpiryDialogOpen, setIsExpiryDialogOpen] = React.useState(false);
   const [expiryDocType, setExpiryDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
+  const [currentDocNumberDisplay, setCurrentDocNumberDisplay] = React.useState("");
+  const [currentVersionNumberDisplay, setCurrentVersionNumberDisplay] = React.useState(1);
+  const [currentIssueDateDisplay, setCurrentIssueDateDisplay] = React.useState("");
   const [currentExpiryDateDisplay, setCurrentExpiryDateDisplay] = React.useState("");
+  const [expiryIssueDate, setExpiryIssueDate] = React.useState("");
   const [newExpiryDate, setNewExpiryDate] = React.useState("");
   const [expiryReason, setExpiryReason] = React.useState("");
   const [expiryErrors, setExpiryErrors] = React.useState<Record<string, string>>({});
@@ -372,7 +388,11 @@ export default function StudentDetailsPage({ params }: PageProps) {
     const doc = docType === "passport" ? student.passport : docType === "visa" ? student.visa : student.efrro;
     
     setExpiryDocType(docType);
-    setCurrentExpiryDateDisplay(doc?.expiryDate ? formatDisplayDate(doc.expiryDate) : "Not provided");
+    setCurrentDocNumberDisplay(doc?.number && doc.number !== "Not provided" && doc.number !== "Not Recorded" ? doc.number : "Not Recorded");
+    setCurrentVersionNumberDisplay(doc?.versionNumber || 1);
+    setCurrentIssueDateDisplay(doc?.issueDate ? formatDisplayDate(doc.issueDate) : "Not Recorded");
+    setCurrentExpiryDateDisplay(doc?.expiryDate ? formatDisplayDate(doc.expiryDate) : "Not Recorded");
+    setExpiryIssueDate(doc?.issueDate ? doc.issueDate.split("T")[0] : "");
     setNewExpiryDate(doc?.expiryDate ? doc.expiryDate.split("T")[0] : "");
     setExpiryReason("");
     setExpiryErrors({});
@@ -383,17 +403,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
     e.preventDefault();
     if (!expiryDocType || !student) return;
 
-    const doc = expiryDocType === "passport" ? student.passport : expiryDocType === "visa" ? student.visa : student.efrro;
     const errors: Record<string, string> = {};
+
+    if (!expiryIssueDate || !expiryIssueDate.trim()) {
+      errors.expiryIssueDate = "An issue date is required before updating the expiration date.";
+    }
 
     if (!newExpiryDate || !newExpiryDate.trim()) {
       errors.newExpiryDate = "Please select a valid expiration date.";
-    } else if (doc?.issueDate && new Date(newExpiryDate.trim()) <= new Date(doc.issueDate.trim())) {
-      errors.newExpiryDate = `Expiration date must be strictly after the issue date (${formatDisplayDate(doc.issueDate)}).`;
+    } else if (expiryIssueDate && new Date(newExpiryDate.trim()) <= new Date(expiryIssueDate.trim())) {
+      errors.newExpiryDate = `The new expiration date must be strictly after the document issue date (${formatDisplayDate(expiryIssueDate)}).`;
     }
 
     if (!expiryReason || !expiryReason.trim()) {
-      errors.expiryReason = "A reason for modifying the expiration date is required for audit traceability.";
+      errors.expiryReason = "A reason for modifying the expiration date is required for compliance audit logging.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -412,6 +435,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         studentId,
         documentType: expiryDocType,
         newExpiryDate: newExpiryDate.trim(),
+        issueDate: expiryIssueDate.trim(),
         reason: expiryReason.trim()
       });
 
@@ -474,6 +498,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
       errors.expiryDate = "Expiration date must be strictly after the issue date.";
     }
 
+    if (!docMetadataForm.changeReason.trim()) {
+      errors.changeReason = "A mandatory reason for correction is required for compliance audit logs.";
+    }
+
     if (Object.keys(errors).length > 0) {
       setDocMetadataErrors(errors);
       toast.error("Validation Error", { description: "Please correct the highlighted fields before saving." });
@@ -493,13 +521,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
         expiryDate: docMetadataForm.expiryDate.trim(),
         placeOfIssue: editingDocType === "passport" ? docMetadataForm.placeOfIssue.trim() : undefined,
         visaType: editingDocType === "visa" ? docMetadataForm.visaType.trim() : undefined,
-        changeReason: docMetadataForm.changeReason.trim() || undefined
+        changeReason: docMetadataForm.changeReason.trim()
       });
 
       if (res.success) {
         setSaveDocSuccess(true);
-        toast.success("Document Details Updated", {
-          description: `New version created and reminder schedule recalculated for ${editingDocType.toUpperCase()}.`
+        toast.success("Document Information Corrected", {
+          description: `Active document record updated in-place and reminder schedule synchronized for ${editingDocType.toUpperCase()}.`
         });
         await Promise.all([loadStudentData(), loadReminderSchedule()]);
         setTimeout(() => {
@@ -508,7 +536,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         }, 600);
       } else {
         setSaveDocError(true);
-        toast.error("Update Failed", { description: res.error || "Unable to update document details." });
+        toast.error("Correction Failed", { description: res.error || "Unable to update document details." });
       }
     } catch (err) {
       setSaveDocError(true);
@@ -877,12 +905,21 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <div className="flex items-center gap-2 shrink-0">
                       <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs font-semibold px-3 shadow-xs border-primary/30 hover:bg-primary/5 text-primary"
+                        onClick={() => openRenewalDialog("passport")}
+                      >
+                        <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload New Document
+                      </Button>
+                      <Button
+                        type="button"
                         variant="default"
                         size="sm"
                         className="h-8 text-xs font-semibold px-3 shadow-xs"
                         onClick={() => openExpiryDialog("passport")}
                       >
-                        <Calendar className="mr-1.5 h-3.5 w-3.5" /> Update Expiry Date
+                        <Calendar className="mr-1.5 h-3.5 w-3.5" /> Correct Expiry Date
                       </Button>
                     </div>
                   </div>
@@ -910,7 +947,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
                         onClick={() => openDocMetadataDialog("passport")}
                       >
-                        <Edit3 className="mr-1 h-3 w-3" /> Update All Details
+                        <Edit3 className="mr-1 h-3 w-3" /> Correct Information
                       </Button>
                     </div>
 
@@ -926,7 +963,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         </Button>
                         <Button 
                           size="sm" 
-                          className="h-7 text-[11px] px-2"
+                          className="h-7 text-[11px] px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                           onClick={() => handleApproveDocument("passport")}
                         >
                           <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
@@ -1026,12 +1063,21 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <div className="flex items-center gap-2 shrink-0">
                       <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs font-semibold px-3 shadow-xs border-primary/30 hover:bg-primary/5 text-primary"
+                        onClick={() => openRenewalDialog("visa")}
+                      >
+                        <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload New Document
+                      </Button>
+                      <Button
+                        type="button"
                         variant="default"
                         size="sm"
                         className="h-8 text-xs font-semibold px-3 shadow-xs"
                         onClick={() => openExpiryDialog("visa")}
                       >
-                        <Calendar className="mr-1.5 h-3.5 w-3.5" /> Update Expiry Date
+                        <Calendar className="mr-1.5 h-3.5 w-3.5" /> Correct Expiry Date
                       </Button>
                     </div>
                   </div>
@@ -1059,7 +1105,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
                         onClick={() => openDocMetadataDialog("visa")}
                       >
-                        <Edit3 className="mr-1 h-3 w-3" /> Update All Details
+                        <Edit3 className="mr-1 h-3 w-3" /> Correct Information
                       </Button>
                     </div>
 
@@ -1075,7 +1121,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         </Button>
                         <Button 
                           size="sm" 
-                          className="h-7 text-[11px] px-2"
+                          className="h-7 text-[11px] px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                           onClick={() => handleApproveDocument("visa")}
                         >
                           <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
@@ -1170,12 +1216,21 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs font-semibold px-3 shadow-xs border-primary/30 hover:bg-primary/5 text-primary"
+                          onClick={() => openRenewalDialog("efrro")}
+                        >
+                          <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload New Document
+                        </Button>
+                        <Button
+                          type="button"
                           variant="default"
                           size="sm"
                           className="h-8 text-xs font-semibold px-3 shadow-xs"
                           onClick={() => openExpiryDialog("efrro")}
                         >
-                          <Calendar className="mr-1.5 h-3.5 w-3.5" /> Update Expiry Date
+                          <Calendar className="mr-1.5 h-3.5 w-3.5" /> Correct Expiry Date
                         </Button>
                       </div>
                     </div>
@@ -1203,7 +1258,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                           className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
                           onClick={() => openDocMetadataDialog("efrro")}
                         >
-                          <Edit3 className="mr-1 h-3 w-3" /> Update All Details
+                          <Edit3 className="mr-1 h-3 w-3" /> Correct Information
                         </Button>
                       </div>
 
@@ -1219,7 +1274,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                           </Button>
                           <Button 
                             size="sm" 
-                            className="h-7 text-[11px] px-2"
+                            className="h-7 text-[11px] px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                             onClick={() => handleApproveDocument("efrro")}
                           >
                             <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
@@ -1608,15 +1663,59 @@ export default function StudentDetailsPage({ params }: PageProps) {
           </DialogHeader>
 
           <form onSubmit={handleSaveExpiryDate} className="space-y-4 py-2 text-xs">
-            <div className="p-3 rounded-lg bg-muted/30 border border-border/60 space-y-1">
-              <span className="text-[10px] text-muted-foreground font-caption uppercase tracking-wider block font-semibold">
-                Current Expiry Date
-              </span>
-              <span className="text-sm font-bold text-foreground font-mono block">
-                {currentExpiryDateDisplay}
-              </span>
+            {/* Current Document Summary Card */}
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground font-caption uppercase tracking-wider font-semibold">
+                  Current Active Document
+                </span>
+                <Badge variant="outline" className="text-[9px] h-4 font-mono">
+                  v{currentVersionNumberDisplay}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-[10px] text-muted-foreground font-caption block">Document Number</span>
+                  <span className="font-mono font-semibold text-foreground">{currentDocNumberDisplay}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground font-caption block">Current Expiry</span>
+                  <span className="font-mono font-semibold text-foreground">{currentExpiryDateDisplay}</span>
+                </div>
+                <div className="col-span-2 pt-1 border-t border-border/30">
+                  <span className="text-[10px] text-muted-foreground font-caption block">Current Issue Date</span>
+                  <span className="font-medium text-foreground">{currentIssueDateDisplay}</span>
+                </div>
+              </div>
             </div>
 
+            {/* Document Issue Date (Preserved or Required) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-foreground" htmlFor="expiryIssueDate">
+                  Document Issue Date *
+                </label>
+                <span className="text-[10px] text-muted-foreground font-caption">
+                  {currentIssueDateDisplay !== "Not Recorded" ? "(Preserved from active record)" : "(Required to validate expiry)"}
+                </span>
+              </div>
+              <DatePicker
+                id="expiryIssueDate"
+                value={expiryIssueDate}
+                onChange={(e) => {
+                  setExpiryIssueDate(e.target.value);
+                  setExpiryErrors(prev => ({ ...prev, expiryIssueDate: "", newExpiryDate: "" }));
+                }}
+                error={expiryErrors.expiryIssueDate}
+                placeholder="Select document issue date..."
+              />
+              {expiryErrors.expiryIssueDate && (
+                <p className="text-[10px] text-destructive font-caption font-medium">{expiryErrors.expiryIssueDate}</p>
+              )}
+            </div>
+
+            {/* New Expiration Date */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground" htmlFor="newExpiryDate">
                 New Expiration Date *
@@ -1629,12 +1728,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   setExpiryErrors(prev => ({ ...prev, newExpiryDate: "" }));
                 }}
                 error={expiryErrors.newExpiryDate}
+                placeholder="Select new expiration date..."
               />
               {expiryErrors.newExpiryDate && (
                 <p className="text-[10px] text-destructive font-caption font-medium">{expiryErrors.newExpiryDate}</p>
               )}
             </div>
 
+            {/* Mandatory Reason */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground" htmlFor="expiryReason">
                 Reason for Expiry Modification *
@@ -1646,14 +1747,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   setExpiryReason(e.target.value);
                   setExpiryErrors(prev => ({ ...prev, expiryReason: "" }));
                 }}
-                placeholder="e.g. Visa renewal grant received from FRRO; passport extension endorsed by consular authority..."
-                className={`min-h-20 text-xs ${expiryErrors.expiryReason ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                placeholder="e.g. Visa extension endorsed by FRRO; passport validity extended by Embassy..."
+                className={`min-h-18 text-xs ${expiryErrors.expiryReason ? "border-destructive focus-visible:ring-destructive" : ""}`}
               />
               {expiryErrors.expiryReason && (
                 <p className="text-[10px] text-destructive font-caption font-medium">{expiryErrors.expiryReason}</p>
               )}
               <p className="text-[10px] text-muted-foreground font-caption">
-                This modification will create a new verified document version (v{(student?.[expiryDocType === "passport" ? "passport" : expiryDocType === "visa" ? "visa" : "efrro"]?.versionNumber || 1) + 1}) and recalculate all notification reminder schedules.
+                This modification corrects the active document expiration date in-place with audit log traceability. To submit a newly issued renewal document with file evidence, use &quot;Upload New Document&quot;.
               </p>
             </div>
 
@@ -1677,19 +1778,19 @@ export default function StudentDetailsPage({ params }: PageProps) {
         </DialogContent>
       </Dialog>
 
-      {/* FULL METADATA UPDATE DIALOG */}
+      {/* FULL METADATA CORRECTION DIALOG */}
       <Dialog open={isDocMetadataOpen} onOpenChange={setIsDocMetadataOpen}>
         <DialogContent className="sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold flex items-center gap-2">
               <Edit3 className="h-4 w-4 text-primary" />
-              Update {editingDocType ? editingDocType.toUpperCase() : "Document"} Details
+              Correct {editingDocType ? editingDocType.toUpperCase() : "Document"} Information
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSaveDocMetadata} className="space-y-4 py-2 text-xs">
             <p className="text-muted-foreground font-caption">
-              Editing these details creates a new verified version and recalculates compliance timelines.
+              Use this option only when the information recorded for the existing document is incorrect. This updates the current active record in-place without creating a new document version.
             </p>
 
             <div className="space-y-1.5">
@@ -1773,14 +1874,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="changeReason">Reason for Update / Remarks</label>
+              <label className="text-xs font-medium text-foreground" htmlFor="changeReason">Reason for Correction *</label>
               <Textarea
                 id="changeReason"
                 value={docMetadataForm.changeReason}
-                onChange={(e) => setDocMetadataForm(prev => ({ ...prev, changeReason: e.target.value }))}
-                placeholder="e.g. Corrected expiration date following physical document audit..."
-                className="min-h-16 text-sm"
+                onChange={(e) => {
+                  setDocMetadataForm(prev => ({ ...prev, changeReason: e.target.value }));
+                  setDocMetadataErrors(prev => ({ ...prev, changeReason: "" }));
+                }}
+                placeholder="e.g. Corrected typo in expiration date following physical document audit..."
+                className={`min-h-16 text-sm ${docMetadataErrors.changeReason ? "border-destructive" : ""}`}
               />
+              {docMetadataErrors.changeReason && (
+                <p className="text-[10px] text-destructive font-caption">{docMetadataErrors.changeReason}</p>
+              )}
             </div>
 
             <DialogFooter className="pt-2">
@@ -1793,15 +1900,28 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 isLoading={isSavingDocMetadata}
                 isSuccess={saveDocSuccess}
                 isError={saveDocError}
-                idleText="Save & Create Version"
+                idleText="Save Correction"
                 loadingText="Updating metadata..."
-                successText="Version created"
+                successText="Saved"
                 errorText="Try Again"
               />
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* GENUINE RENEWAL / REPLACEMENT UPLOAD MODAL */}
+      {renewalDocType && (
+        <DocumentUploadDialog
+          config={DOCUMENT_CONFIGS[renewalDocType]}
+          studentId={studentId}
+          isOpen={isRenewalUploadOpen}
+          onOpenChange={setIsRenewalUploadOpen}
+          onSuccess={async () => {
+            await Promise.all([loadStudentData(), loadReminderSchedule()]);
+          }}
+        />
+      )}
 
       {/* Edit Student Profile Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={handleCloseDialog}>

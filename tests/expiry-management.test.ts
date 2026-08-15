@@ -121,13 +121,15 @@ function runTests() {
   // TEST D: Historical Version Preservation
   console.log("\n--- Test D: Historical Versioning Integrity ---");
   const versionHistory = [
-    { version_number: 1, is_active: false, expiry_date: "2027-12-13", notes: "Initial upload" },
-    { version_number: 2, is_active: true, expiry_date: "2028-03-20", notes: "Extension stamped" }
+    { version_number: 1, is_active: false, expiry_date: "2027-12-13", issue_date: "2024-12-13", notes: "Initial upload" },
+    { version_number: 2, is_active: true, expiry_date: "2028-03-20", issue_date: "2024-12-13", notes: "Extension stamped" }
   ];
 
   assert(versionHistory.filter(v => v.is_active).length === 1, "Exactly one version active");
   assert(versionHistory.find(v => v.version_number === 1)?.expiry_date === "2027-12-13", "Historical version 1 retains original expiry date");
+  assert(versionHistory.find(v => v.version_number === 1)?.issue_date === "2024-12-13", "Historical version 1 retains original issue date");
   assert(versionHistory.find(v => v.version_number === 2)?.expiry_date === "2028-03-20", "Active version 2 has new expiry date");
+  assert(versionHistory.find(v => v.version_number === 2)?.issue_date === "2024-12-13", "Active version 2 preserved existing issue date");
 
   // TEST E: Role Authorization Checks
   console.log("\n--- Test E: Server-Side Role Authorization ---");
@@ -165,6 +167,70 @@ function runTests() {
   assert(new Date(validExp) > new Date(issueDate), "Valid expiry is after issue date");
   assert(new Date(beforeIssueExp) <= new Date(issueDate), "Expiry before issue date caught");
   assert(new Date(sameDayExp) <= new Date(issueDate), "Same day expiry caught");
+
+  // TEST H: Issue Date Preservation Across Passport, Visa, and eFRRO
+  console.log("\n--- Test H: Issue Date Preservation (Passport, Visa, eFRRO) ---");
+  const passportVersion = { issue_date: "2024-05-10", expiry_date: "2029-05-10", document_number: "P1234567" };
+  const visaVersion = { issue_date: "2025-01-15", expiry_date: "2027-01-15", document_number: "V7654321" };
+  const efrroVersion = { issue_date: "2025-08-01", expiry_date: "2026-08-01", document_number: "E9988776" };
+
+  function resolveIssueDate(inputIssueDate: string | undefined, activeVer: { issue_date?: string }, snapshotIssueDate?: string) {
+    const raw = inputIssueDate?.trim() || activeVer?.issue_date || snapshotIssueDate;
+    if (!raw) return { error: "This document does not have an issue date recorded. Please provide the issue date before updating the expiration date." };
+    return { issueDate: raw };
+  }
+
+  const passRes = resolveIssueDate(undefined, passportVersion);
+  assert(!passRes.error && passRes.issueDate === "2024-05-10", "Passport issue date automatically preserved from active version");
+
+  const visaRes = resolveIssueDate(undefined, visaVersion);
+  assert(!visaRes.error && visaRes.issueDate === "2025-01-15", "Visa issue date automatically preserved from active version");
+
+  const efrroRes = resolveIssueDate(undefined, efrroVersion);
+  assert(!efrroRes.error && efrroRes.issueDate === "2025-08-01", "eFRRO issue date automatically preserved from active version");
+
+  // TEST I: Missing Issue Date Enforcement & Resolution
+  console.log("\n--- Test I: Missing Issue Date Enforcement & Resolution ---");
+  const missingVer = { issue_date: undefined, expiry_date: "2027-12-13" };
+  const missingRes = resolveIssueDate(undefined, missingVer);
+  assert(Boolean(missingRes.error), "Missing issue date without user input returns descriptive error");
+  assert(missingRes.error === "This document does not have an issue date recorded. Please provide the issue date before updating the expiration date.", "Error message matches statutory requirement");
+
+  const providedRes = resolveIssueDate("2025-03-01", missingVer);
+  assert(!providedRes.error && providedRes.issueDate === "2025-03-01", "Staff-provided issue date allows update to proceed when version had no issue date");
+
+  // TEST J: Expiry <= Issue Date Validation Across All Document Types
+  console.log("\n--- Test J: Expiry <= Issue Date Rejection Across All Document Types ---");
+  function validateExpiryAfterIssue(expiry: string, issue: string) {
+    const expD = new Date(expiry);
+    const issD = new Date(issue);
+    if (isNaN(expD.getTime()) || isNaN(issD.getTime())) return { valid: false, error: "Invalid date format" };
+    if (expD <= issD) return { valid: false, error: "The new expiration date must be strictly after the document issue date." };
+    return { valid: true };
+  }
+
+  const passSameCheck = validateExpiryAfterIssue("2025-01-10", "2025-01-10");
+  assert(passSameCheck.valid === false, "Passport expiry on same day as issue date is rejected");
+
+  const visaPriorCheck = validateExpiryAfterIssue("2024-11-20", "2025-01-15");
+  assert(visaPriorCheck.valid === false, "Visa expiry prior to issue date is rejected");
+
+  const efrroValidCheck = validateExpiryAfterIssue("2027-08-01", "2025-08-01");
+  assert(efrroValidCheck.valid === true, "eFRRO valid expiry after issue date is accepted");
+
+  // TEST K: Constraint Error Translation (No Raw SQL Leaks)
+  console.log("\n--- Test K: Constraint Error Translation ---");
+  function mapDatabaseError(err: { code?: string; message?: string }) {
+    if (err.code === "23514" || err.message?.includes("chk_") || err.message?.includes("violates check constraint")) {
+      return "The new expiration date must be strictly after the document issue date.";
+    }
+    return err.message || "Database operation failed";
+  }
+
+  const rawSqlError = { code: "23514", message: 'new row for relation "visa_versions" violates check constraint "chk_visa_expiry_after_issue"' };
+  const translated = mapDatabaseError(rawSqlError);
+  assert(!translated.includes("chk_visa_expiry_after_issue"), "Raw SQL check constraint name stripped from user-facing message");
+  assert(translated === "The new expiration date must be strictly after the document issue date.", "Mapped to human-readable error message");
 
   console.log("\n=======================================================");
   console.log(`  TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
