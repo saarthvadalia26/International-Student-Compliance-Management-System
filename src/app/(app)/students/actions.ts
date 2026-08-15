@@ -1609,20 +1609,42 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
 
     const hasValidFile = (fp?: string | null) => Boolean(fp && fp.trim() !== "" && fp !== "pending_upload" && fp !== "null");
 
-    const activeEfrro = (student.efrro_versions || []).find((e: { is_active?: boolean; deleted_at?: string | null; file_path?: string | null }) => e.is_active && !e.deleted_at);
+    const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
+
+    const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
+    const activeVisa = (student.visa_versions || []).find((v: { is_active?: boolean; deleted_at?: string | null }) => v.is_active && !v.deleted_at);
+    const activeEfrro = (student.efrro_versions || []).find((e: { is_active?: boolean; deleted_at?: string | null }) => e.is_active && !e.deleted_at);
+
+    const isPassportUp = hasValidFile(activePassport?.file_path);
+    const isVisaUp = hasValidFile(activeVisa?.file_path);
     const isEfrroUp = hasValidFile(activeEfrro?.file_path);
 
-    const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
+    // Active version expiry takes priority, followed by snapshot expiry for metadata-only tracking
+    const passportExpiry = activePassport?.expiry_date || snapshot?.passport_expiry || null;
+    const visaExpiry = activeVisa?.expiry_date || snapshot?.visa_expiry || null;
+    const efrroExpiry = activeEfrro?.expiry_date || snapshot?.efrro_expiry || null;
 
     const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
 
     const calculatedSchedule = ExpiryReminderEngine.calculateStudentReminders({
       studentId,
+      passport: {
+        number: activePassport?.document_number || snapshot?.passport_number || "",
+        expiryDate: passportExpiry,
+        isUploaded: isPassportUp,
+        verificationStatus: (activePassport?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isPassportUp ? "pending" : (passportExpiry ? "verified" : "not_uploaded"))
+      },
+      visa: {
+        number: activeVisa?.document_number || snapshot?.visa_number || "",
+        expiryDate: visaExpiry,
+        isUploaded: isVisaUp,
+        verificationStatus: (activeVisa?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isVisaUp ? "pending" : (visaExpiry ? "verified" : "not_uploaded"))
+      },
       efrro: {
-        number: isEfrroUp ? (activeEfrro?.document_number || snapshot?.efrro_number || "") : (snapshot?.efrro_number || ""),
-        expiryDate: isEfrroUp ? (activeEfrro?.expiry_date || snapshot?.efrro_expiry) : (snapshot?.efrro_expiry || null),
+        number: activeEfrro?.document_number || snapshot?.efrro_number || "",
+        expiryDate: efrroExpiry,
         isUploaded: isEfrroUp,
-        verificationStatus: isEfrroUp ? (activeEfrro?.verification_status || "pending") : "not_uploaded"
+        verificationStatus: (activeEfrro?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isEfrroUp ? "pending" : (efrroExpiry ? "verified" : "not_uploaded"))
       },
       notifications
     });
@@ -1641,7 +1663,7 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
 }
 
 /**
- * Server Action: Manually trigger eFRRO reminder dispatch for testing or immediate notification
+ * Server Action: Manually trigger reminder dispatch for testing or immediate notification across any document type (WhatsApp only)
  */
 export async function triggerReminderDispatchAction(
   studentId: string,
@@ -1660,7 +1682,14 @@ export async function triggerReminderDispatchAction(
 
     const { data: student } = await adminSupabase
       .from("students")
-      .select("id, email, phone, student_personal(full_name), student_snapshot(efrro_expiry)")
+      .select(`
+        id, email, phone,
+        student_personal(full_name),
+        student_snapshot(passport_expiry, visa_expiry, efrro_expiry),
+        passport_versions(id, is_active, expiry_date, deleted_at),
+        visa_versions(id, is_active, expiry_date, deleted_at),
+        efrro_versions(id, is_active, expiry_date, deleted_at)
+      `)
       .eq("id", studentId)
       .single();
 
@@ -1671,30 +1700,49 @@ export async function triggerReminderDispatchAction(
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
 
-    const expiryDate = snapshot?.efrro_expiry;
+    const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
+    const activeVisa = (student.visa_versions || []).find((v: { is_active?: boolean; deleted_at?: string | null }) => v.is_active && !v.deleted_at);
+    const activeEfrro = (student.efrro_versions || []).find((e: { is_active?: boolean; deleted_at?: string | null }) => e.is_active && !e.deleted_at);
 
-    if (!expiryDate) {
-      return { success: false, error: "Cannot dispatch reminder: No eFRRO expiry date recorded." };
+    let expiryDate: string | null = null;
+    let docTitle = "Document";
+
+    if (docType === "passport") {
+      expiryDate = activePassport?.expiry_date || snapshot?.passport_expiry || null;
+      docTitle = "International Passport";
+    } else if (docType === "visa") {
+      expiryDate = activeVisa?.expiry_date || snapshot?.visa_expiry || null;
+      docTitle = "Student Visa";
+    } else {
+      expiryDate = activeEfrro?.expiry_date || snapshot?.efrro_expiry || null;
+      docTitle = "eFRRO / Residential Permit";
     }
 
-    const idempotencyKey = `${studentId}:efrro:${thresholdDays}:both:${expiryDate}`;
-    const recipientAddress = student.email || student.phone || "compliance@university.edu";
+    if (!expiryDate) {
+      return { success: false, error: `Cannot dispatch reminder: No ${docTitle} expiry date recorded.` };
+    }
+
+    // Strict WhatsApp channel
+    const channel = "whatsapp";
+    const idempotencyKey = `${studentId}:${docType}:${thresholdDays}:${channel}:${expiryDate}`;
+    const recipientAddress = student.phone || student.email || "international-office@university.edu";
 
     const { data: notif, error: notifErr } = await adminSupabase
       .from("notifications")
       .insert({
         student_id: studentId,
-        document_type: "efrro",
+        document_type: docType,
         status: "sent",
-        channel: "email",
+        channel,
         recipient_address: recipientAddress,
         scheduled_for: new Date().toISOString(),
         trigger_source: "manual_admin_dispatch",
         idempotency_key: idempotencyKey,
         notification_context: {
           student_name: personal?.full_name || "Student",
-          document_type: "eFRRO / Residential Permit",
+          document_type: docTitle,
           days_left: String(thresholdDays),
+          days_remaining: String(thresholdDays),
           expiry_date: expiryDate,
           scheduled_date: new Date().toISOString(),
           dispatched_by: user.id
@@ -1715,7 +1763,7 @@ export async function triggerReminderDispatchAction(
         notification_id: notif.id,
         attempt_number: 1,
         status: "sent",
-        gateway_response: { provider: "smtp_gateway", delivered_at: new Date().toISOString() },
+        gateway_response: { provider: "whatsapp_cloud_api", delivered_at: new Date().toISOString() },
         error_message: null
       });
     }
@@ -1724,7 +1772,7 @@ export async function triggerReminderDispatchAction(
       actor_id: user.id,
       action: "REMINDER_DISPATCHED",
       resource: `students/${studentId}/reminders/${docType}`,
-      filters_applied: { studentId, docType, thresholdDays, idempotencyKey }
+      filters_applied: { studentId, docType, thresholdDays, idempotencyKey, channel }
     });
 
     revalidatePath(`/students/${studentId}`);

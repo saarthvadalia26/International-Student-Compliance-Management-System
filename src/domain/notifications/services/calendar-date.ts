@@ -50,6 +50,16 @@ export class CalendarDateEngine {
   }
 
   /**
+   * Adds integer days to a YYYY-MM-DD date using calendar arithmetic.
+   */
+  static addDays(dateStr: string, days: number): string {
+    const d = this.parseDateOnly(dateStr);
+    if (isNaN(d.getTime())) return "";
+    d.setUTCDate(d.getUTCDate() + days);
+    return this.toISODate(d);
+  }
+
+  /**
    * Calculates difference in calendar days between targetDate and referenceDate (target - ref).
    */
   static diffCalendarDays(targetDateStr: string, refDateStr: string): number {

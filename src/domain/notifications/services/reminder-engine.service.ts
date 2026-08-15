@@ -150,6 +150,9 @@ export class ExpiryReminderEngine {
       });
 
       if (matchingNotif) {
+        const log = matchingNotif.notification_delivery_log?.[0];
+        const isDelivered = log?.status === "delivered";
+
         if (matchingNotif.status === "sent") {
           const sentDate = matchingNotif.updated_at || matchingNotif.created_at;
           return {
@@ -160,15 +163,18 @@ export class ExpiryReminderEngine {
             scheduledDate,
             scheduledDateISO,
             status: "DISPATCHED",
-            statusLabel: "Dispatched",
-            statusReason: `Dispatched via ${matchingNotif.channel} on ${new Date(sentDate).toLocaleDateString()}`,
+            statusLabel: isDelivered ? "Delivered" : "Dispatched",
+            statusReason: isDelivered
+              ? `Delivered via ${matchingNotif.channel} on ${new Date(log?.created_at || sentDate).toLocaleDateString()}`
+              : `Dispatched via ${matchingNotif.channel} on ${new Date(sentDate).toLocaleDateString()}`,
             dispatchedAt: sentDate,
+            deliveredAt: isDelivered ? (log?.created_at || sentDate) : null,
+            deliveryStatus: log?.status || matchingNotif.status,
             notificationId: matchingNotif.id
           };
         }
 
         if (matchingNotif.status === "failed") {
-          const log = matchingNotif.notification_delivery_log?.[0];
           const reason = log?.error_message || "Gateway delivery attempt failed";
           return {
             ruleId: rule.id,
@@ -181,6 +187,7 @@ export class ExpiryReminderEngine {
             statusLabel: "Failed",
             statusReason: reason,
             failureReason: reason,
+            deliveryStatus: "failed",
             notificationId: matchingNotif.id
           };
         }
@@ -194,8 +201,25 @@ export class ExpiryReminderEngine {
             scheduledDate,
             scheduledDateISO,
             status: "DUE",
-            statusLabel: "Scheduled",
+            statusLabel: "Queued",
             statusReason: "Notification is queued in dispatch pipeline",
+            deliveryStatus: "queued",
+            notificationId: matchingNotif.id
+          };
+        }
+
+        if (matchingNotif.status === "cancelled") {
+          return {
+            ruleId: rule.id,
+            ruleName: rule.ruleName,
+            thresholdDays: rule.thresholdDays,
+            channel: rule.channel,
+            scheduledDate,
+            scheduledDateISO,
+            status: "CANCELLED",
+            statusLabel: "Cancelled",
+            statusReason: "Reminder event was cancelled or superseded",
+            deliveryStatus: "cancelled",
             notificationId: matchingNotif.id
           };
         }
@@ -220,6 +244,7 @@ export class ExpiryReminderEngine {
       const daysUntilScheduled = CalendarDateEngine.diffCalendarDays(scheduledDateISO, todayISO);
       
       if (daysUntilScheduled <= 0) {
+        const isLateOrDueNow = daysUntilScheduled < 0;
         return {
           ruleId: rule.id,
           ruleName: rule.ruleName,
@@ -228,8 +253,10 @@ export class ExpiryReminderEngine {
           scheduledDate,
           scheduledDateISO,
           status: "DUE",
-          statusLabel: "Scheduled",
-          statusReason: `Reminder reached scheduled threshold on ${scheduledDate}`
+          statusLabel: isLateOrDueNow ? "Due Now" : "Due",
+          statusReason: isLateOrDueNow
+            ? `Reminder threshold passed (${Math.abs(daysUntilScheduled)} days ago on ${scheduledDate}) - Due immediately`
+            : `Reminder reached scheduled threshold today on ${scheduledDate}`
         };
       }
 
@@ -377,9 +404,9 @@ export class ExpiryReminderEngine {
           visa_expiry, visa_number,
           efrro_expiry, efrro_number
         ),
-        passport_versions(id, version_number, is_active, expiry_date, verification_status, file_path, deleted_at),
-        visa_versions(id, version_number, is_active, expiry_date, verification_status, file_path, deleted_at),
-        efrro_versions(id, version_number, is_active, expiry_date, verification_status, file_path, deleted_at)
+        passport_versions(id, version_number, is_active, document_number, expiry_date, verification_status, file_path, deleted_at),
+        visa_versions(id, version_number, is_active, document_number, expiry_date, verification_status, file_path, deleted_at),
+        efrro_versions(id, version_number, is_active, document_number, expiry_date, verification_status, file_path, deleted_at)
       `)
       .eq("id", studentId)
       .single();
@@ -393,9 +420,9 @@ export class ExpiryReminderEngine {
     const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
 
     // Extract active approved document versions
-    const activePassport = (student.passport_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
-    const activeVisa = (student.visa_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
-    const activeEfrro = (student.efrro_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
+    const activePassport = (student.passport_versions || []).find((v: { is_active: boolean; deleted_at: string | null; document_number?: string }) => v.is_active && !v.deleted_at);
+    const activeVisa = (student.visa_versions || []).find((v: { is_active: boolean; deleted_at: string | null; document_number?: string }) => v.is_active && !v.deleted_at);
+    const activeEfrro = (student.efrro_versions || []).find((v: { is_active: boolean; deleted_at: string | null; document_number?: string }) => v.is_active && !v.deleted_at);
 
     const passportExpiry = activePassport?.expiry_date || snapshot?.passport_expiry || null;
     const visaExpiry = activeVisa?.expiry_date || snapshot?.visa_expiry || null;
@@ -438,19 +465,19 @@ export class ExpiryReminderEngine {
     const scheduleResponse = this.calculateStudentReminders({
       studentId,
       passport: {
-        number: snapshot?.passport_number || "",
+        number: activePassport?.document_number || snapshot?.passport_number || "",
         expiryDate: passportExpiry,
         isUploaded: Boolean(activePassport?.file_path),
         verificationStatus: (activePassport?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
       },
       visa: {
-        number: snapshot?.visa_number || "",
+        number: activeVisa?.document_number || snapshot?.visa_number || "",
         expiryDate: visaExpiry,
         isUploaded: Boolean(activeVisa?.file_path),
         verificationStatus: (activeVisa?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
       },
       efrro: {
-        number: snapshot?.efrro_number || "",
+        number: activeEfrro?.document_number || snapshot?.efrro_number || "",
         expiryDate: efrroExpiry,
         isUploaded: Boolean(activeEfrro?.file_path),
         verificationStatus: (activeEfrro?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
@@ -507,7 +534,7 @@ export class ExpiryReminderEngine {
                 student_id: studentId,
                 document_type: doc.documentType,
                 status: "queued",
-                channel: item.channel,
+                channel: targetChannel,
                 recipient_address: recipientAddress,
                 scheduled_for: new Date().toISOString(),
                 trigger_source: "reminder_engine_calc",

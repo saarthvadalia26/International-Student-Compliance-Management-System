@@ -4,7 +4,8 @@ export type ReminderStatus =
   | "DUE" 
   | "DISPATCHED" 
   | "FAILED" 
-  | "EXPIRED";
+  | "EXPIRED"
+  | "CANCELLED";
 
 export interface ReminderScheduleItem {
   ruleId: string;
@@ -17,6 +18,8 @@ export interface ReminderScheduleItem {
   statusLabel: string;
   statusReason?: string;
   dispatchedAt?: string | null;
+  deliveredAt?: string | null;
+  deliveryStatus?: string | null;
   failureReason?: string | null;
   notificationId?: string | null;
 }

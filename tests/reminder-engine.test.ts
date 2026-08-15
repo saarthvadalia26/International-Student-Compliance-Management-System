@@ -52,7 +52,7 @@ function runTests() {
   });
 
   assert(nullExpiryResult.daysRemaining === null, "Days remaining is null when no expiry");
-  assert(nullExpiryResult.schedule.length === 4, "4 milestone rules created (90, 60, 30, 15)");
+  assert(nullExpiryResult.schedule.length === 5, "5 milestone rules created (90, 60, 30, 15, 7)");
   assert(nullExpiryResult.schedule.every(s => s.status === "NOT_APPLICABLE"), "All rules NOT_APPLICABLE when no expiry date");
   assert(nullExpiryResult.schedule[0].statusLabel === "Not Available", "Status label says 'Not Available'");
 
@@ -192,12 +192,13 @@ function runTests() {
   });
 
   assert(studentSchedule.efrro !== undefined, "eFRRO reminder group is returned directly");
-  assert(studentSchedule.efrro.schedule.length === 4, "4 milestone rules configured (90, 60, 30, 15)");
+  assert(studentSchedule.efrro.schedule.length === 5, "5 milestone rules configured (90, 60, 30, 15, 7)");
   assert(studentSchedule.efrro.schedule[0].ruleName === "90-Day Early Warning", "Milestone 1 is 90-Day Early Warning");
   assert(studentSchedule.efrro.schedule[1].ruleName === "60-Day Administrative Reminder", "Milestone 2 is 60-Day Administrative Reminder");
   assert(studentSchedule.efrro.schedule[2].ruleName === "30-Day Urgent Renewal", "Milestone 3 is 30-Day Urgent Renewal");
-  assert(studentSchedule.efrro.schedule[3].ruleName === "15-Day Critical Warning", "Milestone 4 is 15-Day Critical Warning");
-  assert(studentSchedule.summary.totalRules === 4, "Summary total rules is 4");
+  assert(studentSchedule.efrro.schedule[3].ruleName === "15-Day Critical Alert", "Milestone 4 is 15-Day Critical Alert");
+  assert(studentSchedule.efrro.schedule[4].ruleName === "7-Day Final Warning", "Milestone 5 is 7-Day Final Warning");
+  assert(studentSchedule.summary.totalRules === 15, "Summary total rules across all 3 docs is 15");
 
   // TEST 9: Empty eFRRO
   console.log("\n--- Group 9: Missing eFRRO Expiry ---");
