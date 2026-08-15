@@ -25,13 +25,14 @@ export class ResendEmailService implements IEmailService {
   }
 
   async sendEmail(message: EmailMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    console.log(`[EMAIL_SERVICE] Dispatched Email to: ${message.to}. Subject: ${message.subject}`);
-    // Future Resend SDK integration will go here
-    return { success: true, messageId: `msg_${Math.random().toString(36).substring(7)}` };
+    console.warn(`[EMAIL_SERVICE] Blocked email dispatch attempt to ${message.to}. Email channel is currently disabled.`);
+    return { 
+      success: false, 
+      error: "Email notification delivery is currently disabled. Integration is not available." 
+    };
   }
 
   async verifyProviderStatus(): Promise<boolean> {
-    // Check key configured
-    return !!this.apiKey;
+    return false;
   }
 }

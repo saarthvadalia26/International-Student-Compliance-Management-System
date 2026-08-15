@@ -144,6 +144,10 @@ export async function saveReminderRule(payload: {
   templateId?: string | null;
 }): Promise<{ success: boolean; rule?: ReminderRuleDto; error?: string }> {
   try {
+    if (payload.channel === "email" || payload.channel === "both") {
+      return { success: false, error: "Email notification channel is currently disabled. Please select WhatsApp." };
+    }
+
     const supabase = getAdminSupabase();
     const isNew = !payload.id || payload.id.startsWith("temp-") || payload.id.startsWith("r-");
 

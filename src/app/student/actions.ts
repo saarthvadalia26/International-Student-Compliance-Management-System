@@ -30,16 +30,58 @@ const MOCK_DEMO_STUDENT_PROFILE: StudentPortalProfile = {
   passportExpiry: "2029-10-15",
   passportStatus: "APPROVED",
   passportUploadDate: "2026-08-01",
+  passportEligibility: {
+    canUpload: false,
+    reasonCode: "OUTSIDE_WINDOW",
+    documentType: "passport",
+    userTitle: "Document Verified",
+    userMessage: "Your current PASSPORT is valid until 15 Oct 2029. Direct upload is disabled for verified documents. Please submit a replacement request to unlock the upload window.",
+    expiryDate: "2029-10-15",
+    uploadWindowOpensDate: "2029-09-15",
+    daysUntilWindowOpens: 1125,
+    daysUntilExpiry: 1155,
+    isPendingReview: false,
+    isFirstUpload: false,
+    activeReplacementRequest: null
+  },
   visaNumber: "IND9876543",
   visaType: "Student Visa (S-1)",
   visaExpiry: "2027-07-31",
   visaStatus: "APPROVED",
   visaUploadDate: "2026-08-01",
+  visaEligibility: {
+    canUpload: false,
+    reasonCode: "OUTSIDE_WINDOW",
+    documentType: "visa",
+    userTitle: "Document Verified",
+    userMessage: "Your current VISA is valid until 31 Jul 2027. Direct upload is disabled for verified documents. Please submit a replacement request to unlock the upload window.",
+    expiryDate: "2027-07-31",
+    uploadWindowOpensDate: "2027-07-01",
+    daysUntilWindowOpens: 319,
+    daysUntilExpiry: 349,
+    isPendingReview: false,
+    isFirstUpload: false,
+    activeReplacementRequest: null
+  },
   efrroStatus: "COMPLIANT",
   efrroExpiry: "2027-07-31",
   efrroNumber: "FRRO/AHM/2026/9012",
   efrroUploadDate: "2026-08-02",
-  daysRemaining: 360,
+  efrroEligibility: {
+    canUpload: false,
+    reasonCode: "OUTSIDE_WINDOW",
+    documentType: "efrro",
+    userTitle: "Document Verified",
+    userMessage: "Your current EFRRO is valid until 31 Jul 2027. Direct upload is disabled for verified documents. Please submit a replacement request to unlock the upload window.",
+    expiryDate: "2027-07-31",
+    uploadWindowOpensDate: "2027-07-01",
+    daysUntilWindowOpens: 319,
+    daysUntilExpiry: 349,
+    isPendingReview: false,
+    isFirstUpload: false,
+    activeReplacementRequest: null
+  },
+  daysRemaining: 349,
   lastUploadDate: "2026-08-02"
 };
 
@@ -83,7 +125,7 @@ const MOCK_DEMO_REMINDERS: StudentReminderHistoryRow[] = [
   },
   {
     id: "rem-2",
-    channel: "EMAIL",
+    channel: "WHATSAPP",
     sentAt: "2026-08-03T09:00:00Z",
     triggerSource: "SYSTEM_CRON",
     status: "DELIVERED"
@@ -300,8 +342,8 @@ export async function fetchDocumentUploadEligibilityAction(
 ) {
   try {
     const studentId = await verifyUserAndGetStudentId(jwt);
-    const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
-    return await DocumentUploadEligibilityEngine.evaluateEligibility(studentId, documentType);
+    const { canStudentUploadDocument } = await import("@/domain/compliance/services/upload-eligibility.service");
+    return await canStudentUploadDocument(studentId, documentType);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[ELIGIBILITY_ACTION_ERROR] Failed to fetch eligibility for ${documentType}:`, msg);
@@ -327,12 +369,12 @@ export async function fetchDocumentUploadLimitAction(): Promise<{
 export async function fetchAllDocumentUploadEligibilityAction(jwt: string) {
   try {
     const studentId = await verifyUserAndGetStudentId(jwt);
-    const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+    const { canStudentUploadDocument } = await import("@/domain/compliance/services/upload-eligibility.service");
     const { systemConfigService } = await import("@/lib/system-config");
     const [passport, visa, efrro, maxUploadSizeBytes] = await Promise.all([
-      DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "passport"),
-      DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "visa"),
-      DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "efrro"),
+      canStudentUploadDocument(studentId, "passport"),
+      canStudentUploadDocument(studentId, "visa"),
+      canStudentUploadDocument(studentId, "efrro"),
       systemConfigService.getMaxUploadSizeBytes()
     ]);
     const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
@@ -373,6 +415,16 @@ export async function uploadStudentDocumentAction(
     const studentId = await verifyUserAndGetStudentId(jwt);
     const fileBuffer = Buffer.from(fileBase64, "base64");
 
+    // CRITICAL: Server-authoritative eligibility check BEFORE invoking portal service
+    const { canStudentUploadDocument } = await import("@/domain/compliance/services/upload-eligibility.service");
+    const eligibility = await canStudentUploadDocument(studentId, documentType);
+    if (!eligibility.canUpload) {
+      return {
+        success: false,
+        error: `Your ${documentType.toUpperCase()} upload is currently locked. A replacement request or an active upload window is required before a new document can be uploaded.`
+      };
+    }
+
     const res = await portalService.uploadDocument(
       studentId,
       documentType,
@@ -388,9 +440,6 @@ export async function uploadStudentDocumentAction(
       versionNumber: res.versionNumber 
     };
   } catch (err: unknown) {
-    if (isStudentPortalTestMode()) {
-      return { success: true, versionNumber: 1 };
-    }
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: msg };
   }

@@ -25,7 +25,7 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
       code: "PASSPORT_EXPIRY_30D",
       eventType: "document_expiry",
       documentType: "passport",
-      channel: "both",
+      channel: "whatsapp",
       category: "utility",
       status: "ACTIVE",
       subjectTemplate: "ISCMS Alert: Passport Expiry Notice for {{student_name}}",
@@ -45,16 +45,15 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
       code: "INVALID_TOKENS_TEST",
       eventType: "document_expiry",
       documentType: "passport",
-      channel: "email",
+      channel: "whatsapp",
       category: "utility",
-      subjectTemplate: "Alert for {{student_name}}",
       bodyTemplate: "Hello {{student_name}}, your password is {{password_hash}} and column {{arbitrary_db_col}}."
     });
 
     assert.equal(res.isValid, false, "Unknown tokens must fail validation");
     assert.ok(res.invalidTokens.includes("{{password_hash}}"));
     assert.ok(res.invalidTokens.includes("{{arbitrary_db_col}}"));
-    assert.ok(res.errors[0].includes("not supported"));
+    assert.ok(res.errors.some(e => e.includes("not supported")));
   });
 
   it("4. Rejects malformed variable syntax (unbalanced single brackets)", () => {
@@ -63,9 +62,8 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
       code: "MALFORMED_SYNTAX_TEST",
       eventType: "document_expiry",
       documentType: "visa",
-      channel: "email",
+      channel: "whatsapp",
       category: "utility",
-      subjectTemplate: "Visa Alert for {{student_name}", // unclosed
       bodyTemplate: "Hello {student_name}, your visa expires on {{expiry_date}}." // single brace
     });
 
@@ -110,7 +108,7 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
       code: "STUDENT_PORTAL_OTP",
       eventType: "portal_otp",
       documentType: "general",
-      channel: "both",
+      channel: "whatsapp",
       category: "authentication",
       subjectTemplate: "Your ISCMS Portal Login Verification Code",
       bodyTemplate: "Your login code is {{otp_code}}. It expires in 10 minutes. Office of Compliance, {{institution_name}}"
@@ -120,20 +118,20 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
     assert.equal(res.errors.length, 0);
   });
 
-  it("8. Enforces non-empty Subject line when channel includes Email", () => {
+  it("8. Strictly rejects template creation with disabled Email channel", () => {
     const res = TemplateValidator.validateTemplate({
-      title: "Missing Subject Test",
-      code: "MISSING_SUBJECT",
+      title: "Disabled Email Test",
+      code: "DISABLED_EMAIL_TEST",
       eventType: "document_expiry",
       documentType: "passport",
       channel: "email",
       category: "utility",
-      subjectTemplate: "", // EMPTY: Invalid for Email
+      subjectTemplate: "ISCMS Alert",
       bodyTemplate: "Dear {{student_name}}, your passport expires soon."
     });
 
     assert.equal(res.isValid, false);
-    assert.ok(res.errors.some(e => e.includes("Email subject line is required")));
+    assert.ok(res.errors.some(e => e.includes("Email notifications are currently disabled")));
   });
 
   it("9. WhatsApp-only templates do not require an Email Subject line", () => {
@@ -158,7 +156,7 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
       code: "REPLACEMENT_APPROVED",
       eventType: "replacement_approved",
       documentType: "all",
-      channel: "both",
+      channel: "whatsapp",
       category: "utility",
       subjectTemplate: "Replacement Request Approved for {{document_type}}",
       bodyTemplate: "Dear {{student_name}},\n\nYour request for {{document_type}} replacement was approved. You have {{upload_window_hours}} hours to upload at {{secure_upload_link}}."
@@ -170,7 +168,7 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
       code: "DOCUMENT_REJECTED",
       eventType: "document_rejected",
       documentType: "all",
-      channel: "both",
+      channel: "whatsapp",
       category: "utility",
       subjectTemplate: "Action Required: {{document_type}} Rejected",
       bodyTemplate: "Dear {{student_name}},\n\nYour {{document_type}} was rejected. Reason: {{rejection_reason}}.\n\nRegards,\n{{institution_name}}"

@@ -160,6 +160,10 @@ function DocumentCentreContent() {
   }, [supabase, activeDocType]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isUploadAllowed) {
+      toast.error(`Your ${activeDocType.toUpperCase()} upload is currently locked.`);
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -179,6 +183,10 @@ function DocumentCentreContent() {
 
   const handleUploadSubmit = async () => {
     if (!selectedFile) return;
+    if (!isUploadAllowed) {
+      toast.error(`Your ${activeDocType.toUpperCase()} upload is currently locked.`);
+      return;
+    }
 
     try {
       setIsUploading(true);
@@ -279,10 +287,10 @@ function DocumentCentreContent() {
     activeDocType === "passport" ? profile?.passportEligibility :
     activeDocType === "visa" ? profile?.visaEligibility : profile?.efrroEligibility
   ) || {
-    canUpload: true,
-    reasonCode: "FIRST_UPLOAD",
-    userTitle: "Document Required",
-    userMessage: `Please upload your ${activeDocType.toUpperCase()} document.`
+    canUpload: false,
+    reasonCode: "OUTSIDE_WINDOW",
+    userTitle: "Document Status",
+    userMessage: "Document upload is currently locked."
   };
 
   const isUploadAllowed = Boolean(currentEligibility.canUpload);
@@ -476,15 +484,43 @@ function DocumentCentreContent() {
               )}
 
               {/* Disabled Dropzone Visual Indicator */}
-              <div className="border-2 border-dashed border-border/60 rounded-2xl p-6 text-center bg-accent/10 opacity-70">
+              <div 
+                className="border-2 border-dashed border-border/60 rounded-2xl p-6 text-center bg-accent/10 opacity-70 cursor-not-allowed select-none transition-colors"
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toast.error("Uploads are currently locked for this document.");
+                }}
+              >
                 <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-xs font-semibold text-foreground">Upload Currently Locked</p>
                 <p className="text-[11px] text-muted-foreground mt-1 max-w-sm mx-auto">
                   {currentEligibility.reasonCode === "PENDING_VERIFICATION"
                     ? "A submission is currently under review. Additional uploads are disabled until compliance staff review this version."
+                    : currentEligibility.reasonCode === "REPLACEMENT_REQUEST_PENDING"
+                    ? "A replacement request is currently under review. Additional uploads are locked until staff decision."
                     : "Direct upload is disabled for verified documents. Please submit a replacement request to unlock the upload window."}
                 </p>
-                <Button variant="outline" size="sm" disabled className="mt-4 text-xs rounded-xl cursor-not-allowed">
+                
+                {/* Disabled hidden file input */}
+                <input
+                  type="file"
+                  id="doc-file-input-locked"
+                  className="hidden"
+                  disabled={true}
+                  aria-disabled="true"
+                />
+
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  disabled 
+                  aria-disabled="true"
+                  className="mt-4 text-xs rounded-xl cursor-not-allowed pointer-events-none opacity-60 flex items-center gap-1.5 mx-auto"
+                >
+                  <Lock className="h-3 w-3" />
                   Upload Locked
                 </Button>
               </div>
@@ -513,7 +549,32 @@ function DocumentCentreContent() {
               </CardHeader>
 
               <CardContent className="p-0 pt-2 space-y-4">
-                <div className="border-2 border-dashed border-primary/40 hover:border-primary rounded-2xl p-8 text-center bg-primary/5 transition-colors">
+                <div 
+                  className="border-2 border-dashed border-primary/40 hover:border-primary rounded-2xl p-8 text-center bg-primary/5 transition-colors cursor-pointer"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!isUploadAllowed) {
+                      toast.error("Uploads are currently locked for this document.");
+                      return;
+                    }
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) {
+                      if (file.size > maxUploadSizeBytes) {
+                        toast.error(`This file is too large. The maximum allowed size is ${maxUploadSizeMb} MB.`);
+                        return;
+                      }
+                      const validTypes = ["application/pdf", "image/jpeg", "image/png"];
+                      if (!validTypes.includes(file.type)) {
+                        toast.error("Unsupported file format. Please upload PDF, JPG, or PNG.");
+                        return;
+                      }
+                      setSelectedFile(file);
+                    }
+                  }}
+                >
                   <FileText className="h-10 w-10 text-primary mx-auto mb-3" />
                   <p className="text-xs font-semibold text-foreground">
                     {selectedFile ? selectedFile.name : `Select your ${activeDocType.toUpperCase()} document file`}
@@ -528,12 +589,18 @@ function DocumentCentreContent() {
                     className="hidden"
                     accept=".pdf,.jpg,.jpeg,.png"
                     onChange={handleFileChange}
-                    disabled={isUploading}
+                    disabled={isUploading || !isUploadAllowed}
                   />
                   
                   <label htmlFor="doc-file-input" className="inline-block mt-4">
-                    <Button variant="outline" size="sm" type="button" className="text-xs pointer-events-none rounded-xl">
-                      Browse File
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      type="button" 
+                      disabled={!isUploadAllowed}
+                      className="text-xs pointer-events-none rounded-xl"
+                    >
+                      Browse Files
                     </Button>
                   </label>
                 </div>

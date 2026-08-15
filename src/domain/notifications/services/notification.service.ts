@@ -1,11 +1,10 @@
-import { 
+import type { 
   INotificationRepository 
 } from "../repositories/notification.repository";
 import { 
   INotificationProvider,
   ProviderResponse
 } from "../types/provider.types";
-import { getAdminSupabase } from "@/lib/supabase/admin";
 import crypto from "crypto";
 
 export class NotificationPreferencesService {
@@ -25,6 +24,7 @@ export class ReminderEngine {
     console.log(`[REMINDER_ENGINE] Starting compliance scanning evaluations triggered by ${triggerSource}...`);
     
     const rules = await this.repository.getReminderRules();
+    const { getAdminSupabase } = await import("@/lib/supabase/admin");
     const supabase = getAdminSupabase();
     
     // Query active student compliance snapshots and verified versions
@@ -110,9 +110,13 @@ export class ReminderEngine {
           }
           if (!template) continue;
 
-          // Check communication channel details
-          const channel = rule.channel;
-          const address = channel === "email" ? student.email : (student.phone || student.email || "N/A");
+          // Email channel is currently disabled - only WhatsApp is operational
+          if (rule.channel === "email") {
+            continue;
+          }
+
+          const channel = "whatsapp";
+          const address = student.phone || student.email || "N/A";
           
           // Enforce idempotency key mapping to prevent duplicates: studentId:docType:thresholdDays:channel:expiryDate
           const key = `${studentId}:${docType}:${rule.alertThresholdDays}:${channel}:${cleanExpiry}`;
@@ -199,6 +203,7 @@ export class QueueProcessor {
         let subject = "ISCMS Compliance Reminder Alert";
         
         if (alert.templateId) {
+          const { getAdminSupabase } = await import("@/lib/supabase/admin");
           const supabase = getAdminSupabase();
           const { data: tData } = await supabase
             .from("notification_templates")
@@ -217,16 +222,17 @@ export class QueueProcessor {
           }
         }
 
-        // 4. Submit to Gateway adapters
-        let result: ProviderResponse = { success: false };
-        
-        if (activeChannel === "email" || activeChannel === "both") {
-          activeProvider = this.emailProvider;
-          result = await this.emailProvider.sendEmail(alert.recipientAddress, subject, body);
-        } else {
-          activeProvider = this.whatsappProvider;
-          result = await this.whatsappProvider.sendWhatsApp(alert.recipientAddress, body);
+        // If active channel is email, cancel without attempting delivery since email is not integrated
+        if (activeChannel === "email") {
+          console.log(`[QUEUE_PROCESSOR] Email channel is currently disabled. Cancelling notification ${alert.id}.`);
+          await this.repository.updateNotificationStatus(alert.id, "cancelled");
+          continue;
         }
+
+        // 4. Submit to WhatsApp Gateway adapter
+        let result: ProviderResponse = { success: false };
+        activeProvider = this.whatsappProvider;
+        result = await this.whatsappProvider.sendWhatsApp(alert.recipientAddress, body);
 
         const latencyMs = result.latencyMs || (Date.now() - startTime);
 
@@ -292,6 +298,7 @@ export class NotificationEngine {
   ): Promise<void> {
     console.log(`[NOTIFICATION_ENGINE] Dispatching ${status} event for ${documentType} (student: ${studentId})`);
     
+    const { getAdminSupabase } = await import("@/lib/supabase/admin");
     const supabase = getAdminSupabase();
     
     // Get student details
@@ -326,10 +333,10 @@ export class NotificationEngine {
     }
 
     const key = `${studentId}:${documentType}:${status}:${Date.now()}`;
-    const channels = ["email", "whatsapp"];
+    const channels = ["whatsapp"];
 
     for (const channel of channels) {
-      const address = channel === "email" ? studentAccount.email : studentAccount.phone;
+      const address = studentAccount.phone || studentAccount.email;
       if (!address) continue;
 
       try {
@@ -338,7 +345,7 @@ export class NotificationEngine {
           templateId: template.id,
           documentType,
           status: "queued",
-          channel: channel as "email" | "whatsapp" | "both",
+          channel: "whatsapp",
           recipientAddress: address,
           triggerSource: "event_handler",
           idempotencyKey: `${key}:${channel}`,

@@ -157,7 +157,7 @@ export function ReminderSettings(): React.JSX.Element {
         id: editingRule.id,
         documentType: (editingRule.documentType as "passport" | "visa" | "efrro") || "passport",
         alertThresholdDays: Number(editingRule.alertThresholdDays),
-        channel: (editingRule.channel as "email" | "whatsapp" | "both") || "both",
+        channel: (editingRule.channel as "email" | "whatsapp" | "both") || "whatsapp",
         isActive: editingRule.isActive ?? true,
         ruleName: editingRule.ruleName?.trim() || `${editingRule.documentType?.toUpperCase()} ${editingRule.alertThresholdDays}-Day Reminder`,
         templateId: editingRule.templateId || null
@@ -299,7 +299,7 @@ export function ReminderSettings(): React.JSX.Element {
                           {rule.documentType}
                         </Badge>
                         <Badge variant="secondary" className="text-[10px] font-medium">
-                          {rule.channel === "both" ? "Email & WhatsApp" : rule.channel === "email" ? "Email Only" : "WhatsApp Only"}
+                          {rule.channel === "whatsapp" ? "WhatsApp" : "Email (Disabled)"}
                         </Badge>
                       </div>
                       <CardTitle className="text-sm font-bold text-foreground mt-1 line-clamp-1">
@@ -459,13 +459,13 @@ export function ReminderSettings(): React.JSX.Element {
             <div className="space-y-1.5">
               <label className="font-semibold text-foreground">Delivery Channel</label>
               <select
-                value={editingRule?.channel || "both"}
+                value={editingRule?.channel || "whatsapp"}
                 onChange={(e) => setEditingRule(prev => prev ? { ...prev, channel: e.target.value as "email" | "whatsapp" | "both" } : null)}
                 className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <option value="both">Email & WhatsApp (Both)</option>
-                <option value="email">Email Only</option>
-                <option value="whatsapp">WhatsApp Only</option>
+                <option value="whatsapp">WhatsApp (Active)</option>
+                <option value="email" disabled>Email Only — Coming Soon (Disabled)</option>
+                <option value="both" disabled>Email & WhatsApp — Coming Soon (Disabled)</option>
               </select>
             </div>
 

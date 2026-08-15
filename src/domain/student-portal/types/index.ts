@@ -92,7 +92,7 @@ export interface UploadAuditLog {
   filename: string;
   fileSize: number;
   checksum: string;
-  status: "success" | "failed_size" | "failed_type" | "failed_virus" | "failed_duplicate";
+  status: "success" | "failed_size" | "failed_type" | "failed_virus" | "failed_duplicate" | "blocked_locked";
   timestamp: Date;
   ipAddress: string | null;
   userAgent: string | null;

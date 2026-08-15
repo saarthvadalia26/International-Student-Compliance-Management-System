@@ -641,16 +641,22 @@ function SettingsPageContent() {
               <CardContent className="p-6">
                 <form onSubmit={handleSaveNotifications} className="space-y-4">
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between opacity-75">
                       <div>
-                        <label className="text-xs font-semibold text-foreground">Email Notifications</label>
-                        <p className="text-[10px] text-muted-foreground">Dispatches pre-expiry and post-expiry alerts to student emails.</p>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-semibold text-foreground">Email Notifications</label>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                            Coming Soon
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">Email notification channel is currently disabled until provider integration is available.</p>
                       </div>
                       <input
                         type="checkbox"
-                        checked={emailAlerts}
-                        onChange={e => setEmailAlerts(e.target.checked)}
-                        className="h-4 w-4 rounded accent-primary cursor-pointer"
+                        checked={false}
+                        disabled={true}
+                        className="h-4 w-4 rounded accent-primary cursor-not-allowed opacity-50"
+                        title="Email integration coming soon"
                       />
                     </div>
                     <div className="flex items-center justify-between border-t border-border/40 pt-3">

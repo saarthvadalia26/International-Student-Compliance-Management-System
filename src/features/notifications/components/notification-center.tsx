@@ -260,8 +260,8 @@ export function NotificationQueueTable(): React.JSX.Element {
             className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="all">All Channels</option>
-            <option value="email">Email</option>
             <option value="whatsapp">WhatsApp</option>
+            <option value="email">Email (Historical)</option>
           </select>
 
           <select

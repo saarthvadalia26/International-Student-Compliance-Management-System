@@ -120,7 +120,7 @@ export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps)
       title: "",
       documentType: "passport",
       eventType: "document_expiry",
-      channel: "both",
+      channel: "whatsapp",
       category: "utility",
       providerTemplateName: "",
       subjectTemplate: "",
@@ -340,7 +340,7 @@ export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps)
             Template Manager
           </h2>
           <p className="text-xs text-muted-foreground">
-            Create and manage the messages used by automated compliance notifications across WhatsApp and Email.
+            Create and manage the messages used by automated compliance notifications via WhatsApp. (Email integration coming soon.)
           </p>
         </div>
 
@@ -403,8 +403,7 @@ export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps)
           >
             <option value="all">Channel: All Channels</option>
             <option value="whatsapp">WhatsApp</option>
-            <option value="email">Email</option>
-            <option value="both">Both</option>
+            <option value="email" disabled>Email — Coming Soon (Disabled)</option>
           </select>
         </div>
 
@@ -506,9 +505,17 @@ export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps)
                         {/* Channel */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-1.5">
-                            {isEmail && <span title="Email"><Mail className="h-3.5 w-3.5 text-blue-500" /></span>}
-                            {isWhatsApp && <span title="WhatsApp"><MessageSquare className="h-3.5 w-3.5 text-emerald-500" /></span>}
-                            <span className="capitalize font-medium text-foreground">{tpl.channel}</span>
+                            {tpl.channel === "whatsapp" ? (
+                              <>
+                                <span title="WhatsApp"><MessageSquare className="h-3.5 w-3.5 text-emerald-500" /></span>
+                                <span className="capitalize font-medium text-foreground">WhatsApp</span>
+                              </>
+                            ) : (
+                              <>
+                                <span title="Email (Coming Soon / Disabled)"><Mail className="h-3.5 w-3.5 text-blue-500 opacity-60" /></span>
+                                <span className="capitalize font-medium text-muted-foreground text-[11px]">Email (Disabled)</span>
+                              </>
+                            )}
                           </div>
                         </td>
 
@@ -736,16 +743,16 @@ export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps)
                 <div className="space-y-1">
                   <label className="font-semibold text-foreground">Target Channel</label>
                   <select
-                    value={editingTemplate?.channel || "both"}
+                    value={editingTemplate?.channel || "whatsapp"}
                     onChange={(e) => {
                       const ch = e.target.value as any;
                       setEditingTemplate(prev => prev ? { ...prev, channel: ch } : null);
                     }}
                     className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <option value="both">Both (Email & WA)</option>
                     <option value="whatsapp">WhatsApp</option>
-                    <option value="email">Email</option>
+                    <option value="email" disabled>Email — Coming Soon (Disabled)</option>
+                    <option value="both" disabled>Both — Coming Soon (Disabled)</option>
                   </select>
                 </div>
 

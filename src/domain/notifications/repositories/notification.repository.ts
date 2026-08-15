@@ -112,6 +112,10 @@ export class SupabaseNotificationRepository implements INotificationRepository {
   }
 
   async queueNotification(notification: Partial<Notification>): Promise<Notification> {
+    if (notification.channel === "email" || notification.channel === "both") {
+      throw new Error("[CHANNEL_DISABLED] Email notification delivery is currently disabled. Please use WhatsApp.");
+    }
+
     const supabase = getAdminSupabase();
     
     const dbRow = {

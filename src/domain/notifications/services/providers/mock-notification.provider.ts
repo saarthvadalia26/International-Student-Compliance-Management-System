@@ -13,8 +13,8 @@ export class MockNotificationProvider implements INotificationProvider {
   constructor(public readonly name: string = "unconfigured-provider") {}
 
   async sendEmail(to: string, subject: string, body: string): Promise<ProviderResponse> {
-    console.error(`[PROVIDER_ERROR] Attempted to send email to ${to} without configured provider.`);
-    throw new Error("Provider integration required. Configure EMAIL_PROVIDER with valid credentials.");
+    console.error(`[PROVIDER_ERROR] Attempted to send email to ${to}. Email notification channel is currently disabled.`);
+    throw new Error("Email notification delivery is currently disabled. Integration is not available.");
   }
 
   async sendWhatsApp(to: string, body: string): Promise<ProviderResponse> {
@@ -23,8 +23,8 @@ export class MockNotificationProvider implements INotificationProvider {
   }
 
   async sendBulkEmail(to: string[], subject: string, body: string): Promise<BulkProviderResponse> {
-    console.error(`[PROVIDER_ERROR] Attempted to send bulk email to ${to.length} recipients without configured provider.`);
-    throw new Error("Provider integration required. Configure EMAIL_PROVIDER with valid credentials.");
+    console.error(`[PROVIDER_ERROR] Attempted to send bulk email to ${to.length} recipients. Email notification channel is currently disabled.`);
+    throw new Error("Email notification delivery is currently disabled. Integration is not available.");
   }
 
   async sendBulkWhatsApp(to: string[], body: string): Promise<BulkProviderResponse> {

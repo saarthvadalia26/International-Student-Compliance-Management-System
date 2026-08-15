@@ -105,10 +105,9 @@ export class TemplateValidator {
       errors.push("Template message body is required and must be at least 10 characters.");
     }
 
-    // Email Subject validation
-    const isEmail = input.channel === "email" || input.channel === "both";
-    if (isEmail && (!input.subjectTemplate || input.subjectTemplate.trim().length < 3)) {
-      errors.push("Email subject line is required when channel is Email or Both.");
+    // Channel validation: Email channel is currently disabled until provider integration
+    if (input.channel === "email" || input.channel === "both") {
+      errors.push("Email notifications are currently disabled. Please select WhatsApp as the delivery channel.");
     }
 
     // WhatsApp Category invariant rules

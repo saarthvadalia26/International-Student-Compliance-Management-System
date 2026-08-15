@@ -117,13 +117,22 @@ export class StudentPortalService {
   ): Promise<{ versionId: string; versionNumber: number }> {
     console.log(`[STUDENT_PORTAL_SERVICE] Initiating upload pipeline for student: ${studentId}, type: ${documentType}`);
 
-    const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
+    const { canStudentUploadDocument, DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
 
     // 1. CRITICAL: Evaluate upload eligibility BEFORE touching storage or creating files
-    const eligibility = await DocumentUploadEligibilityEngine.evaluateEligibility(studentId, documentType);
+    const eligibility = await canStudentUploadDocument(studentId, documentType);
     if (!eligibility.canUpload) {
       console.warn(`[STUDENT_PORTAL_SECURITY] Blocked unauthorized upload attempt for student ${studentId}, type ${documentType}. Reason: ${eligibility.reasonCode}`);
-      throw new Error(eligibility.userMessage || "Document upload is currently unavailable. Your current document is still valid.");
+      await this.portalRepo.logUploadAudit({
+        studentId,
+        filename,
+        fileSize: fileBuffer.length,
+        checksum: "N/A",
+        status: "blocked_locked",
+        ipAddress,
+        userAgent
+      });
+      throw new Error(`Your ${documentType.toUpperCase()} upload is currently locked. A replacement request or an active upload window is required before a new document can be uploaded.`);
     }
 
     // 2. File Type Check (PDF, JPG, PNG)

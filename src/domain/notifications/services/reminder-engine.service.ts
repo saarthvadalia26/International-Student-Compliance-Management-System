@@ -13,25 +13,25 @@ export interface ReminderRuleConfig {
 
 export const STANDARD_REMINDER_RULES: Record<"passport" | "visa" | "efrro", ReminderRuleConfig[]> = {
   passport: [
-    { id: "passport-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "email" },
-    { id: "passport-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "email" },
-    { id: "passport-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "both" },
-    { id: "passport-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "both" },
-    { id: "passport-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "both" }
+    { id: "passport-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "whatsapp" },
+    { id: "passport-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "whatsapp" },
+    { id: "passport-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "whatsapp" },
+    { id: "passport-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "whatsapp" },
+    { id: "passport-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "whatsapp" }
   ],
   visa: [
-    { id: "visa-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "email" },
-    { id: "visa-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "email" },
-    { id: "visa-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "both" },
-    { id: "visa-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "both" },
-    { id: "visa-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "both" }
+    { id: "visa-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "whatsapp" },
+    { id: "visa-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "whatsapp" },
+    { id: "visa-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "whatsapp" },
+    { id: "visa-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "whatsapp" },
+    { id: "visa-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "whatsapp" }
   ],
   efrro: [
-    { id: "efrro-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "email" },
-    { id: "efrro-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "email" },
-    { id: "efrro-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "both" },
-    { id: "efrro-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "both" },
-    { id: "efrro-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "both" }
+    { id: "efrro-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "whatsapp" },
+    { id: "efrro-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "whatsapp" },
+    { id: "efrro-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "whatsapp" },
+    { id: "efrro-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "whatsapp" },
+    { id: "efrro-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "whatsapp" }
   ]
 };
 
@@ -482,9 +482,15 @@ export class ExpiryReminderEngine {
 
       for (const item of doc.schedule) {
         if (item.status === "DUE" && item.scheduledDateISO && doc.expiryDate) {
+          // Email channel is currently disabled - do not queue email reminders
+          if (item.channel === "email") {
+            continue;
+          }
+
+          const targetChannel = "whatsapp";
           // Idempotency key accounts for student, docType, thresholdDays, channel, and expiryDate
-          const idempotencyKey = `${studentId}:${doc.documentType}:${item.thresholdDays}:${item.channel}:${doc.expiryDate}`;
-          const recipientAddress = item.channel === "email" ? studentEmail : (studentPhone || studentEmail);
+          const idempotencyKey = `${studentId}:${doc.documentType}:${item.thresholdDays}:${targetChannel}:${doc.expiryDate}`;
+          const recipientAddress = studentPhone || studentEmail;
 
           if (!recipientAddress) {
             errors.push(`No valid contact address for ${doc.documentType.toUpperCase()} ${item.thresholdDays}-day alert.`);
