@@ -28,7 +28,7 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
   const [versions, setVersions] = React.useState<DocumentVersion[]>([]);
   const [isUploadOpen, setIsUploadOpen] = React.useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = React.useState(false);
-  const [selectedPdfUrl, setSelectedPdfUrl] = React.useState<string | null>(null);
+  const [selectedPdfUrl] = React.useState<string | null>(null);
 
   const fetchDocuments = React.useCallback(async () => {
     if (!studentId) return;
@@ -73,12 +73,12 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
     }
   }, [studentId, documentType, fetchDocuments]);
 
-  const handleUploadSubmit = (data: { docNumber: string; issueDate: string; expiryDate: string; file: File | null }) => {
+  const handleUploadSubmit = (_data: { docNumber: string; issueDate: string; expiryDate: string; file: File | null }) => {
     // This will hit an API route securely
     toast.info("Upload initiated", { description: "Sending secure payload to storage layer..." });
   };
 
-  const handleVerificationAction = (data: { status: "verified" | "rejected"; reason: string }) => {
+  const handleVerificationAction = (_data: { status: "verified" | "rejected"; reason: string }) => {
     toast.info("Verification action submitted", { description: "Updating document status..." });
   };
 

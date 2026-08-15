@@ -174,15 +174,18 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
       // 6. Optional: Insert into student_embassy table if provided
       let embassyData = null;
-      if (input.embassyName && input.embassyAddress) {
+      if (input.embassyName && input.embassyName.trim()) {
         const { data: embResult } = await supabase
           .from("student_embassy")
           .insert({
             student_id: studentId,
             embassy_name: input.embassyName.trim(),
-            address: input.embassyAddress.trim(),
+            address: input.embassyAddress?.trim() || "Not Specified",
+            city: input.embassyCity?.trim() || null,
+            country: input.embassyCountry?.trim() || null,
             phone: input.embassyPhone?.trim() || null,
             email: input.embassyEmail?.trim() || null,
+            website: input.embassyWebsite?.trim() || null,
             contact_person: input.embassyContactPerson?.trim() || null,
             created_by: actorId,
             updated_by: actorId
@@ -419,6 +422,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         email: embassy.email,
         phone: embassy.phone,
         address: embassy.address,
+        city: embassy.city || null,
+        country: embassy.country || null,
+        website: embassy.website || null,
         createdAt: new Date(embassy.created_at),
         updatedAt: new Date(embassy.updated_at),
         deletedAt: embassy.deleted_at ? new Date(embassy.deleted_at) : null,
@@ -492,7 +498,64 @@ export class SupabaseStudentRepository implements IStudentRepository {
       await supabase.from("student_academic").update(academicUpdates).eq("student_id", id);
     }
 
-    // 5. Record update audit log
+    // 5. Update or Upsert student_embassy table
+    const hasEmbassyInputs = 
+      input.embassyName !== undefined ||
+      input.embassyAddress !== undefined ||
+      input.embassyCity !== undefined ||
+      input.embassyCountry !== undefined ||
+      input.embassyPhone !== undefined ||
+      input.embassyEmail !== undefined ||
+      input.embassyWebsite !== undefined ||
+      input.embassyContactPerson !== undefined;
+
+    if (hasEmbassyInputs) {
+      const { data: existingEmbassy } = await supabase
+        .from("student_embassy")
+        .select("student_id")
+        .eq("student_id", id)
+        .maybeSingle();
+
+      const embassyPayload: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+        updated_by: actorId
+      };
+      if (input.embassyName !== undefined) embassyPayload.embassy_name = input.embassyName.trim();
+      if (input.embassyAddress !== undefined) embassyPayload.address = input.embassyAddress.trim();
+      if (input.embassyCity !== undefined) embassyPayload.city = input.embassyCity ? input.embassyCity.trim() : null;
+      if (input.embassyCountry !== undefined) embassyPayload.country = input.embassyCountry ? input.embassyCountry.trim() : null;
+      if (input.embassyPhone !== undefined) embassyPayload.phone = input.embassyPhone ? input.embassyPhone.trim() : null;
+      if (input.embassyEmail !== undefined) embassyPayload.email = input.embassyEmail ? input.embassyEmail.trim().toLowerCase() : null;
+      if (input.embassyWebsite !== undefined) embassyPayload.website = input.embassyWebsite ? input.embassyWebsite.trim() : null;
+      if (input.embassyContactPerson !== undefined) embassyPayload.contact_person = input.embassyContactPerson ? input.embassyContactPerson.trim() : null;
+
+      if (existingEmbassy) {
+        if (Object.keys(embassyPayload).length > 2) {
+          await supabase
+            .from("student_embassy")
+            .update(embassyPayload)
+            .eq("student_id", id);
+        }
+      } else if (input.embassyName && input.embassyName.trim()) {
+        await supabase
+          .from("student_embassy")
+          .insert({
+            student_id: id,
+            embassy_name: input.embassyName.trim(),
+            address: input.embassyAddress?.trim() || "Not Specified",
+            city: input.embassyCity?.trim() || null,
+            country: input.embassyCountry?.trim() || null,
+            phone: input.embassyPhone?.trim() || null,
+            email: input.embassyEmail?.trim() || null,
+            website: input.embassyWebsite?.trim() || null,
+            contact_person: input.embassyContactPerson?.trim() || null,
+            created_by: actorId,
+            updated_by: actorId
+          });
+      }
+    }
+
+    // 6. Record update audit log
     await supabase.from("audit_log").insert({
       actor_id: actorId,
       action: "UPDATE_STUDENT",
@@ -626,6 +689,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
             email: embassy.email,
             phone: embassy.phone,
             address: embassy.address,
+            city: embassy.city || null,
+            country: embassy.country || null,
+            website: embassy.website || null,
             createdAt: new Date(embassy.created_at),
             updatedAt: new Date(embassy.updated_at),
             deletedAt: embassy.deleted_at ? new Date(embassy.deleted_at) : null,

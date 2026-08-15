@@ -20,6 +20,7 @@ export interface INotificationRepository {
   getReminderRules(): Promise<ReminderRule[]>;
   createScheduledJob(job: Partial<ScheduledJob>): Promise<ScheduledJob>;
   updateScheduledJob(id: string, job: Partial<ScheduledJob>): Promise<void>;
+  getStudentNotifications(studentId: string): Promise<Notification[]>;
 }
 
 export interface INotificationDbRow {
@@ -321,5 +322,21 @@ export class SupabaseNotificationRepository implements INotificationRepository {
     if (error) {
       throw new Error(`[DB_UPDATE_FAILED] ${error.message}`);
     }
+  }
+
+  async getStudentNotifications(studentId: string): Promise<Notification[]> {
+    const supabase = getAdminSupabase();
+
+    const { data, error } = await supabase
+      .from(NOTIFICATION_TABLE_NAME)
+      .select("*")
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(`[DB_QUERY_FAILED] ${error.message}`);
+    }
+
+    return (data || []).map(row => this.mapToDomain(row));
   }
 }

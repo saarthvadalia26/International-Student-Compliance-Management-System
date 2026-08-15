@@ -78,6 +78,9 @@ export interface StudentEmbassy {
   email: string | null;
   phone: string | null;
   address: string;
+  city?: string | null;
+  country?: string | null;
+  website?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -116,8 +119,11 @@ export interface RegisterStudentInput {
   relationshipAddress?: string;
   embassyName?: string;
   embassyAddress?: string;
+  embassyCity?: string;
+  embassyCountry?: string;
   embassyPhone?: string;
   embassyEmail?: string;
+  embassyWebsite?: string;
   embassyContactPerson?: string;
   passportNumber?: string;
   passportExpiry?: Date | string;
@@ -138,6 +144,15 @@ export interface UpdateStudentInput {
   programCode?: string;
   currentSemester?: number;
   academicStatus?: AcademicStatus;
+  // Embassy / Consular updates
+  embassyName?: string;
+  embassyAddress?: string;
+  embassyCity?: string;
+  embassyCountry?: string;
+  embassyPhone?: string;
+  embassyEmail?: string;
+  embassyWebsite?: string;
+  embassyContactPerson?: string;
 }
 
 export interface StudentFilterOptions {

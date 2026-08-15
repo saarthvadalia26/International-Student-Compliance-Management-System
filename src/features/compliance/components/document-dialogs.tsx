@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { toast } from "sonner";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { DocumentConfig } from "../constants/constants";
 import { DatePicker } from "@/components/ui/date-picker";
 
@@ -26,6 +27,7 @@ export function DocumentUploadDialog({ config, isOpen, onOpenChange, onSubmit }:
   const [uploadSuccess, setUploadSuccess] = React.useState(false);
   const [uploadError, setUploadError] = React.useState(false);
   const [isDirty, setIsDirty] = React.useState(false);
+  const [isConfirmDiscardOpen, setIsConfirmDiscardOpen] = React.useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -59,6 +61,7 @@ export function DocumentUploadDialog({ config, isOpen, onOpenChange, onSubmit }:
     setUploadSuccess(false);
     setUploadError(false);
 
+    // Simulate upload latency
     setTimeout(() => {
       try {
         onSubmit({ docNumber, issueDate, expiryDate, file });
@@ -86,72 +89,91 @@ export function DocumentUploadDialog({ config, isOpen, onOpenChange, onSubmit }:
 
   const handleClose = (open: boolean) => {
     if (!open && isDirty) {
-      const confirmDiscard = window.confirm("You have unsaved changes. Discard file upload details?");
-      if (!confirmDiscard) return;
+      setIsConfirmDiscardOpen(true);
+      return;
     }
     onOpenChange(open);
     setIsDirty(false);
   };
 
+  const handleConfirmDiscard = () => {
+    setIsConfirmDiscardOpen(false);
+    onOpenChange(false);
+    setIsDirty(false);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md w-full">
-        <DialogHeader>
-          <DialogTitle className="text-sm font-semibold">Upload {config.title}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-1 text-xs">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground" htmlFor="docNumber">{config.fieldLabel}</label>
-            <Input id="docNumber" value={docNumber} onChange={(e) => { setDocNumber(e.target.value); setIsDirty(true); }} className="h-9 text-sm" placeholder="e.g. A-12345678" />
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 w-full">
-            <div className="flex-1 space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="issueDate">Issue Date</label>
-              <DatePicker 
-                id="issueDate" 
-                value={issueDate} 
-                onChange={(e) => { setIssueDate(e.target.value); setIsDirty(true); }} 
-              />
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold">Upload {config.title}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4 py-1 text-xs">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="docNumber">{config.fieldLabel}</label>
+              <Input id="docNumber" value={docNumber} onChange={(e) => { setDocNumber(e.target.value); setIsDirty(true); }} className="h-9 text-sm" placeholder="e.g. A-12345678" />
             </div>
-            <div className="flex-1 space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="expiryDate">Expiry Date</label>
-              <DatePicker 
-                id="expiryDate" 
-                value={expiryDate} 
-                onChange={(e) => { setExpiryDate(e.target.value); setIsDirty(true); }} 
-                error={
-                  issueDate && expiryDate && new Date(expiryDate) <= new Date(issueDate) 
-                    ? "Expiry date must be after issue date" 
-                    : undefined
-                }
-              />
+
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 w-full">
+              <div className="flex-1 space-y-1.5">
+                <label className="text-xs font-medium text-foreground" htmlFor="issueDate">Issue Date</label>
+                <DatePicker 
+                  id="issueDate" 
+                  value={issueDate} 
+                  onChange={(e) => { setIssueDate(e.target.value); setIsDirty(true); }} 
+                />
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <label className="text-xs font-medium text-foreground" htmlFor="expiryDate">Expiry Date</label>
+                <DatePicker 
+                  id="expiryDate" 
+                  value={expiryDate} 
+                  onChange={(e) => { setExpiryDate(e.target.value); setIsDirty(true); }} 
+                  error={
+                    issueDate && expiryDate && new Date(expiryDate) <= new Date(issueDate) 
+                      ? "Expiry date must be after issue date" 
+                      : undefined
+                  }
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground" htmlFor="pdfFile">Select PDF Document</label>
-            <Input id="pdfFile" type="file" accept=".pdf" onChange={handleFileChange} className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-primary/10 file:text-primary file:hover:bg-primary/20" />
-            <p className="text-[10px] text-muted-foreground">PDF formats only. Max file size 2MB.</p>
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="pdfFile">Select PDF Document</label>
+              <Input id="pdfFile" type="file" accept=".pdf" onChange={handleFileChange} className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-primary/10 file:text-primary file:hover:bg-primary/20" />
+              <p className="text-[10px] text-muted-foreground">PDF formats only. Max file size 2MB.</p>
+            </div>
 
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => handleClose(false)}>Cancel</Button>
-            <AsyncActionButton
-              type="submit"
-              size="sm"
-              isLoading={isSubmitting}
-              isSuccess={uploadSuccess}
-              isError={uploadError}
-              idleText="Submit Version"
-              loadingText="Uploading..."
-              successText="Changes saved"
-              errorText="Try Again"
-            />
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => handleClose(false)}>Cancel</Button>
+              <AsyncActionButton
+                type="submit"
+                size="sm"
+                isLoading={isSubmitting}
+                isSuccess={uploadSuccess}
+                isError={uploadError}
+                idleText="Submit Version"
+                loadingText="Uploading..."
+                successText="Changes saved"
+                errorText="Try Again"
+              />
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmationDialog
+        open={isConfirmDiscardOpen}
+        title="Discard Document Changes?"
+        description="You have unsaved changes in this document upload form. Are you sure you want to discard your input?"
+        confirmText="Discard Changes"
+        cancelText="Keep Editing"
+        variant="destructive"
+        onClose={() => setIsConfirmDiscardOpen(false)}
+        onConfirm={handleConfirmDiscard}
+      />
+    </>
   );
 }
 

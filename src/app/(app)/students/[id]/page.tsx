@@ -15,9 +15,20 @@ import {
   Check, 
   X,
   Building,
-  Loader2
+  Loader2,
+  Bell,
+  Calendar,
+  Send,
+  RotateCw,
+  ExternalLink
 } from "lucide-react";
-import { getStudentDetailsAction, updateStudentAction, updateDocumentVerificationAction } from "@/app/(app)/students/actions";
+import { 
+  getStudentDetailsAction, 
+  updateStudentAction, 
+  updateDocumentVerificationAction,
+  getStudentReminderScheduleAction,
+  triggerReminderDispatchAction
+} from "@/app/(app)/students/actions";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +40,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { RejectionDialog } from "@/components/ui/rejection-dialog";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
 import { AcademicProgram } from "@/domain/academic-programs/types";
+import { 
+  StudentReminderScheduleResponse, 
+  ReminderStatus 
+} from "@/domain/notifications/types/reminder.types";
 
 export interface StudentDocument {
   number: string;
@@ -82,7 +99,12 @@ export interface StudentProfile {
   embassy: {
     name: string;
     phone?: string;
+    email?: string;
     address: string;
+    city?: string;
+    country?: string;
+    website?: string;
+    contactPerson?: string;
   };
 }
 
@@ -101,6 +123,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
   // Academic Programs State
   const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
 
+  // Expiry-Driven Reminder Schedule State
+  const [reminderSchedule, setReminderSchedule] = React.useState<StudentReminderScheduleResponse | null>(null);
+  const [isLoadingReminders, setIsLoadingReminders] = React.useState(true);
+  const [selectedReminderDoc, setSelectedReminderDoc] = React.useState<"visa" | "passport" | "efrro">("visa");
+  const [isDispatchingReminder, setIsDispatchingReminder] = React.useState<string | null>(null);
+
+  // Unsaved Changes Confirmation Dialog State
+  const [isConfirmDiscardOpen, setIsConfirmDiscardOpen] = React.useState(false);
+
+  // Document Rejection Dialog State
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = React.useState(false);
+  const [rejectDocType, setRejectDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
+  const [isRejecting, setIsRejecting] = React.useState(false);
+
   const loadStudentData = React.useCallback(async () => {
     try {
       setIsLoadingStudent(true);
@@ -118,10 +154,25 @@ export default function StudentDetailsPage({ params }: PageProps) {
     }
   }, [studentId]);
 
+  const loadReminderSchedule = React.useCallback(async () => {
+    try {
+      setIsLoadingReminders(true);
+      const res = await getStudentReminderScheduleAction(studentId);
+      if (res.success && res.schedule) {
+        setReminderSchedule(res.schedule);
+      }
+    } catch (err) {
+      console.error("[REMINDERS_LOAD_ERROR]", err);
+    } finally {
+      setIsLoadingReminders(false);
+    }
+  }, [studentId]);
+
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStudentData();
-  }, [loadStudentData]);
+    loadReminderSchedule();
+  }, [loadStudentData, loadReminderSchedule]);
 
   React.useEffect(() => {
     async function loadPrograms() {
@@ -146,7 +197,15 @@ export default function StudentDetailsPage({ params }: PageProps) {
     localAddress: "",
     currentSemester: 1,
     academicStatus: "good_standing" as StudentProfile["academicStatus"],
-    status: "active" as StudentProfile["status"]
+    status: "active" as StudentProfile["status"],
+    embassyName: "",
+    embassyAddress: "",
+    embassyCity: "",
+    embassyCountry: "",
+    embassyPhone: "",
+    embassyEmail: "",
+    embassyWebsite: "",
+    embassyContactPerson: ""
   });
 
   const openEditDialog = () => {
@@ -161,7 +220,15 @@ export default function StudentDetailsPage({ params }: PageProps) {
         localAddress: student.localAddress || "",
         currentSemester: student.currentSemester,
         academicStatus: student.academicStatus,
-        status: student.status
+        status: student.status,
+        embassyName: student.embassy?.name && student.embassy.name !== "Not Specified" ? student.embassy.name : "",
+        embassyAddress: student.embassy?.address && student.embassy.address !== "Not Specified" ? student.embassy.address : "",
+        embassyCity: student.embassy?.city || "",
+        embassyCountry: student.embassy?.country || "",
+        embassyPhone: student.embassy?.phone || "",
+        embassyEmail: student.embassy?.email || "",
+        embassyWebsite: student.embassy?.website || "",
+        embassyContactPerson: student.embassy?.contactPerson || ""
       });
       setIsDirty(false);
       setIsEditDialogOpen(true);
@@ -206,13 +273,21 @@ export default function StudentDetailsPage({ params }: PageProps) {
         programCode: editForm.program,
         currentSemester: Number(editForm.currentSemester) || 1,
         academicStatus: editForm.academicStatus,
-        status: editForm.status
+        status: editForm.status,
+        embassyName: editForm.embassyName.trim() || undefined,
+        embassyAddress: editForm.embassyAddress.trim() || undefined,
+        embassyCity: editForm.embassyCity.trim() || undefined,
+        embassyCountry: editForm.embassyCountry.trim() || undefined,
+        embassyPhone: editForm.embassyPhone.trim() || undefined,
+        embassyEmail: editForm.embassyEmail.trim() || undefined,
+        embassyWebsite: editForm.embassyWebsite.trim() || undefined,
+        embassyContactPerson: editForm.embassyContactPerson.trim() || undefined
       });
 
       if (res.success) {
         setSaveSuccess(true);
         toast.success("Profile Updated", { description: "Student information updated successfully in database." });
-        await loadStudentData();
+        await Promise.all([loadStudentData(), loadReminderSchedule()]);
         setTimeout(() => {
           setIsEditDialogOpen(false);
           setIsDirty(false);
@@ -234,13 +309,112 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const handleCloseDialog = (open: boolean) => {
     if (!open) {
       if (isDirty) {
-        const confirmClose = window.confirm("You have unsaved changes. Are you sure you want to discard them?");
-        if (!confirmClose) return;
+        setIsConfirmDiscardOpen(true);
+        return;
       }
       setIsEditDialogOpen(false);
       setIsDirty(false);
     } else {
       openEditDialog();
+    }
+  };
+
+  const handleConfirmDiscard = () => {
+    setIsConfirmDiscardOpen(false);
+    setIsEditDialogOpen(false);
+    setIsDirty(false);
+  };
+
+  const handleCancelDiscard = () => {
+    setIsConfirmDiscardOpen(false);
+  };
+
+  // Document verification handlers using ISCMS modals
+  const handleOpenRejectDialog = (docType: "passport" | "visa" | "efrro") => {
+    setRejectDocType(docType);
+    setIsRejectDialogOpen(true);
+  };
+
+  const handleConfirmRejection = async (reason: string) => {
+    if (!rejectDocType) return;
+    setIsRejecting(true);
+    try {
+      const res = await updateDocumentVerificationAction(
+        studentId,
+        rejectDocType,
+        null,
+        "rejected",
+        reason
+      );
+
+      if (res.success) {
+        toast.success("Document Rejected", {
+          description: "Document marked as rejected and audit entry logged."
+        });
+        setIsRejectDialogOpen(false);
+        setRejectDocType(null);
+        await Promise.all([loadStudentData(), loadReminderSchedule()]);
+      } else {
+        toast.error("Rejection Failed", {
+          description: res.error || "Unable to update document verification status."
+        });
+      }
+    } catch (err) {
+      toast.error("Database Error", {
+        description: err instanceof Error ? err.message : "Unable to communicate with database."
+      });
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  const handleApproveDocument = async (docType: "passport" | "visa" | "efrro") => {
+    try {
+      const res = await updateDocumentVerificationAction(
+        studentId,
+        docType,
+        null,
+        "verified",
+        undefined
+      );
+
+      if (res.success) {
+        toast.success("Document Approved", {
+          description: "Document verified successfully. Compliance standing updated."
+        });
+        await Promise.all([loadStudentData(), loadReminderSchedule()]);
+      } else {
+        toast.error("Verification Update Failed", {
+          description: res.error || "Unable to update document verification status."
+        });
+      }
+    } catch (err) {
+      toast.error("Database Error", {
+        description: err instanceof Error ? err.message : "Unable to communicate with database."
+      });
+    }
+  };
+
+  const handleManualDispatch = async (docType: "passport" | "visa" | "efrro", thresholdDays: number, ruleId: string) => {
+    setIsDispatchingReminder(ruleId);
+    try {
+      const res = await triggerReminderDispatchAction(studentId, docType, thresholdDays);
+      if (res.success) {
+        toast.success("Reminder Alert Dispatched", {
+          description: `Dispatched ${thresholdDays}-day reminder for ${docType.toUpperCase()}.`
+        });
+        await loadReminderSchedule();
+      } else {
+        toast.error("Dispatch Failed", {
+          description: res.error || "Unable to dispatch reminder notification."
+        });
+      }
+    } catch (err) {
+      toast.error("Dispatch Error", {
+        description: err instanceof Error ? err.message : "Failed to dispatch reminder."
+      });
+    } finally {
+      setIsDispatchingReminder(null);
     }
   };
 
@@ -268,170 +442,135 @@ export default function StudentDetailsPage({ params }: PageProps) {
     );
   }
 
-
-
-  // Document verification handler
-  const handleVerifyDocument = async (docType: "passport" | "visa" | "efrro", status: "verified" | "rejected") => {
-    let rejectionReason: string | undefined;
-    if (status === "rejected") {
-      const reason = window.prompt("Enter reason for document rejection:");
-      if (reason === null) return; // cancelled
-      rejectionReason = reason.trim() || "Document rejected by administrator during compliance check";
-    }
-
-    try {
-      const res = await updateDocumentVerificationAction(
-        studentId,
-        docType,
-        null,
-        status,
-        rejectionReason
-      );
-
-      if (res.success) {
-        toast.success(`Document marked as ${status}`, {
-          description: `Compliance standing updated successfully.`
-        });
-        await loadStudentData();
-      } else {
-        toast.error("Verification Update Failed", {
-          description: res.error || "Unable to update document verification status."
-        });
-      }
-    } catch (err) {
-      toast.error("Database Error", {
-        description: err instanceof Error ? err.message : "Unable to communicate with database."
-      });
-    }
-  };
-
   const getComplianceHeaderBadge = (status: StudentProfile["complianceStatus"]) => {
     switch (status) {
       case "compliant":
-        return <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-semibold px-3 py-1 text-sm h-7 rounded-md">Compliant</Badge>;
+        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs px-2.5 py-0.5">Compliant</Badge>;
       case "warning":
-        return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-semibold px-3 py-1 text-sm h-7 rounded-md">Warning State</Badge>;
-      case "non_compliant":
-        return <Badge variant="destructive" className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 font-semibold px-3 py-1 text-sm h-7 rounded-md">Non-Compliant</Badge>;
+        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs px-2.5 py-0.5">Warning / Expiring Soon</Badge>;
       case "expired":
-        return <Badge variant="destructive" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 font-semibold px-3 py-1 text-sm h-7 rounded-md">Expired / Suspended</Badge>;
+        return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2.5 py-0.5">Expired Document</Badge>;
+      default:
+        return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2.5 py-0.5">Non-Compliant</Badge>;
     }
   };
 
-  const getDocStatusIcon = (doc: StudentDocument | undefined, daysLeft?: number) => {
-    if (!doc || !doc.hasUploadedDocument || doc.verificationStatus === "not_uploaded") {
-      return <FileText className="h-5 w-5 text-muted-foreground/60" />;
+  const getDocStatusIcon = (doc: StudentDocument, daysLeft?: number) => {
+    if (!doc.hasUploadedDocument || doc.verificationStatus === "not_uploaded") {
+      return <div className="h-3 w-3 rounded-full bg-muted-foreground/40 shrink-0" />;
     }
-    
-    const isExpired = daysLeft !== undefined && daysLeft < 0;
-    if (isExpired) return <XCircle className="h-5 w-5 text-rose-500" />;
-    if (doc.verificationStatus === "rejected") return <XCircle className="h-5 w-5 text-red-500" />;
-    if (doc.verificationStatus === "pending") return <AlertTriangle className="h-5 w-5 text-amber-500 animate-pulse" />;
-    return <CheckCircle2 className="h-5 w-5 text-emerald-500" />;
+    if (doc.verificationStatus === "rejected") {
+      return <XCircle className="h-4 w-4 text-destructive shrink-0" />;
+    }
+    if (doc.verificationStatus === "pending") {
+      return <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />;
+    }
+    if (daysLeft !== undefined && daysLeft < 0) {
+      return <XCircle className="h-4 w-4 text-destructive shrink-0" />;
+    }
+    if (daysLeft !== undefined && daysLeft <= 30) {
+      return <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />;
+    }
+    return <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />;
+  };
+
+  const getReminderStatusBadge = (status: ReminderStatus) => {
+    switch (status) {
+      case "DISPATCHED":
+        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-medium">Dispatched</Badge>;
+      case "DUE":
+        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 bg-amber-500/10 text-amber-600 border-amber-500/30 font-semibold animate-pulse">Due</Badge>;
+      case "FAILED":
+        return <Badge variant="destructive" className="text-[9px] px-1.5 py-0.5 h-4 font-medium">Failed</Badge>;
+      case "EXPIRED":
+        return <Badge variant="destructive" className="text-[9px] px-1.5 py-0.5 h-4 bg-rose-500/10 text-rose-600 border-rose-500/20 font-medium">Expired</Badge>;
+      case "NOT_APPLICABLE":
+        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground border-border/60">Not Available</Badge>;
+      case "NOT_DUE":
+      default:
+        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground/80 border-border/50">Not Due</Badge>;
+    }
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in pb-12">
-      {/* Top Breadcrumb Navigation */}
-      <div className="flex items-center justify-between">
-        <Link 
-          href="/students" 
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Students Directory
-        </Link>
-      </div>
-
-      {/* Hero Profile Header */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 p-6 rounded-xl border border-border/80 bg-card/60 backdrop-blur-sm shadow-sm">
-        <div className="flex items-start gap-4">
-          <CountryFlag countryCode={student.nationalityCode} size="lg" className="mt-1 shrink-0 rounded-md border" />
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-h1 font-bold text-foreground">{student.fullName}</h1>
-              <Badge variant="outline" className="text-xs font-mono">
-                {student.registrationNumber}
-              </Badge>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-muted-foreground font-caption">
-              <span className="flex items-center gap-1">
-                <Globe className="h-3.5 w-3.5" />
-                {student.nationalityName}
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <GraduationCap className="h-3.5 w-3.5" />
-                {student.programName}
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1 capitalize">
-                Semester {student.currentSemester} ({student.academicStatus.replace("_", " ")})
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Global Compliance Status & Actions */}
-        <div className="flex flex-col sm:flex-row md:flex-col items-start md:items-end gap-3 shrink-0">
+    <div className="space-y-6">
+      {/* Top Header / Breadcrumb */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-caption">Compliance Standing:</span>
+            <Link 
+              href="/students" 
+              className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to Directory
+            </Link>
+            <span className="text-muted-foreground/40">/</span>
+            <span className="text-xs font-mono font-medium text-foreground">{student.registrationNumber}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <CountryFlag countryCode={student.nationalityCode} size="md" />
+            <h1 className="text-xl font-h1 font-bold text-foreground tracking-tight">{student.fullName}</h1>
             {getComplianceHeaderBadge(student.complianceStatus)}
           </div>
+        </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-xs h-8"
-              onClick={openEditDialog}
-            >
-              Edit Profile
+        {/* Global Action buttons */}
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-xs"
+            onClick={openEditDialog}
+          >
+            Edit Student Profile
+          </Button>
+          <Link href={`/reports/students?id=${student.id}`} passHref>
+            <Button size="sm" variant="default" className="text-xs">
+              Generate PDF Dossier
             </Button>
-          </div>
+          </Link>
         </div>
       </div>
 
-      {/* Tab Navigation Controls */}
-      <div className="flex border-b border-border/60 gap-4 text-xs font-medium">
-        <button
-          onClick={() => setActiveSubTab("immigration")}
-          className={`pb-3 relative transition-colors ${
-            activeSubTab === "immigration" 
-              ? "text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary" 
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Immigration & Documents
-        </button>
-        <button
-          onClick={() => setActiveSubTab("academic")}
-          className={`pb-3 relative transition-colors ${
-            activeSubTab === "academic" 
-              ? "text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary" 
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Academic Details
-        </button>
-        <button
-          onClick={() => setActiveSubTab("contact")}
-          className={`pb-3 relative transition-colors ${
-            activeSubTab === "contact" 
-              ? "text-primary font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary" 
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Contact & Addresses
-        </button>
-      </div>
-
-      {/* Main Grid: Details vs Right Sidebar */}
+      {/* Main Grid View */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column Content */}
+        {/* Left 2 Cols: Tabbed Content & Immigration Documents */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Immigration documents */}
+          {/* Sub-tabs for detailed drill-down */}
+          <div className="flex border-b border-border/60">
+            <button
+              onClick={() => setActiveSubTab("immigration")}
+              className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
+                activeSubTab === "immigration"
+                  ? "border-primary text-foreground font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Legal & Immigration Papers
+            </button>
+            <button
+              onClick={() => setActiveSubTab("academic")}
+              className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
+                activeSubTab === "academic"
+                  ? "border-primary text-foreground font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Academic Profile
+            </button>
+            <button
+              onClick={() => setActiveSubTab("contact")}
+              className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
+                activeSubTab === "contact"
+                  ? "border-primary text-foreground font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Contact & Addresses
+            </button>
+          </div>
+
+          {/* Tab 1: Immigration Documents */}
           {activeSubTab === "immigration" && (
             <div className="space-y-4">
               {/* PASSPORT DOCUMENT CARD */}
@@ -440,8 +579,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   <div className="flex items-center gap-2">
                     {getDocStatusIcon(student.passport, student.daysToPassportExpiry)}
                     <div>
-                      <CardTitle className="text-sm font-semibold">Passport Document Information</CardTitle>
-                      <CardDescription className="text-[10px] font-caption">Identity verification and international travel documentation.</CardDescription>
+                      <CardTitle className="text-sm font-semibold">Passport Document Details</CardTitle>
+                      <CardDescription className="text-[10px] font-caption">Official primary international identity document.</CardDescription>
                     </div>
                   </div>
 
@@ -466,12 +605,12 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 </CardHeader>
                 <CardContent className="p-4 grid gap-4 sm:grid-cols-2 text-xs">
                   <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Passport Number</span>
+                    <span className="text-muted-foreground block font-caption">Document Number</span>
                     <span className="font-semibold text-foreground block">{student.passport.number || "Not Recorded"}</span>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Place of Issuance</span>
-                    <span className="font-semibold text-foreground block">{student.passport.issuePlace || "N/A"}</span>
+                    <span className="text-muted-foreground block font-caption">Issuing Jurisdiction</span>
+                    <span className="font-semibold text-foreground block">{student.nationalityName} ({student.nationalityCode})</span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-muted-foreground block font-caption">Issue Date</span>
@@ -483,7 +622,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       {student.passport.expiryDate || "Not Recorded"}{" "}
                       {student.passport.expiryDate && student.daysToPassportExpiry !== undefined && (
                         <span className="text-[10px] font-medium font-caption">
-                          ({student.daysToPassportExpiry < 0 ? "Expired" : `${student.daysToPassportExpiry} days left`})
+                          ({student.daysToPassportExpiry < 0 ? `Expired ${Math.abs(student.daysToPassportExpiry)} days ago` : `${student.daysToPassportExpiry} days left`})
                         </span>
                       )}
                     </span>
@@ -504,14 +643,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                             variant="outline" 
                             size="sm" 
                             className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                            onClick={() => handleVerifyDocument("passport", "rejected")}
+                            onClick={() => handleOpenRejectDialog("passport")}
                           >
                             <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
                           </Button>
                           <Button 
                             size="sm" 
                             className="h-7 text-[11px] px-2"
-                            onClick={() => handleVerifyDocument("passport", "verified")}
+                            onClick={() => handleApproveDocument("passport")}
                           >
                             <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
                           </Button>
@@ -601,14 +740,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                             variant="outline" 
                             size="sm" 
                             className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                            onClick={() => handleVerifyDocument("visa", "rejected")}
+                            onClick={() => handleOpenRejectDialog("visa")}
                           >
                             <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
                           </Button>
                           <Button 
                             size="sm" 
                             className="h-7 text-[11px] px-2"
-                            onClick={() => handleVerifyDocument("visa", "verified")}
+                            onClick={() => handleApproveDocument("visa")}
                           >
                             <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
                           </Button>
@@ -695,14 +834,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                               variant="outline" 
                               size="sm" 
                               className="h-7 text-[11px] px-2 text-rose-600 hover:bg-rose-50 border-rose-200 dark:hover:bg-rose-950/20"
-                              onClick={() => handleVerifyDocument("efrro", "rejected")}
+                              onClick={() => handleOpenRejectDialog("efrro")}
                             >
                               <X className="mr-1 h-3.5 w-3.5" /> Reject Upload
                             </Button>
                             <Button 
                               size="sm" 
                               className="h-7 text-[11px] px-2"
-                              onClick={() => handleVerifyDocument("efrro", "verified")}
+                              onClick={() => handleApproveDocument("efrro")}
                             >
                               <Check className="mr-1 h-3.5 w-3.5" /> Approve Verification
                             </Button>
@@ -830,7 +969,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Right Column content (emergency contacts + notifications list) */}
+        {/* Right Column content (emergency contacts + consular details + reminder schedule) */}
         <div className="space-y-6">
           {/* Emergency Contact */}
           <Card className="border border-border/60 shadow-sm">
@@ -863,61 +1002,224 @@ export default function StudentDetailsPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Embassy Details */}
+          {/* Consular & Embassy Details */}
           <Card className="border border-border/60 shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/40 bg-muted/10">
-              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Consular Embassy Info</CardTitle>
+            <CardHeader className="pb-3 border-b border-border/40 bg-muted/10 flex flex-row items-center justify-between">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Consular & Embassy Info</CardTitle>
+              <Button variant="ghost" size="sm" onClick={openEditDialog} className="h-6 text-[10px] px-2 text-primary hover:text-primary">
+                Edit Info
+              </Button>
             </CardHeader>
             <CardContent className="p-4 space-y-3 text-xs">
               <div className="space-y-0.5">
-                <span className="text-muted-foreground block font-caption">Consulate Name</span>
+                <span className="text-muted-foreground block font-caption">Consulate / Embassy Name</span>
                 <span className="font-semibold text-foreground block flex items-center gap-1.5">
-                  <Building className="h-3.5 w-3.5 text-muted-foreground" /> {student.embassy.name}
+                  <Building className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  {student.embassy?.name && student.embassy.name !== "Not Specified" ? student.embassy.name : <span className="text-muted-foreground font-normal">Not Specified</span>}
                 </span>
               </div>
-              {student.embassy.phone && (
-                <div className="space-y-0.5">
-                  <span className="text-muted-foreground block font-caption">Embassy Helpline</span>
-                  <span className="font-semibold text-foreground block flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" /> {student.embassy.phone}
-                  </span>
-                </div>
-              )}
+
               <div className="space-y-0.5">
                 <span className="text-muted-foreground block font-caption">Embassy Address</span>
-                <span className="font-medium text-foreground block leading-normal">{student.embassy.address}</span>
+                <span className="font-medium text-foreground block leading-normal">
+                  {student.embassy?.address && student.embassy.address !== "Not Specified" ? student.embassy.address : <span className="text-muted-foreground font-normal">Not Specified</span>}
+                </span>
               </div>
+
+              {(student.embassy?.city || student.embassy?.country) && (
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  {student.embassy.city && (
+                    <div className="space-y-0.5">
+                      <span className="text-muted-foreground block font-caption">City</span>
+                      <span className="font-medium text-foreground block">{student.embassy.city}</span>
+                    </div>
+                  )}
+                  {student.embassy.country && (
+                    <div className="space-y-0.5">
+                      <span className="text-muted-foreground block font-caption">Country</span>
+                      <span className="font-medium text-foreground block">{student.embassy.country}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-border/30">
+                <div className="space-y-0.5">
+                  <span className="text-muted-foreground block font-caption">Helpline Phone</span>
+                  <span className="font-semibold text-foreground block flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    {student.embassy?.phone || <span className="text-muted-foreground font-normal font-sans">Not Provided</span>}
+                  </span>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-muted-foreground block font-caption">Consular Email</span>
+                  <span className="font-medium text-foreground block flex items-center gap-1.5 truncate">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    {student.embassy?.email || <span className="text-muted-foreground font-normal">Not Provided</span>}
+                  </span>
+                </div>
+              </div>
+
+              {student.embassy?.website && (
+                <div className="space-y-0.5 pt-1 border-t border-border/30">
+                  <span className="text-muted-foreground block font-caption">Official Website</span>
+                  <a
+                    href={student.embassy.website.startsWith("http") ? student.embassy.website : `https://${student.embassy.website}`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="font-medium text-primary hover:underline flex items-center gap-1 text-[11px] truncate"
+                  >
+                    <Globe className="h-3 w-3 shrink-0" />
+                    {student.embassy.website}
+                    <ExternalLink className="h-2.5 w-2.5 shrink-0 ml-0.5 opacity-70" />
+                  </a>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Auto-Reminders checklist */}
-          <Card className="border border-border/60 shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/40 bg-muted/10">
-              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reminder Dispatch Flow</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3.5 text-xs">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground font-caption">90-Day Early Warning</span>
-                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-emerald-500/5 text-emerald-600 border-emerald-500/10">Dispatched</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground font-caption">60-Day Administrative</span>
-                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-emerald-500/5 text-emerald-600 border-emerald-500/10">Dispatched</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground font-caption">30-Day Urgent Renewal</span>
-                  {student.complianceStatus === "warning" || student.complianceStatus === "non_compliant" || student.complianceStatus === "expired" ? (
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-amber-500/5 text-amber-600 border-amber-500/10">Triggered</Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">Pending</Badge>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground font-caption">15-Day Critical Warning</span>
-                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">Pending</Badge>
+          {/* Expiry-Driven Reminder Dispatch Flow */}
+          <Card className="border border-border/60 shadow-sm overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/40 bg-muted/10 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-primary" />
+                <div>
+                  <CardTitle className="text-xs font-semibold text-foreground uppercase tracking-wider">Reminder Dispatch Flow</CardTitle>
+                  <CardDescription className="text-[10px] font-caption">Expiry-driven automatic notification schedule</CardDescription>
                 </div>
               </div>
+              <Button variant="ghost" size="sm" onClick={loadReminderSchedule} disabled={isLoadingReminders} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                <RotateCw className={`h-3.5 w-3.5 ${isLoadingReminders ? "animate-spin" : ""}`} />
+              </Button>
+            </CardHeader>
+
+            <CardContent className="p-4 space-y-4 text-xs">
+              {/* Document Switcher Tabs */}
+              <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border border-border/40">
+                {(["visa", "passport", "efrro"] as const).map((docKey) => {
+                  const group = reminderSchedule?.documents[docKey];
+                  const docLabel = docKey === "visa" ? "Visa" : docKey === "passport" ? "Passport" : "eFRRO";
+                  const isSelected = selectedReminderDoc === docKey;
+                  const isExp = group?.isExpired;
+                  const hasExpiry = Boolean(group?.expiryDate);
+
+                  return (
+                    <button
+                      key={docKey}
+                      type="button"
+                      onClick={() => setSelectedReminderDoc(docKey)}
+                      className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
+                        isSelected 
+                          ? "bg-card text-foreground shadow-xs font-semibold border border-border/60" 
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                      }`}
+                    >
+                      <span>{docLabel}</span>
+                      {hasExpiry ? (
+                        <span className={`h-1.5 w-1.5 rounded-full ${isExp ? "bg-rose-500" : "bg-emerald-500"}`} />
+                      ) : (
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active Driving Expiry Schedule */}
+              {(() => {
+                const activeGroup = reminderSchedule?.documents[selectedReminderDoc];
+                if (!activeGroup) {
+                  return (
+                    <div className="py-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" /> Calculating reminder schedules...
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3.5">
+                    {/* Source Expiry Date Banner */}
+                    <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60 flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold font-caption">
+                          {activeGroup.documentTitle} Expiry
+                        </span>
+                        <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
+                          {activeGroup.expiryDate ? (
+                            <span>{activeGroup.expiryDateFormatted}</span>
+                          ) : (
+                            <span className="text-muted-foreground font-normal italic">Expiry date has not been recorded</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        {activeGroup.expiryDate ? (
+                          activeGroup.isExpired ? (
+                            <Badge variant="destructive" className="text-[10px] h-5">Expired</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] h-5 font-mono bg-primary/5 text-primary border-primary/20">
+                              {activeGroup.daysRemaining} days left
+                            </Badge>
+                          )
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60">
+                            No Expiry
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Milestones Schedule */}
+                    <div className="space-y-2">
+                      {activeGroup.schedule.map((item) => (
+                        <div
+                          key={item.ruleId}
+                          className="p-2.5 rounded-lg border border-border/40 hover:border-border/80 bg-card transition-all space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="space-y-0.5 flex-1 min-w-0">
+                              <span className="font-semibold text-foreground block text-xs truncate">
+                                {item.ruleName}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-caption block">
+                                Scheduled Date: {item.scheduledDate || "Not Available"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {getReminderStatusBadge(item.status)}
+                              {item.status === "DUE" && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleManualDispatch(activeGroup.documentType, item.thresholdDays, item.ruleId)}
+                                  disabled={isDispatchingReminder === item.ruleId}
+                                  className="h-6 px-1.5 text-[10px] bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
+                                  title="Dispatch reminder immediately"
+                                >
+                                  {isDispatchingReminder === item.ruleId ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Send className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {item.statusReason && (
+                            <p className="text-[10px] text-muted-foreground/80 font-caption pt-0.5 border-t border-border/20">
+                              {item.statusReason}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </div>
@@ -925,7 +1227,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
       {/* Edit Student Profile Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={handleCloseDialog}>
-        <DialogContent className="sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold">Edit Student Profile</DialogTitle>
           </DialogHeader>
@@ -1014,7 +1316,95 @@ export default function StudentDetailsPage({ params }: PageProps) {
               <Textarea id="localAddress" value={editForm.localAddress} onChange={handleFormChange} className="min-h-16 text-sm" />
             </div>
 
-            <DialogFooter className="pt-2">
+            {/* Consular & Embassy Information Section */}
+            <div className="pt-3 border-t border-border/60 space-y-3">
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Consular & Embassy Information</h4>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground" htmlFor="embassyName">Consulate / Embassy Name</label>
+                <Input 
+                  id="embassyName" 
+                  value={editForm.embassyName} 
+                  onChange={handleFormChange} 
+                  placeholder="e.g. Embassy of Germany / Consulate General"
+                  className="h-9 text-sm" 
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground" htmlFor="embassyAddress">Embassy / Consulate Address</label>
+                <Textarea 
+                  id="embassyAddress" 
+                  value={editForm.embassyAddress} 
+                  onChange={handleFormChange} 
+                  placeholder="Street address, diplomatic enclave, postal details..."
+                  className="min-h-16 text-sm" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="embassyCity">City</label>
+                  <Input 
+                    id="embassyCity" 
+                    value={editForm.embassyCity} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. New Delhi / Mumbai"
+                    className="h-9 text-sm" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="embassyCountry">Country</label>
+                  <Input 
+                    id="embassyCountry" 
+                    value={editForm.embassyCountry} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. Germany"
+                    className="h-9 text-sm" 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="embassyPhone">Consular Phone Number</label>
+                  <Input 
+                    id="embassyPhone" 
+                    value={editForm.embassyPhone} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. +91 11 4419 9199"
+                    className="h-9 text-sm" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="embassyEmail">Consular Email Address</label>
+                  <Input 
+                    id="embassyEmail" 
+                    type="email" 
+                    value={editForm.embassyEmail} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. visa@newd.diplo.de"
+                    className="h-9 text-sm" 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground" htmlFor="embassyWebsite">Official Consular Website</label>
+                <Input 
+                  id="embassyWebsite" 
+                  value={editForm.embassyWebsite} 
+                  onChange={handleFormChange} 
+                  placeholder="e.g. https://india.diplo.de"
+                  className="h-9 text-sm" 
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3">
               <Button type="button" variant="outline" size="sm" onClick={() => handleCloseDialog(false)}>Cancel</Button>
               <AsyncActionButton
                 type="submit"
@@ -1031,6 +1421,37 @@ export default function StudentDetailsPage({ params }: PageProps) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ISCMS Unsaved Changes Confirmation Modal */}
+      <ConfirmationDialog
+        open={isConfirmDiscardOpen}
+        title="Discard Unsaved Changes?"
+        description="You have unsaved modifications in this student profile. Are you sure you want to discard your input?"
+        confirmText="Discard Changes"
+        cancelText="Keep Editing"
+        variant="warning"
+        icon="warning"
+        onClose={handleCancelDiscard}
+        onConfirm={handleConfirmDiscard}
+      />
+
+      {/* ISCMS Document Rejection Modal */}
+      <RejectionDialog
+        open={isRejectDialogOpen}
+        title={`Reject ${rejectDocType ? rejectDocType.toUpperCase() : "Document"} Verification`}
+        description="Please provide an explanation for rejecting this uploaded document. This note will be recorded in the student audit log and compliance history."
+        placeholder="Explain reason for rejection (e.g. blurred scan, incorrect document details, expired document)..."
+        confirmText="Reject Document"
+        cancelText="Cancel"
+        isLoading={isRejecting}
+        onClose={() => {
+          if (!isRejecting) {
+            setIsRejectDialogOpen(false);
+            setRejectDocType(null);
+          }
+        }}
+        onConfirm={handleConfirmRejection}
+      />
     </div>
   );
 }
