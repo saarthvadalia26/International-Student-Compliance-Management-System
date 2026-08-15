@@ -179,14 +179,31 @@ export class StudentPortalService {
     const { getAdminSupabase } = await import("@/lib/supabase/admin");
     const supabase = getAdminSupabase();
 
+    // 5. Query existing genuine versions to resolve sequence number before setting path
+    const tableName = documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+    const { data: existingVersions } = await supabase
+      .from(tableName)
+      .select("version_number, is_active, file_path")
+      .eq("student_id", studentId)
+      .is("deleted_at", null)
+      .order("version_number", { ascending: false });
+
+    const validExisting = existingVersions?.filter(v => v.file_path && v.file_path !== "pending_upload" && v.file_path !== "null") || [];
+    const highestVer = validExisting.length > 0 ? Math.max(...validExisting.map(v => v.version_number || 0)) : 0;
+    const nextVersion = highestVer + 1;
+
     const ext = isPdf ? "pdf" : isPng ? "png" : "jpg";
     const mimeType = isPdf ? "application/pdf" : isPng ? "image/png" : "image/jpeg";
-    const bucketName = `${documentType}-documents`;
-    const year = new Date().getFullYear();
-    const versionUuid = crypto.randomUUID();
-    const storagePath = `${documentType}/${studentId}/${year}/${versionUuid}.${ext}`;
+    const bucketName = "student-documents";
+    const uniqueFileId = crypto.randomUUID();
+    const storagePath = `students/${studentId}/${documentType}/v${nextVersion}/${uniqueFileId}.${ext}`;
 
-    // 5. Upload file buffer to Storage Provider (R2 / Supabase Storage)
+    // 6. Upload file buffer to Storage Provider (R2 / Supabase Storage)
     try {
       await this.storageProvider.upload(
         bucketName,
@@ -201,24 +218,6 @@ export class StudentPortalService {
     }
 
     try {
-      // 6. Query existing genuine versions to resolve sequence number
-      const tableName = documentType === "passport" 
-        ? "passport_versions" 
-        : documentType === "visa" 
-        ? "visa_versions" 
-        : "efrro_versions";
-
-      const { data: existingVersions } = await supabase
-        .from(tableName)
-        .select("version_number, is_active, file_path")
-        .eq("student_id", studentId)
-        .is("deleted_at", null)
-        .order("version_number", { ascending: false });
-
-      const validExisting = existingVersions?.filter(v => v.file_path && v.file_path !== "pending_upload" && v.file_path !== "null") || [];
-      const highestVer = validExisting.length > 0 ? Math.max(...validExisting.map(v => v.version_number || 0)) : 0;
-      const nextVersion = highestVer + 1;
-
       // Cancel future notifications scheduled for old eFRRO if this is an eFRRO upload
       if (documentType === "efrro") {
         await this.notifRepo.cancelScheduledNotifications(studentId, "efrro");

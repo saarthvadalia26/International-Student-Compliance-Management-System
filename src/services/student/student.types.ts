@@ -112,9 +112,9 @@ export interface RegisterStudentInput {
   admissionDate: Date | string;
   expectedGraduation: Date | string;
   currentSemester?: number;
-  relationshipType: RelationshipType;
-  relationshipName: string;
-  relationshipPhone: string;
+  relationshipType?: RelationshipType;
+  relationshipName?: string;
+  relationshipPhone?: string;
   relationshipEmail?: string;
   relationshipAddress?: string;
   embassyName?: string;

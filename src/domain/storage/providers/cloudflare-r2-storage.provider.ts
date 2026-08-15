@@ -26,11 +26,24 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
     });
   }
 
+  private getTargetBucket(bucket?: string): string {
+    return process.env.R2_BUCKET_NAME?.trim() || bucket || "iscms-documents";
+  }
+
+  private sanitizeError(err: unknown, fallbackMessage: string): Error {
+    const raw = err instanceof Error ? err.message : String(err);
+    const sanitized = raw
+      .replace(/[A-Fa-f0-9]{32,}/g, "[REDACTED]")
+      .replace(/https:\/\/[^@/]+@/g, "https://[REDACTED]@");
+    return new Error(`${fallbackMessage}: ${sanitized}`);
+  }
+
   async upload(bucket: string, path: string, file: Buffer, contentType: string): Promise<string> {
-    console.log(`[CLOUDFLARE_R2] Uploading to ${bucket}/${path}`);
+    const targetBucket = this.getTargetBucket(bucket);
+    console.log(`[CLOUDFLARE_R2] Uploading to ${targetBucket}/${path}`);
     
     const command = new PutObjectCommand({
-      Bucket: bucket,
+      Bucket: targetBucket,
       Key: path,
       Body: file,
       ContentType: contentType,
@@ -40,16 +53,16 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
       await this.s3Client.send(command);
       return path;
     } catch (error: unknown) {
-      const err = error as Error;
-      throw new Error(`[STORAGE_UPLOAD_FAILED] ${err.message}`);
+      throw this.sanitizeError(error, "[STORAGE_UPLOAD_FAILED]");
     }
   }
 
   async download(bucket: string, path: string): Promise<Buffer> {
-    console.log(`[CLOUDFLARE_R2] Downloading from ${bucket}/${path}`);
+    const targetBucket = this.getTargetBucket(bucket);
+    console.log(`[CLOUDFLARE_R2] Downloading from ${targetBucket}/${path}`);
 
     const command = new GetObjectCommand({
-      Bucket: bucket,
+      Bucket: targetBucket,
       Key: path,
     });
 
@@ -64,16 +77,16 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
         stream.on("end", () => resolve(Buffer.concat(chunks)));
       });
     } catch (error: unknown) {
-      const err = error as Error;
-      throw new Error(`[STORAGE_DOWNLOAD_FAILED] ${err.message}`);
+      throw this.sanitizeError(error, "[STORAGE_DOWNLOAD_FAILED]");
     }
   }
 
   async delete(bucket: string, path: string): Promise<boolean> {
-    console.log(`[CLOUDFLARE_R2] Deleting from ${bucket}/${path}`);
+    const targetBucket = this.getTargetBucket(bucket);
+    console.log(`[CLOUDFLARE_R2] Deleting from ${targetBucket}/${path}`);
 
     const command = new DeleteObjectCommand({
-      Bucket: bucket,
+      Bucket: targetBucket,
       Key: path,
     });
 
@@ -88,10 +101,11 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
   }
 
   async generateSignedUrl(bucket: string, path: string, expiresInSeconds: number): Promise<string> {
-    console.log(`[CLOUDFLARE_R2] Generating signed URL for ${bucket}/${path}`);
+    const targetBucket = this.getTargetBucket(bucket);
+    console.log(`[CLOUDFLARE_R2] Generating signed URL for ${targetBucket}/${path} (${expiresInSeconds}s)`);
 
     const command = new GetObjectCommand({
-      Bucket: bucket,
+      Bucket: targetBucket,
       Key: path,
     });
 
@@ -99,23 +113,34 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
       const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn: expiresInSeconds });
       return signedUrl;
     } catch (error: unknown) {
-      const err = error as Error;
-      throw new Error(`[STORAGE_SIGNED_URL_FAILED] ${err.message}`);
+      throw this.sanitizeError(error, "[STORAGE_SIGNED_URL_FAILED]");
     }
   }
 
   async fileExists(bucket: string, path: string): Promise<boolean> {
+    const targetBucket = this.getTargetBucket(bucket);
+    const command = new HeadObjectCommand({
+      Bucket: targetBucket,
+      Key: path,
+    });
+
     try {
-      await this.getMetadata(bucket, path);
+      await this.s3Client.send(command);
       return true;
-    } catch {
+    } catch (error: unknown) {
+      const errorName = (error as { name?: string })?.name || "";
+      const statusCode = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+      if (errorName === "NotFound" || statusCode === 404 || errorName === "NoSuchKey") {
+        return false;
+      }
       return false;
     }
   }
 
   async getMetadata(bucket: string, path: string): Promise<StorageMetadata> {
+    const targetBucket = this.getTargetBucket(bucket);
     const command = new HeadObjectCommand({
-      Bucket: bucket,
+      Bucket: targetBucket,
       Key: path,
     });
 
@@ -127,8 +152,7 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
         lastModified: response.LastModified || new Date()
       };
     } catch (error: unknown) {
-      const err = error as Error;
-      throw new Error(`[STORAGE_METADATA_FAILED] ${err.message}`);
+      throw this.sanitizeError(error, "[STORAGE_METADATA_FAILED]");
     }
   }
 }

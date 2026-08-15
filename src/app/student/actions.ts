@@ -453,3 +453,70 @@ export async function cancelDocumentReplacementRequestAction(
   }
 }
 
+/**
+ * Server action: Securely get presigned URL for a student's own uploaded document version
+ * Strict RBAC: Student can ONLY view/download documents attached to their own verified studentId.
+ */
+export async function getStudentDocumentDownloadUrlAction(
+  jwt: string,
+  documentType: "passport" | "visa" | "efrro",
+  versionId: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const studentId = await verifyUserAndGetStudentId(jwt);
+    if (!studentId) {
+      return { success: false, error: "Authentication required." };
+    }
+
+    const { getAdminSupabase } = await import("@/lib/supabase/admin");
+    const { StorageProviderFactory } = await import("@/domain/storage/factory");
+    const adminSupabase = getAdminSupabase();
+
+    const tableName = documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+    const { data: ver, error: verErr } = await adminSupabase
+      .from(tableName)
+      .select("id, student_id, file_path")
+      .eq("id", versionId)
+      .eq("student_id", studentId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (verErr || !ver) {
+      return { success: false, error: "Document version not found or access denied." };
+    }
+
+    const cleanPath = ver.file_path?.trim();
+    if (!cleanPath || cleanPath === "pending_upload" || cleanPath === "null") {
+      return { success: false, error: "No physical copy has been uploaded for this document record." };
+    }
+
+    const storage = StorageProviderFactory.getProvider();
+    const exists = await storage.fileExists("student-documents", cleanPath);
+    if (!exists) {
+      return { success: false, error: "The requested document file could not be located in storage." };
+    }
+
+    const signedUrl = await storage.generateSignedUrl("student-documents", cleanPath, 300);
+
+    // Log student activity
+    await portalRepo.logActivity(
+      studentId,
+      `VIEWED_${documentType.toUpperCase()}_DOCUMENT`,
+      null,
+      null,
+      { versionId, filePath: cleanPath }
+    ).catch(() => null);
+
+    return { success: true, url: signedUrl };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+

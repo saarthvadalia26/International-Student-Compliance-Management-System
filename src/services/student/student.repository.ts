@@ -186,24 +186,29 @@ export class SupabaseStudentRepository implements IStudentRepository {
         throw new Error(`Failed to create academic record: ${academicError?.message || "Unknown database error"}`);
       }
 
-      // 5. Insert into student_relationships table (Emergency Contact)
-      const { data: relData, error: relError } = await supabase
-        .from("student_relationships")
-        .insert({
-          student_id: studentId,
-          relationship_type: input.relationshipType || "parent",
-          name: input.relationshipName.trim(),
-          phone: input.relationshipPhone.trim(),
-          email: input.relationshipEmail?.trim() || null,
-          address: input.relationshipAddress?.trim() || null,
-          created_by: actorId,
-          updated_by: actorId
-        })
-        .select()
-        .single();
+      // 5. Insert into student_relationships table if emergency contact provided
+      let relData = null;
+      if (input.relationshipName && input.relationshipName.trim() && input.relationshipPhone && input.relationshipPhone.trim()) {
+        const { data: insertedRel, error: relError } = await supabase
+          .from("student_relationships")
+          .insert({
+            student_id: studentId,
+            relationship_type: input.relationshipType || "parent",
+            name: input.relationshipName.trim(),
+            phone: input.relationshipPhone.trim(),
+            email: input.relationshipEmail?.trim() || null,
+            address: input.relationshipAddress?.trim() || null,
+            created_by: actorId,
+            updated_by: actorId
+          })
+          .select()
+          .single();
 
-      if (relError || !relData) {
-        console.warn("[STUDENT_REPOSITORY] Warning: Failed to insert emergency contact:", relError);
+        if (relError) {
+          console.warn("[STUDENT_REPOSITORY] Warning: Failed to insert emergency contact:", relError);
+        } else {
+          relData = insertedRel;
+        }
       }
 
       // 6. Optional: Insert into student_embassy table if provided

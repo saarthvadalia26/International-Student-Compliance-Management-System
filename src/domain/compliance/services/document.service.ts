@@ -266,10 +266,12 @@ export class ComplianceDocumentService {
     const highestVersion = validHistory.length > 0 ? Math.max(...validHistory.map(v => v.versionNumber || 0)) : 0;
     const nextVersion = highestVersion + 1;
 
-    // 3. Upload file to secure isolated storage folder
+    // 5. Upload file to secure isolated storage folder
+    const ext = fileType === "application/pdf" ? "pdf" : fileType === "image/png" ? "png" : "jpg";
+    const uniqueFileId = crypto.randomUUID();
     const storagePath = await this.storageProvider.upload(
-      "student-documents", // Ensure it uploads to the correct bucket
-      `${type}/${studentId}/v${nextVersion}_${fileName}`,
+      "student-documents",
+      `students/${studentId}/${type}/v${nextVersion}/${uniqueFileId}.${ext}`,
       fileBuffer,
       fileType
     );

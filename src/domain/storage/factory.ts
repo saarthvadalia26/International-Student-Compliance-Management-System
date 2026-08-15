@@ -15,8 +15,13 @@ export class StorageProviderFactory {
     }
 
     const providerType = process.env.STORAGE_PROVIDER?.toLowerCase();
+    const hasR2Env = Boolean(
+      process.env.R2_ACCOUNT_ID?.trim() &&
+      process.env.R2_ACCESS_KEY_ID?.trim() &&
+      process.env.R2_SECRET_ACCESS_KEY?.trim()
+    );
 
-    if (providerType === "cloudflare-r2") {
+    if (providerType === "cloudflare-r2" || hasR2Env) {
       console.log("[STORAGE_FACTORY] Initializing Cloudflare R2 Storage Provider");
       this.instance = new CloudflareR2StorageProvider();
     } else {

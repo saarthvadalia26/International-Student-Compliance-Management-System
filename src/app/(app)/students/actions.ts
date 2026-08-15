@@ -1151,9 +1151,11 @@ export async function uploadDocumentRenewalAction(
       : 0;
     const nextVersionNumber = highestVersionNum + 1;
 
-    // Upload to storage provider with immutable version path
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const storagePath = `students/${studentId}/${documentType}/v${nextVersionNumber}/${Date.now()}_${safeFileName}`;
+    // Upload to storage provider with deterministic, collision-free canonical path
+    const safeExt = file.name.split(".").pop()?.toLowerCase() || "pdf";
+    const ext = ["pdf", "jpg", "jpeg", "png"].includes(safeExt) ? safeExt : "pdf";
+    const uniqueFileId = crypto.randomUUID();
+    const storagePath = `students/${studentId}/${documentType}/v${nextVersionNumber}/${uniqueFileId}.${ext}`;
     const fileBuffer = Buffer.from(await file.arrayBuffer());
 
     try {
@@ -1192,6 +1194,15 @@ export async function uploadDocumentRenewalAction(
       .single();
 
     if (insertErr || !newVer) {
+      // Atomic Compensation: remove uploaded object from R2 if database persistence fails
+      try {
+        const storage = StorageProviderFactory.getProvider();
+        await storage.delete("student-documents", storagePath);
+        console.log(`[STORAGE_COMPENSATION] Cleaned up orphaned file ${storagePath} after database insert failure.`);
+      } catch (delErr) {
+        console.error("[STORAGE_COMPENSATION_ERROR] Failed to roll back orphaned storage file:", delErr);
+      }
+
       if (insertErr?.code === "23514" || insertErr?.message?.includes("chk_")) {
         return { success: false, error: "The new expiration date must be strictly after the document issue date." };
       }
@@ -1725,6 +1736,7 @@ export async function triggerReminderDispatchAction(
 
 /**
  * Server Action: Get pre-signed download URL for a specific document version file.
+ * Verifies staff authorization, checks storage existence in Cloudflare R2, and logs access audit.
  */
 export async function getDocumentDownloadUrlAction(
   filePath: string
@@ -1736,12 +1748,47 @@ export async function getDocumentDownloadUrlAction(
       return { success: false, error: "Authentication required to access document files." };
     }
 
-    if (!filePath || filePath.trim() === "" || filePath === "pending_upload" || filePath === "null") {
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: You do not have permission to view or download compliance documents." };
+    }
+
+    const cleanPath = filePath?.trim();
+    if (!cleanPath || cleanPath === "pending_upload" || cleanPath === "null") {
       return { success: false, error: "No physical file is associated with this document record." };
     }
 
+    if (cleanPath.includes("..") || cleanPath.startsWith("/")) {
+      return { success: false, error: "Invalid document storage path." };
+    }
+
     const storage = StorageProviderFactory.getProvider();
-    const signedUrl = await storage.generateSignedUrl("student-documents", filePath.trim(), 300);
+    
+    // Check if the object actually exists in Cloudflare R2 / Storage
+    const exists = await storage.fileExists("student-documents", cleanPath);
+    if (!exists) {
+      console.warn(`[STORAGE_MISSING_OBJECT] Document file not found in storage at path: ${cleanPath}`);
+      return { success: false, error: "The requested document file could not be located in storage." };
+    }
+
+    const signedUrl = await storage.generateSignedUrl("student-documents", cleanPath, 300);
+
+    // Audit log document access
+    try {
+      const adminSupabase = getAdminSupabase();
+      await adminSupabase.from("audit_log").insert({
+        actor_id: user.id,
+        action: "DOCUMENT_ACCESSED",
+        resource: cleanPath,
+        filters_applied: {
+          accessedBy: user.email || user.id,
+          filePath: cleanPath,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (auditErr: unknown) {
+      console.error("[AUDIT_LOG_ERROR] Failed to log document access:", auditErr);
+    }
 
     return { success: true, url: signedUrl };
   } catch (err: unknown) {

@@ -289,9 +289,9 @@ export default function StudentRegistrationPage() {
       admissionDate: sanitizedAdm,
       expectedGraduation: sanitizedGrad,
       currentSemester: 1,
-      relationshipType: (formData.emergencyContactRelation as "parent" | "guardian" | "local_sponsor") || "parent",
-      relationshipName: formData.emergencyContactName.trim(),
-      relationshipPhone: formData.emergencyContactPhone.trim(),
+      relationshipType: formData.emergencyContactName.trim() ? (formData.emergencyContactRelation as "parent" | "guardian" | "local_sponsor") : undefined,
+      relationshipName: formData.emergencyContactName.trim() || undefined,
+      relationshipPhone: formData.emergencyContactPhone.trim() || undefined,
       passportNumber: formData.passportNumber.trim() || undefined,
       passportIssueDate: sanitizedPassIssue || undefined,
       passportExpiry: sanitizedPassExp || undefined,
@@ -420,7 +420,7 @@ export default function StudentRegistrationPage() {
       <div>
         <h1 className="font-h1 tracking-tight text-foreground text-2xl font-bold">Register International Student</h1>
         <p className="font-caption text-muted-foreground text-xs mt-1">
-          Complete personal records, enrollment criteria, and initialize mandatory document audits.
+          Enter the information currently available. Additional information can be added later from the student profile.
         </p>
       </div>
 
@@ -553,12 +553,12 @@ export default function StudentRegistrationPage() {
             )}
           </button>
 
-          <div className="mt-8 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] text-amber-700 dark:text-amber-300 font-caption space-y-1">
-            <div className="flex items-center gap-1 font-semibold text-amber-800 dark:text-amber-200">
-              <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" /> Statutory Audit Notice
+          <div className="mt-8 p-3 rounded-lg border border-border/60 bg-muted/20 text-[11px] text-muted-foreground font-caption space-y-1">
+            <div className="flex items-center gap-1 font-semibold text-foreground">
+              <AlertCircle className="h-3.5 w-3.5 text-primary shrink-0" /> Registration Guidance
             </div>
             <p className="leading-relaxed">
-              Verify passport details directly from official documents. Names must match passport spelling exactly to pass eFRRO verification audits.
+              Enter the information currently available. Additional contact details and physical compliance documents can be added later through the student profile.
             </p>
           </div>
         </div>
@@ -578,7 +578,7 @@ export default function StudentRegistrationPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="fullName">
-                      Full Name (as per Passport) <span className="text-rose-500">*</span>
+                      Full Name (as per Passport)
                     </label>
                     <Input
                       id="fullName"
@@ -597,7 +597,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="nationality">
-                      Nationality <span className="text-rose-500">*</span>
+                      Nationality
                     </label>
                     <NationalitySelector 
                       value={formData.nationality} 
@@ -612,7 +612,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="gender">
-                      Gender <span className="text-rose-500">*</span>
+                      Gender
                     </label>
                     <Select value={formData.gender} onValueChange={(v) => handleSelectChange("gender", v || "")}>
                       <SelectTrigger 
@@ -637,7 +637,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="dateOfBirth">
-                      Date of Birth <span className="text-rose-500">*</span>
+                      Date of Birth
                     </label>
                     <DatePicker
                       id="dateOfBirth"
@@ -668,7 +668,7 @@ export default function StudentRegistrationPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="program">
-                      Academic Program <span className="text-rose-500">*</span>
+                      Academic Program
                     </label>
                     <Select 
                       value={formData.program} 
@@ -683,7 +683,7 @@ export default function StudentRegistrationPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {academicPrograms.map((prog) => (
-                          <SelectItem key={prog.id} value={prog.programName}>
+                           <SelectItem key={prog.id} value={prog.programName}>
                             {prog.programName}
                           </SelectItem>
                         ))}
@@ -717,7 +717,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="admissionDate">
-                      Admission Date <span className="text-rose-500">*</span>
+                      Admission Date
                     </label>
                     <DatePicker
                       id="admissionDate"
@@ -734,7 +734,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="expectedGraduation">
-                      Expected Graduation Date <span className="text-rose-500">*</span>
+                      Expected Graduation Date
                     </label>
                     <DatePicker
                       id="expectedGraduation"
@@ -790,7 +790,7 @@ export default function StudentRegistrationPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">
-                      Home Country Phone Number <span className="text-rose-500">*</span>
+                      Home Country Phone Number
                     </label>
                     <Input
                       id="phoneHome"
@@ -809,7 +809,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="email">
-                      Student Institutional Email <span className="text-rose-500">*</span>
+                      Student Institutional Email
                     </label>
                     <Input
                       id="email"
@@ -848,7 +848,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">
-                      Permanent Address (Home Country) <span className="text-rose-500">*</span>
+                      Permanent Address (Home Country)
                     </label>
                     <Input
                       id="permanentAddress"
@@ -888,7 +888,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactName">
-                      Emergency Contact Name <span className="text-rose-500">*</span>
+                      Emergency Contact Name
                     </label>
                     <Input
                       id="emergencyContactName"
@@ -907,7 +907,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactRelation">
-                      Relationship Type <span className="text-rose-500">*</span>
+                      Relationship Type
                     </label>
                     <Select 
                       value={formData.emergencyContactRelation} 
@@ -934,7 +934,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactPhone">
-                      Emergency Contact Phone Number <span className="text-rose-500">*</span>
+                      Emergency Contact Phone Number
                     </label>
                     <Input
                       id="emergencyContactPhone"
