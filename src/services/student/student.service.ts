@@ -6,6 +6,7 @@ import {
 } from "./student.types";
 import { IStudentRepository, SupabaseStudentRepository } from "./student.repository";
 import { IValidationService, ZodValidationService } from "../validation/validation.service";
+import { AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
 
 export interface IStudentService {
   registerStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile>;
@@ -13,6 +14,21 @@ export interface IStudentService {
   updateStudent(id: string, input: UpdateStudentInput, actorId: string | null): Promise<FullStudentProfile>;
   listStudents(filters: StudentFilterOptions): Promise<FullStudentProfile[]>;
   archiveStudent(id: string, actorId: string | null): Promise<boolean>;
+  recordAcademicAdjustment(
+    studentId: string,
+    input: {
+      adjustmentType: "semester_override" | "semester_repeat" | "academic_leave" | "course_transfer" | "extension" | "admission_date_correction";
+      effectiveDate: string;
+      previousSemester?: number | null;
+      adjustedSemester?: number | null;
+      previousProgramCode?: string | null;
+      newProgramCode?: string | null;
+      reason: string;
+      notes?: string | null;
+    },
+    actorId: string | null
+  ): Promise<{ success: boolean; adjustmentId?: string; currentSemester?: number; expectedGraduation?: string; error?: string }>;
+  getAcademicAdjustments(studentId: string): Promise<AcademicAdjustmentRecord[]>;
 }
 
 export class StudentService implements IStudentService {
@@ -119,4 +135,32 @@ export class StudentService implements IStudentService {
     }
     return this.repository.softDeleteStudent(id.trim(), actorId);
   }
+
+  async recordAcademicAdjustment(
+    studentId: string,
+    input: {
+      adjustmentType: "semester_override" | "semester_repeat" | "academic_leave" | "course_transfer" | "extension" | "admission_date_correction";
+      effectiveDate: string;
+      previousSemester?: number | null;
+      adjustedSemester?: number | null;
+      previousProgramCode?: string | null;
+      newProgramCode?: string | null;
+      reason: string;
+      notes?: string | null;
+    },
+    actorId: string | null
+  ): Promise<{ success: boolean; adjustmentId?: string; currentSemester?: number; expectedGraduation?: string; error?: string }> {
+    if (!studentId || !studentId.trim()) {
+      throw new Error("Invalid student ID.");
+    }
+    return this.repository.recordAcademicAdjustment(studentId.trim(), input, actorId);
+  }
+
+  async getAcademicAdjustments(studentId: string): Promise<AcademicAdjustmentRecord[]> {
+    if (!studentId || !studentId.trim()) {
+      throw new Error("Invalid student ID.");
+    }
+    return this.repository.getAcademicAdjustments(studentId.trim());
+  }
 }
+

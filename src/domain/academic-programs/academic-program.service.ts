@@ -1,15 +1,15 @@
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { AcademicProgram, CreateProgramDto, UpdateProgramDto } from "./types";
+import { AcademicProgram, CreateProgramDto, UpdateProgramDto, SemesterDurationUnit } from "./types";
 
 // In-memory fallback programs list if database table is empty or migrating
 const DEFAULT_FALLBACK_PROGRAMS: AcademicProgram[] = [
-  { id: "fallback-1", programName: "B.Tech in Computer Science & Engineering", programCode: "BTECH_CSE", displayOrder: 1, isActive: true, durationValue: 4, durationUnit: "Years", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-2", programName: "B.Tech in AI & Data Science", programCode: "BTECH_AIDS", displayOrder: 2, isActive: true, durationValue: 4, durationUnit: "Years", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-3", programName: "B.Sc. in Forensic Science", programCode: "BSC_FS", displayOrder: 3, isActive: true, durationValue: 4, durationUnit: "Years", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-4", programName: "M.Sc. in Digital Forensics & Information Security", programCode: "MSC_DFIS", displayOrder: 4, isActive: true, durationValue: 2, durationUnit: "Years", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-5", programName: "M.Tech in Cyber Security", programCode: "MTECH_CS", displayOrder: 5, isActive: true, durationValue: 2, durationUnit: "Years", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-6", programName: "Master of Business Administration (Cyber Security)", programCode: "MBA_CS", displayOrder: 6, isActive: true, durationValue: 2, durationUnit: "Years", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-7", programName: "Doctor of Philosophy (Ph.D.)", programCode: "PHD", displayOrder: 7, isActive: true, durationValue: 6, durationUnit: "Years", academicLevel: "PhD", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-1", programName: "B.Tech in Computer Science & Engineering", programCode: "BTECH_CSE", displayOrder: 1, isActive: true, durationValue: 4, durationUnit: "Years", totalSemesters: 8, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-2", programName: "B.Tech in AI & Data Science", programCode: "BTECH_AIDS", displayOrder: 2, isActive: true, durationValue: 4, durationUnit: "Years", totalSemesters: 8, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-3", programName: "B.Sc. in Forensic Science", programCode: "BSC_FS", displayOrder: 3, isActive: true, durationValue: 4, durationUnit: "Years", totalSemesters: 6, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-4", programName: "M.Sc. in Digital Forensics & Information Security", programCode: "MSC_DFIS", displayOrder: 4, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-5", programName: "M.Tech in Cyber Security", programCode: "MTECH_CS", displayOrder: 5, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-6", programName: "Master of Business Administration (Cyber Security)", programCode: "MBA_CS", displayOrder: 6, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-7", programName: "Doctor of Philosophy (Ph.D.)", programCode: "PHD", displayOrder: 7, isActive: true, durationValue: 6, durationUnit: "Years", totalSemesters: 6, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PhD", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 export class AcademicProgramService {
@@ -61,6 +61,32 @@ export class AcademicProgramService {
   }
 
   /**
+   * Find program by code or name
+   */
+  public async getProgramByCodeOrName(codeOrName: string): Promise<AcademicProgram | null> {
+    const supabase = getAdminSupabase();
+    const query = codeOrName.trim();
+    if (!query) return null;
+
+    try {
+      const { data } = await supabase
+        .from("academic_programs")
+        .select("*")
+        .or(`program_code.eq.${query},program_name.eq.${query}`)
+        .maybeSingle();
+
+      if (data) return this.mapToDomain(data);
+
+      const fallback = DEFAULT_FALLBACK_PROGRAMS.find(
+        p => p.programCode?.toUpperCase() === query.toUpperCase() || p.programName.toLowerCase() === query.toLowerCase()
+      );
+      return fallback || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Create a new academic program master record
    */
   public async createProgram(dto: CreateProgramDto, userId?: string): Promise<AcademicProgram> {
@@ -71,6 +97,9 @@ export class AcademicProgramService {
     const trimmedCode = dto.programCode?.trim().toUpperCase() || null;
     const durationVal = dto.durationValue && dto.durationValue > 0 ? Number(dto.durationValue) : 4;
     const durationUnit = dto.durationUnit?.trim() || "Years";
+    const totalSemesters = dto.totalSemesters && dto.totalSemesters > 0 ? Number(dto.totalSemesters) : 8;
+    const semesterDuration = dto.semesterDuration && dto.semesterDuration > 0 ? Number(dto.semesterDuration) : 6;
+    const semesterDurationUnit = (dto.semesterDurationUnit?.trim() || "months") as SemesterDurationUnit;
 
     const { data: existingName } = await supabase
       .from("academic_programs")
@@ -101,6 +130,9 @@ export class AcademicProgramService {
       is_active: dto.isActive ?? true,
       duration_value: durationVal,
       duration_unit: durationUnit,
+      total_semesters: totalSemesters,
+      semester_duration: semesterDuration,
+      semester_duration_unit: semesterDurationUnit,
       school_name: dto.schoolName?.trim() || null,
       academic_level: dto.academicLevel?.trim() || null,
       created_by: userId || null
@@ -165,6 +197,9 @@ export class AcademicProgramService {
     if (dto.isActive !== undefined) payload.is_active = dto.isActive;
     if (dto.durationValue !== undefined) payload.duration_value = Number(dto.durationValue);
     if (dto.durationUnit !== undefined) payload.duration_unit = dto.durationUnit;
+    if (dto.totalSemesters !== undefined) payload.total_semesters = Number(dto.totalSemesters);
+    if (dto.semesterDuration !== undefined) payload.semester_duration = Number(dto.semesterDuration);
+    if (dto.semesterDurationUnit !== undefined) payload.semester_duration_unit = dto.semesterDurationUnit;
     if (dto.schoolName !== undefined) payload.school_name = dto.schoolName?.trim() || null;
     if (dto.academicLevel !== undefined) payload.academic_level = dto.academicLevel?.trim() || null;
 
@@ -198,6 +233,9 @@ export class AcademicProgramService {
       isActive: Boolean(row.is_active),
       durationValue: Number(row.duration_value) || 4,
       durationUnit: row.duration_unit ? String(row.duration_unit) : "Years",
+      totalSemesters: Number(row.total_semesters) || 8,
+      semesterDuration: Number(row.semester_duration) || 6,
+      semesterDurationUnit: (row.semester_duration_unit ? String(row.semester_duration_unit) : "months") as SemesterDurationUnit,
       schoolName: row.school_name ? String(row.school_name) : null,
       academicLevel: row.academic_level ? String(row.academic_level) : null,
       createdAt: String(row.created_at || new Date().toISOString()),

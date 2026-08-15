@@ -5,12 +5,15 @@ import { CalendarDateEngine } from "../src/domain/notifications/services/calenda
 interface MockVersionRecord {
   id: string;
   student_id: string;
+  document_type: "passport" | "visa" | "efrro";
   version_number: number;
   is_active: boolean;
   document_number: string;
   issue_date: string;
   expiry_date: string;
+  placeOfIssue?: string | null;
   place_of_issue?: string | null;
+  visaType?: string | null;
   visa_type?: string | null;
   file_path: string;
   verification_status: "pending" | "verified" | "rejected";
@@ -82,8 +85,8 @@ async function simulateUploadRenewal(input: {
     throw new Error("The new expiration date must be strictly after the document issue date.");
   }
 
-  // Find existing highest version
-  const existing = mockVersions.filter(v => v.student_id === studentId && !v.deleted_at);
+  // Find existing highest version for THIS SPECIFIC document type
+  const existing = mockVersions.filter(v => v.student_id === studentId && v.document_type === documentType && !v.deleted_at);
   const highestVersion = existing.length > 0 ? Math.max(...existing.map(v => v.version_number)) : 0;
   const nextVersion = highestVersion + 1;
 
@@ -95,6 +98,7 @@ async function simulateUploadRenewal(input: {
   const newRow: MockVersionRecord = {
     id: `ver_${Date.now()}_${Math.random().toString(36).substring(7)}`,
     student_id: studentId,
+    document_type: documentType,
     version_number: nextVersion,
     is_active: false, // Critical: Remains inactive while pending!
     document_number: documentNumber.trim(),
@@ -319,6 +323,7 @@ async function runLifecycleTests() {
     mockVersions.push({
       id: "ver_v1_seed",
       student_id: testStudentId,
+      document_type: "passport",
       version_number: 1,
       is_active: true,
       document_number: "P12345678",
@@ -349,8 +354,115 @@ async function runLifecycleTests() {
     };
   }
 
+  // --- OPERATION 0: NEW STUDENT ZERO UPLOADS & FIRST UPLOAD V1 (ACCEPTANCE TESTS 1-4) ---
+  console.log("--- Operation 0: New Student Creation & First Upload V1 Lifecycle ---");
+  
+  const freshStudentId = "stu_fresh_registration_999";
+  // 1. Initial student creation (metadata recorded, but NO document files uploaded)
+  mockSnapshots[freshStudentId] = {
+    student_id: freshStudentId,
+    passport_number: "P-FRESH-001",
+    passport_issue_date: "2023-01-01",
+    passport_expiry: "2028-01-01",
+    passport_status: "MISSING",
+    visa_number: "V-FRESH-001",
+    visa_issue_date: "2023-01-01",
+    visa_expiry: "2027-01-01",
+    visa_status: "MISSING",
+    compliance_status: "MISSING",
+    updated_at: new Date().toISOString()
+  };
+
+  const freshVersions = mockVersions.filter(v => v.student_id === freshStudentId);
+  assert(freshVersions.length === 0, "Test 1: New student has zero document version rows (no placeholder v1 consumed)");
+
+  // Check UI state before upload: versionNumber is null, status is not_uploaded
+  const passportVersionBefore = freshVersions.find(v => v.student_id === freshStudentId);
+  const isPassportUploaded = Boolean(passportVersionBefore?.file_path && passportVersionBefore.file_path !== "pending_upload");
+  const passportVersionNumber = isPassportUploaded ? passportVersionBefore?.version_number : null;
+
+  assert(passportVersionNumber === null, "Test 1: Passport version is null/none before first upload");
+  assert(isPassportUploaded === false, "Test 1: Passport is NOT marked as uploaded");
+
+  // 2. First actual Passport upload -> MUST BE v1
+  const firstPassportUpload = await simulateUploadRenewal({
+    studentId: freshStudentId,
+    documentType: "passport",
+    documentNumber: "P-FRESH-001",
+    issueDate: "2023-01-01",
+    expiryDate: "2028-01-01",
+    placeOfIssue: "London",
+    fileName: "passport_first_scan.pdf",
+    fileBuffer: Buffer.from("%PDF-1.4 Initial Passport"),
+    contentType: "application/pdf",
+    actorId: staffUserId
+  });
+
+  assert(firstPassportUpload.success === true, "First passport upload succeeds");
+  assert(firstPassportUpload.versionNumber === 1, "Test 2: First passport upload MUST BE v1 (NOT v2)");
+  assert(firstPassportUpload.record.version_number === 1, "First passport record has version_number: 1");
+
+  // 3. First actual Visa upload -> MUST BE v1
+  const firstVisaUpload = await simulateUploadRenewal({
+    studentId: freshStudentId,
+    documentType: "visa",
+    documentNumber: "V-FRESH-001",
+    issueDate: "2023-01-01",
+    expiryDate: "2027-01-01",
+    visaType: "Student (S-1)",
+    fileName: "visa_first_scan.pdf",
+    fileBuffer: Buffer.from("%PDF-1.4 Initial Visa"),
+    contentType: "application/pdf",
+    actorId: staffUserId
+  });
+
+  assert(firstVisaUpload.success === true, "First visa upload succeeds");
+  assert(firstVisaUpload.versionNumber === 1, "Test 3: First visa upload MUST BE v1 (NOT v2)");
+
+  // 4. First actual eFRRO upload -> MUST BE v1
+  const firstEfrroUpload = await simulateUploadRenewal({
+    studentId: freshStudentId,
+    documentType: "efrro",
+    documentNumber: "EFRRO-FRESH-001",
+    issueDate: "2023-02-01",
+    expiryDate: "2026-12-31",
+    fileName: "efrro_first_scan.pdf",
+    fileBuffer: Buffer.from("%PDF-1.4 Initial eFRRO"),
+    contentType: "application/pdf",
+    actorId: staffUserId
+  });
+
+  assert(firstEfrroUpload.success === true, "First eFRRO upload succeeds");
+  assert(firstEfrroUpload.versionNumber === 1, "Test 4: First eFRRO upload MUST BE v1 (NOT v2)");
+
+  // 5. Approve Passport v1
+  await simulateVerification({
+    studentId: freshStudentId,
+    documentType: "passport",
+    versionId: firstPassportUpload.record.id,
+    status: "verified",
+    actorId: staffUserId
+  });
+
+  // 6. Replacement Passport upload -> MUST BE v2
+  const secondPassportUpload = await simulateUploadRenewal({
+    studentId: freshStudentId,
+    documentType: "passport",
+    documentNumber: "P-RENEWED-002",
+    issueDate: "2028-01-02",
+    expiryDate: "2038-01-01",
+    placeOfIssue: "London",
+    fileName: "passport_renewed_scan.pdf",
+    fileBuffer: Buffer.from("%PDF-1.4 Renewed Passport"),
+    contentType: "application/pdf",
+    actorId: staffUserId
+  });
+
+  assert(secondPassportUpload.success === true, "Replacement passport upload succeeds");
+  assert(secondPassportUpload.versionNumber === 2, "Test 5: Replacement passport upload MUST BE v2");
+
   // --- OPERATION A: METADATA CORRECTION (IN-PLACE FIXES) ---
-  console.log("--- Operation A: Metadata Correction (In-Place Fixes) ---");
+  console.log("\n--- Operation A: Metadata Correction (In-Place Fixes) ---");
   resetState();
 
   const correctRes = await simulateCorrectMetadata({

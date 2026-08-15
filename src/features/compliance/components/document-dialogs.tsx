@@ -58,8 +58,10 @@ export function DocumentUploadDialog({ config, studentId, isOpen, onOpenChange, 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!docNumber.trim() || !issueDate || !expiryDate || !file) {
-      toast.error("Required fields missing", { description: "Please populate document identifier, issue date, expiry date, and choose a file." });
+    if (!docNumber.trim() || !issueDate || !expiryDate || !file || !notes.trim()) {
+      toast.error("Required fields missing", { 
+        description: "Please populate document identifier, issue date, expiry date, physical document file, and mandatory reason." 
+      });
       return;
     }
     
@@ -81,13 +83,13 @@ export function DocumentUploadDialog({ config, studentId, isOpen, onOpenChange, 
       formData.append("expiryDate", expiryDate.trim());
       formData.append("placeOfIssue", placeOfIssue.trim());
       formData.append("visaType", visaType.trim());
-      formData.append("notes", notes.trim() || "Renewed document upload");
+      formData.append("notes", notes.trim());
       formData.append("file", file);
 
       const res = await uploadDocumentRenewalAction(formData);
       if (res.success) {
         setUploadSuccess(true);
-        toast.success(`New ${config.title} Uploaded`, {
+        toast.success(`New ${config.title} Version Uploaded`, {
           description: `Version v${res.versionNumber || "new"} uploaded and set to Pending Verification. Existing active document remains active until approved.`
         });
         
@@ -137,13 +139,15 @@ export function DocumentUploadDialog({ config, studentId, isOpen, onOpenChange, 
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center gap-2">
               <UploadCloud className="h-4 w-4 text-primary" />
-              Upload New {config.title}
+              New {config.title} Version
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 py-1 text-xs">
-            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-muted-foreground text-xs leading-relaxed">
-              Upload the newly issued {config.title.toLowerCase()} to create a new document version. The existing document will remain active in the student&apos;s record until this new document is reviewed and approved.
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-muted-foreground text-xs leading-relaxed space-y-1">
+              <div className="font-semibold text-foreground">New Document Version</div>
+              <div>Upload the new physical document to create a new version. A new version cannot be created from metadata changes alone.</div>
+              <div className="text-[11px] text-muted-foreground/80">The existing active document will remain active in the student&apos;s record until this new document version is reviewed and approved.</div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -220,18 +224,18 @@ export function DocumentUploadDialog({ config, studentId, isOpen, onOpenChange, 
                 type="file" 
                 accept=".pdf,image/jpeg,image/png,image/webp" 
                 onChange={handleFileChange} 
-                className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-primary/10 file:text-primary file:hover:bg-primary/20" 
+                className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-primary/10 file:text-primary file:hover:bg-primary/20 cursor-pointer" 
               />
               <p className="text-[10px] text-muted-foreground">Supported formats: PDF, JPEG, PNG, WEBP. Max file size: 5MB.</p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground" htmlFor="notes">Renewal Notes / Remarks</label>
+              <label className="text-xs font-semibold text-foreground" htmlFor="notes">Reason for Replacement / Update *</label>
               <Textarea 
                 id="notes" 
                 value={notes} 
                 onChange={(e) => { setNotes(e.target.value); setIsDirty(true); }} 
-                placeholder="e.g. Renewal grant from FRRO; newly issued passport from Consulate..." 
+                placeholder="e.g. Student submitted newly issued 10-year passport renewal from Embassy / Consulate..." 
                 className="min-h-16 text-xs" 
               />
             </div>
@@ -244,9 +248,9 @@ export function DocumentUploadDialog({ config, studentId, isOpen, onOpenChange, 
                 isLoading={isSubmitting}
                 isSuccess={uploadSuccess}
                 isError={uploadError}
-                idleText="Upload New Document"
-                loadingText="Uploading..."
-                successText="Uploaded"
+                idleText="Upload & Create Version"
+                loadingText="Uploading Version..."
+                successText="Version Created"
                 errorText="Try Again"
               />
             </DialogFooter>

@@ -25,7 +25,11 @@ import {
   CalendarDays,
   Clock,
   History,
-  UploadCloud
+  UploadCloud,
+  SlidersHorizontal,
+  Sparkles,
+  Layers,
+  GraduationCap
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
@@ -34,8 +38,10 @@ import {
   updateDocumentMetadataAction,
   updateExpiryDateAction,
   getStudentReminderScheduleAction,
-  triggerReminderDispatchAction
+  triggerReminderDispatchAction,
+  recordAcademicAdjustmentAction
 } from "@/app/(app)/students/actions";
+import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,15 +73,15 @@ export interface StudentDocument {
   expiryDate: string;
   placeOfIssue?: string;
   visaType?: string;
-  versionNumber?: number;
+  versionNumber?: number | null;
   verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
-  hasUploadedDocument?: boolean;
+  hasUploadedDocument: boolean;
   uploadedAt?: string | null;
   verifiedAt?: string | null;
   verifiedBy?: string | null;
   rejectionReason?: string | null;
-  filePath?: string | null;
   notes?: string | null;
+  filePath?: string | null;
 }
 
 export interface StudentProfile {
@@ -83,10 +89,30 @@ export interface StudentProfile {
   fullName: string;
   email: string;
   phoneHome: string;
-  phoneLocal?: string;
+  phoneLocal: string;
   permanentAddress: string;
-  localAddress?: string;
+  localAddress: string;
   currentSemester: number;
+  totalSemesters?: number;
+  semesterDuration?: number;
+  semesterDurationUnit?: string;
+  academicStage?: string;
+  academicStageLabel?: string;
+  isCompleted?: boolean;
+  isFinalSemester?: boolean;
+  academicAdjustments?: Array<{
+    id?: string;
+    adjustmentType: string;
+    effectiveDate: string;
+    previousProgramCode?: string | null;
+    newProgramCode?: string | null;
+    previousSemester?: number | null;
+    adjustedSemester?: number | null;
+    reason: string;
+    notes?: string | null;
+    createdBy?: string | null;
+    createdAt?: string;
+  }>;
   academicStatus: "good_standing" | "probation" | "suspended";
   status: "active" | "suspended" | "graduated" | "withdrawn";
   registrationNumber: string;
@@ -190,6 +216,91 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [isSavingDocMetadata, setIsSavingDocMetadata] = React.useState(false);
   const [saveDocSuccess, setSaveDocSuccess] = React.useState(false);
   const [saveDocError, setSaveDocError] = React.useState(false);
+
+  // Academic Adjustment Dialog State
+  const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = React.useState(false);
+  const [adjustmentForm, setAdjustmentForm] = React.useState({
+    adjustmentType: "semester_override" as "semester_override" | "semester_repeat" | "academic_leave" | "course_transfer" | "extension" | "admission_date_correction",
+    effectiveDate: new Date().toISOString().split("T")[0],
+    adjustedSemester: 1,
+    newProgramCode: "",
+    reason: "",
+    notes: ""
+  });
+  const [adjustmentErrors, setAdjustmentErrors] = React.useState<Record<string, string>>({});
+  const [isSavingAdjustment, setIsSavingAdjustment] = React.useState(false);
+  const [saveAdjustmentSuccess, setSaveAdjustmentSuccess] = React.useState(false);
+  const [saveAdjustmentError, setSaveAdjustmentError] = React.useState(false);
+
+  const handleOpenAdjustmentDialog = () => {
+    if (!student) return;
+    setAdjustmentForm({
+      adjustmentType: "semester_override",
+      effectiveDate: new Date().toISOString().split("T")[0],
+      adjustedSemester: student.currentSemester || 1,
+      newProgramCode: student.programCode || "",
+      reason: "",
+      notes: ""
+    });
+    setAdjustmentErrors({});
+    setSaveAdjustmentSuccess(false);
+    setSaveAdjustmentError(false);
+    setIsAdjustmentDialogOpen(true);
+  };
+
+  const handleSaveAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student) return;
+
+    const errors: Record<string, string> = {};
+    if (!adjustmentForm.reason.trim()) {
+      errors.reason = "A mandatory institutional reason is required.";
+    }
+    if (!adjustmentForm.effectiveDate) {
+      errors.effectiveDate = "Effective date is required.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAdjustmentErrors(errors);
+      return;
+    }
+
+    setIsSavingAdjustment(true);
+    setSaveAdjustmentSuccess(false);
+    setSaveAdjustmentError(false);
+
+    try {
+      const res = await recordAcademicAdjustmentAction(studentId, {
+        adjustmentType: adjustmentForm.adjustmentType,
+        effectiveDate: adjustmentForm.effectiveDate,
+        previousSemester: student.currentSemester,
+        adjustedSemester: Number(adjustmentForm.adjustedSemester) || null,
+        previousProgramCode: student.programCode,
+        newProgramCode: adjustmentForm.adjustmentType === "course_transfer" ? adjustmentForm.newProgramCode : undefined,
+        reason: adjustmentForm.reason.trim(),
+        notes: adjustmentForm.notes.trim() || undefined
+      });
+
+      if (res.success) {
+        setSaveAdjustmentSuccess(true);
+        toast.success("Academic Adjustment Recorded", {
+          description: `Progression updated to Semester ${res.currentSemester || student.currentSemester}.`
+        });
+        await loadStudentData();
+        setTimeout(() => {
+          setIsAdjustmentDialogOpen(false);
+        }, 500);
+      } else {
+        setSaveAdjustmentError(true);
+        toast.error(res.error || "Failed to record academic adjustment.");
+      }
+    } catch {
+      setSaveAdjustmentError(true);
+      toast.error("Unexpected error saving academic adjustment.");
+    } finally {
+      setIsSavingAdjustment(false);
+    }
+  };
 
   const loadStudentData = React.useCallback(async () => {
     try {
@@ -911,35 +1022,137 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
           {/* Academic Profile */}
           {activeSubTab === "academic" && (
-            <Card className="border border-border/60 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold">Academic standing details</CardTitle>
-                <CardDescription className="text-[10px] font-caption">Student enrollment dates, courses, and current status checks.</CardDescription>
+            <Card className="border border-border/60 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-border/50">
+                <div>
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-primary" />
+                    Academic Standing & Semester Progression
+                  </CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                    Automated curriculum progression, enrollment timeline, and adjustment history.
+                  </CardDescription>
+                </div>
+                <Button 
+                  onClick={handleOpenAdjustmentDialog} 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs h-8 gap-1.5 rounded-xl border-primary/30 hover:bg-primary/5 hover:text-primary text-foreground"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+                  Academic Adjustment
+                </Button>
               </CardHeader>
-              <CardContent className="p-6 grid gap-4 sm:grid-cols-2 text-xs">
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block font-caption">Registered School</span>
-                  <span className="font-semibold text-foreground block">{student.school}</span>
+              <CardContent className="p-6 space-y-6">
+                {/* Academic Metrics Grid */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-xs">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Registered School</span>
+                    <span className="font-semibold text-foreground block">{student.school}</span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Program Curriculum</span>
+                    <span className="font-semibold text-foreground block">{student.programName}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground block">Code: {student.programCode}</span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Curriculum Structure</span>
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                      <Layers className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span>{student.totalSemesters || 8} Semesters</span>
+                      <span className="text-muted-foreground text-[11px] font-normal">({student.semesterDuration || 6} {student.semesterDurationUnit || "mo"}/sem)</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Admission Date</span>
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{AcademicProgressionEngine.formatDisplayDate(student.admissionDate)}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Current Semester</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-foreground font-mono">
+                        Semester {student.currentSemester} of {student.totalSemesters || 8}
+                      </span>
+                      <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/30 flex items-center gap-1 px-1.5 py-0.5">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        Automatically calculated
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Automatically calculated from admission date ({AcademicProgressionEngine.formatDisplayDate(student.admissionDate)}) and {student.semesterDuration || 6}-{student.semesterDurationUnit || "month"} intervals.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Expected Graduation</span>
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{AcademicProgressionEngine.formatDisplayDate(student.expectedGraduation)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block font-caption">Program Curriculum</span>
-                  <span className="font-semibold text-foreground block">{student.programName} ({student.programCode})</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block font-caption">Admission Date</span>
-                  <span className="font-semibold text-foreground block">{student.admissionDate}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block font-caption">Expected Graduation</span>
-                  <span className="font-semibold text-foreground block">{student.expectedGraduation}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block font-caption">Current Semester</span>
-                  <span className="font-semibold text-foreground block">{student.currentSemester} / 8</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-muted-foreground block font-caption">Academic Status</span>
-                  <span className="font-semibold text-foreground block capitalize">{student.academicStatus.replace("_", " ")}</span>
+
+                {/* Adjustments & Exceptions Audit Trail */}
+                <div className="pt-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <History className="h-4 w-4 text-primary" />
+                      <h4 className="text-xs font-semibold text-foreground">Academic Adjustments & Exception History</h4>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      {(student.academicAdjustments?.length || 0)} recorded
+                    </span>
+                  </div>
+
+                  {(!student.academicAdjustments || student.academicAdjustments.length === 0) ? (
+                    <div className="p-4 rounded-xl border border-dashed border-border/70 text-center text-xs text-muted-foreground bg-muted/10">
+                      No manual overrides or exceptions recorded. Progression is automatically synced to academic calendar intervals.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-border/60">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-muted/40 border-b border-border/60 text-muted-foreground font-semibold">
+                          <tr>
+                            <th className="py-2.5 px-3">Effective Date</th>
+                            <th className="py-2.5 px-3">Adjustment Type</th>
+                            <th className="py-2.5 px-3">Prev → New Sem</th>
+                            <th className="py-2.5 px-3">Institutional Reason</th>
+                            <th className="py-2.5 px-3">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/40">
+                          {student.academicAdjustments.map((adj, idx) => (
+                            <tr key={adj.id || idx} className="hover:bg-muted/20 transition-colors">
+                              <td className="py-2.5 px-3 font-mono font-medium text-foreground">
+                                {AcademicProgressionEngine.formatDisplayDate(adj.effectiveDate)}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <Badge variant="secondary" className="text-[10px] capitalize">
+                                  {adj.adjustmentType.replace(/_/g, " ")}
+                                </Badge>
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-muted-foreground">
+                                {adj.previousSemester ? `Sem ${adj.previousSemester}` : "—"} → <span className="font-semibold text-foreground">{adj.adjustedSemester ? `Sem ${adj.adjustedSemester}` : "—"}</span>
+                              </td>
+                              <td className="py-2.5 px-3 font-medium text-foreground max-w-xs">
+                                {adj.reason}
+                              </td>
+                              <td className="py-2.5 px-3 text-muted-foreground text-[11px]">
+                                {adj.notes || "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1428,7 +1641,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground" htmlFor="docIssueDate">Issue Date *</label>
                 <DatePicker
@@ -1565,15 +1778,23 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="email">Email Address</label>
-                <Input id="email" type="email" value={editForm.email} onChange={handleFormChange} className="h-9 text-sm" />
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="email">Email Address</label>
+              <Input id="email" type="email" value={editForm.email} onChange={handleFormChange} className="h-9 text-sm" />
+            </div>
+
+            <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-1.5">
+              <span className="text-[11px] text-muted-foreground block font-medium">Current Semester Progression</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-foreground font-mono">Semester {student?.currentSemester || 1} of {student?.totalSemesters || 8}</span>
+                <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/20 flex items-center gap-1">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  Automatically Managed
+                </Badge>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="currentSemester">Current Semester</label>
-                <Input id="currentSemester" type="number" min={1} max={20} value={editForm.currentSemester} onChange={(e) => setEditForm(prev => ({ ...prev, currentSemester: Number(e.target.value) }))} className="h-9 text-sm" />
-              </div>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Automatically calculated from admission date ({AcademicProgressionEngine.formatDisplayDate(student?.admissionDate)}) and course configuration. To record exceptions, use the <strong>Academic Adjustment</strong> workflow.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -1696,6 +1917,149 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 idleText="Save Details"
                 loadingText="Saving changes..."
                 successText="Changes saved"
+                errorText="Try Again"
+              />
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ACADEMIC ADJUSTMENT DIALOG */}
+      <Dialog open={isAdjustmentDialogOpen} onOpenChange={setIsAdjustmentDialogOpen}>
+        <DialogContent className="sm:max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              Record Academic Adjustment
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveAdjustment} className="space-y-4 py-2 text-xs">
+            <p className="text-muted-foreground font-caption">
+              Adjust progression for exceptional circumstances (repeating a semester, medical/academic leave, program transfer, or authorized override).
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="adjustmentType">
+                Adjustment Type *
+              </label>
+              <Select 
+                value={adjustmentForm.adjustmentType} 
+                onValueChange={(val) => setAdjustmentForm(prev => ({ ...prev, adjustmentType: (val as "semester_override" | "semester_repeat" | "academic_leave" | "course_transfer" | "extension" | "admission_date_correction") || "semester_override" }))}
+              >
+                <SelectTrigger className="h-9 text-xs rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="semester_override">Manual Semester Override</SelectItem>
+                  <SelectItem value="semester_repeat">Repeat Semester</SelectItem>
+                  <SelectItem value="academic_leave">Academic Leave / Break</SelectItem>
+                  <SelectItem value="course_transfer">Course / Program Transfer</SelectItem>
+                  <SelectItem value="extension">Course Extension</SelectItem>
+                  <SelectItem value="admission_date_correction">Admission Date Correction</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground" htmlFor="adjustmentEffectiveDate">
+                  Effective Date *
+                </label>
+                <DatePicker
+                  id="adjustmentEffectiveDate"
+                  value={adjustmentForm.effectiveDate}
+                  onChange={(e) => {
+                    setAdjustmentForm(prev => ({ ...prev, effectiveDate: e.target.value }));
+                    setAdjustmentErrors(prev => ({ ...prev, effectiveDate: "" }));
+                  }}
+                  error={adjustmentErrors.effectiveDate}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground" htmlFor="adjustedSemester">
+                  Adjusted Semester *
+                </label>
+                <Input
+                  id="adjustedSemester"
+                  type="number"
+                  min={1}
+                  max={student?.totalSemesters || 20}
+                  value={adjustmentForm.adjustedSemester}
+                  onChange={(e) => setAdjustmentForm(prev => ({ ...prev, adjustedSemester: Number(e.target.value) }))}
+                  className="h-9 text-xs rounded-xl font-mono"
+                />
+              </div>
+            </div>
+
+            {adjustmentForm.adjustmentType === "course_transfer" && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">New Academic Program *</label>
+                <Select 
+                  value={adjustmentForm.newProgramCode} 
+                  onValueChange={(val) => setAdjustmentForm(prev => ({ ...prev, newProgramCode: val || "" }))}
+                >
+                  <SelectTrigger className="h-9 text-xs rounded-xl">
+                    <SelectValue placeholder="Select Destination Program" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicPrograms.map((p) => (
+                      <SelectItem key={p.id} value={p.programCode || p.programName}>
+                        {p.programName} ({p.totalSemesters || 8} Semesters)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="adjustmentReason">
+                Reason for Adjustment *
+              </label>
+              <Textarea
+                id="adjustmentReason"
+                value={adjustmentForm.reason}
+                onChange={(e) => {
+                  setAdjustmentForm(prev => ({ ...prev, reason: e.target.value }));
+                  setAdjustmentErrors(prev => ({ ...prev, reason: "" }));
+                }}
+                placeholder="e.g. Approved for semester repeat following medical board review ref #MED-2026-89..."
+                className={`min-h-16 text-xs rounded-xl ${adjustmentErrors.reason ? "border-destructive focus-visible:ring-destructive" : ""}`}
+              />
+              {adjustmentErrors.reason && (
+                <p className="text-[10px] text-destructive font-caption font-medium">{adjustmentErrors.reason}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="adjustmentNotes">
+                Additional Notes (Optional)
+              </label>
+              <Input
+                id="adjustmentNotes"
+                value={adjustmentForm.notes}
+                onChange={(e) => setAdjustmentForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="e.g. Dean Approval Ref #2026-44"
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsAdjustmentDialogOpen(false)} className="text-xs rounded-xl">
+                Cancel
+              </Button>
+              <AsyncActionButton
+                type="submit"
+                size="sm"
+                className="text-xs rounded-xl"
+                isLoading={isSavingAdjustment}
+                isSuccess={saveAdjustmentSuccess}
+                isError={saveAdjustmentError}
+                idleText="Record Adjustment"
+                loadingText="Recording..."
+                successText="Recorded"
                 errorText="Try Again"
               />
             </DialogFooter>

@@ -11,7 +11,8 @@ import {
   Loader2, 
   AlertCircle,
   Filter,
-  Clock
+  Clock,
+  Layers
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { toast } from "sonner";
-import { AcademicProgram, AcademicProgramDurationUnit } from "@/domain/academic-programs/types";
+import { AcademicProgram, AcademicProgramDurationUnit, SemesterDurationUnit } from "@/domain/academic-programs/types";
 import { 
   getAllAcademicProgramsAction, 
   createAcademicProgramAction, 
@@ -47,6 +48,9 @@ export function AcademicProgramsTab() {
   const [formLevel, setFormLevel] = React.useState("UG");
   const [formDurationValue, setFormDurationValue] = React.useState(4);
   const [formDurationUnit, setFormDurationUnit] = React.useState<AcademicProgramDurationUnit>("Years");
+  const [formTotalSemesters, setFormTotalSemesters] = React.useState(8);
+  const [formSemesterDuration, setFormSemesterDuration] = React.useState(6);
+  const [formSemesterDurationUnit, setFormSemesterDurationUnit] = React.useState<SemesterDurationUnit>("months");
   const [formOrder, setFormOrder] = React.useState(1);
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -109,6 +113,9 @@ export function AcademicProgramsTab() {
     setFormLevel("UG");
     setFormDurationValue(4);
     setFormDurationUnit("Years");
+    setFormTotalSemesters(8);
+    setFormSemesterDuration(6);
+    setFormSemesterDurationUnit("months");
     setFormOrder(programs.length + 1);
     setIsAddOpen(true);
   };
@@ -121,11 +128,14 @@ export function AcademicProgramsTab() {
     setFormLevel(prog.academicLevel || "UG");
     setFormDurationValue(prog.durationValue || 4);
     setFormDurationUnit((prog.durationUnit as AcademicProgramDurationUnit) || "Years");
+    setFormTotalSemesters(prog.totalSemesters || 8);
+    setFormSemesterDuration(prog.semesterDuration || 6);
+    setFormSemesterDurationUnit((prog.semesterDurationUnit as SemesterDurationUnit) || "months");
     setFormOrder(prog.displayOrder);
     setIsEditOpen(true);
   };
 
-  // Save New Program
+  // Save Create Program
   const handleSaveCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
@@ -133,8 +143,13 @@ export function AcademicProgramsTab() {
       return;
     }
 
-    if (!formDurationValue || formDurationValue <= 0) {
-      toast.error("Program Duration Value must be a positive integer.");
+    if (!formTotalSemesters || formTotalSemesters <= 0) {
+      toast.error("Total Semesters must be greater than 0.");
+      return;
+    }
+
+    if (!formSemesterDuration || formSemesterDuration <= 0) {
+      toast.error("Semester Duration must be greater than 0.");
       return;
     }
 
@@ -145,13 +160,16 @@ export function AcademicProgramsTab() {
       academicLevel: formLevel,
       durationValue: Number(formDurationValue),
       durationUnit: formDurationUnit,
+      totalSemesters: Number(formTotalSemesters),
+      semesterDuration: Number(formSemesterDuration),
+      semesterDurationUnit: formSemesterDurationUnit,
       displayOrder: Number(formOrder) || 1,
       isActive: true
     });
 
     if (res.success) {
       toast.success("Academic Program Created Successfully", {
-        description: `"${formName.trim()}" (${formDurationValue} ${formDurationUnit}) added to master data.`
+        description: `"${formName.trim()}" (${formTotalSemesters} Semesters · ${formSemesterDuration} ${formSemesterDurationUnit}/sem) configured.`
       });
       setIsAddOpen(false);
       fetchProgramsData();
@@ -166,8 +184,13 @@ export function AcademicProgramsTab() {
     e.preventDefault();
     if (!selectedProgram || !formName.trim()) return;
 
-    if (!formDurationValue || formDurationValue <= 0) {
-      toast.error("Program Duration Value must be a positive integer.");
+    if (!formTotalSemesters || formTotalSemesters <= 0) {
+      toast.error("Total Semesters must be greater than 0.");
+      return;
+    }
+
+    if (!formSemesterDuration || formSemesterDuration <= 0) {
+      toast.error("Semester Duration must be greater than 0.");
       return;
     }
 
@@ -178,12 +201,15 @@ export function AcademicProgramsTab() {
       academicLevel: formLevel,
       durationValue: Number(formDurationValue),
       durationUnit: formDurationUnit,
+      totalSemesters: Number(formTotalSemesters),
+      semesterDuration: Number(formSemesterDuration),
+      semesterDurationUnit: formSemesterDurationUnit,
       displayOrder: Number(formOrder) || selectedProgram.displayOrder
     });
 
     if (res.success) {
       toast.success("Academic Program Updated", {
-        description: `Changes saved for "${formName.trim()}" (${formDurationValue} ${formDurationUnit}).`
+        description: `Changes saved for "${formName.trim()}" (${formTotalSemesters} Semesters · ${formSemesterDuration} ${formSemesterDurationUnit}/sem).`
       });
       setIsEditOpen(false);
       fetchProgramsData();
@@ -219,24 +245,30 @@ export function AcademicProgramsTab() {
             Administrator-Managed Academic Programs
           </CardTitle>
           <CardDescription className="text-xs text-muted-foreground mt-0.5">
-            Configure master data academic programs, program duration, and level for university enrollment.
+            Configure course structures, total semesters, and semester durations to drive automatic student progression.
           </CardDescription>
         </div>
-        <Button onClick={handleOpenAdd} size="sm" className="text-xs font-semibold h-9 gap-1.5 rounded-xl">
-          <Plus className="h-4 w-4" /> Add Program
+
+        <Button 
+          onClick={handleOpenAdd} 
+          size="sm" 
+          className="text-xs h-9 gap-1.5 rounded-xl shadow-xs"
+        >
+          <Plus className="h-4 w-4" />
+          Add Program
         </Button>
       </CardHeader>
 
       <CardContent className="p-6 space-y-4">
-        {/* Controls Header */}
+        {/* Search & Filter Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search program or code..."
+              placeholder="Search by name or code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-xs rounded-xl"
+              className="pl-8 text-xs h-9 rounded-xl"
             />
           </div>
 
@@ -276,7 +308,7 @@ export function AcademicProgramsTab() {
                   <th className="py-2.5 px-3">Program Name</th>
                   <th className="py-2.5 px-3">Code</th>
                   <th className="py-2.5 px-3">Level</th>
-                  <th className="py-2.5 px-3">Duration</th>
+                  <th className="py-2.5 px-3">Progression Structure</th>
                   <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3 text-right">Actions</th>
                 </tr>
@@ -293,9 +325,10 @@ export function AcademicProgramsTab() {
                       </Badge>
                     </td>
                     <td className="py-2.5 px-3">
-                      <div className="flex items-center gap-1 text-foreground font-medium text-[11px]">
-                        <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span>{prog.durationValue || 4} {prog.durationUnit || "Years"}</span>
+                      <div className="flex items-center gap-1.5 text-foreground font-medium text-[11px]">
+                        <Layers className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span>{prog.totalSemesters || 8} Semesters</span>
+                        <span className="text-muted-foreground text-[10px]">({prog.semesterDuration || 6} {prog.semesterDurationUnit || "mo"}/sem)</span>
                       </div>
                     </td>
                     <td className="py-2.5 px-3">
@@ -380,32 +413,52 @@ export function AcademicProgramsTab() {
               </div>
             </div>
 
-            {/* Duration Configuration */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Semester Progression Configuration */}
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl text-muted-foreground text-xs space-y-1">
+              <div className="font-semibold text-foreground flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                Automatic Semester Progression Structure
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Semester duration and total semesters determine the student&apos;s automatic academic progression.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Program Duration <span className="text-rose-500">*</span></label>
+                <label className="text-xs font-medium text-foreground">Total Semesters *</label>
                 <Input
                   type="number"
                   min={1}
-                  placeholder="4"
-                  value={formDurationValue}
-                  onChange={(e) => setFormDurationValue(Math.max(1, Number(e.target.value)))}
+                  max={20}
+                  placeholder="8"
+                  value={formTotalSemesters}
+                  onChange={(e) => setFormTotalSemesters(Math.max(1, Number(e.target.value)))}
                   className="h-9 text-xs rounded-xl font-mono"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Duration Unit <span className="text-rose-500">*</span></label>
-                <Select value={formDurationUnit} onValueChange={(val) => setFormDurationUnit((val as AcademicProgramDurationUnit) || "Years")}>
+                <label className="text-xs font-medium text-foreground">Semester Duration *</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  placeholder="6"
+                  value={formSemesterDuration}
+                  onChange={(e) => setFormSemesterDuration(Math.max(1, Number(e.target.value)))}
+                  className="h-9 text-xs rounded-xl font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Duration Unit *</label>
+                <Select value={formSemesterDurationUnit} onValueChange={(val) => setFormSemesterDurationUnit((val as SemesterDurationUnit) || "months")}>
                   <SelectTrigger className="h-9 text-xs rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Years">Years</SelectItem>
-                    <SelectItem value="Semesters">Semesters</SelectItem>
-                    <SelectItem value="Trimesters">Trimesters</SelectItem>
-                    <SelectItem value="Months">Months</SelectItem>
-                    <SelectItem value="Credits">Credits</SelectItem>
-                    <SelectItem value="Research_Months">Research Months</SelectItem>
+                    <SelectItem value="months">Months</SelectItem>
+                    <SelectItem value="weeks">Weeks</SelectItem>
+                    <SelectItem value="days">Days</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -479,31 +532,50 @@ export function AcademicProgramsTab() {
               </div>
             </div>
 
-            {/* Duration Configuration */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Semester Progression Configuration */}
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl text-muted-foreground text-xs space-y-1">
+              <div className="font-semibold text-foreground flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5 text-primary" />
+                Automatic Semester Progression Structure
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Semester duration and total semesters determine the student&apos;s automatic academic progression.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Program Duration <span className="text-rose-500">*</span></label>
+                <label className="text-xs font-medium text-foreground">Total Semesters *</label>
                 <Input
                   type="number"
                   min={1}
-                  value={formDurationValue}
-                  onChange={(e) => setFormDurationValue(Math.max(1, Number(e.target.value)))}
+                  max={20}
+                  value={formTotalSemesters}
+                  onChange={(e) => setFormTotalSemesters(Math.max(1, Number(e.target.value)))}
                   className="h-9 text-xs rounded-xl font-mono"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Duration Unit <span className="text-rose-500">*</span></label>
-                <Select value={formDurationUnit} onValueChange={(val) => setFormDurationUnit((val as AcademicProgramDurationUnit) || "Years")}>
+                <label className="text-xs font-medium text-foreground">Semester Duration *</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={formSemesterDuration}
+                  onChange={(e) => setFormSemesterDuration(Math.max(1, Number(e.target.value)))}
+                  className="h-9 text-xs rounded-xl font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Duration Unit *</label>
+                <Select value={formSemesterDurationUnit} onValueChange={(val) => setFormSemesterDurationUnit((val as SemesterDurationUnit) || "months")}>
                   <SelectTrigger className="h-9 text-xs rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Years">Years</SelectItem>
-                    <SelectItem value="Semesters">Semesters</SelectItem>
-                    <SelectItem value="Trimesters">Trimesters</SelectItem>
-                    <SelectItem value="Months">Months</SelectItem>
-                    <SelectItem value="Credits">Credits</SelectItem>
-                    <SelectItem value="Research_Months">Research Months</SelectItem>
+                    <SelectItem value="months">Months</SelectItem>
+                    <SelectItem value="weeks">Weeks</SelectItem>
+                    <SelectItem value="days">Days</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

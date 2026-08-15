@@ -6,6 +6,8 @@ export type AcademicProgramDurationUnit =
   | "Credits" 
   | "Research_Months";
 
+export type SemesterDurationUnit = "months" | "weeks" | "days";
+
 export interface AcademicProgram {
   id: string;
   programName: string;
@@ -14,6 +16,9 @@ export interface AcademicProgram {
   isActive: boolean;
   durationValue: number;
   durationUnit: AcademicProgramDurationUnit | string;
+  totalSemesters: number;
+  semesterDuration: number;
+  semesterDurationUnit: SemesterDurationUnit;
   schoolName?: string | null;
   academicLevel?: string | null;
   createdAt: string;
@@ -28,6 +33,9 @@ export interface CreateProgramDto {
   isActive?: boolean;
   durationValue?: number;
   durationUnit?: AcademicProgramDurationUnit | string;
+  totalSemesters?: number;
+  semesterDuration?: number;
+  semesterDurationUnit?: SemesterDurationUnit;
   schoolName?: string | null;
   academicLevel?: string | null;
 }
@@ -39,6 +47,9 @@ export interface UpdateProgramDto {
   isActive?: boolean;
   durationValue?: number;
   durationUnit?: AcademicProgramDurationUnit | string;
+  totalSemesters?: number;
+  semesterDuration?: number;
+  semesterDurationUnit?: SemesterDurationUnit;
   schoolName?: string | null;
   academicLevel?: string | null;
 }

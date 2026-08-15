@@ -141,8 +141,26 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
           {versions.length > 0 && (
             <Card className="border border-border/60 shadow-sm bg-card/65">
               <CardContent className="p-4 space-y-4">
-                <h2 className="text-xs font-semibold text-foreground uppercase tracking-wider">Version History</h2>
-                <ComplianceDocumentTable versions={versions} onDownloadClick={(v) => toast.info(`Downloading version v${v.versionNumber}...`)} />
+                <ComplianceDocumentTable 
+                  versions={versions} 
+                  onDownloadClick={async (v) => {
+                    if (!v.filePath) {
+                      toast.error("File Unavailable", { description: "No physical file is attached to this document version." });
+                      return;
+                    }
+                    try {
+                      const { getDocumentDownloadUrlAction } = await import("@/app/(app)/students/actions");
+                      const res = await getDocumentDownloadUrlAction(v.filePath);
+                      if (res.success && res.url) {
+                        window.open(res.url, "_blank", "noopener,noreferrer");
+                      } else {
+                        toast.error("Download Failed", { description: res.error || "Unable to retrieve document file." });
+                      }
+                    } catch (err) {
+                      toast.error("Error", { description: err instanceof Error ? err.message : "Failed to open document file." });
+                    }
+                  }} 
+                />
               </CardContent>
             </Card>
           )}

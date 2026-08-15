@@ -259,9 +259,12 @@ export class ComplianceDocumentService {
       throw new ValidationFailedError("Security violation: Malware detected in uploaded document.");
     }
 
-    // 4. Fetch current active document version to resolve sequence
+    // 4. Fetch existing genuine uploaded versions to resolve sequence
     const currentActive = await this.repository.getActiveDocument(studentId, type);
-    const nextVersion = currentActive ? currentActive.versionNumber + 1 : 1;
+    const history = await this.repository.getVersionHistory(studentId, type);
+    const validHistory = history.filter(v => v.filePath && v.filePath !== "pending_upload" && v.filePath !== "null");
+    const highestVersion = validHistory.length > 0 ? Math.max(...validHistory.map(v => v.versionNumber || 0)) : 0;
+    const nextVersion = highestVersion + 1;
 
     // 3. Upload file to secure isolated storage folder
     const storagePath = await this.storageProvider.upload(

@@ -146,6 +146,8 @@ export interface UpdateStudentInput {
   permanentAddress?: string;
   localAddress?: string;
   programCode?: string;
+  admissionDate?: string | Date;
+  expectedGraduation?: string | Date;
   currentSemester?: number;
   academicStatus?: AcademicStatus;
   // Embassy / Consular updates

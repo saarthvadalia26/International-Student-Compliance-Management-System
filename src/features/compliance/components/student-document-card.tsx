@@ -69,7 +69,7 @@ export function StudentDocumentCard({
   expiryDate,
   placeOfIssue,
   visaType,
-  versionNumber = 1,
+  versionNumber = null,
   verificationStatus = "not_uploaded",
   hasUploadedDocument = false,
   verifiedAt,
@@ -263,9 +263,11 @@ export function StudentDocumentCard({
               <CardTitle className="text-xs sm:text-sm font-bold tracking-tight uppercase text-foreground truncate">
                 {title}
               </CardTitle>
-              <Badge variant="outline" className="text-[9px] uppercase tracking-wider font-mono px-1.5 py-0.2 h-4 text-muted-foreground border-border/60 bg-muted/20 shrink-0">
-                CURRENT · V{versionNumber || 1}
-              </Badge>
+              {hasUploadedDocument && versionNumber ? (
+                <Badge variant="outline" className="text-[9px] uppercase tracking-wider font-mono px-1.5 py-0.2 h-4 text-muted-foreground border-border/60 bg-muted/20 shrink-0">
+                  CURRENT · V{versionNumber}
+                </Badge>
+              ) : null}
             </div>
             <CardDescription className="text-[10px] font-caption text-muted-foreground truncate">
               {description}

@@ -5,6 +5,8 @@ import {
   UpdateStudentInput, 
   StudentFilterOptions
 } from "./student.types";
+import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
+import { AcademicProgramService } from "@/domain/academic-programs/academic-program.service";
 
 export interface IStudentRepository {
   createStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile>;
@@ -13,6 +15,21 @@ export interface IStudentRepository {
   updateStudent(id: string, input: UpdateStudentInput, actorId: string | null): Promise<FullStudentProfile>;
   listStudents(filters: StudentFilterOptions): Promise<FullStudentProfile[]>;
   softDeleteStudent(id: string, actorId: string | null): Promise<boolean>;
+  recordAcademicAdjustment(
+    studentId: string,
+    input: {
+      adjustmentType: "semester_override" | "semester_repeat" | "academic_leave" | "course_transfer" | "extension" | "admission_date_correction";
+      effectiveDate: string;
+      previousSemester?: number | null;
+      adjustedSemester?: number | null;
+      previousProgramCode?: string | null;
+      newProgramCode?: string | null;
+      reason: string;
+      notes?: string | null;
+    },
+    actorId: string | null
+  ): Promise<{ success: boolean; adjustmentId?: string; currentSemester?: number; expectedGraduation?: string; error?: string }>;
+  getAcademicAdjustments(studentId: string): Promise<AcademicAdjustmentRecord[]>;
 }
 
 interface RelationshipRow {
@@ -130,17 +147,34 @@ export class SupabaseStudentRepository implements IStudentRepository {
         throw new Error(`Failed to create contact record: ${contactError?.message || "Unknown database error"}`);
       }
 
-      // 4. Insert into student_academic table
-      const admFormatted = this.formatDate(input.admissionDate);
-      const expGradFormatted = this.formatDate(input.expectedGraduation);
+      // 4. Insert into student_academic table (automatically calculated from course structure)
+      const admFormatted = this.formatDate(input.admissionDate) || "";
+      
+      const programService = new AcademicProgramService();
+      const progConfig = await programService.getProgramByCodeOrName(input.programCode);
+
+      const progression = AcademicProgressionEngine.calculateProgression({
+        admissionDate: admFormatted,
+        courseConfig: {
+          programName: progConfig?.programName || input.programCode,
+          programCode: progConfig?.programCode || input.programCode,
+          totalSemesters: progConfig?.totalSemesters || 8,
+          semesterDuration: progConfig?.semesterDuration || 6,
+          semesterDurationUnit: progConfig?.semesterDurationUnit || "months"
+        }
+      });
+
+      const expGradFormatted = progression.expectedGraduationDateISO || this.formatDate(input.expectedGraduation) || "";
+      const calculatedSemester = progression.currentSemester;
+
       const { data: academicData, error: academicError } = await supabase
         .from("student_academic")
         .insert({
           student_id: studentId,
-          program_code: input.programCode.trim(),
+          program_code: progConfig?.programCode || input.programCode.trim(),
           admission_date: admFormatted,
           expected_graduation: expGradFormatted,
-          current_semester: input.currentSemester || 1,
+          current_semester: calculatedSemester,
           academic_status: "good_standing",
           created_by: actorId,
           updated_by: actorId
@@ -224,41 +258,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         compliance_status: "MISSING"
       });
 
-      // If valid passport metadata is provided with valid issue and expiry dates, create baseline version
-      if (passportNum && passportIssue && passportExp && new Date(passportExp) > new Date(passportIssue)) {
-        await supabase.from("passport_versions").insert({
-          student_id: studentId,
-          version_number: 1,
-          is_active: true,
-          document_number: passportNum,
-          issue_date: passportIssue,
-          expiry_date: passportExp,
-          place_of_issue: passportPlace,
-          file_path: "pending_upload",
-          verification_status: "pending",
-          notes: "Initial registration record",
-          created_by: actorId,
-          updated_by: actorId
-        });
-      }
-
-      // If valid visa metadata is provided with valid issue and expiry dates, create baseline version
-      if (visaNum && visaIssue && visaExp && new Date(visaExp) > new Date(visaIssue)) {
-        await supabase.from("visa_versions").insert({
-          student_id: studentId,
-          version_number: 1,
-          is_active: true,
-          document_number: visaNum,
-          issue_date: visaIssue,
-          expiry_date: visaExp,
-          visa_type: visaType,
-          file_path: "pending_upload",
-          verification_status: "pending",
-          notes: "Initial registration record",
-          created_by: actorId,
-          updated_by: actorId
-        });
-      }
+      // Note: A document version is ONLY created when an actual document file is uploaded.
+      // Metadata registered during student creation is stored in student_snapshot without consuming version numbers.
 
       // 9. Record entry in audit_log
       await supabase.from("audit_log").insert({
@@ -536,8 +537,64 @@ export class SupabaseStudentRepository implements IStudentRepository {
     // 4. Update student_academic table if academic fields provided
     const academicUpdates: Record<string, unknown> = {};
     if (input.programCode) academicUpdates.program_code = input.programCode.trim();
-    if (input.currentSemester) academicUpdates.current_semester = input.currentSemester;
+    if (input.admissionDate) academicUpdates.admission_date = this.formatDate(input.admissionDate);
+    if (input.expectedGraduation) academicUpdates.expected_graduation = this.formatDate(input.expectedGraduation);
     if (input.academicStatus) academicUpdates.academic_status = input.academicStatus;
+
+    if (input.programCode || input.admissionDate) {
+      // Re-calculate progression automatically based on updated course or admission date
+      const { data: currentAcademic } = await supabase
+        .from("student_academic")
+        .select("program_code, admission_date, expected_graduation")
+        .eq("student_id", id)
+        .maybeSingle();
+
+      const progCode = input.programCode?.trim() || currentAcademic?.program_code;
+      const admDate = input.admissionDate ? this.formatDate(input.admissionDate) : currentAcademic?.admission_date;
+
+      if (progCode && admDate) {
+        const programService = new AcademicProgramService();
+        const progConfig = await programService.getProgramByCodeOrName(progCode);
+
+        // Fetch existing adjustments
+        const { data: adjustmentsData } = await supabase
+          .from("student_academic_adjustments")
+          .select("*")
+          .eq("student_id", id);
+
+        const adjustments = (adjustmentsData || []).map(a => ({
+          id: a.id,
+          adjustmentType: a.adjustment_type,
+          effectiveDate: a.effective_date,
+          previousProgramCode: a.previous_program_code,
+          newProgramCode: a.new_program_code,
+          previousSemester: a.previous_semester,
+          adjustedSemester: a.adjusted_semester,
+          reason: a.reason,
+          notes: a.notes,
+          createdBy: a.created_by,
+          createdAt: a.created_at
+        }));
+
+        const progression = AcademicProgressionEngine.calculateProgression({
+          admissionDate: admDate,
+          courseConfig: {
+            programName: progConfig?.programName || progCode,
+            programCode: progConfig?.programCode || progCode,
+            totalSemesters: progConfig?.totalSemesters || 8,
+            semesterDuration: progConfig?.semesterDuration || 6,
+            semesterDurationUnit: progConfig?.semesterDurationUnit || "months"
+          },
+          adjustments
+        });
+
+        academicUpdates.current_semester = progression.currentSemester;
+        if (!input.expectedGraduation) {
+          academicUpdates.expected_graduation = progression.expectedGraduationDateISO;
+        }
+      }
+    }
+
     if (Object.keys(academicUpdates).length > 0) {
       academicUpdates.updated_at = new Date().toISOString();
       academicUpdates.updated_by = actorId;
@@ -789,5 +846,173 @@ export class SupabaseStudentRepository implements IStudentRepository {
     });
 
     return true;
+  }
+
+  /**
+   * Records an auditable academic adjustment (override, repeat, leave, extension, course transfer) and updates progression
+   */
+  async recordAcademicAdjustment(
+    studentId: string,
+    input: {
+      adjustmentType: "semester_override" | "semester_repeat" | "academic_leave" | "course_transfer" | "extension" | "admission_date_correction";
+      effectiveDate: string;
+      previousSemester?: number | null;
+      adjustedSemester?: number | null;
+      previousProgramCode?: string | null;
+      newProgramCode?: string | null;
+      reason: string;
+      notes?: string | null;
+    },
+    actorId: string | null
+  ): Promise<{ success: boolean; adjustmentId?: string; currentSemester?: number; expectedGraduation?: string; error?: string }> {
+    const supabase = getAdminSupabase();
+
+    if (!input.reason || !input.reason.trim()) {
+      throw new Error("A mandatory institutional reason is required to record an academic adjustment.");
+    }
+    if (!input.effectiveDate) {
+      throw new Error("An effective date is required for the academic adjustment.");
+    }
+
+    // 1. Fetch current academic record
+    const { data: academic, error: acadErr } = await supabase
+      .from("student_academic")
+      .select("program_code, admission_date, expected_graduation, current_semester, academic_status")
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    if (acadErr || !academic) {
+      throw new Error(`Academic record not found for student ${studentId}`);
+    }
+
+    const previousSem = academic.current_semester;
+    const currentProgCode = academic.program_code;
+
+    // 2. Insert into student_academic_adjustments
+    const { data: adjRecord, error: adjErr } = await supabase
+      .from("student_academic_adjustments")
+      .insert({
+        student_id: studentId,
+        adjustment_type: input.adjustmentType,
+        effective_date: this.formatDate(input.effectiveDate),
+        previous_program_code: currentProgCode,
+        new_program_code: input.newProgramCode?.trim() || currentProgCode,
+        previous_semester: input.previousSemester ?? previousSem,
+        adjusted_semester: input.adjustedSemester ?? null,
+        reason: input.reason.trim(),
+        notes: input.notes ? input.notes.trim() : null,
+        created_by: actorId,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (adjErr || !adjRecord) {
+      throw new Error(`Failed to record academic adjustment: ${adjErr?.message || "Unknown error"}`);
+    }
+
+    // 3. Fetch all active adjustments for this student to recalculate progression
+    const { data: allAdjustments } = await supabase
+      .from("student_academic_adjustments")
+      .select("*")
+      .eq("student_id", studentId);
+
+    const adjustments = (allAdjustments || []).map(a => ({
+      id: a.id,
+      adjustmentType: a.adjustment_type,
+      effectiveDate: a.effective_date,
+      previousProgramCode: a.previous_program_code,
+      newProgramCode: a.new_program_code,
+      previousSemester: a.previous_semester,
+      adjustedSemester: a.adjusted_semester,
+      reason: a.reason,
+      notes: a.notes,
+      createdBy: a.created_by,
+      createdAt: a.created_at
+    }));
+
+    // 4. Load program configuration
+    const activeProgramCode = input.newProgramCode?.trim() || currentProgCode;
+    const programService = new AcademicProgramService();
+    const progConfig = await programService.getProgramByCodeOrName(activeProgramCode);
+
+    const progression = AcademicProgressionEngine.calculateProgression({
+      admissionDate: academic.admission_date,
+      courseConfig: {
+        programName: progConfig?.programName || activeProgramCode,
+        programCode: progConfig?.programCode || activeProgramCode,
+        totalSemesters: progConfig?.totalSemesters || 8,
+        semesterDuration: progConfig?.semesterDuration || 6,
+        semesterDurationUnit: progConfig?.semesterDurationUnit || "months"
+      },
+      adjustments
+    });
+
+    // 5. Update student_academic table
+    const updatePayload: Record<string, unknown> = {
+      current_semester: progression.currentSemester,
+      expected_graduation: progression.expectedGraduationDateISO || academic.expected_graduation,
+      updated_at: new Date().toISOString(),
+      updated_by: actorId
+    };
+
+    if (input.newProgramCode && input.newProgramCode.trim() !== currentProgCode) {
+      updatePayload.program_code = input.newProgramCode.trim();
+    }
+
+    await supabase
+      .from("student_academic")
+      .update(updatePayload)
+      .eq("student_id", studentId);
+
+    // 6. Record in audit log
+    await supabase.from("audit_log").insert({
+      actor_id: actorId,
+      action: "ACADEMIC_ADJUSTMENT_RECORDED",
+      resource: `students/${studentId}/academic`,
+      filters_applied: {
+        adjustmentId: adjRecord.id,
+        adjustmentType: input.adjustmentType,
+        previousSemester: previousSem,
+        newSemester: progression.currentSemester,
+        reason: input.reason
+      }
+    });
+
+    return {
+      success: true,
+      adjustmentId: adjRecord.id,
+      currentSemester: progression.currentSemester,
+      expectedGraduation: progression.expectedGraduationDateISO
+    };
+  }
+
+  /**
+   * Retrieves all historical academic adjustments for a student
+   */
+  async getAcademicAdjustments(studentId: string): Promise<AcademicAdjustmentRecord[]> {
+    const supabase = getAdminSupabase();
+    const { data, error } = await supabase
+      .from("student_academic_adjustments")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("effective_date", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map(row => ({
+      id: row.id,
+      adjustmentType: row.adjustment_type,
+      effectiveDate: row.effective_date,
+      previousProgramCode: row.previous_program_code,
+      newProgramCode: row.new_program_code,
+      previousSemester: row.previous_semester,
+      adjustedSemester: row.adjusted_semester,
+      reason: row.reason,
+      notes: row.notes,
+      createdBy: row.created_by,
+      createdAt: row.created_at
+    }));
   }
 }

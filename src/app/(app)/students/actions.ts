@@ -9,6 +9,7 @@ import { z } from "zod";
 import { getCountryByCode } from "@/utils/countries";
 import { sanitizeError } from "@/lib/errors/error-sanitizer";
 import { StorageProviderFactory } from "@/domain/storage/factory";
+import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
 
 const studentService = new StudentService();
 
@@ -33,7 +34,7 @@ export interface StudentDocumentDetail {
   expiryDate: string;
   placeOfIssue?: string;
   visaType?: string;
-  versionNumber?: number;
+  versionNumber?: number | null;
   verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
   hasUploadedDocument: boolean;
   uploadedAt?: string | null;
@@ -63,6 +64,26 @@ export interface StudentDetailProfile {
   school: string;
   admissionDate: string;
   expectedGraduation: string;
+  totalSemesters?: number;
+  semesterDuration?: number;
+  semesterDurationUnit?: string;
+  academicStage?: string;
+  academicStageLabel?: string;
+  isCompleted?: boolean;
+  isFinalSemester?: boolean;
+  academicAdjustments?: Array<{
+    id?: string;
+    adjustmentType: string;
+    effectiveDate: string;
+    previousProgramCode?: string | null;
+    newProgramCode?: string | null;
+    previousSemester?: number | null;
+    adjustedSemester?: number | null;
+    reason: string;
+    notes?: string | null;
+    createdBy?: string | null;
+    createdAt?: string;
+  }>;
   complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
   passport: StudentDocumentDetail;
   visa: StudentDocumentDetail;
@@ -389,12 +410,49 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
 
     const countryObj = getCountryByCode(personal?.nationality_code || "IND");
 
-    // Retrieve academic program metadata
+    // Retrieve academic program metadata & course structure
     const { data: progData } = await adminSupabase
       .from("academic_programs")
-      .select("program_name, school_name")
+      .select("program_name, program_code, school_name, total_semesters, semester_duration, semester_duration_unit")
       .or(`program_code.eq.${academic?.program_code},program_name.eq.${academic?.program_code}`)
       .maybeSingle();
+
+    // Retrieve academic adjustments for this student
+    const { data: adjustmentsData } = await adminSupabase
+      .from("student_academic_adjustments")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("effective_date", { ascending: false });
+
+    const adjustments: AcademicAdjustmentRecord[] = (adjustmentsData || []).map(a => ({
+      id: a.id,
+      adjustmentType: a.adjustment_type,
+      effectiveDate: a.effective_date,
+      previousProgramCode: a.previous_program_code,
+      newProgramCode: a.new_program_code,
+      previousSemester: a.previous_semester,
+      adjustedSemester: a.adjusted_semester,
+      reason: a.reason,
+      notes: a.notes,
+      createdBy: a.created_by,
+      createdAt: a.created_at
+    }));
+
+    const totalSemesters = Number(progData?.total_semesters) || 8;
+    const semesterDuration = Number(progData?.semester_duration) || 6;
+    const semesterDurationUnit = progData?.semester_duration_unit || "months";
+
+    const progression = AcademicProgressionEngine.calculateProgression({
+      admissionDate: academic?.admission_date || "",
+      courseConfig: {
+        programName: progData?.program_name || academic?.program_code || "General Studies",
+        programCode: progData?.program_code || academic?.program_code || "",
+        totalSemesters,
+        semesterDuration,
+        semesterDurationUnit
+      },
+      adjustments
+    });
 
     const studentProfile: StudentDetailProfile = {
       id: record.id,
@@ -404,7 +462,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       phoneLocal: contact?.phone_local || "",
       permanentAddress: contact?.permanent_address || "",
       localAddress: contact?.local_address || "",
-      currentSemester: academic?.current_semester || 1,
+      currentSemester: progression.currentSemester,
       academicStatus: academic?.academic_status || "good_standing",
       status: record.status || "active",
       registrationNumber: record.registration_number,
@@ -414,7 +472,15 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       programCode: academic?.program_code || "",
       school: progData?.school_name || "Academic Department",
       admissionDate: academic?.admission_date || "",
-      expectedGraduation: academic?.expected_graduation || "",
+      expectedGraduation: progression.expectedGraduationDateISO || academic?.expected_graduation || "",
+      totalSemesters: progression.totalSemesters,
+      semesterDuration: progression.details.semesterDuration,
+      semesterDurationUnit: progression.details.semesterDurationUnit,
+      academicStage: progression.stage,
+      academicStageLabel: progression.stageLabel,
+      isCompleted: progression.isCompleted,
+      isFinalSemester: progression.isFinalSemester,
+      academicAdjustments: adjustments,
       complianceStatus: (() => {
         const raw = (snapshot?.compliance_status || "").toUpperCase();
         if (raw === "WARNING" || raw === "PENDING_VERIFICATION") return "warning";
@@ -427,7 +493,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         issueDate: activePassport?.issue_date || snapshot?.passport_issue_date || "",
         expiryDate: activePassport?.expiry_date || snapshot?.passport_expiry || "",
         placeOfIssue: activePassport?.place_of_issue || snapshot?.passport_place_of_issue || "",
-        versionNumber: activePassport?.version_number || 1,
+        versionNumber: isPassportUploaded ? (activePassport?.version_number ?? 1) : null,
         verificationStatus: isPassportUploaded ? (activePassport?.verification_status || "pending") : "not_uploaded",
         hasUploadedDocument: isPassportUploaded,
         uploadedAt: isPassportUploaded ? (activePassport?.created_at || null) : null,
@@ -442,7 +508,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         issueDate: activeVisa?.issue_date || snapshot?.visa_issue_date || "",
         expiryDate: activeVisa?.expiry_date || snapshot?.visa_expiry || "",
         visaType: activeVisa?.visa_type || snapshot?.visa_type || "Student (S-1)",
-        versionNumber: activeVisa?.version_number || 1,
+        versionNumber: isVisaUploaded ? (activeVisa?.version_number ?? 1) : null,
         verificationStatus: isVisaUploaded ? (activeVisa?.verification_status || "pending") : "not_uploaded",
         hasUploadedDocument: isVisaUploaded,
         uploadedAt: isVisaUploaded ? (activeVisa?.created_at || null) : null,
@@ -456,7 +522,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         number: activeEfrro?.document_number || snapshot?.efrro_number || "Not provided",
         issueDate: activeEfrro?.issue_date || snapshot?.efrro_issue_date || "",
         expiryDate: activeEfrro?.expiry_date || snapshot?.efrro_expiry || "",
-        versionNumber: activeEfrro?.version_number || 1,
+        versionNumber: isEfrroUploaded ? (activeEfrro?.version_number ?? 1) : null,
         verificationStatus: isEfrroUploaded ? (activeEfrro?.verification_status || "pending") : "not_uploaded",
         hasUploadedDocument: isEfrroUploaded,
         uploadedAt: isEfrroUploaded ? (activeEfrro?.created_at || null) : null,
@@ -970,10 +1036,10 @@ export async function uploadDocumentRenewalAction(
       ? "visa_versions" 
       : "efrro_versions";
 
-    // Fetch existing versions to resolve next version number
+    // Fetch existing genuine uploaded versions to resolve next version number
     const { data: currentVersions, error: fetchErr } = await adminSupabase
       .from(tableName)
-      .select("version_number, is_active")
+      .select("version_number, file_path")
       .eq("student_id", studentId)
       .is("deleted_at", null)
       .order("version_number", { ascending: false });
@@ -982,8 +1048,15 @@ export async function uploadDocumentRenewalAction(
       return { success: false, error: `Failed to query existing versions: ${fetchErr.message}` };
     }
 
-    const highestVersionNum = currentVersions && currentVersions.length > 0
-      ? Math.max(...currentVersions.map(v => v.version_number || 1))
+    // Filter to only genuine uploaded versions
+    const validUploadedVersions = (currentVersions || []).filter(v => {
+      if (!v.file_path) return false;
+      const fp = v.file_path.trim().toLowerCase();
+      return fp !== "" && fp !== "pending_upload" && fp !== "null";
+    });
+
+    const highestVersionNum = validUploadedVersions.length > 0
+      ? Math.max(...validUploadedVersions.map(v => v.version_number || 0))
       : 0;
     const nextVersionNumber = highestVersionNum + 1;
 
@@ -1558,3 +1631,90 @@ export async function triggerReminderDispatchAction(
     };
   }
 }
+
+/**
+ * Server Action: Get pre-signed download URL for a specific document version file.
+ */
+export async function getDocumentDownloadUrlAction(
+  filePath: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to access document files." };
+    }
+
+    if (!filePath || filePath.trim() === "" || filePath === "pending_upload" || filePath === "null") {
+      return { success: false, error: "No physical file is associated with this document record." };
+    }
+
+    const storage = StorageProviderFactory.getProvider();
+    const signedUrl = await storage.generateSignedUrl("student-documents", filePath.trim(), 300);
+
+    return { success: true, url: signedUrl };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "getDocumentDownloadUrlAction" });
+    return { success: false, error: sanitized.message };
+  }
+}
+
+/**
+ * Server Action: Record an authorized academic adjustment (semester override, repeated semester, academic leave, etc.)
+ */
+export async function recordAcademicAdjustmentAction(
+  studentId: string,
+  input: {
+    adjustmentType: "semester_override" | "semester_repeat" | "academic_leave" | "course_transfer" | "extension" | "admission_date_correction";
+    effectiveDate: string;
+    previousSemester?: number | null;
+    adjustedSemester?: number | null;
+    previousProgramCode?: string | null;
+    newProgramCode?: string | null;
+    reason: string;
+    notes?: string | null;
+  }
+): Promise<{ success: boolean; currentSemester?: number; expectedGraduation?: string; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to record academic adjustments." };
+    }
+
+    if (!input.reason || !input.reason.trim()) {
+      return { success: false, error: "A mandatory institutional reason is required to record an academic adjustment." };
+    }
+
+    const res = await studentService.recordAcademicAdjustment(studentId, input, user.id);
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath(`/students`);
+    return res;
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "recordAcademicAdjustmentAction", route: `/students/${studentId}` });
+    return { success: false, error: sanitized.message };
+  }
+}
+
+/**
+ * Server Action: Get all academic adjustments for a student
+ */
+export async function getAcademicAdjustmentsAction(
+  studentId: string
+): Promise<{ success: boolean; adjustments?: AcademicAdjustmentRecord[]; error?: string }> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to view academic adjustments." };
+    }
+
+    const adjustments = await studentService.getAcademicAdjustments(studentId);
+    return { success: true, adjustments };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "getAcademicAdjustmentsAction", route: `/students/${studentId}` });
+    return { success: false, error: sanitized.message };
+  }
+}
+
+

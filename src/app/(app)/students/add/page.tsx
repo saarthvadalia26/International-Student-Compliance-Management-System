@@ -27,6 +27,8 @@ import { RegisterStudentValidationSchema } from "@/services/validation/student-v
 import { registerStudentAction } from "@/app/(app)/students/actions";
 import { RegisterStudentInput } from "@/services/student/student.types";
 import { DatePicker } from "@/components/ui/date-picker";
+import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
+import { Layers, Sparkles } from "lucide-react";
 
 type TabKey = "personal" | "academic" | "contact" | "documents";
 
@@ -172,29 +174,22 @@ export default function StudentRegistrationPage() {
     return counts;
   }, [validationErrors]);
 
-  // Helper to calculate expected graduation date dynamically from program duration
+  // Helper to calculate expected graduation date dynamically from program configuration
   const calculateGraduationDate = (programName: string, admissionDateStr: string) => {
     if (!admissionDateStr) return "";
     const selectedProg = academicPrograms.find(p => p.programName === programName);
     if (!selectedProg) return "";
 
-    const durationVal = selectedProg.durationValue || 4;
-    const durationUnit = selectedProg.durationUnit || "Years";
-    
-    const admissionDate = new Date(admissionDateStr);
-    if (isNaN(admissionDate.getTime())) return "";
-
-    const gradDate = new Date(admissionDate);
-
-    if (durationUnit === "Semesters") {
-      gradDate.setMonth(gradDate.getMonth() + durationVal * 6);
-    } else if (durationUnit === "Months" || durationUnit === "Research_Months") {
-      gradDate.setMonth(gradDate.getMonth() + durationVal);
-    } else {
-      gradDate.setFullYear(gradDate.getFullYear() + durationVal);
-    }
-
-    return normalizeDateToISO(gradDate);
+    return AcademicProgressionEngine.calculateExpectedGraduationDate({
+      admissionDate: admissionDateStr,
+      courseConfig: {
+        programName: selectedProg.programName,
+        programCode: selectedProg.programCode,
+        totalSemesters: selectedProg.totalSemesters || 8,
+        semesterDuration: selectedProg.semesterDuration || 6,
+        semesterDurationUnit: selectedProg.semesterDurationUnit || "months"
+      }
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -754,6 +749,32 @@ export default function StudentRegistrationPage() {
                     />
                   </div>
                 </div>
+
+                {formData.program && (
+                  <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 space-y-1.5 mt-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      Automatic Semester Progression Enabled
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Layers className="h-3.5 w-3.5 text-primary" />
+                        <span className="font-medium text-foreground">
+                          {academicPrograms.find(p => p.programName === formData.program)?.totalSemesters || 8} Semesters
+                        </span>
+                      </div>
+                      <div>
+                        Interval: <span className="font-medium text-foreground">{academicPrograms.find(p => p.programName === formData.program)?.semesterDuration || 6} Months / Semester</span>
+                      </div>
+                      <div>
+                        Initial: <span className="font-semibold text-primary font-mono">Semester 1</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      ISCMS will automatically calculate and advance the student&apos;s current semester without manual staff intervention.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             )}
 
