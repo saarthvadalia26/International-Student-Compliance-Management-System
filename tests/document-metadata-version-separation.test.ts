@@ -45,9 +45,9 @@ async function runTestSuite() {
       efrro_number: "FRRO/2026/8899",
       efrro_expiry: "2027-04-15"
     },
-    passportVersions: [] as any[],
-    visaVersions: [] as any[],
-    efrroVersions: [] as any[],
+    passportVersions: [] as Array<{ id: string; version_number: number; file_path: string; verification_status: string; is_active: boolean }>,
+    visaVersions: [] as Array<{ id: string; version_number: number; file_path: string; verification_status: string; is_active: boolean }>,
+    efrroVersions: [] as Array<{ id: string; version_number: number; file_path: string; verification_status: string; is_active: boolean }>,
     r2ObjectsCount: 0
   };
 
@@ -135,7 +135,7 @@ async function runTestSuite() {
   assert(eligibilityB.reasonCode === "PENDING_VERIFICATION", "Reason code is PENDING_VERIFICATION");
 
   // Staff approves v1
-  v1Uploaded.verification_status = "verified" as any;
+  v1Uploaded.verification_status = "verified";
   v1Uploaded.is_active = true;
 
   assert(v1Uploaded.is_active === true, "v1 is active after staff approval");
@@ -151,7 +151,17 @@ async function runTestSuite() {
 
   assert(nextVerC === 2, "Second physical upload resolves to version 2 (v2)");
 
-  const v2Uploaded = {
+  const v2Uploaded: {
+    id: string;
+    student_id: string;
+    version_number: number;
+    document_number: string;
+    issue_date: string;
+    expiry_date: string;
+    file_path: string;
+    verification_status: "pending" | "verified" | "rejected";
+    is_active: boolean;
+  } = {
     id: "ver-pass-002",
     student_id: studentMetadataOnly.id,
     version_number: 2,
@@ -159,7 +169,7 @@ async function runTestSuite() {
     issue_date: "2026-08-01",
     expiry_date: "2036-08-01",
     file_path: "students/student-metadata-001/passport/v2/1780000000_renewed_passport.pdf",
-    verification_status: "pending" as const,
+    verification_status: "pending",
     is_active: false
   };
   studentMetadataOnly.passportVersions.push(v2Uploaded);
@@ -170,7 +180,7 @@ async function runTestSuite() {
   assert(studentMetadataOnly.r2ObjectsCount === 2, "Total 2 physical R2 objects stored");
 
   // Staff verifies v2
-  v2Uploaded.verification_status = "verified" as any;
+  v2Uploaded.verification_status = "verified";
   v2Uploaded.is_active = true;
   v1Uploaded.is_active = false; // v1 deactivated
 
@@ -237,9 +247,9 @@ async function runTestSuite() {
   // Test F: R2 Object Protection (Zero R2 Uploads for Metadata)
   // -------------------------------------------------------------
   console.log("\n--- Test F: Zero R2 Objects Created for Metadata Operations ---");
-  let mockR2Storage: Record<string, Buffer> = {};
+  const mockR2Storage: Record<string, Buffer> = {};
 
-  function simulateExcelImport(records: any[]) {
+  function simulateExcelImport(records: Array<{ passport_number: string; passport_expiry: string; visa_number: string; visa_expiry: string }>) {
     // Stores in database metadata cache, does NOT touch R2
     return records.map(r => ({
       passport_number: r.passport_number,
@@ -274,7 +284,7 @@ async function runTestSuite() {
   };
 
   // Staff corrects typo in expiry date from 2028-12-20 to 2028-12-25
-  function correctMetadataInPlace(student: typeof studentProfileG, newExpiry: string, reason: string) {
+  function correctMetadataInPlace(student: typeof studentProfileG, newExpiry: string, _reason: string) {
     // 1. Updates snapshot
     student.snapshot.passport_expiry = newExpiry;
     // 2. Updates active version in-place

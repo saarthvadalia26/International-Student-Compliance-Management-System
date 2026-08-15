@@ -77,7 +77,6 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
     },
   });
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => {
     if (studentId) {
       fetchDocuments();

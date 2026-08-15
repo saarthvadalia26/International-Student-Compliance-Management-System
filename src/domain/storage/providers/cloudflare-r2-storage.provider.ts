@@ -6,9 +6,10 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
   private s3Client: S3Client;
 
   constructor() {
-    const accountId = process.env.R2_ACCOUNT_ID;
-    const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+    const accountId = process.env.R2_ACCOUNT_ID?.trim();
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
+    const endpoint = process.env.R2_ENDPOINT?.trim() || (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : "https://placeholder.r2.cloudflarestorage.com");
     
     // In production, these should be strictly validated during initialization
     if (!accountId || !accessKeyId || !secretAccessKey) {
@@ -17,7 +18,7 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
 
     this.s3Client = new S3Client({
       region: "auto",
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      endpoint,
       credentials: {
         accessKeyId: accessKeyId || "",
         secretAccessKey: secretAccessKey || "",

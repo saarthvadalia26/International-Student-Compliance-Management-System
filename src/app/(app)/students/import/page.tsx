@@ -106,14 +106,7 @@ export default function BulkStudentImportPage() {
   const [rollbackBatch, setRollbackBatch] = React.useState<ImportBatchRecord | null>(null);
   const [isRollingBack, setIsRollingBack] = React.useState(false);
 
-  // Load history when tab changes
-  React.useEffect(() => {
-    if (activeTab === "history") {
-      loadHistory();
-    }
-  }, [activeTab]);
-
-  const loadHistory = async () => {
+  const loadHistory = React.useCallback(async () => {
     setIsLoadingHistory(true);
     try {
       const res = await fetchImportHistoryAction();
@@ -127,7 +120,14 @@ export default function BulkStudentImportPage() {
     } finally {
       setIsLoadingHistory(false);
     }
-  };
+  }, []);
+
+  // Load history when tab changes
+  React.useEffect(() => {
+    if (activeTab === "history") {
+      loadHistory();
+    }
+  }, [activeTab, loadHistory]);
 
   // 1. Handle File Upload
   const handleFileDrop = async (file: File) => {

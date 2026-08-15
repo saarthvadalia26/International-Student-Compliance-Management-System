@@ -302,7 +302,6 @@ export function CorrectMetadataDialog({ config, studentId, initialValues, isOpen
   const [saveError, setSaveError] = React.useState(false);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => {
     if (isOpen) {
       setDocNumber(initialValues.documentNumber || "");
@@ -647,7 +646,7 @@ export function AllowEarlyUploadDialog({
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground">Exception Reason</label>
-            <Select value={reason} onValueChange={(val: any) => setReason(val)}>
+            <Select value={reason} onValueChange={(val) => { if (val) setReason(val as typeof reason); }}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Select reason" />
               </SelectTrigger>

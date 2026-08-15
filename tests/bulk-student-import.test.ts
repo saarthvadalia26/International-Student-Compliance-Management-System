@@ -67,7 +67,7 @@ async function runTestSuite() {
 
   const parsedTemplateWb = XLSX.read(xlsxTemplate.buffer, { type: "buffer" });
   const firstSheet = parsedTemplateWb.Sheets[parsedTemplateWb.SheetNames[0]];
-  const templateRows = XLSX.utils.sheet_to_json<any[]>(firstSheet, { header: 1 });
+  const templateRows = XLSX.utils.sheet_to_json<string[]>(firstSheet, { header: 1 });
   const templateHeaders = templateRows[0] as string[];
 
   assert(templateHeaders.includes("Registration / Enrollment Number"), "Template includes Registration Number");
@@ -397,7 +397,7 @@ async function runTestSuite() {
   // Test 11: Large Dataset Handling (500+ Rows)
   // -------------------------------------------------------------
   console.log("\n--- Test 11: Large Dataset Handling (500 Rows) ---");
-  const largeDataset: any[] = [];
+  const largeDataset: Array<Record<string, string>> = [];
   for (let i = 1; i <= 500; i++) {
     largeDataset.push({
       "registration_number": `NFSU2026BATCH_${String(i).padStart(4, "0")}`,
