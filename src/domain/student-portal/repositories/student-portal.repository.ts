@@ -139,6 +139,15 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       .filter(Boolean)
       .sort((a, b) => new Date(b!).getTime() - new Date(a!).getTime())[0] || null;
 
+    const today = new Date().toISOString().split("T")[0];
+    const passExp = passportVer?.expiry_date || snapshot?.passport_expiry || null;
+    const visaExp = visaVer?.expiry_date || snapshot?.visa_expiry || null;
+    const efrroExp = snapshot?.efrro_expiry || null;
+
+    const passportDaysRemaining = passExp ? Math.round((new Date(passExp).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const visaDaysRemaining = visaExp ? Math.round((new Date(visaExp).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const efrroDaysRemaining = efrroExp ? Math.round((new Date(efrroExp).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)) : (snapshot?.days_until_efrro_expiry !== undefined ? snapshot.days_until_efrro_expiry : null);
+
     return {
       studentId: student.id,
       fullName: personal?.full_name || "",
@@ -153,23 +162,26 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       overallCompliance,
 
       passportNumber: passportVer?.document_number || snapshot?.passport_number || null,
-      passportExpiry: passportVer?.expiry_date || snapshot?.passport_expiry || null,
+      passportExpiry: passExp,
+      passportDaysRemaining,
       passportStatus,
       passportRemarks: passportVer?.rejection_reason || passportVer?.notes || null,
       passportUploadDate: passportVer?.created_at || null,
 
       visaNumber: visaVer?.document_number || snapshot?.visa_number || null,
       visaType: visaVer?.visa_type || snapshot?.visa_type || null,
-      visaExpiry: visaVer?.expiry_date || snapshot?.visa_expiry || null,
+      visaExpiry: visaExp,
+      visaDaysRemaining,
       visaStatus,
       visaRemarks: visaVer?.rejection_reason || visaVer?.notes || null,
       visaUploadDate: visaVer?.created_at || null,
 
       efrroStatus,
-      efrroExpiry: snapshot?.efrro_expiry || null,
+      efrroExpiry: efrroExp,
       efrroRemarks: efrroVer?.rejection_reason || efrroVer?.notes || null,
       efrroUploadDate: efrroVer?.created_at || null,
-      daysRemaining: snapshot?.days_until_efrro_expiry !== undefined ? snapshot.days_until_efrro_expiry : null,
+      daysRemaining: efrroDaysRemaining,
+      efrroDaysRemaining,
 
       lastUploadDate: lastUpload
     };

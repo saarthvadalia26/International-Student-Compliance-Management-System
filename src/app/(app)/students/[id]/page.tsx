@@ -22,13 +22,16 @@ import {
   ExternalLink,
   Edit3,
   ShieldCheck,
-  Clock
+  CalendarDays,
+  Clock,
+  History
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
   updateStudentAction, 
   updateDocumentVerificationAction,
   updateDocumentMetadataAction,
+  updateExpiryDateAction,
   getStudentReminderScheduleAction,
   triggerReminderDispatchAction
 } from "@/app/(app)/students/actions";
@@ -48,6 +51,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { RejectionDialog } from "@/components/ui/rejection-dialog";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
 import { AcademicProgram } from "@/domain/academic-programs/types";
+import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
 import { 
   StudentReminderScheduleResponse, 
   ReminderStatus 
@@ -142,6 +146,17 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [isRejectDialogOpen, setIsRejectDialogOpen] = React.useState(false);
   const [rejectDocType, setRejectDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
   const [isRejecting, setIsRejecting] = React.useState(false);
+
+  // First-Class "Update Expiry Date" Dialog State
+  const [isExpiryDialogOpen, setIsExpiryDialogOpen] = React.useState(false);
+  const [expiryDocType, setExpiryDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
+  const [currentExpiryDateDisplay, setCurrentExpiryDateDisplay] = React.useState("");
+  const [newExpiryDate, setNewExpiryDate] = React.useState("");
+  const [expiryReason, setExpiryReason] = React.useState("");
+  const [expiryErrors, setExpiryErrors] = React.useState<Record<string, string>>({});
+  const [isSavingExpiry, setIsSavingExpiry] = React.useState(false);
+  const [saveExpirySuccess, setSaveExpirySuccess] = React.useState(false);
+  const [saveExpiryError, setSaveExpiryError] = React.useState(false);
 
   // Document Metadata Update Dialog State
   const [isDocMetadataOpen, setIsDocMetadataOpen] = React.useState(false);
@@ -351,7 +366,80 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setIsConfirmDiscardOpen(false);
   };
 
-  // Document Metadata Update Modal Handlers
+  // FIRST-CLASS "UPDATE EXPIRY DATE" HANDLERS
+  const openExpiryDialog = (docType: "passport" | "visa" | "efrro") => {
+    if (!student) return;
+    const doc = docType === "passport" ? student.passport : docType === "visa" ? student.visa : student.efrro;
+    
+    setExpiryDocType(docType);
+    setCurrentExpiryDateDisplay(doc?.expiryDate ? formatDisplayDate(doc.expiryDate) : "Not provided");
+    setNewExpiryDate(doc?.expiryDate ? doc.expiryDate.split("T")[0] : "");
+    setExpiryReason("");
+    setExpiryErrors({});
+    setIsExpiryDialogOpen(true);
+  };
+
+  const handleSaveExpiryDate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expiryDocType || !student) return;
+
+    const doc = expiryDocType === "passport" ? student.passport : expiryDocType === "visa" ? student.visa : student.efrro;
+    const errors: Record<string, string> = {};
+
+    if (!newExpiryDate || !newExpiryDate.trim()) {
+      errors.newExpiryDate = "Please select a valid expiration date.";
+    } else if (doc?.issueDate && new Date(newExpiryDate.trim()) <= new Date(doc.issueDate.trim())) {
+      errors.newExpiryDate = `Expiration date must be strictly after the issue date (${formatDisplayDate(doc.issueDate)}).`;
+    }
+
+    if (!expiryReason || !expiryReason.trim()) {
+      errors.expiryReason = "A reason for modifying the expiration date is required for audit traceability.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setExpiryErrors(errors);
+      toast.error("Validation Error", { description: "Please resolve the highlighted field errors." });
+      return;
+    }
+
+    setIsSavingExpiry(true);
+    setSaveExpirySuccess(false);
+    setSaveExpiryError(false);
+
+    try {
+      const docLabel = expiryDocType === "passport" ? "Passport" : expiryDocType === "visa" ? "Visa" : "eFRRO";
+      const res = await updateExpiryDateAction({
+        studentId,
+        documentType: expiryDocType,
+        newExpiryDate: newExpiryDate.trim(),
+        reason: expiryReason.trim()
+      });
+
+      if (res.success) {
+        setSaveExpirySuccess(true);
+        toast.success(`${docLabel} Expiry Updated`, {
+          description: `${docLabel} expiration date updated to ${formatDisplayDate(newExpiryDate)}. Reminder schedule recalculated.`
+        });
+        await Promise.all([loadStudentData(), loadReminderSchedule()]);
+        setTimeout(() => {
+          setIsExpiryDialogOpen(false);
+          setExpiryDocType(null);
+        }, 600);
+      } else {
+        setSaveExpiryError(true);
+        toast.error("Update Failed", { description: res.error || `Unable to update ${docLabel} expiration date.` });
+      }
+    } catch (err) {
+      setSaveExpiryError(true);
+      toast.error("Database Error", {
+        description: err instanceof Error ? err.message : "Unable to communicate with database."
+      });
+    } finally {
+      setIsSavingExpiry(false);
+    }
+  };
+
+  // FULL METADATA UPDATE HANDLERS
   const openDocMetadataDialog = (docType: "passport" | "visa" | "efrro") => {
     if (!student) return;
     const doc = docType === "passport" ? student.passport : docType === "visa" ? student.visa : student.efrro;
@@ -361,8 +449,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
       documentNumber: doc?.number && doc.number !== "Not provided" && doc.number !== "Not Recorded" ? doc.number : "",
       placeOfIssue: doc?.placeOfIssue || "",
       visaType: doc?.visaType || "Student (S-1)",
-      issueDate: doc?.issueDate || "",
-      expiryDate: doc?.expiryDate || "",
+      issueDate: doc?.issueDate ? doc.issueDate.split("T")[0] : "",
+      expiryDate: doc?.expiryDate ? doc.expiryDate.split("T")[0] : "",
       changeReason: ""
     });
     setDocMetadataErrors({});
@@ -375,15 +463,15 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
     const errors: Record<string, string> = {};
     if (!docMetadataForm.documentNumber.trim()) {
-      errors.documentNumber = "Document number is required";
+      errors.documentNumber = "Document number is required.";
     }
     if (!docMetadataForm.issueDate.trim()) {
-      errors.issueDate = "Issue date is required";
+      errors.issueDate = "Issue date is required.";
     }
     if (!docMetadataForm.expiryDate.trim()) {
-      errors.expiryDate = "Expiration date is required";
+      errors.expiryDate = "Expiration date is required.";
     } else if (docMetadataForm.issueDate.trim() && new Date(docMetadataForm.expiryDate) <= new Date(docMetadataForm.issueDate)) {
-      errors.expiryDate = "Expiration date must be strictly after the issue date";
+      errors.expiryDate = "Expiration date must be strictly after the issue date.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -432,7 +520,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     }
   };
 
-  // Document verification handlers using ISCMS modals
+  // Verification & Rejection Handlers
   const handleOpenRejectDialog = (docType: "passport" | "visa" | "efrro") => {
     setRejectDocType(docType);
     setIsRejectDialogOpen(true);
@@ -591,7 +679,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground border-border/60">Not Available</Badge>;
       case "NOT_DUE":
       default:
-        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground/80 border-border/50">Not Due</Badge>;
+        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground/80 border-border/50">Scheduled</Badge>;
     }
   };
 
@@ -599,18 +687,24 @@ export default function StudentDetailsPage({ params }: PageProps) {
     if (!dateStr || dateStr.trim() === "" || dateStr === "Not provided" || dateStr === "Not Recorded") {
       return "Not provided";
     }
-    const clean = dateStr.split("T")[0];
-    const parts = clean.split("-");
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        return `${day} ${shortMonths[month]} ${year}`;
-      }
+    return CalendarDateEngine.formatDateDisplay(dateStr);
+  };
+
+  const renderExpiryHealthBadge = (expiryDate?: string | null, daysRemaining?: number | null) => {
+    if (!expiryDate || expiryDate === "Not provided" || expiryDate === "Not Recorded") {
+      return (
+        <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60 bg-muted/20">
+          No Expiry Recorded
+        </Badge>
+      );
     }
-    return dateStr;
+
+    const health = CalendarDateEngine.getExpiryHealth(daysRemaining);
+    return (
+      <Badge variant={health.badgeVariant} className={`text-[10px] h-5 font-medium ${health.colorClass}`}>
+        {health.label}
+      </Badge>
+    );
   };
 
   return (
@@ -693,15 +787,15 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
           {/* Tab 1: Immigration Documents */}
           {activeSubTab === "immigration" && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {/* PASSPORT DOCUMENT CARD */}
-              <Card className="border border-border/60 shadow-sm overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20">
-                  <div className="flex items-center gap-2">
+              <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20 border-b border-border/40">
+                  <div className="flex items-center gap-2.5">
                     {getDocStatusIcon(student.passport, student.daysToPassportExpiry)}
                     <div>
                       <div className="flex items-center gap-2">
-                        <CardTitle className="text-sm font-semibold">PASSPORT DOCUMENT</CardTitle>
+                        <CardTitle className="text-sm font-bold tracking-tight uppercase">PASSPORT DOCUMENT</CardTitle>
                         <Badge variant="outline" className="text-[10px] h-4 font-mono text-muted-foreground border-border/60">
                           Current Version (v{student.passport.versionNumber || 1})
                         </Badge>
@@ -729,67 +823,94 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="p-4 grid gap-4 sm:grid-cols-2 text-xs">
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Passport Number</span>
-                    <span className="font-semibold text-foreground block font-mono">
-                      {student.passport.number && student.passport.number !== "Not provided" ? student.passport.number : <span className="text-muted-foreground font-sans font-normal">Not provided</span>}
-                    </span>
+
+                <CardContent className="p-4 space-y-4 text-xs">
+                  {/* Basic Metadata Grid */}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Passport Number</span>
+                      <span className="font-semibold text-foreground block font-mono text-sm">
+                        {student.passport.number && student.passport.number !== "Not provided" ? student.passport.number : <span className="text-muted-foreground font-sans font-normal text-xs">Not provided</span>}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Place of Issue</span>
+                      <span className="font-medium text-foreground block text-xs">
+                        {student.passport.placeOfIssue || <span className="text-muted-foreground font-normal">Not provided</span>}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Issue Date</span>
+                      <span className="font-medium text-foreground block text-xs">
+                        {student.passport.issueDate ? formatDisplayDate(student.passport.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Place of Issue</span>
-                    <span className="font-semibold text-foreground block">
-                      {student.passport.placeOfIssue || <span className="text-muted-foreground font-normal">Not provided</span>}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Issue Date</span>
-                    <span className="font-semibold text-foreground block">
-                      {student.passport.issueDate ? formatDisplayDate(student.passport.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Expiration Date</span>
-                    <span className={`font-semibold block ${student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry < 0 ? "text-rose-600" : "text-foreground"}`}>
-                      {student.passport.expiryDate ? (
-                        <>
-                          {formatDisplayDate(student.passport.expiryDate)}{" "}
-                          {student.daysToPassportExpiry !== undefined && (
-                            <span className="text-[10px] font-medium font-caption">
-                              ({student.daysToPassportExpiry < 0 ? `Expired ${Math.abs(student.daysToPassportExpiry)} days ago` : `${student.daysToPassportExpiry} days left`})
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground font-normal">Not provided</span>
-                      )}
-                    </span>
+
+                  {/* FIRST-CLASS EXPIRATION DATE & VALIDITY HIGHLIGHT CONTAINER */}
+                  <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-caption flex items-center gap-1">
+                          <CalendarDays className="h-3 w-3 text-primary" /> Expiration Date & Validity
+                        </span>
+                        {renderExpiryHealthBadge(student.passport.expiryDate, student.daysToPassportExpiry)}
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-base font-bold text-foreground font-mono">
+                          {formatDisplayDate(student.passport.expiryDate)}
+                        </span>
+                        {student.passport.expiryDate && (
+                          <span className={`text-xs font-semibold ${
+                            student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry < 0 
+                              ? "text-rose-600 dark:text-rose-400" 
+                              : student.daysToPassportExpiry !== undefined && student.daysToPassportExpiry <= 30
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          }`}>
+                            ({CalendarDateEngine.formatRelativeDays(student.daysToPassportExpiry)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        className="h-8 text-xs font-semibold px-3 shadow-xs"
+                        onClick={() => openExpiryDialog("passport")}
+                      >
+                        <Calendar className="mr-1.5 h-3.5 w-3.5" /> Update Expiry Date
+                      </Button>
+                    </div>
                   </div>
 
                   {student.passport.verifiedAt && (
-                    <div className="sm:col-span-2 pt-2 border-t border-border/20 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <div className="pt-2 border-t border-border/30 flex items-center gap-2 text-[11px] text-muted-foreground">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                       <span>Verified on {new Date(student.passport.verifiedAt).toLocaleDateString()}</span>
                     </div>
                   )}
 
                   {/* Document Card Action Footer */}
-                  <div className="sm:col-span-2 pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
+                  <div className="pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Link 
                         href={`/students/${student.id}/passport`} 
                         className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
                       >
-                        <FileText className="h-3.5 w-3.5" /> View Document
+                        <FileText className="h-3.5 w-3.5" /> View Document & History
                       </Link>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="h-7 text-[11px] px-2.5"
+                        className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
                         onClick={() => openDocMetadataDialog("passport")}
                       >
-                        <Edit3 className="mr-1 h-3 w-3" /> Update Details
+                        <Edit3 className="mr-1 h-3 w-3" /> Update All Details
                       </Button>
                     </div>
 
@@ -817,13 +938,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </Card>
 
               {/* VISA DOCUMENT CARD */}
-              <Card className="border border-border/60 shadow-sm overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20">
-                  <div className="flex items-center gap-2">
+              <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20 border-b border-border/40">
+                  <div className="flex items-center gap-2.5">
                     {getDocStatusIcon(student.visa, student.daysToVisaExpiry)}
                     <div>
                       <div className="flex items-center gap-2">
-                        <CardTitle className="text-sm font-semibold">VISA DOCUMENT</CardTitle>
+                        <CardTitle className="text-sm font-bold tracking-tight uppercase">VISA DOCUMENT</CardTitle>
                         <Badge variant="outline" className="text-[10px] h-4 font-mono text-muted-foreground border-border/60">
                           Current Version (v{student.visa.versionNumber || 1})
                         </Badge>
@@ -851,67 +972,94 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="p-4 grid gap-4 sm:grid-cols-2 text-xs">
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Visa Number</span>
-                    <span className="font-semibold text-foreground block font-mono">
-                      {student.visa.number && student.visa.number !== "Not provided" ? student.visa.number : <span className="text-muted-foreground font-sans font-normal">Not provided</span>}
-                    </span>
+
+                <CardContent className="p-4 space-y-4 text-xs">
+                  {/* Basic Metadata Grid */}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Visa Number</span>
+                      <span className="font-semibold text-foreground block font-mono text-sm">
+                        {student.visa.number && student.visa.number !== "Not provided" ? student.visa.number : <span className="text-muted-foreground font-sans font-normal text-xs">Not provided</span>}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Visa Classification</span>
+                      <span className="font-medium text-foreground block text-xs">
+                        {student.visa.visaType || <span className="text-muted-foreground font-normal">Not provided</span>}
+                      </span>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Issue Date</span>
+                      <span className="font-medium text-foreground block text-xs">
+                        {student.visa.issueDate ? formatDisplayDate(student.visa.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Visa Type Classification</span>
-                    <span className="font-semibold text-foreground block">
-                      {student.visa.visaType || <span className="text-muted-foreground font-normal">Not provided</span>}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Issue Date</span>
-                    <span className="font-semibold text-foreground block">
-                      {student.visa.issueDate ? formatDisplayDate(student.visa.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Expiration Date</span>
-                    <span className={`font-semibold block ${student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry < 0 ? "text-rose-600" : "text-foreground"}`}>
-                      {student.visa.expiryDate ? (
-                        <>
-                          {formatDisplayDate(student.visa.expiryDate)}{" "}
-                          {student.daysToVisaExpiry !== undefined && (
-                            <span className="text-[10px] font-medium font-caption">
-                              ({student.daysToVisaExpiry < 0 ? `Expired ${Math.abs(student.daysToVisaExpiry)} days ago` : `${student.daysToVisaExpiry} days left`})
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground font-normal">Not provided</span>
-                      )}
-                    </span>
+
+                  {/* FIRST-CLASS EXPIRATION DATE & VALIDITY HIGHLIGHT CONTAINER */}
+                  <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-caption flex items-center gap-1">
+                          <CalendarDays className="h-3 w-3 text-primary" /> Expiration Date & Validity
+                        </span>
+                        {renderExpiryHealthBadge(student.visa.expiryDate, student.daysToVisaExpiry)}
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-base font-bold text-foreground font-mono">
+                          {formatDisplayDate(student.visa.expiryDate)}
+                        </span>
+                        {student.visa.expiryDate && (
+                          <span className={`text-xs font-semibold ${
+                            student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry < 0 
+                              ? "text-rose-600 dark:text-rose-400" 
+                              : student.daysToVisaExpiry !== undefined && student.daysToVisaExpiry <= 30
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          }`}>
+                            ({CalendarDateEngine.formatRelativeDays(student.daysToVisaExpiry)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        className="h-8 text-xs font-semibold px-3 shadow-xs"
+                        onClick={() => openExpiryDialog("visa")}
+                      >
+                        <Calendar className="mr-1.5 h-3.5 w-3.5" /> Update Expiry Date
+                      </Button>
+                    </div>
                   </div>
 
                   {student.visa.verifiedAt && (
-                    <div className="sm:col-span-2 pt-2 border-t border-border/20 flex items-center gap-2 text-[11px] text-muted-foreground">
+                    <div className="pt-2 border-t border-border/30 flex items-center gap-2 text-[11px] text-muted-foreground">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                       <span>Verified on {new Date(student.visa.verifiedAt).toLocaleDateString()}</span>
                     </div>
                   )}
 
                   {/* Document Card Action Footer */}
-                  <div className="sm:col-span-2 pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
+                  <div className="pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Link 
                         href={`/students/${student.id}/visa`} 
                         className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
                       >
-                        <FileText className="h-3.5 w-3.5" /> View Document
+                        <FileText className="h-3.5 w-3.5" /> View Document & History
                       </Link>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="h-7 text-[11px] px-2.5"
+                        className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
                         onClick={() => openDocMetadataDialog("visa")}
                       >
-                        <Edit3 className="mr-1 h-3 w-3" /> Update Details
+                        <Edit3 className="mr-1 h-3 w-3" /> Update All Details
                       </Button>
                     </div>
 
@@ -940,13 +1088,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
               {/* EFRRO REGISTRATION CARD */}
               {student.efrro ? (
-                <Card className="border border-border/60 shadow-sm overflow-hidden">
-                  <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20">
-                    <div className="flex items-center gap-2">
+                <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
+                  <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/20 border-b border-border/40">
+                    <div className="flex items-center gap-2.5">
                       {getDocStatusIcon(student.efrro, student.daysToEfrroExpiry)}
                       <div>
                         <div className="flex items-center gap-2">
-                          <CardTitle className="text-sm font-semibold">eFRRO / RESIDENTIAL PERMIT</CardTitle>
+                          <CardTitle className="text-sm font-bold tracking-tight uppercase">eFRRO / RESIDENTIAL PERMIT</CardTitle>
                           <Badge variant="outline" className="text-[10px] h-4 font-mono text-muted-foreground border-border/60">
                             Current Version (v{student.efrro.versionNumber || 1})
                           </Badge>
@@ -974,61 +1122,88 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className="p-4 grid gap-4 sm:grid-cols-2 text-xs">
-                    <div className="space-y-1">
-                      <span className="text-muted-foreground block font-caption">Certificate Number</span>
-                      <span className="font-semibold text-foreground block font-mono">
-                        {student.efrro.number && student.efrro.number !== "Not provided" ? student.efrro.number : <span className="text-muted-foreground font-sans font-normal">Not provided</span>}
-                      </span>
+
+                  <CardContent className="p-4 space-y-4 text-xs">
+                    {/* Basic Metadata Grid */}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Certificate Number</span>
+                        <span className="font-semibold text-foreground block font-mono text-sm">
+                          {student.efrro.number && student.efrro.number !== "Not provided" ? student.efrro.number : <span className="text-muted-foreground font-sans font-normal text-xs">Not provided</span>}
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-muted-foreground block font-caption uppercase tracking-wider">Issue Date</span>
+                        <span className="font-medium text-foreground block text-xs">
+                          {student.efrro.issueDate ? formatDisplayDate(student.efrro.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
+                        </span>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <span className="text-muted-foreground block font-caption">Issue Date</span>
-                      <span className="font-semibold text-foreground block">
-                        {student.efrro.issueDate ? formatDisplayDate(student.efrro.issueDate) : <span className="text-muted-foreground font-normal">Not provided</span>}
-                      </span>
-                    </div>
-                    <div className="space-y-1 sm:col-span-2">
-                      <span className="text-muted-foreground block font-caption">Expiration Date</span>
-                      <span className={`font-semibold block ${student.daysToEfrroExpiry !== undefined && student.daysToEfrroExpiry < 0 ? "text-rose-600" : "text-foreground"}`}>
-                        {student.efrro.expiryDate ? (
-                          <>
-                            {formatDisplayDate(student.efrro.expiryDate)}{" "}
-                            {student.daysToEfrroExpiry !== undefined && (
-                              <span className="text-[10px] font-medium font-caption">
-                                ({student.daysToEfrroExpiry < 0 ? "Expired" : `${student.daysToEfrroExpiry} days left`})
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground font-normal">Not provided</span>
-                        )}
-                      </span>
+
+                    {/* FIRST-CLASS EXPIRATION DATE & VALIDITY HIGHLIGHT CONTAINER */}
+                    <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/[0.03] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider font-caption flex items-center gap-1">
+                            <CalendarDays className="h-3 w-3 text-primary" /> Expiration Date & Validity
+                          </span>
+                          {renderExpiryHealthBadge(student.efrro.expiryDate, student.daysToEfrroExpiry)}
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-base font-bold text-foreground font-mono">
+                            {formatDisplayDate(student.efrro.expiryDate)}
+                          </span>
+                          {student.efrro.expiryDate && (
+                            <span className={`text-xs font-semibold ${
+                              student.daysToEfrroExpiry !== undefined && student.daysToEfrroExpiry < 0 
+                                ? "text-rose-600 dark:text-rose-400" 
+                                : student.daysToEfrroExpiry !== undefined && student.daysToEfrroExpiry <= 30
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            }`}>
+                              ({CalendarDateEngine.formatRelativeDays(student.daysToEfrroExpiry)})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          className="h-8 text-xs font-semibold px-3 shadow-xs"
+                          onClick={() => openExpiryDialog("efrro")}
+                        >
+                          <Calendar className="mr-1.5 h-3.5 w-3.5" /> Update Expiry Date
+                        </Button>
+                      </div>
                     </div>
 
                     {student.efrro.verifiedAt && (
-                      <div className="sm:col-span-2 pt-2 border-t border-border/20 flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <div className="pt-2 border-t border-border/30 flex items-center gap-2 text-[11px] text-muted-foreground">
                         <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                         <span>Verified on {new Date(student.efrro.verifiedAt).toLocaleDateString()}</span>
                       </div>
                     )}
 
                     {/* Document Card Action Footer */}
-                    <div className="sm:col-span-2 pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
+                    <div className="pt-3 border-t border-border/40 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Link 
                           href={`/students/${student.id}/efrro`} 
                           className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
                         >
-                          <FileText className="h-3.5 w-3.5" /> View Document
+                          <FileText className="h-3.5 w-3.5" /> View Document & History
                         </Link>
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="h-7 text-[11px] px-2.5"
+                          className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
                           onClick={() => openDocMetadataDialog("efrro")}
                         >
-                          <Edit3 className="mr-1 h-3 w-3" /> Update Details
+                          <Edit3 className="mr-1 h-3 w-3" /> Update All Details
                         </Button>
                       </div>
 
@@ -1163,7 +1338,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Right Column content (emergency contacts + consular details + reminder schedule) */}
+        {/* Right Column: Emergency Contacts + Consular Info + DEDICATED REMINDER SCHEDULE */}
         <div className="space-y-6">
           {/* Emergency Contact */}
           <Card className="border border-border/60 shadow-sm">
@@ -1272,14 +1447,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* Expiry-Driven Reminder Dispatch Flow */}
-          <Card className="border border-border/60 shadow-sm overflow-hidden">
+          {/* DEDICATED REMINDER SCHEDULE SECTION (FIRST-CLASS FEATURE) */}
+          <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
             <CardHeader className="pb-3 border-b border-border/40 bg-muted/10 flex flex-row items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="h-4 w-4 text-primary" />
                 <div>
-                  <CardTitle className="text-xs font-semibold text-foreground uppercase tracking-wider">Reminder Dispatch Flow</CardTitle>
-                  <CardDescription className="text-[10px] font-caption">Expiry-driven automatic notification schedule</CardDescription>
+                  <CardTitle className="text-xs font-bold text-foreground uppercase tracking-wider">Reminder Schedule</CardTitle>
+                  <CardDescription className="text-[10px] font-caption">Automated expiry-driven notification timetable</CardDescription>
                 </div>
               </div>
               <Button variant="ghost" size="sm" onClick={loadReminderSchedule} disabled={isLoadingReminders} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
@@ -1332,7 +1507,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
                 return (
                   <div className="space-y-3.5">
-                    {/* Source Expiry Date Banner */}
+                    {/* Active Source Expiry Date Banner */}
                     <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60 flex items-center justify-between">
                       <div className="space-y-0.5">
                         <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold font-caption">
@@ -1365,51 +1540,54 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       </div>
                     </div>
 
-                    {/* Milestones Schedule */}
-                    <div className="space-y-2">
-                      {activeGroup.schedule.map((item) => (
-                        <div
-                          key={item.ruleId}
-                          className="p-2.5 rounded-lg border border-border/40 hover:border-border/80 bg-card transition-all space-y-1.5"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="space-y-0.5 flex-1 min-w-0">
-                              <span className="font-semibold text-foreground block text-xs truncate">
-                                {item.ruleName}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground font-caption block">
-                                Scheduled Date: {item.scheduledDate || "Not Available"}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {getReminderStatusBadge(item.status)}
-                              {item.status === "DUE" && (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleManualDispatch(activeGroup.documentType, item.thresholdDays, item.ruleId)}
-                                  disabled={isDispatchingReminder === item.ruleId}
-                                  className="h-6 px-1.5 text-[10px] bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
-                                  title="Dispatch reminder immediately"
-                                >
-                                  {isDispatchingReminder === item.ruleId ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <Send className="h-3 w-3" />
+                    {/* Interactive Reminder Milestones Table */}
+                    <div className="rounded-lg border border-border/60 overflow-hidden bg-card">
+                      <table className="w-full text-[11px] text-left">
+                        <thead className="bg-muted/40 text-[10px] text-muted-foreground uppercase border-b border-border/50">
+                          <tr>
+                            <th className="py-2 px-2.5 font-semibold">Reminder</th>
+                            <th className="py-2 px-2 font-semibold">Date</th>
+                            <th className="py-2 px-2 font-semibold text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/30">
+                          {activeGroup.schedule.map((item) => (
+                            <tr key={item.ruleId} className="hover:bg-muted/20 transition-colors">
+                              <td className="py-2.5 px-2.5">
+                                <span className="font-semibold text-foreground block">{item.ruleName}</span>
+                                <span className="text-[9px] text-muted-foreground font-caption capitalize">
+                                  via {item.channel}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-2 font-medium text-foreground whitespace-nowrap">
+                                {item.scheduledDate || <span className="text-muted-foreground font-normal">N/A</span>}
+                              </td>
+                              <td className="py-2.5 px-2 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {getReminderStatusBadge(item.status)}
+                                  {item.status === "DUE" && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleManualDispatch(activeGroup.documentType, item.thresholdDays, item.ruleId)}
+                                      disabled={isDispatchingReminder === item.ruleId}
+                                      className="h-5 px-1 text-[9px] bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary"
+                                      title="Dispatch notification now"
+                                    >
+                                      {isDispatchingReminder === item.ruleId ? (
+                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                      ) : (
+                                        <Send className="h-2.5 w-2.5" />
+                                      )}
+                                    </Button>
                                   )}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-
-                          {item.statusReason && (
-                            <p className="text-[10px] text-muted-foreground/80 font-caption pt-0.5 border-t border-border/20">
-                              {item.statusReason}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 );
@@ -1419,7 +1597,87 @@ export default function StudentDetailsPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Update Document Metadata Dialog */}
+      {/* FIRST-CLASS "UPDATE EXPIRY DATE" DIALOG */}
+      <Dialog open={isExpiryDialogOpen} onOpenChange={setIsExpiryDialogOpen}>
+        <DialogContent className="sm:max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              Update {expiryDocType ? expiryDocType.toUpperCase() : "Document"} Expiration Date
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveExpiryDate} className="space-y-4 py-2 text-xs">
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/60 space-y-1">
+              <span className="text-[10px] text-muted-foreground font-caption uppercase tracking-wider block font-semibold">
+                Current Expiry Date
+              </span>
+              <span className="text-sm font-bold text-foreground font-mono block">
+                {currentExpiryDateDisplay}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground" htmlFor="newExpiryDate">
+                New Expiration Date *
+              </label>
+              <DatePicker
+                id="newExpiryDate"
+                value={newExpiryDate}
+                onChange={(e) => {
+                  setNewExpiryDate(e.target.value);
+                  setExpiryErrors(prev => ({ ...prev, newExpiryDate: "" }));
+                }}
+                error={expiryErrors.newExpiryDate}
+              />
+              {expiryErrors.newExpiryDate && (
+                <p className="text-[10px] text-destructive font-caption font-medium">{expiryErrors.newExpiryDate}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground" htmlFor="expiryReason">
+                Reason for Expiry Modification *
+              </label>
+              <Textarea
+                id="expiryReason"
+                value={expiryReason}
+                onChange={(e) => {
+                  setExpiryReason(e.target.value);
+                  setExpiryErrors(prev => ({ ...prev, expiryReason: "" }));
+                }}
+                placeholder="e.g. Visa renewal grant received from FRRO; passport extension endorsed by consular authority..."
+                className={`min-h-20 text-xs ${expiryErrors.expiryReason ? "border-destructive focus-visible:ring-destructive" : ""}`}
+              />
+              {expiryErrors.expiryReason && (
+                <p className="text-[10px] text-destructive font-caption font-medium">{expiryErrors.expiryReason}</p>
+              )}
+              <p className="text-[10px] text-muted-foreground font-caption">
+                This modification will create a new verified document version (v{(student?.[expiryDocType === "passport" ? "passport" : expiryDocType === "visa" ? "visa" : "efrro"]?.versionNumber || 1) + 1}) and recalculate all notification reminder schedules.
+              </p>
+            </div>
+
+            <DialogFooter className="pt-3">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsExpiryDialogOpen(false)}>
+                Cancel
+              </Button>
+              <AsyncActionButton
+                type="submit"
+                size="sm"
+                isLoading={isSavingExpiry}
+                isSuccess={saveExpirySuccess}
+                isError={saveExpiryError}
+                idleText="Save Expiration Date"
+                loadingText="Updating expiry..."
+                successText="Expiry date updated"
+                errorText="Try Again"
+              />
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* FULL METADATA UPDATE DIALOG */}
       <Dialog open={isDocMetadataOpen} onOpenChange={setIsDocMetadataOpen}>
         <DialogContent className="sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>

@@ -201,7 +201,15 @@ export default function StudentDashboardPage() {
               {profile.passportStatus.replace("_", " ")}
             </span>
             <p className="text-[11px] text-muted-foreground mt-2">
-              {profile.passportExpiry ? `Expires: ${profile.passportExpiry}` : "No passport on file"}
+              {profile.passportExpiry ? (
+                profile.passportDaysRemaining !== null && profile.passportDaysRemaining !== undefined ? (
+                  profile.passportDaysRemaining < -1 ? `Expired ${Math.abs(profile.passportDaysRemaining)} days ago` :
+                  profile.passportDaysRemaining === -1 ? "Expired yesterday" :
+                  profile.passportDaysRemaining === 0 ? "Expires today" :
+                  profile.passportDaysRemaining === 1 ? "Expires tomorrow" :
+                  `Expires in ${profile.passportDaysRemaining} days`
+                ) : `Expires: ${profile.passportExpiry}`
+              ) : "No passport on file"}
             </p>
           </div>
         </Card>
@@ -221,7 +229,15 @@ export default function StudentDashboardPage() {
               {profile.visaStatus.replace("_", " ")}
             </span>
             <p className="text-[11px] text-muted-foreground mt-2">
-              {profile.visaExpiry ? `Expires: ${profile.visaExpiry}` : "No visa on file"}
+              {profile.visaExpiry ? (
+                profile.visaDaysRemaining !== null && profile.visaDaysRemaining !== undefined ? (
+                  profile.visaDaysRemaining < -1 ? `Expired ${Math.abs(profile.visaDaysRemaining)} days ago` :
+                  profile.visaDaysRemaining === -1 ? "Expired yesterday" :
+                  profile.visaDaysRemaining === 0 ? "Expires today" :
+                  profile.visaDaysRemaining === 1 ? "Expires tomorrow" :
+                  `Expires in ${profile.visaDaysRemaining} days`
+                ) : `Expires: ${profile.visaExpiry}`
+              ) : "No visa on file"}
             </p>
           </div>
         </Card>
@@ -241,7 +257,13 @@ export default function StudentDashboardPage() {
               {profile.efrroStatus.replace("_", " ")}
             </span>
             <p className="text-[11px] text-muted-foreground mt-2">
-              {profile.daysRemaining !== null ? `${profile.daysRemaining} days remaining` : "Pending compliance"}
+              {profile.daysRemaining !== null && profile.daysRemaining !== undefined ? (
+                profile.daysRemaining < -1 ? `Expired ${Math.abs(profile.daysRemaining)} days ago` :
+                profile.daysRemaining === -1 ? "Expired yesterday" :
+                profile.daysRemaining === 0 ? "Expires today" :
+                profile.daysRemaining === 1 ? "Expires tomorrow" :
+                `Expires in ${profile.daysRemaining} days`
+              ) : "Pending compliance"}
             </p>
           </div>
         </Card>

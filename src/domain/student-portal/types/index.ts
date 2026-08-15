@@ -16,6 +16,7 @@ export interface StudentPortalProfile {
   // Passport Info
   passportNumber?: string | null;
   passportExpiry?: string | null;
+  passportDaysRemaining?: number | null;
   passportStatus: "APPROVED" | "PENDING_VERIFICATION" | "REJECTED" | "EXPIRED" | "NOT_SUBMITTED";
   passportRemarks?: string | null;
   passportUploadDate?: string | null;
@@ -24,6 +25,7 @@ export interface StudentPortalProfile {
   visaNumber?: string | null;
   visaType?: string | null;
   visaExpiry?: string | null;
+  visaDaysRemaining?: number | null;
   visaStatus: "APPROVED" | "PENDING_VERIFICATION" | "REJECTED" | "EXPIRED" | "NOT_SUBMITTED";
   visaRemarks?: string | null;
   visaUploadDate?: string | null;
@@ -35,6 +37,7 @@ export interface StudentPortalProfile {
   efrroRemarks?: string | null;
   efrroUploadDate?: string | null;
   daysRemaining: number | null;
+  efrroDaysRemaining?: number | null;
 
   lastUploadDate: string | null;
 }
