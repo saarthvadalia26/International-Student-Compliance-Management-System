@@ -309,16 +309,41 @@ export async function fetchDocumentUploadEligibilityAction(
   }
 }
 
+export async function fetchDocumentUploadLimitAction(): Promise<{
+  maxUploadSizeBytes: number;
+  maxUploadSizeMb: number;
+  maxUploadSizeLabel: string;
+}> {
+  const { systemConfigService } = await import("@/lib/system-config");
+  const maxUploadSizeBytes = await systemConfigService.getMaxUploadSizeBytes();
+  const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
+  return {
+    maxUploadSizeBytes,
+    maxUploadSizeMb,
+    maxUploadSizeLabel: `${maxUploadSizeMb} MB`,
+  };
+}
+
 export async function fetchAllDocumentUploadEligibilityAction(jwt: string) {
   try {
     const studentId = await verifyUserAndGetStudentId(jwt);
     const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
-    const [passport, visa, efrro] = await Promise.all([
+    const { systemConfigService } = await import("@/lib/system-config");
+    const [passport, visa, efrro, maxUploadSizeBytes] = await Promise.all([
       DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "passport"),
       DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "visa"),
-      DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "efrro")
+      DocumentUploadEligibilityEngine.evaluateEligibility(studentId, "efrro"),
+      systemConfigService.getMaxUploadSizeBytes()
     ]);
-    return { passport, visa, efrro };
+    const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
+    return { 
+      passport, 
+      visa, 
+      efrro, 
+      maxUploadSizeBytes, 
+      maxUploadSizeMb, 
+      maxUploadSizeLabel: `${maxUploadSizeMb} MB` 
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[ELIGIBILITY_ACTION_ERROR] Failed to fetch all eligibility:", msg);

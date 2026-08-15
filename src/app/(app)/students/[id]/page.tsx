@@ -366,6 +366,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [isDirty, setIsDirty] = React.useState(false);
   const [editForm, setEditForm] = React.useState({
+    registrationNumber: "",
     fullName: "",
     email: "",
     program: "",
@@ -389,6 +390,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const openEditDialog = () => {
     if (student) {
       setEditForm({
+        registrationNumber: student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "",
         fullName: student.fullName,
         email: student.email,
         program: student.programName || student.programCode || "",
@@ -442,6 +444,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
     try {
       const res = await updateStudentAction(studentId, {
+        registrationNumber: editForm.registrationNumber?.trim() || null,
         fullName: editForm.fullName,
         email: editForm.email,
         phoneHome: editForm.phoneHome,
@@ -876,7 +879,9 @@ export default function StudentDetailsPage({ params }: PageProps) {
               <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to Directory
             </Link>
             <span className="text-muted-foreground/40">/</span>
-            <span className="text-xs font-mono font-medium text-foreground">{student.registrationNumber}</span>
+            <span className="text-xs font-mono font-medium text-foreground">
+              {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "Enrollment: Not provided"}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <CountryFlag countryCode={student.nationalityCode} size="md" />
@@ -1074,6 +1079,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
               <CardContent className="p-6 space-y-6">
                 {/* Academic Metrics Grid */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-xs">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Enrollment Number</span>
+                    <span className="font-semibold text-foreground block font-mono">
+                      {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "Not provided"}
+                    </span>
+                  </div>
+
                   <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
                     <span className="text-muted-foreground block text-[11px] font-medium">Registered School</span>
                     <span className="font-semibold text-foreground block">{student.school}</span>
@@ -1754,6 +1766,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
             <DialogTitle className="text-sm font-semibold">Edit Student Profile</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSaveEdit} className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="registrationNumber">University Enrollment Number</label>
+              <Input 
+                id="registrationNumber" 
+                placeholder="e.g. NFSU/2026/CS/101 (leave empty if not yet assigned)" 
+                value={editForm.registrationNumber} 
+                onChange={handleFormChange} 
+                className="h-9 text-sm font-mono" 
+              />
+              <p className="text-[10px] text-muted-foreground font-caption">
+                Externally issued by the university academic registrar.
+              </p>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground" htmlFor="fullName">Full Name</label>
               <Input id="fullName" value={editForm.fullName} onChange={handleFormChange} className="h-9 text-sm" />

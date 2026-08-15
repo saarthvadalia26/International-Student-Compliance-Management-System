@@ -137,6 +137,11 @@ export default function BulkStudentImportPage() {
       return;
     }
 
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("Import file exceeds the maximum allowed size of 100 MB.");
+      return;
+    }
+
     setSelectedFile(file);
     setIsParsing(true);
 
@@ -470,7 +475,7 @@ export default function BulkStudentImportPage() {
                   </div>
                   <div>
                     <p className="text-base font-semibold">Click to select or drag and drop your spreadsheet</p>
-                    <p className="text-xs text-muted-foreground mt-1">Supports .xlsx, .xls, and .csv up to 25MB</p>
+                    <p className="text-xs text-muted-foreground mt-1">Supports .xlsx, .xls, and .csv up to 100MB</p>
                   </div>
                   {isParsing && (
                     <div className="flex items-center gap-2 text-xs font-semibold text-primary animate-pulse mt-2">

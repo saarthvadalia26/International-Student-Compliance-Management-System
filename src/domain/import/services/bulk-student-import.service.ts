@@ -296,17 +296,9 @@ export class BulkStudentImportService {
         }
       }
 
-      // 1. Mandatory Identity Validations
+      // 1. Enrollment Number (Optional for initial import)
       const regNo = mappedData.registration_number?.trim() || "";
-      if (!regNo) {
-        errors.push({
-          field: "registration_number",
-          fieldLabel: "Registration Number",
-          value: "",
-          problem: "Registration number is required.",
-          suggestion: "Enter a valid student registration number."
-        });
-      } else {
+      if (regNo) {
         const regLower = regNo.toLowerCase();
         // Check intra-file duplicate
         if (seenFileRegs.has(regLower)) {
@@ -756,7 +748,7 @@ export class BulkStudentImportService {
         const { data: studentRecord, error: stErr } = await supabase
           .from("students")
           .insert({
-            registration_number: regNo,
+            registration_number: regNo ? regNo : null,
             status: "active",
             import_batch_id: batchId,
             created_by: params.actorId,

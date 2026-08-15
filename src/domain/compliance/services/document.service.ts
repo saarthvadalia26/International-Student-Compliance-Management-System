@@ -1,7 +1,6 @@
 import { ComplianceDocument, ComplianceDocumentType, StudentSnapshot, ComplianceStatus } from "../types/student-snapshot.types";
 import { IComplianceDocumentRepository } from "../repositories/document.repository";
 import { IStorageProvider } from "../../storage/providers/storage.provider";
-import { DocumentUploadSchema } from "../validators/document.validator";
 import { 
   DocumentNotFoundError, 
   VerificationFailedError, 
@@ -234,7 +233,12 @@ export class ComplianceDocumentService {
     const fileType = fileName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 
                      fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-    const parse = DocumentUploadSchema.safeParse({
+    const { systemConfigService } = await import("@/lib/system-config");
+    const maxUploadSizeBytes = await systemConfigService.getMaxUploadSizeBytes();
+    const { createDocumentUploadSchema } = await import("../validators/document.validator");
+    const uploadSchema = createDocumentUploadSchema(maxUploadSizeBytes);
+
+    const parse = uploadSchema.safeParse({
       studentId,
       documentNumber: docNumber,
       issueDate: issueDate.toISOString().split("T")[0],

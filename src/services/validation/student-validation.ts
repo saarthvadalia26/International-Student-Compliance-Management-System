@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const RegisterStudentValidationSchema = z.object({
-  registrationNumber: z.string().min(3, "Registration number must contain at least 3 characters").max(50),
+  registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
   fullName: z.string().min(2, "Full name must be at least 2 characters").max(255),
   nationalityCode: z.string().length(3, "Please select a valid nationality"),
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"], {
@@ -94,6 +94,7 @@ export const RegisterStudentValidationSchema = z.object({
 
 export const UpdateStudentValidationSchema = z.object({
   status: z.enum(["active", "suspended", "graduated", "withdrawn"]).optional(),
+  registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
   fullName: z.string().min(2).max(255).optional(),
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional(),
   dateOfBirth: z.string().optional(),

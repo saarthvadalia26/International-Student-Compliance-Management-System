@@ -39,6 +39,8 @@ interface FieldMeta {
 }
 
 const FIELD_METADATA: Record<string, FieldMeta> = {
+  enrollmentNumber: { tab: "academic", elementId: "enrollmentNumber", label: "Enrollment Number" },
+  registrationNumber: { tab: "academic", elementId: "enrollmentNumber", label: "Enrollment Number" },
   fullName: { tab: "personal", elementId: "fullName", label: "Full Name" },
   nationalityCode: { tab: "personal", elementId: "nationality", label: "Nationality" },
   nationality: { tab: "personal", elementId: "nationality", label: "Nationality" },
@@ -131,6 +133,7 @@ export default function StudentRegistrationPage() {
 
   // Form State (persisted across all tab transitions)
   const [formData, setFormData] = React.useState({
+    enrollmentNumber: "",
     fullName: "",
     nationality: "",
     gender: "",
@@ -275,7 +278,7 @@ export default function StudentRegistrationPage() {
 
     // Zod payload assembly
     const validationPayload: RegisterStudentInput = {
-      registrationNumber: `ISCMS-${Date.now().toString().slice(-4)}`,
+      registrationNumber: formData.enrollmentNumber?.trim() || undefined,
       fullName: formData.fullName.trim(),
       nationalityCode: formData.nationality.trim().toUpperCase(),
       gender: (formData.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
@@ -666,6 +669,28 @@ export default function StudentRegistrationPage() {
                 <Separator className="my-2" />
                 
                 <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="enrollmentNumber">
+                      Enrollment Number (optional)
+                    </label>
+                    <Input
+                      id="enrollmentNumber"
+                      placeholder="e.g. NFSU/2026/CS/101"
+                      value={formData.enrollmentNumber}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className={`h-10 text-sm font-mono ${(validationErrors.registrationNumber || validationErrors.enrollmentNumber) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                    />
+                    <p className="text-[11px] text-muted-foreground font-caption">
+                      Provided by the university. You can add it later if it is not available now.
+                    </p>
+                    {(validationErrors.registrationNumber || validationErrors.enrollmentNumber) && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.registrationNumber || validationErrors.enrollmentNumber}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="program">
                       Academic Program

@@ -1050,7 +1050,7 @@ export async function updateDocumentVerificationAction(
  * Implements the strict document lifecycle:
  * Upload -> Pending Verification -> Staff Approval -> Active Version
  *
- * 1. Validates physical file (PDF / PNG / JPEG <= 5MB)
+ * 1. Validates physical file (PDF / PNG / JPEG <= configured limit, default 10MB)
  * 2. Saves file buffer to immutable storage: students/${studentId}/${type}/v${nextVersion}/${fileName}
  * 3. Creates next version (vN+1) with verification_status: 'pending' and is_active: false
  * 4. Preserves previous active version as active until approval
@@ -1102,8 +1102,12 @@ export async function uploadDocumentRenewalAction(
       return { success: false, error: "A valid physical document file (PDF or Image) is required for version renewal." };
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      return { success: false, error: "File size exceeds 5MB limit." };
+    const { systemConfigService } = await import("@/lib/system-config");
+    const maxUploadSizeBytes = await systemConfigService.getMaxUploadSizeBytes();
+    const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
+
+    if (file.size > maxUploadSizeBytes) {
+      return { success: false, error: `File exceeds the maximum allowed size of ${maxUploadSizeMb} MB.` };
     }
 
     const cleanDocNum = documentNumber.trim();

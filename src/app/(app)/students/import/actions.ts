@@ -62,8 +62,9 @@ export async function parseUploadedSpreadsheetAction(
     }
 
     const fileBuffer = Buffer.from(fileBase64, "base64");
-    if (fileBuffer.length > 25 * 1024 * 1024) { // 25MB max
-      return { success: false, error: "Spreadsheet exceeds maximum allowed size of 25MB." };
+    const MAX_IMPORT_SIZE_BYTES = 100 * 1024 * 1024; // Dedicated 100 MB bulk import limit
+    if (fileBuffer.length > MAX_IMPORT_SIZE_BYTES) {
+      return { success: false, error: "Import file exceeds the maximum allowed size of 100 MB." };
     }
 
     const { headers, rows } = BulkStudentImportService.parseSpreadsheet(fileBuffer);

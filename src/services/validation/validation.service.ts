@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // 1. Core Student Schema
 export const StudentSchema = z.object({
-  registrationNumber: z.string().min(3).max(50),
+  registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
   status: z.enum(["active", "suspended", "graduated", "withdrawn"]).default("active"),
 });
 

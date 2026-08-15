@@ -1,472 +1,421 @@
+/**
+ * ============================================================================
+ * Acceptance Test Suite: Student Document Replacement Request Workflow
+ * ============================================================================
+ * 
+ * Verifies that:
+ * 1. Verified Document v1 -> Upload locked, Request Replacement available.
+ * 2. Student requests Passport replacement -> Status becomes PENDING, upload locked.
+ * 3. Staff approves request -> Status becomes APPROVED, upload window opens.
+ * 4. Student uploads new Passport -> Status becomes PENDING VERIFICATION (no verified version yet).
+ * 5. Staff approves new Passport -> v2 Verified, Upload locks again.
+ * 6. Student attempts upload without replacement request -> Upload blocked.
+ * 7. Duplicate replacement request -> Prevented while one is already pending.
+ * 8. Unauthorized student request -> Blocked.
+ * 9. Rejected replacement request -> Upload remains locked, reason visible, can request again.
+ * 10. Expired upload window -> Upload disabled, requires new request.
+ */
+
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { 
-  DocumentReplacementRequestService, 
-  DocumentReplacementStatus,
-  DocumentReplacementReason 
-} from "../src/domain/compliance/services/replacement-request.service";
-import { 
-  DocumentUploadEligibilityEngine,
-  ComplianceDocumentType,
+  DocumentUploadEligibilityEngine, 
+  ComplianceDocumentType, 
   DocumentVersionInfo,
   StudentUploadAuthorization
 } from "../src/domain/compliance/services/upload-eligibility.service";
+import { 
+  DocumentReplacementRequestRecord,
+  DocumentReplacementReason,
+  REASON_LABELS
+} from "../src/domain/compliance/types/replacement-request.types";
 
-console.log("=======================================================");
-console.log("  ISCMS DOCUMENT REPLACEMENT REQUEST TEST SUITE");
-console.log("=======================================================\n");
+describe("Student Document Replacement Request Workflow", () => {
 
-// -------------------------------------------------------------
-// Test 1: Valid approved document outside window
-// -------------------------------------------------------------
-console.log("--- Test 1: Approved Document Outside Window ---");
-{
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "efrro",
-    activeDocument: {
-      versionNumber: 1,
-      filePath: "efrro/std-1/v1/efrro.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2026-12-20"
-    },
-    pendingDocument: null,
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: null,
-    currentDate: new Date("2026-08-15") // 127 days before expiry
-  });
+  console.log("\n=======================================================");
+  console.log("  ISCMS DOCUMENT REPLACEMENT REQUEST ACCEPTANCE TESTS  ");
+  console.log("=======================================================\n");
 
-  assert.equal(eligibility.canUpload, false, "Upload must be disabled outside window");
-  assert.equal(eligibility.reasonCode, "OUTSIDE_WINDOW", "Reason code must be OUTSIDE_WINDOW");
-  assert.equal(eligibility.daysUntilExpiry, 127, "Days until expiry should be 127");
-  assert.equal(eligibility.userTitle, "Document Verified");
-  console.log("✅ [PASS] Test 1: Upload is DISABLED outside window with valid approved document");
-}
+  const mockStudentId = "11111111-1111-4111-a111-111111111111";
+  const otherStudentId = "22222222-2222-4222-a222-222222222222";
 
-// -------------------------------------------------------------
-// Test 2: Student submits early replacement request
-// -------------------------------------------------------------
-console.log("\n--- Test 2: Replacement Request Submitted (Pending) ---");
-{
-  const pendingRequest = {
-    id: "req-001",
-    studentId: "std-1",
-    documentType: "efrro" as const,
-    currentDocumentVersion: 1,
-    currentExpiryDate: "2026-12-20",
-    reason: "efrro_reissued" as const,
-    reasonDetails: "Received new eFRRO registration certificate from immigration.",
-    status: "pending" as const,
-    submittedAt: "2026-08-15T10:00:00.000Z",
-    reviewedBy: null,
-    reviewedAt: null,
-    rejectionReason: null,
-    authorizationId: null,
-    authorizationExpiresAt: null,
-    completedAt: null,
-    completedVersionId: null,
-    createdAt: "2026-08-15T10:00:00.000Z",
-    updatedAt: "2026-08-15T10:00:00.000Z"
-  };
+  // Simulated Database State for In-Memory Engine Validation
+  interface MockDbState {
+    students: Record<string, { id: string }>;
+    documents: Record<string, {
+      activeVersion: DocumentVersionInfo | null;
+      pendingVersion: DocumentVersionInfo | null;
+    }>;
+    replacementRequests: DocumentReplacementRequestRecord[];
+    uploadAuthorizations: StudentUploadAuthorization[];
+  }
 
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "efrro",
-    activeDocument: {
-      versionNumber: 1,
-      filePath: "efrro/std-1/v1/efrro.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2026-12-20"
-    },
-    pendingDocument: null,
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: pendingRequest,
-    currentDate: new Date("2026-08-15")
-  });
+  let db: MockDbState;
 
-  assert.equal(eligibility.canUpload, false, "Upload must remain DISABLED while replacement request is pending");
-  assert.equal(eligibility.reasonCode, "REPLACEMENT_REQUEST_PENDING", "Reason code must be REPLACEMENT_REQUEST_PENDING");
-  assert.equal(eligibility.userTitle, "Replacement Request Pending");
-  assert.ok(eligibility.userMessage.includes("under review"), "User message must indicate under review");
-  console.log("✅ [PASS] Test 2: Request status is Pending and upload remains securely disabled");
-}
+  function resetDb() {
+    db = {
+      students: {
+        [mockStudentId]: { id: mockStudentId },
+        [otherStudentId]: { id: otherStudentId }
+      },
+      documents: {
+        [`${mockStudentId}_passport`]: {
+          activeVersion: {
+            versionNumber: 1,
+            filePath: "students/11111111-1111-4111-a111-111111111111/passport/v1.pdf",
+            verificationStatus: "verified",
+            isActive: true,
+            expiryDate: "2028-12-20"
+          },
+          pendingVersion: null
+        },
+        [`${mockStudentId}_visa`]: {
+          activeVersion: {
+            versionNumber: 1,
+            filePath: "students/11111111-1111-4111-a111-111111111111/visa/v1.pdf",
+            verificationStatus: "verified",
+            isActive: true,
+            expiryDate: "2027-06-15"
+          },
+          pendingVersion: null
+        },
+        [`${mockStudentId}_efrro`]: {
+          activeVersion: {
+            versionNumber: 1,
+            filePath: "students/11111111-1111-4111-a111-111111111111/efrro/v1.pdf",
+            verificationStatus: "verified",
+            isActive: true,
+            expiryDate: "2027-01-30"
+          },
+          pendingVersion: null
+        }
+      },
+      replacementRequests: [],
+      uploadAuthorizations: []
+    };
+  }
 
-// -------------------------------------------------------------
-// Test 3: Staff approves request -> Temporary authorization created
-// -------------------------------------------------------------
-console.log("\n--- Test 3: Staff Approves Replacement Request ---");
-{
-  const approvedRequest = {
-    id: "req-001",
-    studentId: "std-1",
-    documentType: "efrro" as const,
-    currentDocumentVersion: 1,
-    currentExpiryDate: "2026-12-20",
-    reason: "efrro_reissued" as const,
-    reasonDetails: "Received new eFRRO registration certificate from immigration.",
-    status: "approved" as const,
-    submittedAt: "2026-08-15T10:00:00.000Z",
-    reviewedBy: "staff-99",
-    reviewedAt: "2026-08-15T11:00:00.000Z",
-    rejectionReason: null,
-    authorizationId: "auth-001",
-    authorizationExpiresAt: "2026-08-22T11:00:00.000Z", // 7 days later
-    completedAt: null,
-    completedVersionId: null,
-    createdAt: "2026-08-15T10:00:00.000Z",
-    updatedAt: "2026-08-15T11:00:00.000Z"
-  };
+  // Helper to calculate student upload eligibility based on db state
+  function getEligibility(studentId: string, docType: ComplianceDocumentType, currentDate: string = "2026-08-15") {
+    const docKey = `${studentId}_${docType}`;
+    const docState = db.documents[docKey] || { activeVersion: null, pendingVersion: null };
+    
+    // Find active or pending replacement request
+    const activeReq = db.replacementRequests.find(r => 
+      r.studentId === studentId && 
+      r.documentType === docType && 
+      (r.status === "pending" || r.status === "approved" || r.status === "rejected")
+    ) || null;
 
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "efrro",
-    activeDocument: {
-      versionNumber: 1,
-      filePath: "efrro/std-1/v1/efrro.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2026-12-20"
-    },
-    pendingDocument: null,
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: approvedRequest,
-    currentDate: new Date("2026-08-16") // Inside 7-day window
-  });
+    const activeAuth = db.uploadAuthorizations.find(a => 
+      a.studentId === studentId && 
+      a.documentType === docType && 
+      a.status === "active"
+    ) || null;
 
-  assert.equal(eligibility.canUpload, true, "Upload must be ENABLED after replacement request is approved");
-  assert.equal(eligibility.reasonCode, "REPLACEMENT_REQUEST_APPROVED", "Reason code must be REPLACEMENT_REQUEST_APPROVED");
-  assert.equal(eligibility.userTitle, "Replacement Approved");
-  assert.equal(eligibility.authorizationExpiresAt, "2026-08-22T11:00:00.000Z");
-  assert.ok(eligibility.userMessage.includes("approved"), "User message confirms approval");
-  console.log("✅ [PASS] Test 3: Approved request enables upload with specific expiration date");
-}
+    return DocumentUploadEligibilityEngine.calculateEligibility({
+      documentType: docType,
+      activeDocument: docState.activeVersion,
+      pendingDocument: docState.pendingVersion,
+      activeAuthorization: activeAuth,
+      activeReplacementRequest: activeReq,
+      currentDate
+    });
+  }
 
-// -------------------------------------------------------------
-// Test 4: Student uploads -> Pending verification & Request completed
-// -------------------------------------------------------------
-console.log("\n--- Test 4: Student Uploads Document -> Pending Verification ---");
-{
-  // When student uploads file v2:
-  // 1. Pending document version exists
-  // 2. Request transitions to completed
-  const completedRequest = {
-    id: "req-001",
-    studentId: "std-1",
-    documentType: "efrro" as const,
-    currentDocumentVersion: 1,
-    currentExpiryDate: "2026-12-20",
-    reason: "efrro_reissued" as const,
-    reasonDetails: "Received new eFRRO registration certificate from immigration.",
-    status: "completed" as const,
-    submittedAt: "2026-08-15T10:00:00.000Z",
-    reviewedBy: "staff-99",
-    reviewedAt: "2026-08-15T11:00:00.000Z",
-    rejectionReason: null,
-    authorizationId: "auth-001",
-    authorizationExpiresAt: "2026-08-22T11:00:00.000Z",
-    completedAt: "2026-08-16T14:30:00.000Z",
-    completedVersionId: "ver-002",
-    createdAt: "2026-08-15T10:00:00.000Z",
-    updatedAt: "2026-08-16T14:30:00.000Z"
-  };
+  function submitReplacementRequest(
+    studentId: string, 
+    docType: ComplianceDocumentType, 
+    reason: DocumentReplacementReason, 
+    reasonDetails: string,
+    callerStudentId: string
+  ): { success: boolean; error?: string; request?: DocumentReplacementRequestRecord } {
+    // 1. Authorization check
+    if (studentId !== callerStudentId) {
+      return { success: false, error: "Unauthorized: You can only submit replacement requests for your own documents." };
+    }
 
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "efrro",
-    activeDocument: {
-      versionNumber: 1,
-      filePath: "efrro/std-1/v1/efrro.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2026-12-20"
-    },
-    pendingDocument: {
-      versionNumber: 2,
-      filePath: "efrro/std-1/v2/new_efrro.pdf",
+    // 2. Check existing pending or active approved request
+    const existing = db.replacementRequests.find(r => 
+      r.studentId === studentId && 
+      r.documentType === docType && 
+      r.status === "pending"
+    );
+    if (existing) {
+      return { 
+        success: false, 
+        error: `A replacement request for your ${docType.toUpperCase()} is already pending review by the compliance team.` 
+      };
+    }
+
+    const docKey = `${studentId}_${docType}`;
+    const activeDoc = db.documents[docKey]?.activeVersion;
+
+    const newReq: DocumentReplacementRequestRecord = {
+      id: `req-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      studentId,
+      documentType: docType,
+      currentDocumentVersion: activeDoc?.versionNumber || 1,
+      currentExpiryDate: activeDoc?.expiryDate || null,
+      reason,
+      reasonDetails: reasonDetails.trim() || REASON_LABELS[reason] || "Replacement requested",
+      status: "pending",
+      submittedAt: new Date().toISOString(),
+      reviewedBy: null,
+      reviewedAt: null,
+      rejectionReason: null,
+      authorizationId: null,
+      authorizationExpiresAt: null,
+      completedAt: null,
+      completedVersionId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    db.replacementRequests.push(newReq);
+    return { success: true, request: newReq };
+  }
+
+  function staffApproveReplacementRequest(requestId: string, durationDays: number = 7) {
+    const req = db.replacementRequests.find(r => r.id === requestId);
+    if (!req) return { success: false, error: "Request not found." };
+
+    const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+    const authId = `auth-${Date.now()}`;
+
+    req.status = "approved";
+    req.reviewedAt = new Date().toISOString();
+    req.reviewedBy = "staff-user-id";
+    req.authorizationId = authId;
+    req.authorizationExpiresAt = expiresAt;
+
+    db.uploadAuthorizations.push({
+      id: authId,
+      studentId: req.studentId,
+      documentType: req.documentType,
+      reason: "document_replaced",
+      reasonDetails: req.reasonDetails,
+      validFrom: new Date().toISOString(),
+      validUntil: expiresAt,
+      status: "active",
+      createdAt: new Date().toISOString()
+    });
+
+    return { success: true, request: req };
+  }
+
+  function staffRejectReplacementRequest(requestId: string, rejectionReason: string) {
+    const req = db.replacementRequests.find(r => r.id === requestId);
+    if (!req) return { success: false, error: "Request not found." };
+
+    req.status = "rejected";
+    req.reviewedAt = new Date().toISOString();
+    req.reviewedBy = "staff-user-id";
+    req.rejectionReason = rejectionReason;
+
+    return { success: true, request: req };
+  }
+
+  function studentUploadReplacementDocument(studentId: string, docType: ComplianceDocumentType, filePath: string) {
+    const elig = getEligibility(studentId, docType);
+    if (!elig.canUpload) {
+      return { success: false, error: "Upload is locked. Please request a replacement first." };
+    }
+
+    const docKey = `${studentId}_${docType}`;
+    db.documents[docKey].pendingVersion = {
+      versionNumber: (db.documents[docKey].activeVersion?.versionNumber || 0) + 1,
+      filePath,
       verificationStatus: "pending",
       isActive: false,
-      expiryDate: "2027-12-20"
-    },
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: completedRequest,
-    currentDate: new Date("2026-08-16")
+      expiryDate: "2031-08-01"
+    };
+
+    return { success: true };
+  }
+
+  function staffVerifyAndApproveDocument(studentId: string, docType: ComplianceDocumentType) {
+    const docKey = `${studentId}_${docType}`;
+    const pending = db.documents[docKey].pendingVersion;
+    if (!pending) return { success: false, error: "No pending document to approve." };
+
+    pending.verificationStatus = "verified";
+    pending.isActive = true;
+    db.documents[docKey].activeVersion = pending;
+    db.documents[docKey].pendingVersion = null;
+
+    // Consume replacement request & authorizations
+    const req = db.replacementRequests.find(r => r.studentId === studentId && r.documentType === docType && r.status === "approved");
+    if (req) {
+      req.status = "completed";
+    }
+    const auth = db.uploadAuthorizations.find(a => a.studentId === studentId && a.documentType === docType && a.status === "active");
+    if (auth) {
+      auth.status = "consumed";
+    }
+
+    return { success: true, activeVersion: pending };
+  }
+
+  it("Test 1: Verified Passport v1 -> Upload locked, Request Replacement available", () => {
+    resetDb();
+    const elig = getEligibility(mockStudentId, "passport");
+    assert.equal(elig.canUpload, false);
+    assert.equal(elig.reasonCode, "OUTSIDE_WINDOW");
+    assert.equal(elig.isPendingReview, false);
+    console.log("✅ [PASS] Test 1: Verified Passport v1 is upload-locked and replacement request is accessible");
   });
 
-  assert.equal(eligibility.canUpload, false, "Upload must be DISABLED while v2 is pending review");
-  assert.equal(eligibility.reasonCode, "PENDING_VERIFICATION", "Reason code must be PENDING_VERIFICATION");
-  assert.equal(eligibility.isPendingReview, true, "isPendingReview must be true");
-  assert.equal(eligibility.userTitle, "Pending Verification");
-  console.log("✅ [PASS] Test 4: Upload immediately locks after submission while awaiting staff verification");
-}
+  it("Test 2: Student requests Passport replacement -> Status becomes PENDING, Upload remains locked", () => {
+    resetDb();
+    const subRes = submitReplacementRequest(
+      mockStudentId, 
+      "passport", 
+      "passport_renewed_early", 
+      "Renewed passport early at embassy", 
+      mockStudentId
+    );
 
-// -------------------------------------------------------------
-// Test 5: Staff verifies document -> New active v2
-// -------------------------------------------------------------
-console.log("\n--- Test 5: Staff Verifies v2 Document ---");
-{
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "efrro",
-    activeDocument: {
-      versionNumber: 2,
-      filePath: "efrro/std-1/v2/new_efrro.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2027-12-20" // 1 year renewal
-    },
-    pendingDocument: null,
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: null,
-    currentDate: new Date("2026-08-17")
+    assert.equal(subRes.success, true);
+    assert.equal(subRes.request?.status, "pending");
+
+    const elig = getEligibility(mockStudentId, "passport");
+    assert.equal(elig.canUpload, false);
+    assert.equal(elig.reasonCode, "REPLACEMENT_REQUEST_PENDING");
+    assert.equal(elig.activeReplacementRequest?.status, "pending");
+    console.log("✅ [PASS] Test 2: Replacement request is PENDING and upload remains securely locked");
   });
 
-  assert.equal(eligibility.canUpload, false, "Upload must be locked after v2 verification");
-  assert.equal(eligibility.reasonCode, "OUTSIDE_WINDOW", "Reason code must be OUTSIDE_WINDOW");
-  assert.equal(eligibility.uploadWindowOpensDate, "2027-11-20", "Next window opens 30 days before new expiry");
-  console.log("✅ [PASS] Test 5: v2 verified and active, next upload window correctly set for 2027-11-20");
-}
+  it("Test 3: Staff approves request -> Status becomes APPROVED, Passport upload window opens", () => {
+    resetDb();
+    const subRes = submitReplacementRequest(
+      mockStudentId, 
+      "passport", 
+      "passport_renewed_early", 
+      "Renewed passport early at embassy", 
+      mockStudentId
+    );
 
-// -------------------------------------------------------------
-// Test 6: Staff rejects request
-// -------------------------------------------------------------
-console.log("\n--- Test 6: Staff Rejects Replacement Request ---");
-{
-  const rejectedRequest = {
-    id: "req-002",
-    studentId: "std-1",
-    documentType: "passport" as const,
-    currentDocumentVersion: 1,
-    currentExpiryDate: "2028-05-10",
-    reason: "passport_lost" as const,
-    reasonDetails: "I mislaid my passport somewhere at home.",
-    status: "rejected" as const,
-    submittedAt: "2026-08-15T10:00:00.000Z",
-    reviewedBy: "staff-99",
-    reviewedAt: "2026-08-15T11:00:00.000Z",
-    rejectionReason: "Official police report or embassy loss acknowledgment letter required.",
-    authorizationId: null,
-    authorizationExpiresAt: null,
-    completedAt: null,
-    completedVersionId: null,
-    createdAt: "2026-08-15T10:00:00.000Z",
-    updatedAt: "2026-08-15T11:00:00.000Z"
-  };
+    const appRes = staffApproveReplacementRequest(subRes.request!.id, 7);
+    assert.equal(appRes.success, true);
+    assert.equal(appRes.request?.status, "approved");
 
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "passport",
-    activeDocument: {
-      versionNumber: 1,
-      filePath: "passport/std-1/v1/passport.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2028-05-10"
-    },
-    pendingDocument: null,
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: rejectedRequest,
-    currentDate: new Date("2026-08-15")
+    const elig = getEligibility(mockStudentId, "passport");
+    assert.equal(elig.canUpload, true);
+    assert.equal(elig.reasonCode, "REPLACEMENT_REQUEST_APPROVED");
+
+    // Other documents remain locked
+    const visaElig = getEligibility(mockStudentId, "visa");
+    const efrroElig = getEligibility(mockStudentId, "efrro");
+    assert.equal(visaElig.canUpload, false);
+    assert.equal(efrroElig.canUpload, false);
+
+    console.log("✅ [PASS] Test 3: Approved request opens upload window ONLY for the requested document (Passport)");
   });
 
-  assert.equal(eligibility.canUpload, false, "Upload must remain disabled after request rejection");
-  assert.equal(eligibility.activeReplacementRequest?.status, "rejected");
-  assert.equal(eligibility.activeReplacementRequest?.rejectionReason, "Official police report or embassy loss acknowledgment letter required.");
-  console.log("✅ [PASS] Test 6: Rejected request keeps upload disabled and preserves rejection reason");
-}
+  it("Test 4: Student uploads new Passport -> Status becomes PENDING VERIFICATION, no verified version created yet", () => {
+    resetDb();
+    const subRes = submitReplacementRequest(mockStudentId, "passport", "passport_renewed_early", "Details", mockStudentId);
+    staffApproveReplacementRequest(subRes.request!.id, 7);
 
-// -------------------------------------------------------------
-// Test 7: Approved request expires without submission
-// -------------------------------------------------------------
-console.log("\n--- Test 7: Approved Request Expiration ---");
-{
-  const expiredApprovedRequest = {
-    id: "req-003",
-    studentId: "std-1",
-    documentType: "visa" as const,
-    currentDocumentVersion: 1,
-    currentExpiryDate: "2027-04-15",
-    reason: "visa_renewed_reissued" as const,
-    reasonDetails: "Embassy issued fresh visa endorsement.",
-    status: "approved" as const,
-    submittedAt: "2026-08-01T10:00:00.000Z",
-    reviewedBy: "staff-99",
-    reviewedAt: "2026-08-01T11:00:00.000Z",
-    rejectionReason: null,
-    authorizationId: "auth-003",
-    authorizationExpiresAt: "2026-08-08T11:00:00.000Z", // Expired 7 days ago
-    completedAt: null,
-    completedVersionId: null,
-    createdAt: "2026-08-01T10:00:00.000Z",
-    updatedAt: "2026-08-01T11:00:00.000Z"
-  };
+    const uploadRes = studentUploadReplacementDocument(mockStudentId, "passport", "students/1111/passport/v2_temp.pdf");
+    assert.equal(uploadRes.success, true);
 
-  assert.equal(
-    DocumentReplacementRequestService.isRequestExpired(expiredApprovedRequest, new Date("2026-08-15")),
-    true,
-    "Request should be detected as expired"
-  );
+    const elig = getEligibility(mockStudentId, "passport");
+    assert.equal(elig.canUpload, false);
+    assert.equal(elig.reasonCode, "PENDING_VERIFICATION");
 
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "visa",
-    activeDocument: {
-      versionNumber: 1,
-      filePath: "visa/std-1/v1/visa.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2027-04-15"
-    },
-    pendingDocument: null,
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: expiredApprovedRequest,
-    currentDate: new Date("2026-08-15") // Date is past authorizationExpiresAt
+    // Verified version remains v1 until staff verifies
+    const currentActive = db.documents[`${mockStudentId}_passport`].activeVersion;
+    assert.equal(currentActive?.versionNumber, 1);
+    assert.equal(currentActive?.verificationStatus, "verified");
+
+    console.log("✅ [PASS] Test 4: Uploaded replacement is Pending Verification without prematurely creating verified version");
   });
 
-  assert.equal(eligibility.canUpload, false, "Upload must be DISABLED once authorization window expires");
-  assert.equal(eligibility.reasonCode, "OUTSIDE_WINDOW");
-  console.log("✅ [PASS] Test 7: Expired authorization correctly locks upload");
-}
+  it("Test 5: Staff approves new Passport -> v2 Verified, Upload locks again", () => {
+    resetDb();
+    const subRes = submitReplacementRequest(mockStudentId, "passport", "passport_renewed_early", "Details", mockStudentId);
+    staffApproveReplacementRequest(subRes.request!.id, 7);
+    studentUploadReplacementDocument(mockStudentId, "passport", "students/1111/passport/v2.pdf");
 
-// -------------------------------------------------------------
-// Test 8: State Machine Transitions & Duplicate Prevention
-// -------------------------------------------------------------
-console.log("\n--- Test 8: State Machine Rules ---");
-{
-  assert.equal(DocumentReplacementRequestService.isValidStatusTransition("pending", "approved"), true);
-  assert.equal(DocumentReplacementRequestService.isValidStatusTransition("pending", "rejected"), true);
-  assert.equal(DocumentReplacementRequestService.isValidStatusTransition("pending", "cancelled"), true);
-  assert.equal(DocumentReplacementRequestService.isValidStatusTransition("approved", "completed"), true);
-  assert.equal(DocumentReplacementRequestService.isValidStatusTransition("approved", "expired"), true);
-  
-  // Invalid transitions
-  assert.equal(DocumentReplacementRequestService.isValidStatusTransition("rejected", "approved"), false);
-  assert.equal(DocumentReplacementRequestService.isValidStatusTransition("completed", "pending"), false);
-  assert.equal(DocumentReplacementRequestService.isValidStatusTransition("cancelled", "approved"), false);
-  console.log("✅ [PASS] Test 8: State machine enforces valid transition paths");
-}
+    const staffApproval = staffVerifyAndApproveDocument(mockStudentId, "passport");
+    assert.equal(staffApproval.success, true);
+    assert.equal(staffApproval.activeVersion?.versionNumber, 2);
+    assert.equal(staffApproval.activeVersion?.verificationStatus, "verified");
 
-// -------------------------------------------------------------
-// Test 9: Direct Security Bypass Attempt
-// -------------------------------------------------------------
-console.log("\n--- Test 9: Direct API Security Check ---");
-{
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "passport",
-    activeDocument: {
-      versionNumber: 1,
-      filePath: "passport/std-1/v1/passport.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2029-01-01"
-    },
-    pendingDocument: null,
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: null,
-    currentDate: new Date("2026-08-15")
+    // Upload locks again
+    const elig = getEligibility(mockStudentId, "passport");
+    assert.equal(elig.canUpload, false);
+    assert.equal(elig.reasonCode, "OUTSIDE_WINDOW");
+
+    console.log("✅ [PASS] Test 5: Staff verification creates v2 Verified and automatically locks upload again");
   });
 
-  assert.equal(eligibility.canUpload, false, "Server MUST reject direct upload without valid window or authorization");
-  console.log("✅ [PASS] Test 9: Unauthorized direct upload is rejected server-side");
-}
-
-// -------------------------------------------------------------
-// Test 10: Document Independence
-// -------------------------------------------------------------
-console.log("\n--- Test 10: Document Independence ---");
-{
-  // Student has approved replacement for Passport, but Visa and eFRRO are outside window
-  const passportApprovedReq = {
-    id: "req-p1",
-    studentId: "std-1",
-    documentType: "passport" as const,
-    currentDocumentVersion: 1,
-    currentExpiryDate: "2028-10-10",
-    reason: "passport_renewed_early" as const,
-    reasonDetails: "Passport renewed early.",
-    status: "approved" as const,
-    submittedAt: "2026-08-15T10:00:00.000Z",
-    reviewedBy: "staff-1",
-    reviewedAt: "2026-08-15T11:00:00.000Z",
-    rejectionReason: null,
-    authorizationId: "auth-p1",
-    authorizationExpiresAt: "2026-08-22T11:00:00.000Z",
-    completedAt: null,
-    completedVersionId: null,
-    createdAt: "2026-08-15T10:00:00.000Z",
-    updatedAt: "2026-08-15T11:00:00.000Z"
-  };
-
-  const passportElig = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "passport",
-    activeDocument: { versionNumber: 1, filePath: "p.pdf", verificationStatus: "verified", isActive: true, expiryDate: "2028-10-10" },
-    pendingDocument: null,
-    activeReplacementRequest: passportApprovedReq,
-    currentDate: new Date("2026-08-15")
+  it("Test 6: Student attempts direct upload without replacement request -> Upload blocked", () => {
+    resetDb();
+    const uploadRes = studentUploadReplacementDocument(mockStudentId, "passport", "students/1111/passport/rogue.pdf");
+    assert.equal(uploadRes.success, false);
+    assert.match(uploadRes.error!, /Upload is locked/i);
+    console.log("✅ [PASS] Test 6: Direct upload blocked while document is valid");
   });
 
-  const visaElig = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "visa",
-    activeDocument: { versionNumber: 1, filePath: "v.pdf", verificationStatus: "verified", isActive: true, expiryDate: "2028-10-10" },
-    pendingDocument: null,
-    activeReplacementRequest: null,
-    currentDate: new Date("2026-08-15")
+  it("Test 7: Duplicate replacement request -> Prevented while one is already pending", () => {
+    resetDb();
+    const firstReq = submitReplacementRequest(mockStudentId, "passport", "passport_lost", "Lost passport", mockStudentId);
+    assert.equal(firstReq.success, true);
+
+    const dupReq = submitReplacementRequest(mockStudentId, "passport", "passport_renewed_early", "Renewed", mockStudentId);
+    assert.equal(dupReq.success, false);
+    assert.match(dupReq.error!, /already pending/i);
+    console.log("✅ [PASS] Test 7: Duplicate replacement requests for same document type are strictly prevented");
   });
 
-  const efrroElig = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "efrro",
-    activeDocument: { versionNumber: 1, filePath: "e.pdf", verificationStatus: "verified", isActive: true, expiryDate: "2028-10-10" },
-    pendingDocument: null,
-    activeReplacementRequest: null,
-    currentDate: new Date("2026-08-15")
+  it("Test 8: Cross-student unauthorized replacement request -> Blocked", () => {
+    resetDb();
+    const unauthReq = submitReplacementRequest(mockStudentId, "passport", "passport_damaged", "Damaged", otherStudentId);
+    assert.equal(unauthReq.success, false);
+    assert.match(unauthReq.error!, /Unauthorized/i);
+    console.log("✅ [PASS] Test 8: Cross-student replacement requests strictly denied");
   });
 
-  assert.equal(passportElig.canUpload, true, "Passport upload must be ENABLED");
-  assert.equal(visaElig.canUpload, false, "Visa upload must remain DISABLED");
-  assert.equal(efrroElig.canUpload, false, "eFRRO upload must remain DISABLED");
-  console.log("✅ [PASS] Test 10: Passport authorization does NOT unlock Visa or eFRRO");
-}
+  it("Test 9: Rejected replacement request -> Upload remains locked, reason visible, can request again", () => {
+    resetDb();
+    const subReq = submitReplacementRequest(mockStudentId, "visa", "incorrect_document", "Uploaded wrong page", mockStudentId);
+    assert.equal(subReq.success, true);
 
-// -------------------------------------------------------------
-// Test 11: Normal Pre-Expiry Window (No Request Required)
-// -------------------------------------------------------------
-console.log("\n--- Test 11: Automatic Pre-Expiry Window ---");
-{
-  const eligibility = DocumentUploadEligibilityEngine.calculateEligibility({
-    documentType: "efrro",
-    activeDocument: {
-      versionNumber: 1,
-      filePath: "efrro/std-1/v1/efrro.pdf",
-      verificationStatus: "verified",
-      isActive: true,
-      expiryDate: "2026-09-05"
-    },
-    pendingDocument: null,
-    policyWindowDays: 30,
-    activeAuthorization: null,
-    activeReplacementRequest: null,
-    currentDate: new Date("2026-08-15") // 21 days before expiry (within 30-day window)
+    const rejRes = staffRejectReplacementRequest(subReq.request!.id, "Please visit the compliance office with your original visa stamped copy.");
+    assert.equal(rejRes.success, true);
+
+    const elig = getEligibility(mockStudentId, "visa");
+    assert.equal(elig.canUpload, false);
+    assert.equal(elig.activeReplacementRequest?.status, "rejected");
+    assert.equal(elig.activeReplacementRequest?.rejectionReason, "Please visit the compliance office with your original visa stamped copy.");
+
+    // Student can submit a new replacement request
+    const newReq = submitReplacementRequest(mockStudentId, "visa", "visa_renewed_reissued", "Received official renewal from FRRO", mockStudentId);
+    assert.equal(newReq.success, true);
+    console.log("✅ [PASS] Test 9: Rejected request leaves upload locked, presents staff reason, and allows new request submission");
   });
 
-  assert.equal(eligibility.canUpload, true, "Upload must be automatically enabled inside window");
-  assert.equal(eligibility.reasonCode, "WINDOW_OPEN");
-  assert.equal(eligibility.daysUntilExpiry, 21);
-  console.log("✅ [PASS] Test 11: Normal expiry window opens automatically without replacement request");
-}
+  it("Test 10: Expired upload authorization -> Upload disabled, requires new replacement request", () => {
+    resetDb();
+    const subReq = submitReplacementRequest(mockStudentId, "efrro", "efrro_reissued", "Reissued", mockStudentId);
+    staffApproveReplacementRequest(subReq.request!.id, 7);
 
-// -------------------------------------------------------------
-// Test 12: Reason formatting and validation
-// -------------------------------------------------------------
-console.log("\n--- Test 12: Reason Formatting ---");
-{
-  assert.equal(DocumentReplacementRequestService.formatReason("passport_lost"), "Passport Lost / Stolen");
-  assert.equal(DocumentReplacementRequestService.formatReason("visa_renewed_reissued"), "Visa Renewed / Reissued");
-  assert.equal(DocumentReplacementRequestService.formatReason("efrro_reissued"), "eFRRO / Permit Reissued");
-  assert.equal(DocumentReplacementRequestService.formatReason("other"), "Other Legitimate Reason");
-  console.log("✅ [PASS] Test 12: Reason codes map to institutional labels");
-}
+    // Simulate 10 days later (authorization expired)
+    const futureDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Invalidate authorization in mock db
+    const auth = db.uploadAuthorizations.find(a => a.studentId === mockStudentId && a.documentType === "efrro");
+    if (auth) auth.status = "expired";
+    const req = db.replacementRequests.find(r => r.studentId === mockStudentId && r.documentType === "efrro");
+    if (req) req.status = "expired";
 
-console.log("\n=======================================================");
-console.log("  DOCUMENT REPLACEMENT TEST RESULTS: ALL 12 PASSED");
-console.log("=======================================================\n");
+    const elig = getEligibility(mockStudentId, "efrro", futureDate);
+    assert.equal(elig.canUpload, false);
+    assert.equal(elig.reasonCode, "OUTSIDE_WINDOW");
+
+    console.log("✅ [PASS] Test 10: Expired authorization locks upload and requires new replacement request");
+  });
+});

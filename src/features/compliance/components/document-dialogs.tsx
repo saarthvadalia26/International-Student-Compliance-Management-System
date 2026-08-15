@@ -12,6 +12,7 @@ import { DocumentConfig } from "../constants/constants";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { uploadDocumentRenewalAction, correctDocumentMetadataAction, authorizeEarlyDocumentUploadAction } from "@/app/(app)/students/actions";
+import { fetchDocumentUploadLimitAction } from "@/app/student/actions";
 import { UploadCloud, Edit3, ShieldAlert, Sparkles, Loader2 } from "lucide-react";
 
 interface UploadDialogProps {
@@ -38,6 +39,21 @@ export function DocumentUploadDialog({ config, studentId, isOpen, onOpenChange, 
   const [uploadError, setUploadError] = React.useState(false);
   const [isDirty, setIsDirty] = React.useState(false);
   const [isConfirmDiscardOpen, setIsConfirmDiscardOpen] = React.useState(false);
+  const [maxUploadSizeBytes, setMaxUploadSizeBytes] = React.useState<number>(10485760); // Default 10 MB
+  const [maxUploadSizeMb, setMaxUploadSizeMb] = React.useState<number>(10);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchDocumentUploadLimitAction().then(res => {
+        if (res?.maxUploadSizeBytes) {
+          setMaxUploadSizeBytes(res.maxUploadSizeBytes);
+          setMaxUploadSizeMb(res.maxUploadSizeMb);
+        }
+      }).catch(() => {
+        // use default 10MB
+      });
+    }
+  }, [isOpen]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -47,8 +63,8 @@ export function DocumentUploadDialog({ config, studentId, isOpen, onOpenChange, 
         toast.error("File Type Blocked", { description: "Only PDF and Image files (JPEG/PNG/WEBP) are allowed." });
         return;
       }
-      if (selected.size > 5 * 1024 * 1024) {
-        toast.error("File Size Exceeded", { description: "File size must not exceed 5MB." });
+      if (selected.size > maxUploadSizeBytes) {
+        toast.error("File Size Exceeded", { description: `File size must not exceed ${maxUploadSizeMb} MB.` });
         return;
       }
       setFile(selected);
@@ -226,7 +242,7 @@ export function DocumentUploadDialog({ config, studentId, isOpen, onOpenChange, 
                 onChange={handleFileChange} 
                 className="h-9 text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-primary/10 file:text-primary file:hover:bg-primary/20 cursor-pointer" 
               />
-              <p className="text-[10px] text-muted-foreground">Supported formats: PDF, JPEG, PNG, WEBP. Max file size: 5MB.</p>
+              <p className="text-[10px] text-muted-foreground">Supported formats: PDF, JPEG, PNG, WEBP. Max file size: {maxUploadSizeMb} MB.</p>
             </div>
 
             <div className="space-y-1.5">

@@ -14,7 +14,8 @@ import {
   History,
   ShieldAlert,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  Clock
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -211,17 +212,28 @@ export default function StudentDashboardPage() {
           <div className="pt-3 mt-2 border-t border-border/50 text-[11px]">
             {profile.passportEligibility?.canUpload ? (
               <Link href="/student/efrro?type=passport" className="text-primary font-semibold hover:underline flex items-center gap-1">
-                <span>{profile.passportEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Replacement Approved" : "Upload Open"}</span>
+                <span>{profile.passportEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Upload Replacement" : "Upload Open"}</span>
                 <ArrowRight className="h-3 w-3" />
               </Link>
             ) : profile.passportEligibility?.reasonCode === "PENDING_VERIFICATION" ? (
-              <span className="text-amber-600 dark:text-amber-400 font-medium">Under Verification</span>
+              <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Under Verification
+              </span>
             ) : profile.passportEligibility?.reasonCode === "REPLACEMENT_REQUEST_PENDING" ? (
-              <span className="text-blue-600 dark:text-blue-400 font-medium">Request Pending</span>
-            ) : profile.passportEligibility?.uploadWindowOpensDate ? (
-              <span className="text-muted-foreground">Next upload: {profile.passportEligibility.uploadWindowOpensDate}</span>
+              <span className="text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Replacement Pending Review
+              </span>
             ) : (
-              <span className="text-muted-foreground">Upload locked</span>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Upload locked</span>
+                <Link 
+                  href="/student/efrro?type=passport&action=request_replacement" 
+                  className="text-primary font-semibold hover:underline flex items-center gap-0.5"
+                >
+                  <span>Request Replacement</span>
+                  <ArrowRight className="h-2.5 w-2.5" />
+                </Link>
+              </div>
             )}
           </div>
         </Card>
@@ -251,17 +263,28 @@ export default function StudentDashboardPage() {
           <div className="pt-3 mt-2 border-t border-border/50 text-[11px]">
             {profile.visaEligibility?.canUpload ? (
               <Link href="/student/efrro?type=visa" className="text-primary font-semibold hover:underline flex items-center gap-1">
-                <span>{profile.visaEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Replacement Approved" : "Upload Open"}</span>
+                <span>{profile.visaEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Upload Replacement" : "Upload Open"}</span>
                 <ArrowRight className="h-3 w-3" />
               </Link>
             ) : profile.visaEligibility?.reasonCode === "PENDING_VERIFICATION" ? (
-              <span className="text-amber-600 dark:text-amber-400 font-medium">Under Verification</span>
+              <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Under Verification
+              </span>
             ) : profile.visaEligibility?.reasonCode === "REPLACEMENT_REQUEST_PENDING" ? (
-              <span className="text-blue-600 dark:text-blue-400 font-medium">Request Pending</span>
-            ) : profile.visaEligibility?.uploadWindowOpensDate ? (
-              <span className="text-muted-foreground">Next upload: {profile.visaEligibility.uploadWindowOpensDate}</span>
+              <span className="text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Replacement Pending Review
+              </span>
             ) : (
-              <span className="text-muted-foreground">Upload locked</span>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Upload locked</span>
+                <Link 
+                  href="/student/efrro?type=visa&action=request_replacement" 
+                  className="text-primary font-semibold hover:underline flex items-center gap-0.5"
+                >
+                  <span>Request Replacement</span>
+                  <ArrowRight className="h-2.5 w-2.5" />
+                </Link>
+              </div>
             )}
           </div>
         </Card>
@@ -291,17 +314,28 @@ export default function StudentDashboardPage() {
           <div className="pt-3 mt-2 border-t border-border/50 text-[11px]">
             {profile.efrroEligibility?.canUpload ? (
               <Link href="/student/efrro?type=efrro" className="text-primary font-semibold hover:underline flex items-center gap-1">
-                <span>{profile.efrroEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Replacement Approved" : "Upload Open"}</span>
+                <span>{profile.efrroEligibility?.reasonCode === "REPLACEMENT_REQUEST_APPROVED" ? "Upload Replacement" : "Upload Open"}</span>
                 <ArrowRight className="h-3 w-3" />
               </Link>
             ) : profile.efrroEligibility?.reasonCode === "PENDING_VERIFICATION" ? (
-              <span className="text-amber-600 dark:text-amber-400 font-medium">Under Verification</span>
+              <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Under Verification
+              </span>
             ) : profile.efrroEligibility?.reasonCode === "REPLACEMENT_REQUEST_PENDING" ? (
-              <span className="text-blue-600 dark:text-blue-400 font-medium">Request Pending</span>
-            ) : profile.efrroEligibility?.uploadWindowOpensDate ? (
-              <span className="text-muted-foreground">Next upload: {profile.efrroEligibility.uploadWindowOpensDate}</span>
+              <span className="text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Replacement Pending Review
+              </span>
             ) : (
-              <span className="text-muted-foreground">Upload locked</span>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Upload locked</span>
+                <Link 
+                  href="/student/efrro?type=efrro&action=request_replacement" 
+                  className="text-primary font-semibold hover:underline flex items-center gap-0.5"
+                >
+                  <span>Request Replacement</span>
+                  <ArrowRight className="h-2.5 w-2.5" />
+                </Link>
+              </div>
             )}
           </div>
         </Card>

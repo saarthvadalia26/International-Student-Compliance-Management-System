@@ -121,7 +121,7 @@ export default function StudentListPage() {
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch = 
         student.fullName.toLowerCase().includes(query) ||
-        student.registrationNumber.toLowerCase().includes(query) ||
+        (student.registrationNumber || "").toLowerCase().includes(query) ||
         student.nationalityName.toLowerCase().includes(query) ||
         student.programName.toLowerCase().includes(query) ||
         student.school.toLowerCase().includes(query) ||
@@ -346,7 +346,9 @@ export default function StudentListPage() {
                           <Link href={`/students/${student.id}`} className="text-sm font-medium hover:underline text-foreground block">
                             {student.fullName}
                           </Link>
-                          <span className="text-[11px] text-muted-foreground block font-caption">{student.registrationNumber}</span>
+                          <span className="text-[11px] text-muted-foreground block font-caption">
+                            {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "Not provided"}
+                          </span>
                         </div>
                       </div>
                     </TableCell>

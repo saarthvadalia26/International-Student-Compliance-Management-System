@@ -769,3 +769,72 @@ export async function updateDocumentUploadPoliciesAction(
     return { success: false, error: msg };
   }
 }
+
+// ── System Preferences Actions (Administrator) ──────────────────────────────
+
+export async function fetchSystemPreferencesAction(): Promise<{
+  success: boolean;
+  preferences?: {
+    reminderSchedule: string;
+    sessionTimeoutMinutes: number;
+    maxUploadSizeBytes: number;
+    maxUploadSizeMb: number;
+    dateFormat: string;
+    enableAuditLogging: boolean;
+    enableMaintenanceNotifications: boolean;
+  };
+  error?: string;
+}> {
+  try {
+    const { systemConfigService } = await import("@/lib/system-config");
+    const prefs = await systemConfigService.getSystemPreferences();
+    return {
+      success: true,
+      preferences: {
+        ...prefs,
+        maxUploadSizeMb: Math.round(prefs.maxUploadSizeBytes / (1024 * 1024)),
+      }
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+export async function updateSystemPreferencesAction(updates: {
+  maxUploadSizeBytes?: number;
+  sessionTimeoutMinutes?: number;
+  reminderSchedule?: string;
+  dateFormat?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const adminUser = await getAdminUser();
+    const { systemConfigService } = await import("@/lib/system-config");
+    
+    if (updates.maxUploadSizeBytes !== undefined) {
+      if (typeof updates.maxUploadSizeBytes !== "number" || updates.maxUploadSizeBytes < 1024 * 1024 || updates.maxUploadSizeBytes > 100 * 1024 * 1024) {
+        return { success: false, error: "Maximum document upload size must be between 1 MB and 100 MB." };
+      }
+    }
+
+    const previous = await systemConfigService.getSystemPreferences();
+    await systemConfigService.updateSystemPreferences(updates, adminUser.email || adminUser.id);
+
+    const adminSupabase = getAdminSupabase();
+    await adminSupabase.from("audit_log").insert({
+      actor_id: adminUser.id,
+      action: "SYSTEM_PREFERENCES_UPDATED",
+      resource: "system_config/preferences",
+      filters_applied: {
+        previous,
+        updates,
+        updatedBy: adminUser.email || adminUser.id
+      }
+    });
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}

@@ -22,7 +22,7 @@ export default function HelpPage() {
     },
     {
       q: "What file validation sizes are enforced for students?",
-      a: "The student upload renewal page strictly permits PDF document formats only, with an upper file size limit of 5MB. Duplicated files are automatically rejected using cryptographic SHA-256 checksum comparisons."
+      a: "The student upload renewal page permits PDF and image document formats (JPEG/PNG), with the upper file size limit configured centrally by the institution administrator (default: 10MB). Duplicated files are automatically rejected using cryptographic SHA-256 checksum comparisons."
     }
   ];
 

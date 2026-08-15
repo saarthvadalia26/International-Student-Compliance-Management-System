@@ -1,6 +1,9 @@
 /**
- * Type definitions and field metadata for Bulk Student Import from Excel/CSV
+ * Dedicated Maximum Bulk Import File Size Limit (100 MB)
+ * Separate from normal student document upload limits
  */
+export const MAX_BULK_IMPORT_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+export const MAX_BULK_IMPORT_FILE_SIZE_MB = 100;
 
 export type ISCMSImportField =
   // Student Identity
@@ -64,8 +67,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "registration_number",
     label: "Registration / Enrollment Number",
     category: "Identity",
-    required: true,
-    description: "Unique university registration number or student ID.",
+    required: false,
+    description: "University-assigned registration / enrollment number (optional during initial import).",
     sample: "NFSU2026CS101",
     aliases: ["registration_number", "registration number", "reg no", "reg_no", "enrollment number", "enrollment no", "enrollment_no", "student id", "student_id", "roll no", "roll_number", "id"]
   },

@@ -83,10 +83,14 @@ export class SupabaseStudentRepository implements IStudentRepository {
     const supabase = getAdminSupabase();
 
     // 1. Insert into core students table
+    const regNumber = input.registrationNumber && input.registrationNumber.trim()
+      ? input.registrationNumber.trim()
+      : null;
+
     const { data: studentData, error: studentError } = await supabase
       .from("students")
       .insert({
-        registration_number: input.registrationNumber.trim(),
+        registration_number: regNumber,
         status: "active",
         created_by: actorId,
         updated_by: actorId
@@ -96,7 +100,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
     if (studentError || !studentData) {
       if (studentError?.code === "23505") {
-        throw new Error(`Student with registration number "${input.registrationNumber}" already exists.`);
+        throw new Error(`Student with enrollment number "${input.registrationNumber}" already exists.`);
       }
       throw new Error(`Failed to create core student record: ${studentError?.message || "Unknown database error"}`);
     }
@@ -503,16 +507,58 @@ export class SupabaseStudentRepository implements IStudentRepository {
   async updateStudent(id: string, input: UpdateStudentInput, actorId: string | null): Promise<FullStudentProfile> {
     const supabase = getAdminSupabase();
 
-    // 1. Update students table if status provided
-    if (input.status) {
-      await supabase
+    // 1. Update students table if status or registrationNumber provided
+    const studentUpdates: Record<string, unknown> = {};
+    if (input.status) studentUpdates.status = input.status;
+    if (input.registrationNumber !== undefined) {
+      studentUpdates.registration_number = input.registrationNumber && input.registrationNumber.trim() 
+        ? input.registrationNumber.trim() 
+        : null;
+    }
+
+    if (Object.keys(studentUpdates).length > 0) {
+      studentUpdates.updated_at = new Date().toISOString();
+      studentUpdates.updated_by = actorId;
+
+      // Fetch previous registration number for audit logging
+      let previousRegNumber: string | null = null;
+      if (input.registrationNumber !== undefined) {
+        const { data: prevStudent } = await supabase
+          .from("students")
+          .select("registration_number")
+          .eq("id", id)
+          .maybeSingle();
+        previousRegNumber = prevStudent?.registration_number || null;
+      }
+
+      const { error: studentUpdateErr } = await supabase
         .from("students")
-        .update({
-          status: input.status,
-          updated_at: new Date().toISOString(),
-          updated_by: actorId
-        })
+        .update(studentUpdates)
         .eq("id", id);
+
+      if (studentUpdateErr) {
+        if (studentUpdateErr.code === "23505") {
+          throw new Error(`Enrollment number "${input.registrationNumber}" is already in use by another student.`);
+        }
+        throw new Error(`Failed to update student: ${studentUpdateErr.message}`);
+      }
+
+      // Log audit event if enrollment number was modified
+      if (input.registrationNumber !== undefined) {
+        const newReg = studentUpdates.registration_number as string | null;
+        if (previousRegNumber !== newReg) {
+          await supabase.from("audit_log").insert({
+            actor_id: actorId,
+            action: "UPDATE_ENROLLMENT_NUMBER",
+            resource: `students/${id}`,
+            filters_applied: {
+              student_id: id,
+              previous_enrollment_number: previousRegNumber,
+              new_enrollment_number: newReg
+            }
+          });
+        }
+      }
     }
 
     // 2. Update student_personal table if personal fields provided

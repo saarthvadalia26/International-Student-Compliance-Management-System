@@ -145,9 +145,12 @@ export class StudentPortalService {
       throw new Error("Allowed file types: PDF, JPG, and PNG.");
     }
 
-    // 3. File Size Validation (Max 5MB)
-    const MAX_SIZE = 5 * 1024 * 1024;
-    if (fileBuffer.length > MAX_SIZE) {
+    // 3. File Size Validation (Configured Dynamic Single Source of Truth)
+    const { systemConfigService } = await import("@/lib/system-config");
+    const maxUploadSizeBytes = await systemConfigService.getMaxUploadSizeBytes();
+    const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
+
+    if (fileBuffer.length > maxUploadSizeBytes) {
       await this.portalRepo.logUploadAudit({
         studentId,
         filename,
@@ -157,7 +160,7 @@ export class StudentPortalService {
         ipAddress,
         userAgent
       });
-      throw new Error("Maximum file size exceeded (limit: 5MB).");
+      throw new Error(`File exceeds the maximum allowed size of ${maxUploadSizeMb} MB.`);
     }
 
     // 4. Duplicate Checksum Verification (SHA-256)

@@ -101,10 +101,12 @@ export class StudentService implements IStudentService {
       }
     });
 
-    // 2. Perform duplicate registration number check
-    const existing = await this.repository.getStudentByRegistrationNumber(input.registrationNumber);
-    if (existing) {
-      throw new Error(`Student with registration number "${input.registrationNumber}" is already registered.`);
+    // 2. Perform duplicate registration number check if provided
+    if (input.registrationNumber && input.registrationNumber.trim()) {
+      const existing = await this.repository.getStudentByRegistrationNumber(input.registrationNumber.trim());
+      if (existing) {
+        throw new Error(`Student with enrollment number "${input.registrationNumber}" is already registered.`);
+      }
     }
 
     // 3. Persist record

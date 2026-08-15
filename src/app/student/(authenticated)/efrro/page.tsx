@@ -24,6 +24,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -45,6 +46,7 @@ import {
   uploadStudentDocumentAction, 
   fetchStudentProfile, 
   fetchDocumentUploadEligibilityAction,
+  fetchDocumentUploadLimitAction,
   submitDocumentReplacementRequestAction,
   cancelDocumentReplacementRequestAction
 } from "../../actions";
@@ -75,6 +77,8 @@ function DocumentCentreContent() {
   const [isUploading, setIsUploading] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [eligibilityData, setEligibilityData] = React.useState<Record<string, any>>({});
+  const [maxUploadSizeBytes, setMaxUploadSizeBytes] = React.useState<number>(10485760); // Default 10 MB
+  const [maxUploadSizeMb, setMaxUploadSizeMb] = React.useState<number>(10);
 
   // Replacement Request Dialog state
   const [isRequestDialogOpen, setIsRequestDialogOpen] = React.useState(false);
@@ -83,11 +87,16 @@ function DocumentCentreContent() {
   const [isSubmittingRequest, setIsSubmittingRequest] = React.useState(false);
   const [isCancellingRequest, setIsCancellingRequest] = React.useState(false);
 
+  const actionParam = searchParams ? searchParams.get("action") : null;
+
   React.useEffect(() => {
     if (typeParam && ["passport", "visa", "efrro"].includes(typeParam)) {
       setActiveDocType(typeParam as "passport" | "visa" | "efrro");
     }
-  }, [typeParam]);
+    if (actionParam === "request_replacement") {
+      setIsRequestDialogOpen(true);
+    }
+  }, [typeParam, actionParam]);
 
   // Default reason tailored to active document type
   React.useEffect(() => {
@@ -100,13 +109,18 @@ function DocumentCentreContent() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const jwt = session?.access_token || "test_token";
-      const [profileData, elig] = await Promise.all([
+      const [profileData, elig, limitData] = await Promise.all([
         fetchStudentProfile(jwt),
-        fetchDocumentUploadEligibilityAction(jwt, activeDocType)
+        fetchDocumentUploadEligibilityAction(jwt, activeDocType),
+        fetchDocumentUploadLimitAction()
       ]);
       if (profileData) setProfile(profileData);
       if (elig) {
         setEligibilityData(prev => ({ ...prev, [activeDocType]: elig }));
+      }
+      if (limitData?.maxUploadSizeBytes) {
+        setMaxUploadSizeBytes(limitData.maxUploadSizeBytes);
+        setMaxUploadSizeMb(limitData.maxUploadSizeMb);
       }
     } catch {
       // ignore
@@ -119,14 +133,19 @@ function DocumentCentreContent() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const jwt = session?.access_token || "test_token";
-        const [profileData, elig] = await Promise.all([
+        const [profileData, elig, limitData] = await Promise.all([
           fetchStudentProfile(jwt),
-          fetchDocumentUploadEligibilityAction(jwt, activeDocType)
+          fetchDocumentUploadEligibilityAction(jwt, activeDocType),
+          fetchDocumentUploadLimitAction()
         ]);
         if (mounted) {
           if (profileData) setProfile(profileData);
           if (elig) {
             setEligibilityData(prev => ({ ...prev, [activeDocType]: elig }));
+          }
+          if (limitData?.maxUploadSizeBytes) {
+            setMaxUploadSizeBytes(limitData.maxUploadSizeBytes);
+            setMaxUploadSizeMb(limitData.maxUploadSizeMb);
           }
           setIsLoading(false);
         }
@@ -144,8 +163,8 @@ function DocumentCentreContent() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size exceeds maximum limit of 5MB.");
+    if (file.size > maxUploadSizeBytes) {
+      toast.error(`File size exceeds maximum limit of ${maxUploadSizeMb} MB.`);
       return;
     }
 
@@ -195,8 +214,9 @@ function DocumentCentreContent() {
   };
 
   const handleSubmitReplacementRequest = async () => {
-    if (!requestDetails.trim()) {
-      toast.error("Please provide an explanation for the replacement request.");
+    const details = requestDetails.trim() || REASON_LABELS[requestReason] || "Document replacement requested by student.";
+    if (requestReason === "other" && !requestDetails.trim()) {
+      toast.error("Please provide additional explanation when selecting 'Other'.");
       return;
     }
 
@@ -208,11 +228,11 @@ function DocumentCentreContent() {
       const res = await submitDocumentReplacementRequestAction(jwt, {
         documentType: activeDocType,
         reason: requestReason,
-        reasonDetails: requestDetails.trim()
+        reasonDetails: details
       });
 
       if (res.success) {
-        toast.success(`Replacement request for ${activeDocType.toUpperCase()} submitted for compliance review.`);
+        toast.success(`Replacement request for ${activeDocType.toUpperCase()} submitted for staff review.`);
         setIsRequestDialogOpen(false);
         setRequestDetails("");
         await refreshProfileAndEligibility();
@@ -427,24 +447,30 @@ function DocumentCentreContent() {
                 </div>
               )}
 
-              {/* EARLY REPLACEMENT PROMPT (Only when outside window and no pending request) */}
-              {currentEligibility.reasonCode === "OUTSIDE_WINDOW" && (
-                <div className="p-4 rounded-xl border border-border/80 bg-accent/20 space-y-2.5">
-                  <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                    <HelpCircle className="h-4 w-4 text-primary" />
-                    Need to replace this document early?
+              {/* REPLACEMENT REQUEST PROMPT (When upload is locked and no pending request) */}
+              {currentEligibility.reasonCode !== "PENDING_VERIFICATION" && currentEligibility.reasonCode !== "REPLACEMENT_REQUEST_PENDING" && (
+                <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                      <FileText className="h-4 w-4 text-primary" />
+                      Request Document Replacement
+                    </div>
+                    {activeDocStatus === "APPROVED" || activeDocStatus === "COMPLIANT" ? (
+                      <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+                        Verified
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    If your {activeDocType.toUpperCase()} was lost, damaged, renewed early, or reissued by authorities before the standard expiry window, you can submit a replacement request for compliance approval.
+                    If your {activeDocType.toUpperCase()} has been renewed, replaced, damaged, or reissued by authorities, you can submit a replacement request for compliance review.
                   </p>
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="text-xs rounded-xl font-semibold gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                    className="text-xs rounded-xl font-semibold gap-1.5 shadow-xs"
                     onClick={() => setIsRequestDialogOpen(true)}
                   >
                     <FileText className="h-3.5 w-3.5" />
-                    Request Document Replacement
+                    Request Replacement
                   </Button>
                 </div>
               )}
@@ -452,11 +478,11 @@ function DocumentCentreContent() {
               {/* Disabled Dropzone Visual Indicator */}
               <div className="border-2 border-dashed border-border/60 rounded-2xl p-6 text-center bg-accent/10 opacity-70">
                 <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-xs font-semibold text-foreground">Upload Currently Unavailable</p>
+                <p className="text-xs font-semibold text-foreground">Upload Currently Locked</p>
                 <p className="text-[11px] text-muted-foreground mt-1 max-w-sm mx-auto">
                   {currentEligibility.reasonCode === "PENDING_VERIFICATION"
                     ? "A submission is currently under review. Additional uploads are disabled until compliance staff review this version."
-                    : "You can upload a replacement once the automatic expiry window opens or an early replacement request is approved."}
+                    : "Direct upload is disabled for verified documents. Please submit a replacement request to unlock the upload window."}
                 </p>
                 <Button variant="outline" size="sm" disabled className="mt-4 text-xs rounded-xl cursor-not-allowed">
                   Upload Locked
@@ -493,7 +519,7 @@ function DocumentCentreContent() {
                     {selectedFile ? selectedFile.name : `Select your ${activeDocType.toUpperCase()} document file`}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : "PDF, JPG, or PNG (Max 5MB)"}
+                    {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : `PDF, JPG, or PNG (Max ${maxUploadSizeMb} MB)`}
                   </p>
                   
                   <input
@@ -609,14 +635,19 @@ function DocumentCentreContent() {
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2">
               <FileText className="h-4 w-4 text-primary" />
-              Request Early {activeDocType.toUpperCase()} Replacement
+              Request {activeDocType.toUpperCase()} Replacement
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Submit an early replacement request to the compliance office. Once approved, you will be granted a temporary window to upload your new document.
+              Submit a replacement request to the compliance office. Once approved, you will be granted an authorized window to upload your new physical document.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2 text-xs">
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Document Type</label>
+              <Input value={activeDocType.toUpperCase()} disabled className="h-8 text-xs font-mono bg-muted" />
+            </div>
+
             <div className="space-y-1.5">
               <label className="font-semibold text-foreground">Reason for Replacement</label>
               <Select value={requestReason} onValueChange={(val) => setRequestReason(val as DocumentReplacementReason)}>
@@ -624,24 +655,25 @@ function DocumentCentreContent() {
                   <SelectValue placeholder="Select reason" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="passport_lost">Passport Lost / Stolen</SelectItem>
-                  <SelectItem value="passport_damaged">Passport Damaged</SelectItem>
-                  <SelectItem value="passport_renewed_early">Passport Renewed Early</SelectItem>
-                  <SelectItem value="visa_renewed_reissued">Visa Renewed / Reissued</SelectItem>
-                  <SelectItem value="efrro_reissued">eFRRO / Permit Reissued</SelectItem>
-                  <SelectItem value="government_replacement">Government Replaced / New Booklet</SelectItem>
-                  <SelectItem value="incorrect_document">Incorrect Document Uploaded</SelectItem>
+                  <SelectItem value={activeDocType === "passport" ? "passport_renewed_early" : activeDocType === "visa" ? "visa_renewed_reissued" : "efrro_reissued"}>
+                    Document Renewed
+                  </SelectItem>
+                  <SelectItem value="government_replacement">Document Replaced / New Booklet</SelectItem>
+                  <SelectItem value="incorrect_document">Information Changed / Correction</SelectItem>
+                  <SelectItem value="passport_damaged">Document Damaged</SelectItem>
+                  <SelectItem value="passport_lost">Document Lost / Stolen</SelectItem>
                   <SelectItem value="other">Other Legitimate Reason</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-semibold text-foreground">Explanation / Details (Mandatory)</label>
+              <label className="font-semibold text-foreground">
+                Additional Details / Explanation {requestReason === "other" ? "(Required)" : "(Optional)"}
+              </label>
               <Textarea
-                required
                 rows={3}
-                placeholder="Explain why an early replacement is necessary (e.g. Received new visa endorsement from embassy, or lost old passport)..."
+                placeholder="Describe the reason for replacement (e.g. Received new visa endorsement from embassy, or renewed passport booklet)..."
                 value={requestDetails}
                 onChange={e => setRequestDetails(e.target.value)}
                 className="text-xs"
@@ -653,7 +685,11 @@ function DocumentCentreContent() {
             <Button variant="outline" size="sm" onClick={() => setIsRequestDialogOpen(false)} disabled={isSubmittingRequest}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSubmitReplacementRequest} disabled={isSubmittingRequest || !requestDetails.trim()}>
+            <Button 
+              size="sm" 
+              onClick={handleSubmitReplacementRequest} 
+              disabled={isSubmittingRequest || (requestReason === "other" && !requestDetails.trim())}
+            >
               {isSubmittingRequest ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
               Submit Replacement Request
             </Button>

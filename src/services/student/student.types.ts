@@ -4,7 +4,7 @@ export type RelationshipType = "parent" | "guardian" | "local_sponsor";
 
 export interface Student {
   id: string;
-  registrationNumber: string;
+  registrationNumber: string | null;
   status: StudentStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -98,7 +98,7 @@ export interface FullStudentProfile {
 }
 
 export interface RegisterStudentInput {
-  registrationNumber: string;
+  registrationNumber?: string | null;
   fullName: string;
   nationalityCode: string;
   gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
@@ -137,6 +137,7 @@ export interface RegisterStudentInput {
 
 export interface UpdateStudentInput {
   status?: StudentStatus;
+  registrationNumber?: string | null;
   fullName?: string;
   gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
   dateOfBirth?: Date;

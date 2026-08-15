@@ -41,9 +41,11 @@ import {
   runDocumentCleanupAction,
   globalSignOutAction,
   factoryResetAction,
-  fetchDocumentUploadPoliciesAction,
+  fetchDocumentUploadPoliciesAction, 
   updateDocumentUploadPoliciesAction,
-  DocumentUploadPolicyConfig
+  DocumentUploadPolicyConfig,
+  fetchSystemPreferencesAction,
+  updateSystemPreferencesAction
 } from "./actions";
 import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
 import { EmergencyLogoutDialog } from "@/components/settings/emergency-logout-dialog";
@@ -114,6 +116,12 @@ function SettingsPageContent() {
   const [uploadPolicySuccess, setUploadPolicySuccess] = React.useState(false);
   const [uploadPolicyError, setUploadPolicyError] = React.useState(false);
 
+  // System Preferences (Upload Limit) State
+  const [maxUploadSizeMb, setMaxUploadSizeMb] = React.useState<number>(10);
+  const [isSavingPreferences, setIsSavingPreferences] = React.useState(false);
+  const [preferencesSuccess, setPreferencesSuccess] = React.useState(false);
+  const [preferencesError, setPreferencesError] = React.useState(false);
+
   // Manual Cleanup overrides state
   const [cleanupReport, setCleanupReport] = React.useState<CleanupExecutionReport | null>(null);
   const [isRunningCleanup, setIsRunningCleanup] = React.useState(false);
@@ -158,6 +166,44 @@ function SettingsPageContent() {
     }
   };
 
+  const loadSystemPreferences = async () => {
+    try {
+      const res = await fetchSystemPreferencesAction();
+      if (res.success && res.preferences) {
+        setMaxUploadSizeMb(res.preferences.maxUploadSizeMb || 10);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSavePreferences = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingPreferences(true);
+    setPreferencesSuccess(false);
+    setPreferencesError(false);
+
+    try {
+      const res = await updateSystemPreferencesAction({
+        maxUploadSizeBytes: maxUploadSizeMb * 1024 * 1024
+      });
+      if (res.success) {
+        setPreferencesSuccess(true);
+        toast.success(`Maximum document size updated to ${maxUploadSizeMb} MB.`, {
+          description: "Student and Staff portals will immediately enforce this limit."
+        });
+      } else {
+        setPreferencesError(true);
+        toast.error(res.error || "Failed to update preferences.");
+      }
+    } catch (err: unknown) {
+      setPreferencesError(true);
+      toast.error(err instanceof Error ? err.message : "Failed to update preferences.");
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
+
   const handleSaveUploadPolicies = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingUploadPolicies(true);
@@ -196,6 +242,7 @@ function SettingsPageContent() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPolicies();
     loadUploadPolicies();
+    loadSystemPreferences();
   }, []);
 
   // Preview Language Template changer
@@ -515,6 +562,50 @@ function SettingsPageContent() {
                     idleText="Save Upload Policies"
                     loadingText="Saving policies..."
                     successText="Policies saved"
+                    errorText="Try Again"
+                  />
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Document Upload Size Limit Configuration */}
+            <Card className="border border-border/60 shadow-sm">
+              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Archive className="h-4 w-4 text-muted-foreground" /> Document Upload Size Limit Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <form onSubmit={handleSavePreferences} className="space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    Centrally configured single source of truth for maximum physical document file size (PDF, JPEG, PNG). The Student Portal, Staff Portal, and server-side validators automatically enforce this limit.
+                  </p>
+
+                  <div className="max-w-xs space-y-1.5 p-3.5 rounded-xl border border-border/60 bg-muted/5">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      Maximum Document Size (MB)
+                    </label>
+                    <p className="text-[10px] text-muted-foreground">Allowed upload size per physical document (1–100 MB)</p>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={maxUploadSizeMb}
+                      onChange={e => setMaxUploadSizeMb(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))}
+                      className="h-9 text-xs mt-1"
+                    />
+                  </div>
+
+                  <AsyncActionButton
+                    type="submit"
+                    size="sm"
+                    className="h-8 text-xs"
+                    isLoading={isSavingPreferences}
+                    isSuccess={preferencesSuccess}
+                    isError={preferencesError}
+                    idleText="Save Document Size Limit"
+                    loadingText="Saving limit..."
+                    successText="Size limit saved"
                     errorText="Try Again"
                   />
                 </form>

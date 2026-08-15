@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { 
   User, 
   Mail, 
   Globe, 
   BookOpen, 
-  Loader2 
+  Loader2,
+  ArrowRight
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
@@ -157,6 +159,15 @@ export default function StudentProfilePage() {
                 Remarks: {profile.passportRemarks}
               </p>
             )}
+            <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between">
+              <Link 
+                href="/student/efrro?type=passport&action=request_replacement" 
+                className="text-[11px] text-primary font-semibold hover:underline flex items-center gap-1"
+              >
+                <span>Request Replacement</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
           </div>
         </Card>
 
@@ -175,6 +186,15 @@ export default function StudentProfilePage() {
             <p className="text-muted-foreground">Number: <strong className="text-foreground">{profile.visaNumber || "N/A"}</strong></p>
             <p className="text-muted-foreground">Type: <strong className="text-foreground">{profile.visaType || "Student Visa"}</strong></p>
             <p className="text-muted-foreground">Expiry: <strong className="text-foreground">{profile.visaExpiry || "N/A"}</strong></p>
+            <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between">
+              <Link 
+                href="/student/efrro?type=visa&action=request_replacement" 
+                className="text-[11px] text-primary font-semibold hover:underline flex items-center gap-1"
+              >
+                <span>Request Replacement</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
           </div>
         </Card>
 
@@ -192,6 +212,15 @@ export default function StudentProfilePage() {
           <div className="space-y-2 text-xs">
             <p className="text-muted-foreground">Expiry Date: <strong className="text-foreground">{profile.efrroExpiry || "N/A"}</strong></p>
             <p className="text-muted-foreground">Days Remaining: <strong className="text-foreground">{profile.daysRemaining ?? "N/A"}</strong></p>
+            <div className="pt-2 mt-2 border-t border-border/40 flex items-center justify-between">
+              <Link 
+                href="/student/efrro?type=efrro&action=request_replacement" 
+                className="text-[11px] text-primary font-semibold hover:underline flex items-center gap-1"
+              >
+                <span>Request Replacement</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
           </div>
         </Card>
       </div>
