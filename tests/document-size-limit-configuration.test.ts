@@ -129,7 +129,7 @@ describe("Document Size Limit Single Source of Truth Configuration", () => {
     if (fileSize > configuredMaxSizeBytes) {
       return {
         allowed: false,
-        message: `File size exceeds maximum limit of ${maxMb} MB.`
+        message: `This file is too large. The maximum allowed size is ${maxMb} MB.`
       };
     }
     return {

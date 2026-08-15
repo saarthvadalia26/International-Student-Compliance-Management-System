@@ -17,6 +17,7 @@ export interface INotificationRepository {
   cancelScheduledNotifications(studentId: string, docType: string): Promise<void>;
   getStudentPreferences(studentId: string): Promise<StudentNotificationPreference[]>;
   getActiveTemplate(code: string, language: string): Promise<NotificationTemplate | null>;
+  getTemplateById(id: string): Promise<NotificationTemplate | null>;
   getReminderRules(): Promise<ReminderRule[]>;
   createScheduledJob(job: Partial<ScheduledJob>): Promise<ScheduledJob>;
   updateScheduledJob(id: string, job: Partial<ScheduledJob>): Promise<void>;
@@ -48,9 +49,18 @@ export interface INotificationTemplateDbRow {
   language_code: string;
   version: number;
   is_active: boolean;
+  status?: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
   title: string;
+  document_type?: "passport" | "visa" | "efrro" | "general" | "all";
+  event_type?: "document_expiry" | "portal_otp" | "replacement_approved" | "replacement_rejected" | "document_verified" | "document_rejected" | "general_alert";
+  channel?: "email" | "whatsapp" | "both" | "sms";
+  category?: "utility" | "authentication" | "marketing" | "alert";
+  provider_template_name?: string | null;
+  provider_template_id?: string | null;
   subject_template: string | null;
   body_template: string;
+  created_by?: string | null;
+  updated_by?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -83,10 +93,19 @@ export class SupabaseNotificationRepository implements INotificationRepository {
       code: row.code,
       languageCode: row.language_code,
       version: row.version,
-      isActive: row.is_active,
+      isActive: row.status === "ACTIVE" || (row.is_active && row.status !== "INACTIVE" && row.status !== "DRAFT"),
+      status: row.status || (row.is_active ? "ACTIVE" : "INACTIVE"),
       title: row.title,
+      documentType: row.document_type || "all",
+      eventType: row.event_type || "document_expiry",
+      channel: row.channel || "both",
+      category: row.category || "utility",
+      providerTemplateName: row.provider_template_name || null,
+      providerTemplateId: row.provider_template_id || null,
       subjectTemplate: row.subject_template,
       bodyTemplate: row.body_template,
+      createdBy: row.created_by || null,
+      updatedBy: row.updated_by || null,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     };
@@ -236,6 +255,23 @@ export class SupabaseNotificationRepository implements INotificationRepository {
       .eq("code", code)
       .eq("language_code", language)
       .eq("is_active", true)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`[DB_QUERY_FAILED] ${error.message}`);
+    }
+
+    return data ? this.mapTemplateToDomain(data) : null;
+  }
+
+  async getTemplateById(id: string): Promise<NotificationTemplate | null> {
+    const supabase = getAdminSupabase();
+
+    console.log(`[DB_REPOSITORY] Resolving template by id: ${id}`);
+    const { data, error } = await supabase
+      .from("notification_templates")
+      .select("*")
+      .eq("id", id)
       .maybeSingle();
 
     if (error) {

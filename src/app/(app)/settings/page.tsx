@@ -568,32 +568,37 @@ function SettingsPageContent() {
               </CardContent>
             </Card>
 
-            {/* Document Upload Size Limit Configuration */}
+            {/* Document Upload Size Settings */}
             <Card className="border border-border/60 shadow-sm">
               <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
                 <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                  <Archive className="h-4 w-4 text-muted-foreground" /> Document Upload Size Limit Configuration
+                  <Archive className="h-4 w-4 text-muted-foreground" /> Document Upload Settings
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
                 <form onSubmit={handleSavePreferences} className="space-y-4">
                   <p className="text-xs text-muted-foreground">
-                    Centrally configured single source of truth for maximum physical document file size (PDF, JPEG, PNG). The Student Portal, Staff Portal, and server-side validators automatically enforce this limit.
+                    Configure the maximum file size allowed for documents uploaded through the Student Portal (Passport, Visa, and eFRRO).
                   </p>
 
                   <div className="max-w-xs space-y-1.5 p-3.5 rounded-xl border border-border/60 bg-muted/5">
                     <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                      Maximum Document Size (MB)
+                      Maximum Student Document Upload Size
                     </label>
-                    <p className="text-[10px] text-muted-foreground">Allowed upload size per physical document (1–100 MB)</p>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={maxUploadSizeMb}
-                      onChange={e => setMaxUploadSizeMb(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))}
-                      className="h-9 text-xs mt-1"
-                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Students can upload individual passport, visa and eFRRO documents up to this size (1–100 MB).
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={maxUploadSizeMb}
+                        onChange={e => setMaxUploadSizeMb(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))}
+                        className="h-9 text-xs font-medium"
+                      />
+                      <span className="text-xs font-semibold text-muted-foreground">MB</span>
+                    </div>
                   </div>
 
                   <AsyncActionButton
@@ -603,9 +608,9 @@ function SettingsPageContent() {
                     isLoading={isSavingPreferences}
                     isSuccess={preferencesSuccess}
                     isError={preferencesError}
-                    idleText="Save Document Size Limit"
-                    loadingText="Saving limit..."
-                    successText="Size limit saved"
+                    idleText="Save Changes"
+                    loadingText="Saving changes..."
+                    successText="Changes saved"
                     errorText="Try Again"
                   />
                 </form>

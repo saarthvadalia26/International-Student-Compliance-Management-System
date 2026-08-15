@@ -1,38 +1,56 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash, Save, HelpCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { 
+  Plus, 
+  Trash2, 
+  Edit3, 
+  HelpCircle, 
+  FileText, 
+  Mail, 
+  MessageSquare, 
+  Check, 
+  X, 
+  Clock, 
+  Layers, 
+  Filter, 
+  RefreshCw 
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AsyncActionButton } from "@/components/ui/async-action-button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-
-export interface ReminderRule {
-  id: string;
-  documentType: "passport" | "visa" | "efrro";
-  alertThresholdDays: number;
-  channel: "email" | "whatsapp" | "both";
-  isActive: boolean;
-}
+import { 
+  fetchReminderRules, 
+  saveReminderRule, 
+  deleteReminderRule, 
+  toggleReminderRule, 
+  fetchNotificationTemplates, 
+  ReminderRuleDto, 
+  NotificationTemplateDto 
+} from "@/app/(app)/reminders/actions";
 
 interface CustomSwitchProps {
   checked: boolean;
   onCheckedChange: (val: boolean) => void;
   "aria-label"?: string;
+  disabled?: boolean;
 }
 
-export function CustomSwitch({ checked, onCheckedChange, "aria-label": ariaLabel }: CustomSwitchProps): React.JSX.Element {
+export function CustomSwitch({ checked, onCheckedChange, "aria-label": ariaLabel, disabled }: CustomSwitchProps): React.JSX.Element {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
+      disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={`${
         checked ? "bg-primary" : "bg-muted"
-      } relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+      } relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed`}
     >
       <span
         className={`${
@@ -44,202 +62,450 @@ export function CustomSwitch({ checked, onCheckedChange, "aria-label": ariaLabel
 }
 
 export function ReminderSettings(): React.JSX.Element {
-  const [rules, setRules] = React.useState<ReminderRule[]>([]);
+  const [rules, setRules] = React.useState<ReminderRuleDto[]>([]);
+  const [templates, setTemplates] = React.useState<NotificationTemplateDto[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [selectedDocFilter, setSelectedDocFilter] = React.useState<"all" | "passport" | "visa" | "efrro">("all");
 
-  const [preferences, setPreferences] = React.useState({
-    email: true,
-    whatsapp: true,
-    sms: false
-  });
-
-  // Reusable save action button states
+  // Create / Edit Dialog State
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [editingRule, setEditingRule] = React.useState<Partial<ReminderRuleDto> | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [saveSuccess, setSaveSuccess] = React.useState(false);
-  const [saveError, setSaveError] = React.useState(false);
 
-  const handlePreferenceToggle = (channel: "email" | "whatsapp" | "sms") => {
-    setPreferences(prev => ({
-      ...prev,
-      [channel]: !prev[channel]
-    }));
-    toast.success("Preferences updated", { description: `Communication preferences changes saved.` });
-  };
-
-  const handleAddRule = () => {
-    const newRule: ReminderRule = {
-      id: `r-${Math.random().toString(36).substring(7)}`, // Note: Temp ID generator until real DB save
-      documentType: "efrro",
-      alertThresholdDays: 30,
-      channel: "email",
-      isActive: true
-    };
-    setRules(prev => [...prev, newRule]);
-    toast.info("Alert threshold added", { description: "Configure threshold days offset settings below." });
-  };
-
-  const handleDeleteRule = (id: string) => {
-    setRules(prev => prev.filter(r => r.id !== id));
-    toast.error("Alert threshold removed");
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    setSaveSuccess(false);
-    setSaveError(false);
-
+  const loadData = React.useCallback(async () => {
+    setLoading(true);
     try {
-      // TODO: Implement actual database save
-      setSaveError(true);
-      toast.error("Database integration required for saving settings.");
+      const [fetchedRules, fetchedTemplates] = await Promise.all([
+        fetchReminderRules(),
+        fetchNotificationTemplates()
+      ]);
+      setRules(fetchedRules);
+      setTemplates(fetchedTemplates);
+    } catch {
+      toast.error("Failed to load reminder configuration.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const filteredRules = React.useMemo(() => {
+    if (selectedDocFilter === "all") return rules;
+    return rules.filter(r => r.documentType === selectedDocFilter);
+  }, [rules, selectedDocFilter]);
+
+  const handleOpenCreateDialog = () => {
+    const docType = selectedDocFilter === "all" ? "passport" : selectedDocFilter;
+    setEditingRule({
+      documentType: docType,
+      alertThresholdDays: 30,
+      channel: "both",
+      isActive: true,
+      ruleName: `${docType.toUpperCase()} 30-Day Reminder`,
+      templateId: null
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (rule: ReminderRuleDto) => {
+    setEditingRule({ ...rule });
+    setIsDialogOpen(true);
+  };
+
+  const handleToggle = async (rule: ReminderRuleDto) => {
+    const newStatus = !rule.isActive;
+    // Optimistic UI update
+    setRules(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: newStatus } : r));
+    
+    const res = await toggleReminderRule(rule.id, newStatus);
+    if (!res.success) {
+      // Revert on error
+      setRules(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: !newStatus } : r));
+      toast.error(res.error || "Failed to toggle rule");
+    } else {
+      toast.success(newStatus ? "Reminder rule activated" : "Reminder rule deactivated");
+    }
+  };
+
+  const handleDelete = async (id: string, ruleName: string) => {
+    if (!confirm(`Are you sure you want to delete '${ruleName}'?`)) return;
+    
+    setRules(prev => prev.filter(r => r.id !== id));
+    const res = await deleteReminderRule(id);
+    if (!res.success) {
+      toast.error(res.error || "Failed to delete rule");
+      loadData();
+    } else {
+      toast.success("Reminder rule removed");
+    }
+  };
+
+  const handleSaveRule = async () => {
+    if (!editingRule) return;
+
+    if (editingRule.alertThresholdDays === undefined || isNaN(Number(editingRule.alertThresholdDays))) {
+      toast.error("Please enter a valid threshold days offset.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res = await saveReminderRule({
+        id: editingRule.id,
+        documentType: (editingRule.documentType as "passport" | "visa" | "efrro") || "passport",
+        alertThresholdDays: Number(editingRule.alertThresholdDays),
+        channel: (editingRule.channel as "email" | "whatsapp" | "both") || "both",
+        isActive: editingRule.isActive ?? true,
+        ruleName: editingRule.ruleName?.trim() || `${editingRule.documentType?.toUpperCase()} ${editingRule.alertThresholdDays}-Day Reminder`,
+        templateId: editingRule.templateId || null
+      });
+
+      if (res.success) {
+        toast.success(editingRule.id ? "Reminder rule updated" : "Reminder rule created");
+        setIsDialogOpen(false);
+        setEditingRule(null);
+        await loadData();
+      } else {
+        toast.error(res.error || "Failed to save reminder rule");
+      }
     } finally {
       setIsSaving(false);
     }
   };
 
+  const getDocBadgeColor = (type: string) => {
+    switch (type) {
+      case "passport": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30";
+      case "visa": return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30";
+      case "efrro": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30";
+      default: return "bg-muted text-muted-foreground border-border";
+    }
+  };
+
+  // Filter available templates for modal dropdown based on current document type
+  const editingDocType = editingRule?.documentType;
+  const modalTemplates = React.useMemo(() => {
+    if (!editingDocType) return templates;
+    return templates.filter(t => t.documentType === editingDocType || t.documentType === "all");
+  }, [templates, editingDocType]);
+
   return (
-    <div className="space-y-6 text-xs">
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* Left Column: Preferences */}
-        <div className="md:col-span-1 space-y-6">
-          <Card className="border border-border/60 bg-card/65 shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/40">
-              <CardTitle className="text-sm font-semibold">Preferences toggles</CardTitle>
-              <CardDescription className="text-xs font-caption">Students can select active messaging channels.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4 pt-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <span className="font-semibold block">Email Channel</span>
-                  <span className="text-[10px] text-muted-foreground font-caption">Send alerts to student registered email</span>
-                </div>
-                <CustomSwitch checked={preferences.email} onCheckedChange={() => handlePreferenceToggle("email")} aria-label="Toggle Email alerts" />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <span className="font-semibold block">WhatsApp Channel</span>
-                  <span className="text-[10px] text-muted-foreground font-caption">Send message alerts to whatsapp mobile</span>
-                </div>
-                <CustomSwitch checked={preferences.whatsapp} onCheckedChange={() => handlePreferenceToggle("whatsapp")} aria-label="Toggle WhatsApp alerts" />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <span className="font-semibold block">SMS alerts</span>
-                  <span className="text-[10px] text-muted-foreground font-caption">Mobile carrier standard text alert</span>
-                </div>
-                <CustomSwitch checked={preferences.sms} onCheckedChange={() => handlePreferenceToggle("sms")} aria-label="Toggle SMS alerts" />
-              </div>
-            </CardContent>
-          </Card>
+    <div className="space-y-6 text-xs animate-fade-in">
+      {/* Header controls and Document Filter Tabs */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/65 p-4 rounded-xl border border-border/60 shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-muted-foreground mr-1 flex items-center gap-1.5">
+            <Filter className="h-3.5 w-3.5" /> Document Scope:
+          </span>
+          <button
+            onClick={() => setSelectedDocFilter("all")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              selectedDocFilter === "all"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            All Documents ({rules.length})
+          </button>
+          <button
+            onClick={() => setSelectedDocFilter("passport")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              selectedDocFilter === "passport"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            Passport ({rules.filter(r => r.documentType === "passport").length})
+          </button>
+          <button
+            onClick={() => setSelectedDocFilter("visa")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              selectedDocFilter === "visa"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            Visa ({rules.filter(r => r.documentType === "visa").length})
+          </button>
+          <button
+            onClick={() => setSelectedDocFilter("efrro")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              selectedDocFilter === "efrro"
+                ? "bg-emerald-600 text-white shadow-sm"
+                : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+            }`}
+          >
+            eFRRO ({rules.filter(r => r.documentType === "efrro").length})
+          </button>
         </div>
 
-        {/* Right Column: Trigger Rules */}
-        <div className="md:col-span-2 space-y-6">
-          <Card className="border border-border/60 bg-card/65 shadow-sm">
-            <CardHeader className="pb-3 border-b border-border/40 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-semibold">Global Compliance Alert Threshold Rules</CardTitle>
-                <CardDescription className="text-xs font-caption">Define pre-expiry days warnings and post-expiry negative interval alerts.</CardDescription>
-              </div>
-              <Button size="sm" className="h-8 text-xs" onClick={handleAddRule}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Rule
-              </Button>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4 pt-4">
-              <div className="space-y-3">
-                {rules.map((rule, idx) => (
-                  <div key={rule.id} className="flex items-center gap-3 border-b border-border/20 pb-3 last:border-b-0 last:pb-0">
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 flex-1">
-                      {/* Doc Type Selector */}
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block font-caption">Document Type</label>
-                        <select 
-                          value={rule.documentType} 
-                          onChange={(e) => {
-                            const val = e.target.value as "passport" | "visa" | "efrro";
-                            setRules(prev => prev.map((r, i) => i === idx ? { ...r, documentType: val } : r));
-                          }}
-                          className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
-                          <option value="passport">Passport</option>
-                          <option value="visa">Visa</option>
-                          <option value="efrro">eFRRO</option>
-                        </select>
-                      </div>
-
-                      {/* Threshold Days */}
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block font-caption">Days Offset (threshold)</label>
-                        <Input 
-                          type="number" 
-                          value={rule.alertThresholdDays} 
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            setRules(prev => prev.map((r, i) => i === idx ? { ...r, alertThresholdDays: val } : r));
-                          }}
-                          className="h-8 text-xs font-semibold"
-                        />
-                      </div>
-
-                      {/* Channel */}
-                      <div>
-                        <label className="text-[10px] text-muted-foreground block font-caption">Provider Channel</label>
-                        <select 
-                          value={rule.channel} 
-                          onChange={(e) => {
-                            const val = e.target.value as "email" | "whatsapp" | "both";
-                            setRules(prev => prev.map((r, i) => i === idx ? { ...r, channel: val } : r));
-                          }}
-                          className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
-                          <option value="email">Email Only</option>
-                          <option value="whatsapp">WhatsApp Only</option>
-                          <option value="both">Email & WhatsApp</option>
-                        </select>
-                      </div>
-
-                      {/* Status */}
-                      <div className="flex items-center gap-2 pt-3 sm:pt-0 sm:justify-center">
-                        <label className="text-[10px] text-muted-foreground block font-caption sm:hidden">Rule Enabled</label>
-                        <CustomSwitch 
-                          checked={rule.isActive} 
-                          onCheckedChange={(val: boolean) => {
-                            setRules(prev => prev.map((r, i) => i === idx ? { ...r, isActive: val } : r));
-                          }}
-                          aria-label={`Toggle rule ${idx + 1}`}
-                        />
-                      </div>
-                    </div>
-
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-500 hover:bg-rose-500/10 shrink-0 mt-3 sm:mt-0" onClick={() => handleDeleteRule(rule.id)}>
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-border/40">
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-caption">
-                  <HelpCircle className="h-3.5 w-3.5" /> Negative offsets (e.g. -7) represent alerts scheduled after expiration has occurred.
-                </div>
-                <AsyncActionButton
-                  size="sm"
-                  className="h-8 text-xs font-semibold"
-                  onClick={handleSave}
-                  isLoading={isSaving}
-                  isSuccess={saveSuccess}
-                  isError={saveError}
-                  idleText={<><Save className="mr-1.5 h-3.5 w-3.5 inline" /> Save Changes</>}
-                  loadingText="Saving changes..."
-                  successText="Changes saved"
-                  errorText="Try Again"
-                />
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+          <Button variant="outline" size="sm" onClick={loadData} className="h-8 text-xs gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button size="sm" onClick={handleOpenCreateDialog} className="h-8 text-xs gap-1.5 shadow-sm">
+            <Plus className="h-3.5 w-3.5" /> Create Reminder Rule
+          </Button>
         </div>
       </div>
+
+      {/* Rules Grid */}
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map(n => (
+            <Card key={n} className="border border-border/40 bg-card/40 animate-pulse h-40">
+              <CardContent className="p-4" />
+            </Card>
+          ))}
+        </div>
+      ) : filteredRules.length === 0 ? (
+        <Card className="border border-dashed border-border/80 bg-muted/10 p-12 text-center">
+          <Layers className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+          <h3 className="text-sm font-semibold text-foreground">No Reminder Rules Found</h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+            {selectedDocFilter === "all"
+              ? "No compliance alert threshold rules have been configured yet."
+              : `No reminder rules found for ${selectedDocFilter.toUpperCase()}. Click Create Rule to configure one.`}
+          </p>
+          <Button size="sm" onClick={handleOpenCreateDialog} className="mt-4 text-xs gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Add First Rule
+          </Button>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredRules.map(rule => {
+            const isNegative = rule.alertThresholdDays < 0;
+            const triggerText = isNegative 
+              ? `${Math.abs(rule.alertThresholdDays)} days AFTER expiry (Overdue Notice)` 
+              : `${rule.alertThresholdDays} days BEFORE expiry`;
+
+            return (
+              <Card 
+                key={rule.id} 
+                className={`border transition-all duration-200 hover:shadow-md ${
+                  rule.isActive 
+                    ? "border-border/70 bg-card/75 shadow-sm" 
+                    : "border-border/40 bg-muted/20 opacity-75"
+                }`}
+              >
+                <CardHeader className="pb-3 border-b border-border/30">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${getDocBadgeColor(rule.documentType)}`}>
+                          {rule.documentType}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] font-medium">
+                          {rule.channel === "both" ? "Email & WhatsApp" : rule.channel === "email" ? "Email Only" : "WhatsApp Only"}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-sm font-bold text-foreground mt-1 line-clamp-1">
+                        {rule.ruleName}
+                      </CardTitle>
+                    </div>
+
+                    <CustomSwitch
+                      checked={rule.isActive}
+                      onCheckedChange={() => handleToggle(rule)}
+                      aria-label={`Toggle ${rule.ruleName}`}
+                    />
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-4 space-y-3">
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Clock className="h-3.5 w-3.5 text-primary" /> Trigger Schedule:
+                      </span>
+                      <span className={`font-semibold ${isNegative ? "text-rose-500 font-bold" : "text-foreground"}`}>
+                        {triggerText}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <FileText className="h-3.5 w-3.5 text-primary" /> Bound Template:
+                      </span>
+                      <span className="font-medium text-foreground truncate max-w-[140px]" title={rule.templateTitle || "System Default"}>
+                        {rule.templateTitle || "Auto-Selected"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        {rule.channel === "email" ? (
+                          <Mail className="h-3.5 w-3.5 text-blue-500" />
+                        ) : rule.channel === "whatsapp" ? (
+                          <MessageSquare className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : (
+                          <Layers className="h-3.5 w-3.5 text-indigo-500" />
+                        )}
+                        Active Channel:
+                      </span>
+                      <span className="font-medium text-foreground capitalize">
+                        {rule.channel}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-border/30 flex items-center justify-between">
+                    <span className={`text-[11px] font-semibold flex items-center gap-1 ${rule.isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                      {rule.isActive ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                      {rule.isActive ? "Rule Enabled" : "Rule Deactivated"}
+                    </span>
+
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground" 
+                        onClick={() => handleOpenEditDialog(rule)}
+                        title="Edit Rule"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 text-rose-500 hover:bg-rose-500/10" 
+                        onClick={() => handleDelete(rule.id, rule.ruleName)}
+                        title="Delete Rule"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Info Note */}
+      <div className="bg-primary/5 border border-primary/20 p-3 rounded-lg flex items-start gap-2.5 text-muted-foreground text-[11px]">
+        <HelpCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+        <div>
+          <span className="font-semibold text-foreground">Rule Execution Invariant:</span> Reminders automatically evaluate the current verified document version or stored metadata for each student. Positive threshold offsets (e.g. 30) fire prior to expiration; negative offsets (e.g. -7) fire after expiration. Duplicate dispatches are prevented via cryptographic idempotency keys.
+        </div>
+      </div>
+
+      {/* Create / Edit Rule Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold">
+              {editingRule?.id ? "Edit Reminder Rule" : "Create Reminder Rule"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            {/* Rule Name */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Rule Name / Title</label>
+              <Input
+                value={editingRule?.ruleName || ""}
+                onChange={(e) => setEditingRule(prev => prev ? { ...prev, ruleName: e.target.value } : null)}
+                placeholder="e.g. Passport 30-Day Urgent Renewal"
+                className="h-8 text-xs"
+              />
+            </div>
+
+            {/* Document Type */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Target Document Type</label>
+              <select
+                value={editingRule?.documentType || "passport"}
+                onChange={(e) => {
+                  const doc = e.target.value as "passport" | "visa" | "efrro";
+                  setEditingRule(prev => prev ? {
+                    ...prev,
+                    documentType: doc,
+                    ruleName: prev.ruleName ? prev.ruleName.replace(/^(PASSPORT|VISA|EFRRO)/i, doc.toUpperCase()) : `${doc.toUpperCase()} ${prev.alertThresholdDays}-Day Reminder`
+                  } : null);
+                }}
+                className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="passport">Passport</option>
+                <option value="visa">Student Visa</option>
+                <option value="efrro">eFRRO / Residential Permit</option>
+              </select>
+            </div>
+
+            {/* Threshold Days */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Alert Threshold (Days Offset)</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={editingRule?.alertThresholdDays ?? 30}
+                  onChange={(e) => setEditingRule(prev => prev ? { ...prev, alertThresholdDays: parseInt(e.target.value) || 0 } : null)}
+                  className="h-8 text-xs font-semibold"
+                />
+                <span className="text-muted-foreground whitespace-nowrap text-[11px]">
+                  {(editingRule?.alertThresholdDays ?? 30) >= 0 ? "days before expiry" : "days post-expiry (overdue)"}
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Tip: Enter 90, 60, 30, 15, or 7 for pre-expiry alerts, or -7 for post-expiry grace warnings.
+              </p>
+            </div>
+
+            {/* Provider Channel */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Delivery Channel</label>
+              <select
+                value={editingRule?.channel || "both"}
+                onChange={(e) => setEditingRule(prev => prev ? { ...prev, channel: e.target.value as "email" | "whatsapp" | "both" } : null)}
+                className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="both">Email & WhatsApp (Both)</option>
+                <option value="email">Email Only</option>
+                <option value="whatsapp">WhatsApp Only</option>
+              </select>
+            </div>
+
+            {/* Bound Template */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Notification Template (Optional)</label>
+              <select
+                value={editingRule?.templateId || ""}
+                onChange={(e) => setEditingRule(prev => prev ? { ...prev, templateId: e.target.value || null } : null)}
+                className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Auto-resolve from system default</option>
+                {modalTemplates.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} ({t.code} - {t.languageCode.toUpperCase()})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Is Active */}
+            <div className="flex items-center justify-between pt-2 border-t border-border/30">
+              <span className="font-semibold text-foreground">Enable Rule</span>
+              <CustomSwitch
+                checked={editingRule?.isActive ?? true}
+                onCheckedChange={(val) => setEditingRule(prev => prev ? { ...prev, isActive: val } : null)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setIsDialogOpen(false)} disabled={isSaving} className="text-xs">
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSaveRule} disabled={isSaving} className="text-xs">
+              {isSaving ? "Saving..." : editingRule?.id ? "Save Changes" : "Create Rule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

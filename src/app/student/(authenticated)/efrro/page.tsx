@@ -164,7 +164,7 @@ function DocumentCentreContent() {
     if (!file) return;
 
     if (file.size > maxUploadSizeBytes) {
-      toast.error(`File size exceeds maximum limit of ${maxUploadSizeMb} MB.`);
+      toast.error(`This file is too large. The maximum allowed size is ${maxUploadSizeMb} MB.`);
       return;
     }
 
@@ -519,7 +519,7 @@ function DocumentCentreContent() {
                     {selectedFile ? selectedFile.name : `Select your ${activeDocType.toUpperCase()} document file`}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : `PDF, JPG, or PNG (Max ${maxUploadSizeMb} MB)`}
+                    {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : `PDF, JPG, PNG • Maximum file size: ${maxUploadSizeMb} MB`}
                   </p>
                   
                   <input

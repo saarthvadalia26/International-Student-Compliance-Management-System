@@ -6,7 +6,6 @@ import {
   ProviderResponse
 } from "../types/provider.types";
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { StudentPortalService } from "@/domain/student-portal/services/student-portal.service";
 import crypto from "crypto";
 
 export class NotificationPreferencesService {
@@ -28,95 +27,119 @@ export class ReminderEngine {
     const rules = await this.repository.getReminderRules();
     const supabase = getAdminSupabase();
     
-    // Query active student compliance snapshots
-    const { data: snapshots, error } = await supabase
-      .from("student_snapshot")
-      .select("student_id, passport_status, passport_expiry, visa_status, visa_expiry, efrro_status, efrro_expiry, days_until_expiry");
+    // Query active student compliance snapshots and verified versions
+    const { data: students, error } = await supabase
+      .from("students")
+      .select(`
+        id,
+        email,
+        phone,
+        registration_number,
+        student_personal(full_name, preferred_language),
+        student_academic(program_code),
+        student_snapshot(passport_expiry, visa_expiry, efrro_expiry),
+        passport_versions(version_number, is_active, expiry_date, verification_status, deleted_at),
+        visa_versions(version_number, is_active, expiry_date, verification_status, deleted_at),
+        efrro_versions(version_number, is_active, expiry_date, verification_status, deleted_at)
+      `);
 
-    if (error || !snapshots) {
-      console.error("[REMINDER_ENGINE_ERROR] Failed to load student snapshots:", error?.message);
+    if (error || !students) {
+      console.error("[REMINDER_ENGINE_ERROR] Failed to load students for reminders:", error?.message);
       return;
     }
 
-    for (const snap of snapshots) {
-      const studentId = snap.student_id;
-      
-      // Load student profile details to resolve contact email/phone references
-      const { data: student, error: sError } = await supabase
-        .from("student_personal")
-        .select("full_name, preferred_language")
-        .eq("student_id", studentId)
-        .single();
-        
-      const { data: studentAccount, error: saError } = await supabase
-        .from("students")
-        .select("email, phone")
-        .eq("id", studentId)
-        .single();
+    const institutionName = process.env.NEXT_PUBLIC_INSTITUTION_NAME || "Office of International Compliance";
 
-      if (sError || saError || !student || !studentAccount) continue;
+    for (const student of students) {
+      const studentId = student.id;
+      const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
+      const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
+      const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
 
-      // Evaluate rules against document status dates - automated expiry reminders are only generated for eFRRO
+      const studentName = personal?.full_name || "Student";
+      const enrollmentNumber = student.registration_number || "N/A";
+      const prefLang = personal?.preferred_language || "en";
+      const programName = academic?.program_code || "Academic Program";
+
+      // Resolve current verified active expiry dates for all 3 document types
+      const activePassport = (student.passport_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
+      const activeVisa = (student.visa_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
+      const activeEfrro = (student.efrro_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
+
+      const expiryDates: Record<"passport" | "visa" | "efrro", string | null> = {
+        passport: activePassport?.expiry_date || snapshot?.passport_expiry || null,
+        visa: activeVisa?.expiry_date || snapshot?.visa_expiry || null,
+        efrro: activeEfrro?.expiry_date || snapshot?.efrro_expiry || null
+      };
+
+      const docLabels: Record<"passport" | "visa" | "efrro", string> = {
+        passport: "Passport",
+        visa: "Student Visa",
+        efrro: "eFRRO / Residential Permit"
+      };
+
+      // Evaluate rules against document status dates for passport, visa, and efrro
       for (const rule of rules) {
-        if (rule.documentType !== "efrro") continue;
+        const docType = rule.documentType;
+        const expiryDate = expiryDates[docType];
 
-        const expiryDate: string | null = snap.efrro_expiry;
-        const documentStatus: string | null = snap.efrro_status;
+        if (!expiryDate) {
+          // No valid expiry date recorded -> do not fabricate or send false reminders
+          continue;
+        }
 
-        if (!expiryDate || documentStatus === "COMPLIANT") continue;
-
+        const cleanExpiry = expiryDate.split("T")[0].trim();
+        const today = new Date().toISOString().split("T")[0];
+        
         // Calculate offset difference
-        const daysLeft = Math.ceil((new Date(expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+        const daysLeft = Math.ceil((new Date(cleanExpiry).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24));
         
         // Match alert rule triggers
         if (daysLeft === rule.alertThresholdDays) {
-          const prefLang = student.preferred_language || "en";
-          let template = await this.repository.getActiveTemplate("EXPIRY_ALERT", prefLang);
+          // Resolve document-specific template or fallback
+          const specificCode = `${docType.toUpperCase()}_EXPIRY_ALERT`;
+          let template = await this.repository.getActiveTemplate(specificCode, prefLang);
           if (!template && prefLang !== "en") {
-            template = await this.repository.getActiveTemplate("EXPIRY_ALERT", "en");
+            template = await this.repository.getActiveTemplate(specificCode, "en");
+          }
+          if (!template) {
+            template = await this.repository.getActiveTemplate("EXPIRY_ALERT", prefLang);
+            if (!template && prefLang !== "en") {
+              template = await this.repository.getActiveTemplate("EXPIRY_ALERT", "en");
+            }
           }
           if (!template) continue;
 
           // Check communication channel details
           const channel = rule.channel;
-          const address = channel === "email" ? studentAccount.email : studentAccount.phone || "N/A";
+          const address = channel === "email" ? student.email : (student.phone || student.email || "N/A");
           
-          // Enforce idempotency key mapping to prevent duplicates: studentId:docType:thresholdDays:channel
-          const key = `${studentId}:${rule.documentType}:${rule.alertThresholdDays}:${channel}`;
-
-          // Generate secure upload token for eFRRO reminder alerts
-          let secureUploadLink = "";
-          if (rule.documentType === "efrro") {
-            try {
-              const portalService = new StudentPortalService();
-              const token = await portalService.generateUploadToken(studentId, "UPLOAD");
-              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-              secureUploadLink = `${baseUrl}/student/upload/${token}`;
-            } catch (err) {
-              console.error("[REMINDER_ENGINE_ERROR] Failed generating secure upload token:", err);
-            }
-          }
+          // Enforce idempotency key mapping to prevent duplicates: studentId:docType:thresholdDays:channel:expiryDate
+          const key = `${studentId}:${docType}:${rule.alertThresholdDays}:${channel}:${cleanExpiry}`;
 
           try {
             await this.repository.queueNotification({
               studentId,
               templateId: template.id,
-              documentType: rule.documentType,
+              documentType: docType,
               status: "queued",
               channel,
               recipientAddress: address,
               triggerSource,
               idempotencyKey: key,
               notificationContext: {
-                student_name: student.full_name,
-                document_type: rule.documentType,
+                student_name: studentName,
+                enrollment_number: enrollmentNumber,
+                document_type: docLabels[docType],
                 days_left: String(daysLeft),
-                expiry_date: expiryDate,
-                secure_upload_link: secureUploadLink
+                days_remaining: String(daysLeft),
+                expiry_date: cleanExpiry,
+                institution_name: institutionName,
+                program_name: programName
               }
             });
           } catch (e) {
-            // In case of duplicate key insert exceptions, catch silently to prevent execution halts
+            // Duplicate key insert exception caught cleanly to prevent duplicate dispatch
             const msg = e instanceof Error ? e.message : String(e);
             console.log(`[REMINDER_ENGINE_INFO] Duplicate alert rejected by idempotency key: ${key}. Details: ${msg}`);
           }
@@ -184,6 +207,11 @@ export class QueueProcessor {
             .single();
 
           if (tData) {
+            const isInactive = tData.status === "INACTIVE" || tData.status === "DRAFT" || tData.status === "ARCHIVED" || tData.is_active === false;
+            if (isInactive) {
+              throw new Error(`[CONFIGURATION_ERROR] Referenced template '${tData.title}' (${tData.code}) is not ACTIVE.`);
+            }
+
             body = this.interpolateTemplate(tData.body_template, alert.notificationContext);
             subject = tData.subject_template ? this.interpolateTemplate(tData.subject_template, alert.notificationContext) : subject;
           }

@@ -394,7 +394,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
 
     const { data, error } = await supabase
       .from(NOTIFICATION_TABLE_NAME)
-      .select("id, channel, created_at, trigger_source, status")
+      .select("id, document_type, channel, created_at, trigger_source, status, notification_context")
       .eq("student_id", studentId)
       .order("created_at", { ascending: false });
 
@@ -404,10 +404,12 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
 
     return data.map(row => ({
       id: row.id,
+      documentType: row.document_type as "passport" | "visa" | "efrro",
       channel: row.channel,
       sentAt: row.created_at,
       triggerSource: row.trigger_source,
-      status: row.status
+      status: row.status,
+      details: row.notification_context || {}
     }));
   }
 

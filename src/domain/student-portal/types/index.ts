@@ -110,8 +110,10 @@ export interface StudentHistoryRow {
 
 export interface StudentReminderHistoryRow {
   id: string;
+  documentType?: "passport" | "visa" | "efrro";
   channel: string;
   sentAt: string;
   triggerSource: string;
   status: string;
+  details?: Record<string, unknown>;
 }

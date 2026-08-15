@@ -24,10 +24,30 @@ export interface NotificationTemplate {
   version: number;
   isActive: boolean;
   title: string;
+  documentType?: "passport" | "visa" | "efrro" | "general" | "all";
+  eventType?: "document_expiry" | "portal_otp" | "replacement_approved" | "replacement_rejected" | "document_verified" | "document_rejected" | "general_alert";
+  channel?: "email" | "whatsapp" | "both" | "sms";
+  category?: "utility" | "authentication" | "marketing" | "alert";
+  status?: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
+  providerTemplateName?: string | null;
+  providerTemplateId?: string | null;
   subjectTemplate: string | null;
   bodyTemplate: string;
+  createdBy?: string | null;
+  updatedBy?: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface NotificationTemplateAuditLog {
+  id: string;
+  templateId: string;
+  action: "CREATED" | "UPDATED" | "DUPLICATED" | "ACTIVATED" | "DEACTIVATED" | "ARCHIVED";
+  actorId?: string | null;
+  actorEmail?: string | null;
+  beforeState?: Record<string, unknown> | null;
+  afterState?: Record<string, unknown> | null;
+  createdAt: Date;
 }
 
 export interface StudentNotificationPreference {
@@ -57,6 +77,8 @@ export interface ReminderRule {
   alertThresholdDays: number;
   channel: string;
   isActive: boolean;
+  ruleName?: string | null;
+  templateId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

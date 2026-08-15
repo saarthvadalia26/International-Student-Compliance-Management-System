@@ -37,7 +37,10 @@ export interface DocumentReminderGroup {
 export interface StudentReminderScheduleResponse {
   studentId: string;
   evaluatedAt: string;
+  passport: DocumentReminderGroup;
+  visa: DocumentReminderGroup;
   efrro: DocumentReminderGroup;
+  documents: Record<"passport" | "visa" | "efrro", DocumentReminderGroup>;
   summary: {
     totalRules: number;
     dueCount: number;
@@ -45,5 +48,13 @@ export interface StudentReminderScheduleResponse {
     failedCount: number;
     notDueCount: number;
     notApplicableCount: number;
+    byDocument: Record<"passport" | "visa" | "efrro", {
+      totalRules: number;
+      dueCount: number;
+      dispatchedCount: number;
+      failedCount: number;
+      notDueCount: number;
+      notApplicableCount: number;
+    }>;
   };
 }

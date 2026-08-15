@@ -12,13 +12,26 @@ export interface ReminderRuleConfig {
 }
 
 export const STANDARD_REMINDER_RULES: Record<"passport" | "visa" | "efrro", ReminderRuleConfig[]> = {
-  passport: [],
-  visa: [],
+  passport: [
+    { id: "passport-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "email" },
+    { id: "passport-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "email" },
+    { id: "passport-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "both" },
+    { id: "passport-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "both" },
+    { id: "passport-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "both" }
+  ],
+  visa: [
+    { id: "visa-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "email" },
+    { id: "visa-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "email" },
+    { id: "visa-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "both" },
+    { id: "visa-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "both" },
+    { id: "visa-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "both" }
+  ],
   efrro: [
     { id: "efrro-90", ruleName: "90-Day Early Warning", thresholdDays: 90, channel: "email" },
     { id: "efrro-60", ruleName: "60-Day Administrative Reminder", thresholdDays: 60, channel: "email" },
     { id: "efrro-30", ruleName: "30-Day Urgent Renewal", thresholdDays: 30, channel: "both" },
-    { id: "efrro-15", ruleName: "15-Day Critical Warning", thresholdDays: 15, channel: "both" }
+    { id: "efrro-15", ruleName: "15-Day Critical Alert", thresholdDays: 15, channel: "both" },
+    { id: "efrro-7", ruleName: "7-Day Final Warning", thresholdDays: 7, channel: "both" }
   ]
 };
 
@@ -41,6 +54,13 @@ export interface RawNotificationRecord {
   }>;
 }
 
+export interface DocumentInfoParam {
+  number?: string | null;
+  expiryDate?: string | null;
+  isUploaded?: boolean;
+  verificationStatus?: "not_uploaded" | "pending" | "verified" | "rejected";
+}
+
 import { CalendarDateEngine } from "./calendar-date";
 export { CalendarDateEngine };
 
@@ -56,6 +76,7 @@ export class ExpiryReminderEngine {
     isUploaded: boolean;
     verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
     existingNotifications: RawNotificationRecord[];
+    customRules?: ReminderRuleConfig[];
     todayISO?: string;
   }): DocumentReminderGroup {
     const {
@@ -66,10 +87,14 @@ export class ExpiryReminderEngine {
       isUploaded,
       verificationStatus,
       existingNotifications,
+      customRules,
       todayISO = CalendarDateEngine.getTodayISO()
     } = params;
 
-    const rules = STANDARD_REMINDER_RULES[documentType] || [];
+    const rules = (customRules && customRules.length > 0)
+      ? customRules
+      : (STANDARD_REMINDER_RULES[documentType] || []);
+
     const cleanExpiry = expiryDate ? expiryDate.split("T")[0].trim() : "";
     const hasValidExpiry = Boolean(cleanExpiry && /^\d{4}-\d{2}-\d{2}$/.test(cleanExpiry));
 
@@ -112,7 +137,9 @@ export class ExpiryReminderEngine {
         if (n.document_type !== documentType) return false;
         
         const key = n.idempotency_key || "";
-        const contextDays = n.notification_context?.days_left ? Number(n.notification_context.days_left) : null;
+        const contextDays = n.notification_context?.days_left 
+          ? Number(n.notification_context.days_left) 
+          : (n.notification_context?.days_remaining ? Number(n.notification_context.days_remaining) : null);
         
         const matchesThreshold = 
           key.includes(`:${rule.thresholdDays}:`) || 
@@ -175,7 +202,7 @@ export class ExpiryReminderEngine {
       }
 
       // No dispatched/failed notification record found -> evaluate dynamically against calendar date
-      if (isExpired) {
+      if (isExpired && rule.thresholdDays > 0) {
         return {
           ruleId: rule.id,
           ruleName: rule.ruleName,
@@ -235,16 +262,42 @@ export class ExpiryReminderEngine {
   }
 
   /**
-   * Calculate student automated reminder schedule for active eFRRO expiry.
-   * Passport and Visa do NOT generate automated reminder schedules.
+   * Calculate student automated reminder schedules for Passport, Visa, and eFRRO.
    */
   static calculateStudentReminders(params: {
     studentId: string;
-    efrro?: { number: string; expiryDate?: string | null; isUploaded: boolean; verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected" } | null;
+    passport?: DocumentInfoParam | null;
+    visa?: DocumentInfoParam | null;
+    efrro?: DocumentInfoParam | null;
     notifications: RawNotificationRecord[];
+    customRules?: Record<"passport" | "visa" | "efrro", ReminderRuleConfig[]>;
     todayISO?: string;
   }): StudentReminderScheduleResponse {
     const today = params.todayISO || CalendarDateEngine.getTodayISO();
+
+    const passportGroup = this.calculateDocumentReminders({
+      documentType: "passport",
+      documentTitle: "International Passport",
+      documentNumber: params.passport?.number || "",
+      expiryDate: params.passport?.expiryDate,
+      isUploaded: params.passport?.isUploaded || false,
+      verificationStatus: params.passport?.verificationStatus || "not_uploaded",
+      existingNotifications: params.notifications,
+      customRules: params.customRules?.passport,
+      todayISO: today
+    });
+
+    const visaGroup = this.calculateDocumentReminders({
+      documentType: "visa",
+      documentTitle: "Student Visa",
+      documentNumber: params.visa?.number || "",
+      expiryDate: params.visa?.expiryDate,
+      isUploaded: params.visa?.isUploaded || false,
+      verificationStatus: params.visa?.verificationStatus || "not_uploaded",
+      existingNotifications: params.notifications,
+      customRules: params.customRules?.visa,
+      todayISO: today
+    });
 
     const efrroGroup = this.calculateDocumentReminders({
       documentType: "efrro",
@@ -254,44 +307,79 @@ export class ExpiryReminderEngine {
       isUploaded: params.efrro?.isUploaded || false,
       verificationStatus: params.efrro?.verificationStatus || "not_uploaded",
       existingNotifications: params.notifications,
+      customRules: params.customRules?.efrro,
       todayISO: today
     });
 
+    const allSchedules = [
+      ...passportGroup.schedule,
+      ...visaGroup.schedule,
+      ...efrroGroup.schedule
+    ];
+
+    const getGroupCounts = (group: DocumentReminderGroup) => ({
+      totalRules: group.schedule.length,
+      dueCount: group.schedule.filter(s => s.status === "DUE").length,
+      dispatchedCount: group.schedule.filter(s => s.status === "DISPATCHED").length,
+      failedCount: group.schedule.filter(s => s.status === "FAILED").length,
+      notDueCount: group.schedule.filter(s => s.status === "NOT_DUE").length,
+      notApplicableCount: group.schedule.filter(s => s.status === "NOT_APPLICABLE").length
+    });
+
     const summary = {
-      totalRules: efrroGroup.schedule.length,
-      dueCount: efrroGroup.schedule.filter(s => s.status === "DUE").length,
-      dispatchedCount: efrroGroup.schedule.filter(s => s.status === "DISPATCHED").length,
-      failedCount: efrroGroup.schedule.filter(s => s.status === "FAILED").length,
-      notDueCount: efrroGroup.schedule.filter(s => s.status === "NOT_DUE").length,
-      notApplicableCount: efrroGroup.schedule.filter(s => s.status === "NOT_APPLICABLE").length
+      totalRules: allSchedules.length,
+      dueCount: allSchedules.filter(s => s.status === "DUE").length,
+      dispatchedCount: allSchedules.filter(s => s.status === "DISPATCHED").length,
+      failedCount: allSchedules.filter(s => s.status === "FAILED").length,
+      notDueCount: allSchedules.filter(s => s.status === "NOT_DUE").length,
+      notApplicableCount: allSchedules.filter(s => s.status === "NOT_APPLICABLE").length,
+      byDocument: {
+        passport: getGroupCounts(passportGroup),
+        visa: getGroupCounts(visaGroup),
+        efrro: getGroupCounts(efrroGroup)
+      }
     };
 
     return {
       studentId: params.studentId,
       evaluatedAt: new Date().toISOString(),
+      passport: passportGroup,
+      visa: visaGroup,
       efrro: efrroGroup,
+      documents: {
+        passport: passportGroup,
+        visa: visaGroup,
+        efrro: efrroGroup
+      },
       summary
     };
   }
 
   /**
-   * Evaluates and queues due eFRRO reminders for a student in database with idempotent keys.
-   * Automated expiry reminders are only generated for eFRRO documents.
+   * Evaluates and queues due reminders for all configured document types for a student.
    */
   static async evaluateAndQueueStudentDueReminders(studentId: string): Promise<{ queuedCount: number; errors: string[] }> {
     const { getAdminSupabase } = await import("@/lib/supabase/admin");
     const supabase = getAdminSupabase();
 
-    // 1. Fetch student snapshot & eFRRO versions
+    // 1. Fetch student details, snapshot, and active document versions across all 3 document types
     const { data: student, error: sErr } = await supabase
       .from("students")
       .select(`
         id,
         email,
         phone,
+        registration_number,
         student_personal(full_name, preferred_language),
-        student_snapshot(efrro_expiry, efrro_number),
-        efrro_versions(is_active, expiry_date, verification_status, file_path, deleted_at)
+        student_academic(program_code),
+        student_snapshot(
+          passport_expiry, passport_number,
+          visa_expiry, visa_number,
+          efrro_expiry, efrro_number
+        ),
+        passport_versions(id, version_number, is_active, expiry_date, verification_status, file_path, deleted_at),
+        visa_versions(id, version_number, is_active, expiry_date, verification_status, file_path, deleted_at),
+        efrro_versions(id, version_number, is_active, expiry_date, verification_status, file_path, deleted_at)
       `)
       .eq("id", studentId)
       .single();
@@ -300,89 +388,145 @@ export class ExpiryReminderEngine {
       return { queuedCount: 0, errors: [`Failed to load student: ${sErr?.message || "Not found"}`] };
     }
 
-    // Extract active approved eFRRO version
-    const activeEfrro = (student.efrro_versions || []).find((e: { is_active: boolean; deleted_at: string | null }) => e.is_active && !e.deleted_at);
-
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
+    const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
 
-    const efrroExpiry = activeEfrro?.expiry_date || snapshot?.efrro_expiry;
-    if (!efrroExpiry) {
-      // Do not create notification records when there is no valid eFRRO expiry date
-      return { queuedCount: 0, errors: [] };
-    }
+    // Extract active approved document versions
+    const activePassport = (student.passport_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
+    const activeVisa = (student.visa_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
+    const activeEfrro = (student.efrro_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
 
-    // 2. Fetch existing eFRRO notifications
+    const passportExpiry = activePassport?.expiry_date || snapshot?.passport_expiry || null;
+    const visaExpiry = activeVisa?.expiry_date || snapshot?.visa_expiry || null;
+    const efrroExpiry = activeEfrro?.expiry_date || snapshot?.efrro_expiry || null;
+
+    // 2. Fetch existing notification history for this student
     const { data: notifData } = await supabase
       .from("notifications")
       .select("*, notification_delivery_log(*)")
-      .eq("student_id", studentId)
-      .eq("document_type", "efrro");
+      .eq("student_id", studentId);
 
     const notifications: RawNotificationRecord[] = (notifData || []) as RawNotificationRecord[];
 
+    // 3. Fetch active reminder rules from database
+    const { data: dbRules } = await supabase
+      .from("reminder_rules")
+      .select("id, document_type, alert_threshold_days, channel, is_active, rule_name, template_id")
+      .eq("is_active", true);
+
+    const customRules: Record<"passport" | "visa" | "efrro", ReminderRuleConfig[]> = {
+      passport: [],
+      visa: [],
+      efrro: []
+    };
+
+    if (dbRules && dbRules.length > 0) {
+      for (const r of dbRules) {
+        const dType = r.document_type as "passport" | "visa" | "efrro";
+        if (customRules[dType]) {
+          customRules[dType].push({
+            id: r.id,
+            ruleName: r.rule_name || `${r.alert_threshold_days}-Day Reminder`,
+            thresholdDays: r.alert_threshold_days,
+            channel: r.channel as "email" | "whatsapp" | "both"
+          });
+        }
+      }
+    }
+
     const scheduleResponse = this.calculateStudentReminders({
       studentId,
+      passport: {
+        number: snapshot?.passport_number || "",
+        expiryDate: passportExpiry,
+        isUploaded: Boolean(activePassport?.file_path),
+        verificationStatus: (activePassport?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
+      },
+      visa: {
+        number: snapshot?.visa_number || "",
+        expiryDate: visaExpiry,
+        isUploaded: Boolean(activeVisa?.file_path),
+        verificationStatus: (activeVisa?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
+      },
       efrro: {
         number: snapshot?.efrro_number || "",
         expiryDate: efrroExpiry,
         isUploaded: Boolean(activeEfrro?.file_path),
         verificationStatus: (activeEfrro?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
       },
-      notifications
+      notifications,
+      customRules: dbRules && dbRules.length > 0 ? customRules : undefined
     });
 
     let queuedCount = 0;
     const errors: string[] = [];
     const studentName = personal?.full_name || "Student";
+    const enrollmentNumber = student.registration_number || "Pending Registration";
     const studentEmail = student.email || "";
     const studentPhone = student.phone || "";
+    const institutionName = process.env.NEXT_PUBLIC_INSTITUTION_NAME || "Office of International Student Affairs";
+    const programName = academic?.program_code || "Academic Program";
 
-    const doc = scheduleResponse.efrro;
-    if (!doc.expiryDate || doc.isExpired) {
-      // Do not generate future reminder records for expired documents
-      return { queuedCount: 0, errors: [] };
-    }
+    const docGroups: DocumentReminderGroup[] = [
+      scheduleResponse.passport,
+      scheduleResponse.visa,
+      scheduleResponse.efrro
+    ];
 
-    // 3. For each DUE eFRRO reminder, queue notification if not already queued
-    for (const item of doc.schedule) {
-      if (item.status === "DUE" && item.scheduledDateISO && doc.expiryDate) {
-        const idempotencyKey = `${studentId}:efrro:${item.thresholdDays}:${item.channel}:${doc.expiryDate}`;
-        const recipientAddress = item.channel === "email" ? studentEmail : (studentPhone || studentEmail);
+    // 4. Iterate over each document type and queue DUE reminders
+    for (const doc of docGroups) {
+      if (!doc.expiryDate || doc.isExpired) {
+        continue;
+      }
 
-        if (!recipientAddress) {
-          errors.push(`No valid contact address for eFRRO ${item.thresholdDays}-day alert.`);
-          continue;
-        }
+      for (const item of doc.schedule) {
+        if (item.status === "DUE" && item.scheduledDateISO && doc.expiryDate) {
+          // Idempotency key accounts for student, docType, thresholdDays, channel, and expiryDate
+          const idempotencyKey = `${studentId}:${doc.documentType}:${item.thresholdDays}:${item.channel}:${doc.expiryDate}`;
+          const recipientAddress = item.channel === "email" ? studentEmail : (studentPhone || studentEmail);
 
-        try {
-          const { error: insertErr } = await supabase
-            .from("notifications")
-            .insert({
-              student_id: studentId,
-              document_type: "efrro",
-              status: "queued",
-              channel: item.channel,
-              recipient_address: recipientAddress,
-              scheduled_for: new Date().toISOString(),
-              trigger_source: "reminder_engine_calc",
-              idempotency_key: idempotencyKey,
-              notification_context: {
-                student_name: studentName,
-                document_type: "eFRRO / Residential Permit",
-                days_left: String(item.thresholdDays),
-                expiry_date: doc.expiryDate,
-                scheduled_date: item.scheduledDate
-              }
-            });
-
-          if (!insertErr) {
-            queuedCount++;
-          } else if (!insertErr.message.includes("unique") && !insertErr.message.includes("duplicate")) {
-            errors.push(`Failed to queue eFRRO reminder: ${insertErr.message}`);
+          if (!recipientAddress) {
+            errors.push(`No valid contact address for ${doc.documentType.toUpperCase()} ${item.thresholdDays}-day alert.`);
+            continue;
           }
-        } catch (err) {
-          errors.push(err instanceof Error ? err.message : "Error queuing reminder");
+
+          const docTitle = doc.documentTitle;
+          const daysLeft = String(item.thresholdDays);
+
+          try {
+            const { error: insertErr } = await supabase
+              .from("notifications")
+              .insert({
+                student_id: studentId,
+                document_type: doc.documentType,
+                status: "queued",
+                channel: item.channel,
+                recipient_address: recipientAddress,
+                scheduled_for: new Date().toISOString(),
+                trigger_source: "reminder_engine_calc",
+                idempotency_key: idempotencyKey,
+                notification_context: {
+                  student_name: studentName,
+                  enrollment_number: enrollmentNumber,
+                  document_type: docTitle,
+                  days_left: daysLeft,
+                  days_remaining: daysLeft,
+                  expiry_date: doc.expiryDate,
+                  scheduled_date: item.scheduledDate,
+                  institution_name: institutionName,
+                  program_name: programName
+                }
+              });
+
+            if (!insertErr) {
+              queuedCount++;
+            } else if (!insertErr.message.includes("unique") && !insertErr.message.includes("duplicate")) {
+              errors.push(`Failed to queue ${doc.documentType} reminder: ${insertErr.message}`);
+            }
+          } catch (err) {
+            errors.push(err instanceof Error ? err.message : "Error queuing reminder");
+          }
         }
       }
     }
