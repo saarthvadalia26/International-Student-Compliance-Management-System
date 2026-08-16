@@ -70,6 +70,7 @@ import {
   validateImportDataAction,
   executeBulkImportAction,
   downloadImportTemplateAction,
+  downloadImportErrorReportAction,
   fetchImportHistoryAction,
   rollbackImportBatchAction
 } from "./actions";
@@ -86,6 +87,7 @@ export default function BulkStudentImportPage() {
   const [isValidating, setIsValidating] = React.useState(false);
   const [isImporting, setIsImporting] = React.useState(false);
   const [isDownloadingTemplate, setIsDownloadingTemplate] = React.useState(false);
+  const [isDownloadingReport, setIsDownloadingReport] = React.useState(false);
 
   // Parsed state
   const [detectedHeaders, setDetectedHeaders] = React.useState<string[]>([]);
@@ -207,9 +209,42 @@ export default function BulkStudentImportPage() {
     }
   };
 
-  // 3. Trigger Validation
+  // 3. Download Error & Warnings Report (.xlsx)
+  const handleDownloadErrorReport = async () => {
+    if (!validationReport) return;
+    setIsDownloadingReport(true);
+    try {
+      const res = await downloadImportErrorReportAction(validationReport, importResult?.errors);
+      if (res.success && res.base64 && res.fileName) {
+        const byteCharacters = atob(res.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: res.mimeType || "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = res.fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success(`Downloaded Error & Warnings Report: ${res.fileName}`);
+      } else {
+        toast.error(res.error || "Failed to generate error report");
+      }
+    } catch {
+      toast.error("Failed to download error report");
+    } finally {
+      setIsDownloadingReport(false);
+    }
+  };
+
+  // 4. Trigger Validation
   const handleRunValidation = async () => {
-    // Check if critical fields mapped
+    // Check if mandatory fields are mapped
     const mappedValues = Object.values(columnMapping);
     const requiredDefs = ISCMS_FIELD_DEFINITIONS.filter(f => f.required);
     const missingRequired = requiredDefs.filter(f => !mappedValues.includes(f.field));
@@ -226,7 +261,7 @@ export default function BulkStudentImportPage() {
         setValidationReport(res.report);
         setStep(3);
         if (res.report.errorCount === 0 && res.report.duplicateCount === 0) {
-          toast.success(`Validation passed: All ${res.report.validCount} records are ready for import.`);
+          toast.success(`Validation passed: ${res.report.validCount} records ready for import (${res.report.cleanValidCount} clean, ${res.report.warningRowsCount} with warnings).`);
         } else {
           toast.warning(`Validation completed with ${res.report.errorCount} error(s) and ${res.report.duplicateCount} duplicate(s).`);
         }
@@ -240,7 +275,7 @@ export default function BulkStudentImportPage() {
     }
   };
 
-  // 4. Commit Bulk Import
+  // 5. Commit Bulk Import
   const handleCommitImport = async () => {
     if (!validationReport || !selectedFile) return;
 
@@ -267,7 +302,7 @@ export default function BulkStudentImportPage() {
     }
   };
 
-  // 5. Rollback Batch
+  // 6. Rollback Batch
   const handleExecuteRollback = async () => {
     if (!rollbackBatch) return;
 
@@ -363,7 +398,7 @@ export default function BulkStudentImportPage() {
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Safely import university student records from Excel (.xlsx, .xls) and CSV files with column mapping, automated validation, and batch auditing.
+            Safely import university student records from Excel (.xlsx, .xls) and CSV files with row-level validation, empty-cell tolerance, and batch auditing.
           </p>
         </div>
 
@@ -444,7 +479,7 @@ export default function BulkStudentImportPage() {
               <CardHeader>
                 <CardTitle className="text-lg">Step 1: Upload Spreadsheet File</CardTitle>
                 <CardDescription>
-                  Upload your Excel (.xlsx, .xls) or CSV file containing existing student records.
+                  Upload your Excel (.xlsx, .xls) or CSV file containing university student records.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -490,30 +525,30 @@ export default function BulkStudentImportPage() {
                   <div className="p-4 rounded-xl bg-card border border-border/70 space-y-1.5">
                     <div className="flex items-center gap-2 font-semibold text-xs text-foreground">
                       <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                      Strict Relational Architecture
+                      University-Controlled IDs
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Imports create complete relational entities across identity, contacts, academic records, and emergency guardians safely.
+                      Enrollment numbers originate strictly from the university. Missing enrollment numbers are rejected rather than auto-generated.
                     </p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-card border border-border/70 space-y-1.5">
                     <div className="flex items-center gap-2 font-semibold text-xs text-foreground">
                       <Database className="h-4 w-4 text-blue-600" />
-                      Document Version Integrity
+                      Empty Cells & NULL Storage
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Passport, Visa, and eFRRO numbers are stored in metadata. No fake document versions or empty R2 files are created. First actual upload becomes v1.
+                      Missing optional fields (e.g. DOB, phone, address, passport/visa numbers) import cleanly as NULL and can be completed later.
                     </p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-card border border-border/70 space-y-1.5">
                     <div className="flex items-center gap-2 font-semibold text-xs text-foreground">
                       <Sparkles className="h-4 w-4 text-amber-600" />
-                      Automatic Academic Progression
+                      Zero Fake Files & R2 Objects
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Automatically computes current semester and expected graduation from the student&apos;s admission date and configured course structure.
+                      Excel import captures metadata only. No fake document versions or empty R2 objects are created. First actual upload becomes v1.
                     </p>
                   </div>
                 </div>
@@ -521,83 +556,144 @@ export default function BulkStudentImportPage() {
             </Card>
           )}
 
-          {/* STEP 2: Map Columns */}
+          {/* STEP 2: Column Mapping */}
           {step === 2 && (
             <Card className="border-border/60 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-4">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <div>
-                  <CardTitle className="text-lg">Step 2: Match Spreadsheet Columns to ISCMS Fields</CardTitle>
+                  <CardTitle className="text-lg">Step 2: Map Spreadsheet Columns</CardTitle>
                   <CardDescription>
-                    We automatically detected and suggested matching fields for your {detectedHeaders.length} columns. Review and adjust below.
+                    Review detected column headers from <span className="font-semibold text-foreground">{selectedFile?.name}</span> and match them to ISCMS fields.
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="font-mono text-xs">
+                <div className="text-xs text-muted-foreground font-mono bg-muted/60 px-3 py-1.5 rounded-lg">
                   {rawRows.length} Rows Detected
-                </Badge>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="border rounded-xl overflow-hidden shadow-sm">
+                <div className="border rounded-xl overflow-hidden">
                   <Table>
                     <TableHeader className="bg-muted/50">
                       <TableRow>
-                        <TableHead className="w-[30%]">Spreadsheet Header</TableHead>
-                        <TableHead className="w-[30%]">Sample Value (Row 1)</TableHead>
-                        <TableHead className="w-[40%]">Target ISCMS Field</TableHead>
+                        <TableHead className="w-1/3">Spreadsheet Column Header</TableHead>
+                        <TableHead className="w-1/3">Target ISCMS Student Field</TableHead>
+                        <TableHead className="w-1/3">Requirement & Guidance</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {detectedHeaders.map((header) => {
-                        const currentMapped = columnMapping[header] || "ignore";
-                        const sampleVal = rawRows[0]?.[header] || "";
-                        const def = ISCMS_FIELD_DEFINITIONS.find(d => d.field === currentMapped);
+                        const currentTarget = columnMapping[header] || "ignore";
+                        const def = ISCMS_FIELD_DEFINITIONS.find(f => f.field === currentTarget);
 
                         return (
                           <TableRow key={header} className="hover:bg-muted/20">
-                            <TableCell className="font-medium text-xs">
-                              <div className="flex items-center gap-2">
-                                <FileSpreadsheet className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span>{header}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">
-                              {sampleVal ? sampleVal : <span className="italic text-muted-foreground/60">(empty)</span>}
+                            <TableCell className="font-semibold text-xs text-foreground">
+                              {header}
+                              {rawRows[0] && rawRows[0][header] && (
+                                <div className="text-[11px] font-mono text-muted-foreground mt-0.5 truncate max-w-xs">
+                                  Sample: &quot;{rawRows[0][header]}&quot;
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Select
-                                value={currentMapped}
-                                onValueChange={(val) => {
+                                value={currentTarget}
+                                onValueChange={(val: any) => {
                                   setColumnMapping(prev => ({
                                     ...prev,
-                                    [header]: val as (ISCMSImportField | "ignore")
+                                    [header]: val
                                   }));
                                 }}
                               >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Select target field..." />
+                                <SelectTrigger className="h-8 text-xs font-medium">
+                                  <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-72">
-                                  <SelectItem value="ignore" className="text-xs text-muted-foreground font-semibold">
-                                    — Ignore this column —
+                                  <SelectItem value="ignore" className="text-xs text-muted-foreground italic">
+                                    -- Ignore / Do Not Import --
                                   </SelectItem>
 
-                                  {["Identity", "Contact", "Academic", "Emergency", "Passport", "Visa", "eFRRO", "Embassy"].map(category => (
-                                    <SelectGroup key={category}>
-                                      <SelectLabel className="text-[10px] uppercase font-bold text-muted-foreground">
-                                        {category}
-                                      </SelectLabel>
-                                      {ISCMS_FIELD_DEFINITIONS.filter(d => d.category === category).map(f => (
-                                        <SelectItem key={f.field} value={f.field} className="text-xs">
-                                          {f.label} {f.required ? "*" : ""}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectGroup>
-                                  ))}
+                                  <SelectGroup>
+                                    <SelectLabel className="text-[11px] font-bold text-primary">Student Identity</SelectLabel>
+                                    {ISCMS_FIELD_DEFINITIONS.filter(f => f.category === "Identity").map(f => (
+                                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                                        {f.label} {f.required && "*"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+
+                                  <SelectGroup>
+                                    <SelectLabel className="text-[11px] font-bold text-primary">Academic Track</SelectLabel>
+                                    {ISCMS_FIELD_DEFINITIONS.filter(f => f.category === "Academic").map(f => (
+                                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                                        {f.label} {f.required && "*"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+
+                                  <SelectGroup>
+                                    <SelectLabel className="text-[11px] font-bold text-primary">Contact Details</SelectLabel>
+                                    {ISCMS_FIELD_DEFINITIONS.filter(f => f.category === "Contact").map(f => (
+                                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                                        {f.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+
+                                  <SelectGroup>
+                                    <SelectLabel className="text-[11px] font-bold text-primary">Emergency Contact</SelectLabel>
+                                    {ISCMS_FIELD_DEFINITIONS.filter(f => f.category === "Emergency").map(f => (
+                                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                                        {f.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+
+                                  <SelectGroup>
+                                    <SelectLabel className="text-[11px] font-bold text-primary">Passport Metadata</SelectLabel>
+                                    {ISCMS_FIELD_DEFINITIONS.filter(f => f.category === "Passport").map(f => (
+                                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                                        {f.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+
+                                  <SelectGroup>
+                                    <SelectLabel className="text-[11px] font-bold text-primary">Visa Metadata</SelectLabel>
+                                    {ISCMS_FIELD_DEFINITIONS.filter(f => f.category === "Visa").map(f => (
+                                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                                        {f.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+
+                                  <SelectGroup>
+                                    <SelectLabel className="text-[11px] font-bold text-primary">eFRRO Metadata</SelectLabel>
+                                    {ISCMS_FIELD_DEFINITIONS.filter(f => f.category === "eFRRO").map(f => (
+                                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                                        {f.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
+
+                                  <SelectGroup>
+                                    <SelectLabel className="text-[11px] font-bold text-primary">Embassy / Consulate</SelectLabel>
+                                    {ISCMS_FIELD_DEFINITIONS.filter(f => f.category === "Embassy").map(f => (
+                                      <SelectItem key={f.field} value={f.field} className="text-xs">
+                                        {f.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
                                 </SelectContent>
                               </Select>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
                               {def && (
-                                <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1.5">
-                                  {def.required && (
+                                <div className="flex items-center gap-1.5">
+                                  {def.required ? (
                                     <span className="text-rose-600 font-semibold">Required</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">Optional</span>
                                   )}
                                   <span>• {def.description}</span>
                                 </div>
@@ -649,27 +745,46 @@ export default function BulkStudentImportPage() {
               {/* Validation Summary Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <Card className="p-4 rounded-xl border border-border/60 bg-card">
-                  <div className="text-xs text-muted-foreground font-medium">Total Rows</div>
+                  <div className="text-xs text-muted-foreground font-medium">Total Spreadsheet Rows</div>
                   <div className="text-2xl font-black mt-1">{validationReport.totalRows}</div>
                 </Card>
 
                 <Card className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5">
                   <div className="text-xs text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    Valid Records
+                    Ready to Import
                   </div>
                   <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400 mt-1">
                     {validationReport.validCount}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    {validationReport.cleanValidCount} clean · {validationReport.warningRowsCount} with warnings
+                  </div>
+                </Card>
+
+                <Card className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/5">
+                  <div className="text-xs text-blue-700 dark:text-blue-400 font-medium flex items-center gap-1">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Warnings (Optional NULL)
+                  </div>
+                  <div className="text-2xl font-black text-blue-700 dark:text-blue-400 mt-1">
+                    {validationReport.warningCount}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Non-blocking missing fields
                   </div>
                 </Card>
 
                 <Card className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/5">
                   <div className="text-xs text-rose-700 dark:text-rose-400 font-medium flex items-center gap-1">
                     <XCircle className="h-3.5 w-3.5" />
-                    Errors
+                    Rejected Errors
                   </div>
                   <div className="text-2xl font-black text-rose-700 dark:text-rose-400 mt-1">
                     {validationReport.errorCount}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Missing required fields / invalid dates
                   </div>
                 </Card>
 
@@ -681,22 +796,35 @@ export default function BulkStudentImportPage() {
                   <div className="text-2xl font-black text-amber-700 dark:text-amber-400 mt-1">
                     {validationReport.duplicateCount}
                   </div>
-                </Card>
-
-                <Card className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/5">
-                  <div className="text-xs text-blue-700 dark:text-blue-400 font-medium flex items-center gap-1">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    Warnings
-                  </div>
-                  <div className="text-2xl font-black text-blue-700 dark:text-blue-400 mt-1">
-                    {validationReport.warningCount}
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Enrollment number collisions
                   </div>
                 </Card>
               </div>
 
+              {/* Warnings Breakdown Banner */}
+              {validationReport.warningCount > 0 && (
+                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs space-y-2">
+                  <div className="flex items-center gap-2 font-semibold text-blue-900 dark:text-blue-200">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    Missing Optional Information Breakdown (Will be stored as NULL and completed later)
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-muted-foreground pt-1">
+                    <div>• Missing Passport Expiry: <strong className="text-foreground">{validationReport.warningsBreakdown.passportExpiryMissing}</strong></div>
+                    <div>• Missing Visa Expiry: <strong className="text-foreground">{validationReport.warningsBreakdown.visaExpiryMissing}</strong></div>
+                    <div>• Missing eFRRO Expiry: <strong className="text-foreground">{validationReport.warningsBreakdown.efrroExpiryMissing}</strong></div>
+                    <div>• Missing Email Address: <strong className="text-foreground">{validationReport.warningsBreakdown.emailMissing}</strong></div>
+                    <div>• Missing Phone Number: <strong className="text-foreground">{validationReport.warningsBreakdown.phoneMissing}</strong></div>
+                    <div>• Missing Date of Birth: <strong className="text-foreground">{validationReport.warningsBreakdown.dobMissing}</strong></div>
+                    <div>• Missing Address: <strong className="text-foreground">{validationReport.warningsBreakdown.addressMissing}</strong></div>
+                    <div>• Missing Emergency Contact: <strong className="text-foreground">{validationReport.warningsBreakdown.emergencyMissing}</strong></div>
+                  </div>
+                </div>
+              )}
+
               {/* Subtabs: Issues vs Data Preview */}
               <Card className="border-border/60 shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-border/40">
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 gap-3 border-b border-border/40">
                   <div className="flex items-center gap-3">
                     <Button
                       variant={reviewTab === "issues" ? "secondary" : "ghost"}
@@ -714,29 +842,42 @@ export default function BulkStudentImportPage() {
                       onClick={() => setReviewTab("preview")}
                     >
                       <Eye className="h-3.5 w-3.5" />
-                      Preview Clean Records ({validationReport.validCount})
+                      Preview Valid Records ({validationReport.validCount})
                     </Button>
                   </div>
 
-                  {reviewTab === "issues" && (
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                      <Select
-                        value={issuesFilter}
-                        onValueChange={(val: any) => setIssuesFilter(val)}
-                      >
-                        <SelectTrigger className="h-7 text-xs w-36">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all" className="text-xs">All Issues</SelectItem>
-                          <SelectItem value="errors" className="text-xs">Errors Only</SelectItem>
-                          <SelectItem value="duplicates" className="text-xs">Duplicates Only</SelectItem>
-                          <SelectItem value="warnings" className="text-xs">Warnings Only</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {reviewTab === "issues" && (
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Select
+                          value={issuesFilter}
+                          onValueChange={(val: any) => setIssuesFilter(val)}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-44">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all" className="text-xs">All Issues</SelectItem>
+                            <SelectItem value="errors" className="text-xs">Errors (Will Reject)</SelectItem>
+                            <SelectItem value="duplicates" className="text-xs">Duplicates (Will Reject)</SelectItem>
+                            <SelectItem value="warnings" className="text-xs">Warnings (Stored as NULL)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5"
+                      onClick={handleDownloadErrorReport}
+                      disabled={isDownloadingReport}
+                    >
+                      <Download className="h-3.5 w-3.5 text-rose-600" />
+                      Download Report (.xlsx)
+                    </Button>
+                  </div>
                 </CardHeader>
 
                 <CardContent className="pt-4">
@@ -746,8 +887,8 @@ export default function BulkStudentImportPage() {
                       {filteredIssues.length === 0 ? (
                         <div className="py-12 text-center space-y-2">
                           <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto" />
-                          <p className="text-sm font-semibold">No issues found!</p>
-                          <p className="text-xs text-muted-foreground">All rows passed validation checks cleanly.</p>
+                          <p className="text-sm font-semibold">No issues matching current filter!</p>
+                          <p className="text-xs text-muted-foreground">All rows passed the selected criteria.</p>
                         </div>
                       ) : (
                         <div className="border rounded-xl overflow-hidden">
@@ -804,7 +945,7 @@ export default function BulkStudentImportPage() {
                           </Table>
                           {filteredIssues.length > 50 && (
                             <div className="p-2 text-center text-xs text-muted-foreground border-t">
-                              Showing first 50 issues out of {filteredIssues.length} total.
+                              Showing first 50 issues out of {filteredIssues.length} total. Download the full Excel report to view all.
                             </div>
                           )}
                         </div>
@@ -828,7 +969,7 @@ export default function BulkStudentImportPage() {
                               <TableHeader className="bg-muted/50">
                                 <TableRow>
                                   <TableHead className="w-16">Row</TableHead>
-                                  <TableHead>Registration No</TableHead>
+                                  <TableHead>Enrollment No</TableHead>
                                   <TableHead>Student Name</TableHead>
                                   <TableHead>Nationality</TableHead>
                                   <TableHead>Program / Course</TableHead>
@@ -850,18 +991,22 @@ export default function BulkStudentImportPage() {
                                       {r.mappedData.full_name}
                                     </TableCell>
                                     <TableCell className="text-xs">
-                                      {r.mappedData.nationality}
+                                      {r.mappedData.nationality || <span className="text-muted-foreground italic">NULL</span>}
                                     </TableCell>
                                     <TableCell className="text-xs truncate max-w-[200px]">
                                       {r.mappedData.academic_program}
                                     </TableCell>
                                     <TableCell className="text-xs font-mono">
-                                      {r.mappedData.admission_date}
+                                      {r.mappedData.admission_date || <span className="text-muted-foreground italic">NULL</span>}
                                     </TableCell>
                                     <TableCell className="text-xs">
-                                      <Badge variant="outline" className="bg-primary/5 text-primary text-[10px]">
-                                        Semester {r.calculatedProgression?.currentSemester || 1}
-                                      </Badge>
+                                      {r.calculatedProgression?.currentSemester ? (
+                                        <Badge variant="outline" className="bg-primary/5 text-primary text-[10px]">
+                                          Semester {r.calculatedProgression.currentSemester}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs italic">Uncalculated</span>
+                                      )}
                                     </TableCell>
                                     <TableCell className="text-xs text-muted-foreground font-mono">
                                       {r.mappedData.passport_number || "No Passport"} / {r.mappedData.visa_number || "No Visa"}
@@ -965,15 +1110,17 @@ export default function BulkStudentImportPage() {
                   </div>
                   <div className="flex justify-between py-1 border-b border-border/50">
                     <span className="text-muted-foreground">Records to be Created:</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{validationReport.validCount} students</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      {validationReport.validCount} students ({validationReport.cleanValidCount} clean, {validationReport.warningRowsCount} with NULL fallbacks)
+                    </span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-border/50">
                     <span className="text-muted-foreground">Rows Skipped (Errors / Duplicates):</span>
                     <span className="font-semibold text-rose-600">{validationReport.errorCount + validationReport.duplicateCount}</span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span className="text-muted-foreground">Automatic Progression:</span>
-                    <span className="font-semibold text-primary">Active Course Progression Engine</span>
+                    <span className="text-muted-foreground">Physical Documents / Storage:</span>
+                    <span className="font-semibold text-primary">Metadata only (Zero fake R2 objects)</span>
                   </div>
                 </div>
 
@@ -1048,13 +1195,13 @@ export default function BulkStudentImportPage() {
                     <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400">{importResult.importedCount}</div>
                     <div className="text-[11px] text-muted-foreground font-semibold mt-0.5">Imported</div>
                   </div>
-                  <div className="p-3 rounded-xl bg-muted/40 border">
-                    <div className="text-2xl font-black text-foreground">{importResult.skippedCount}</div>
-                    <div className="text-[11px] text-muted-foreground font-semibold mt-0.5">Skipped</div>
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                    <div className="text-2xl font-black text-amber-700 dark:text-amber-400">{importResult.warningImportedCount || 0}</div>
+                    <div className="text-[11px] text-muted-foreground font-semibold mt-0.5">With Warnings</div>
                   </div>
                   <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30">
-                    <div className="text-2xl font-black text-rose-700 dark:text-rose-400">{importResult.failedCount}</div>
-                    <div className="text-[11px] text-muted-foreground font-semibold mt-0.5">Failed</div>
+                    <div className="text-2xl font-black text-rose-700 dark:text-rose-400">{importResult.skippedCount + importResult.failedCount}</div>
+                    <div className="text-[11px] text-muted-foreground font-semibold mt-0.5">Skipped / Rejected</div>
                   </div>
                 </div>
 
@@ -1062,7 +1209,19 @@ export default function BulkStudentImportPage() {
                   The imported students are now active in ISCMS and accessible under the Students directory.
                 </p>
 
-                <div className="flex items-center justify-center gap-3 pt-4 border-t">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4 border-t">
+                  {(importResult.skippedCount > 0 || importResult.failedCount > 0) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadErrorReport}
+                      disabled={isDownloadingReport}
+                      className="gap-2 text-xs"
+                    >
+                      <Download className="h-4 w-4 text-rose-600" />
+                      Download Error Report (.xlsx)
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"

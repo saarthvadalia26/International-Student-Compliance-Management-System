@@ -67,8 +67,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "registration_number",
     label: "Registration / Enrollment Number",
     category: "Identity",
-    required: false,
-    description: "University-assigned registration / enrollment number (optional during initial import).",
+    required: true,
+    description: "University-assigned registration / enrollment number (mandatory; must be provided by the university).",
     sample: "NFSU2026CS101",
     aliases: ["registration_number", "registration number", "reg no", "reg_no", "enrollment number", "enrollment no", "enrollment_no", "student id", "student_id", "roll no", "roll_number", "id"]
   },
@@ -77,7 +77,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Full Name",
     category: "Identity",
     required: true,
-    description: "Full name as printed on passport.",
+    description: "Full legal name of the student as printed on official records.",
     sample: "John Michael Doe",
     aliases: ["full_name", "full name", "student name", "name", "candidate name", "student_name", "first name", "first_name"]
   },
@@ -85,8 +85,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "nationality",
     label: "Nationality",
     category: "Identity",
-    required: true,
-    description: "Country of citizenship (e.g. Nepal, Bhutan, USA, NPL, BHT).",
+    required: false,
+    description: "Country of citizenship (e.g. Nepal, Bhutan, USA, NPL, BHT). Defaults to NULL if omitted.",
     sample: "Nepal",
     aliases: ["nationality", "country", "citizenship", "country of origin", "nationality_code", "country of citizenship"]
   },
@@ -95,7 +95,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Gender",
     category: "Identity",
     required: false,
-    description: "Male, Female, Other, or Prefer not to say.",
+    description: "Male, Female, Other, or Prefer not to say. Defaults to NULL if omitted.",
     sample: "Male",
     aliases: ["gender", "sex"]
   },
@@ -103,8 +103,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "date_of_birth",
     label: "Date of Birth",
     category: "Identity",
-    required: true,
-    description: "Date of birth (YYYY-MM-DD or DD/MM/YYYY).",
+    required: false,
+    description: "Date of birth (YYYY-MM-DD or DD/MM/YYYY). Defaults to NULL if omitted; validated if provided.",
     sample: "2002-05-14",
     aliases: ["date_of_birth", "date of birth", "dob", "birth date", "birth_date", "d.o.b"]
   },
@@ -113,7 +113,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Blood Group",
     category: "Identity",
     required: false,
-    description: "A+, B+, O+, AB+, etc.",
+    description: "A+, B+, O+, AB+, etc. Defaults to NULL if omitted.",
     sample: "O+",
     aliases: ["blood_group", "blood group", "blood type", "blood_type"]
   },
@@ -123,8 +123,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "email",
     label: "Email Address",
     category: "Contact",
-    required: true,
-    description: "Student's primary personal or university email address.",
+    required: false,
+    description: "Student's primary email address (optional, validated if provided). Defaults to NULL if omitted.",
     sample: "john.doe@example.com",
     aliases: ["email", "email address", "student email", "email_address", "student_email", "mail", "contact email"]
   },
@@ -132,8 +132,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "phone_home",
     label: "Home / Primary Phone",
     category: "Contact",
-    required: true,
-    description: "Primary international phone number with country code.",
+    required: false,
+    description: "Primary international phone number with country code. Defaults to NULL if omitted.",
     sample: "+977-9812345678",
     aliases: ["phone_home", "phone", "phone number", "mobile", "mobile number", "contact number", "primary phone", "home phone", "phone_number"]
   },
@@ -142,7 +142,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Local Phone (India)",
     category: "Contact",
     required: false,
-    description: "Local Indian SIM contact number if available.",
+    description: "Local Indian SIM contact number if available. Defaults to NULL if omitted.",
     sample: "+91-9876543210",
     aliases: ["phone_local", "local phone", "local mobile", "indian phone", "local_mobile"]
   },
@@ -150,8 +150,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "permanent_address",
     label: "Permanent Address (Home Country)",
     category: "Contact",
-    required: true,
-    description: "Complete permanent address in home country.",
+    required: false,
+    description: "Complete permanent address in home country. Defaults to NULL if omitted.",
     sample: "123 Ring Road, Kathmandu, Nepal",
     aliases: ["permanent_address", "permanent address", "home address", "address in home country", "permanent_addr"]
   },
@@ -160,7 +160,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Local Address (Campus / City)",
     category: "Contact",
     required: false,
-    description: "Hostel room or local residence address.",
+    description: "Hostel room or local residence address. Defaults to NULL if omitted.",
     sample: "Hostel Block B, Room 302, NFSU Campus, Gandhinagar",
     aliases: ["local_address", "local address", "campus address", "hostel address", "hostel", "current address"]
   },
@@ -179,8 +179,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "admission_date",
     label: "Admission / Start Date",
     category: "Academic",
-    required: true,
-    description: "Date student commenced studies (YYYY-MM-DD or DD/MM/YYYY).",
+    required: false,
+    description: "Date student commenced studies (YYYY-MM-DD or DD/MM/YYYY). Defaults to NULL if omitted; validated if provided.",
     sample: "2024-08-01",
     aliases: ["admission_date", "admission date", "joining date", "commencement date", "enrollment date", "start date", "academic_start_date"]
   },
@@ -189,7 +189,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Current Semester (Optional Override/Reference)",
     category: "Academic",
     required: false,
-    description: "Recorded semester in spreadsheet (system verifies against admission date calculation).",
+    description: "Recorded semester in spreadsheet. Auto-calculated if admission date is available; otherwise stored as NULL.",
     sample: "Semester 3",
     aliases: ["current_semester", "current semester", "semester", "sem", "current sem"]
   },
@@ -198,7 +198,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Expected Graduation Date",
     category: "Academic",
     required: false,
-    description: "Expected completion date (auto-calculated if omitted).",
+    description: "Expected completion date (auto-calculated from program duration if omitted).",
     sample: "2028-06-30",
     aliases: ["expected_graduation", "expected graduation", "graduation date", "completion date", "expected_completion"]
   },
@@ -208,8 +208,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "emergency_contact_name",
     label: "Emergency Contact Name",
     category: "Emergency",
-    required: true,
-    description: "Parent, guardian, or next of kin full name.",
+    required: false,
+    description: "Parent, guardian, or next of kin full name. Defaults to NULL if omitted.",
     sample: "Robert Doe",
     aliases: ["emergency_contact_name", "emergency contact name", "emergency contact", "emergency_contact", "parent name", "guardian name", "next of kin", "emergency_name", "emergency name", "father name", "mother name"]
   },
@@ -218,7 +218,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Emergency Relationship",
     category: "Emergency",
     required: false,
-    description: "Parent, Guardian, Sibling, Spouse, Other.",
+    description: "Parent, Guardian, Sibling, Spouse, Other. Defaults to NULL if omitted.",
     sample: "Parent",
     aliases: ["emergency_contact_relationship", "relationship", "emergency relationship", "relation", "emergency_relation"]
   },
@@ -226,8 +226,8 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     field: "emergency_contact_phone",
     label: "Emergency Contact Phone",
     category: "Emergency",
-    required: true,
-    description: "Emergency phone number with international country code.",
+    required: false,
+    description: "Emergency phone number with international country code. Defaults to NULL if omitted.",
     sample: "+977-9800000000",
     aliases: ["emergency_contact_phone", "emergency contact phone", "emergency phone", "parent phone", "guardian phone", "emergency_phone", "parent mobile"]
   },
@@ -236,7 +236,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Emergency Contact Email",
     category: "Emergency",
     required: false,
-    description: "Emergency contact email address.",
+    description: "Emergency contact email address. Defaults to NULL if omitted.",
     sample: "robert.doe@example.com",
     aliases: ["emergency_contact_email", "emergency email", "parent email", "guardian email", "emergency_email"]
   },
@@ -247,36 +247,36 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Passport Number",
     category: "Passport",
     required: false,
-    description: "Passport document number.",
-    sample: "N12345678",
-    aliases: ["passport_number", "passport number", "passport no", "passport_no", "passport"]
+    description: "Passport document number (metadata only). Defaults to NULL if omitted.",
+    sample: "P12345678",
+    aliases: ["passport_number", "passport no", "passport_no", "passport number", "passport", "pp no", "pp_no"]
   },
   {
     field: "passport_issue_date",
     label: "Passport Issue Date",
     category: "Passport",
     required: false,
-    description: "Date of passport issuance.",
+    description: "Date of passport issuance (YYYY-MM-DD or DD/MM/YYYY). Defaults to NULL if omitted.",
     sample: "2020-01-15",
-    aliases: ["passport_issue_date", "passport issue date", "passport issue", "passport_issue"]
+    aliases: ["passport_issue_date", "passport issue date", "pp issue date", "passport_issue", "passport issued"]
   },
   {
     field: "passport_expiry",
     label: "Passport Expiry Date",
     category: "Passport",
     required: false,
-    description: "Date of passport expiration.",
+    description: "Passport expiration date (YYYY-MM-DD or DD/MM/YYYY). Used by reminder engine. Defaults to NULL if omitted.",
     sample: "2030-01-14",
-    aliases: ["passport_expiry", "passport expiry", "passport expiry date", "passport_expiry_date", "passport expiration", "passport valid until"]
+    aliases: ["passport_expiry", "passport expiry date", "passport expiry", "passport expiration", "pp expiry", "passport_expiry_date", "pp expiry date"]
   },
   {
     field: "passport_place_of_issue",
     label: "Passport Place of Issue",
     category: "Passport",
     required: false,
-    description: "City or issuing authority of passport.",
+    description: "Issuing city or country. Defaults to NULL if omitted.",
     sample: "Kathmandu",
-    aliases: ["passport_place_of_issue", "passport place of issue", "passport place", "passport_place"]
+    aliases: ["passport_place_of_issue", "passport place of issue", "pp place of issue", "passport issuing authority"]
   },
 
   // Visa Metadata
@@ -285,36 +285,36 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Visa Number",
     category: "Visa",
     required: false,
-    description: "Indian visa / sticker number.",
-    sample: "VZ98765432",
-    aliases: ["visa_number", "visa number", "visa no", "visa_no", "visa"]
+    description: "Indian Visa document identifier (metadata only). Defaults to NULL if omitted.",
+    sample: "V98765432",
+    aliases: ["visa_number", "visa no", "visa_no", "visa number", "visa", "visa id"]
   },
   {
     field: "visa_issue_date",
     label: "Visa Issue Date",
     category: "Visa",
     required: false,
-    description: "Date of visa issuance.",
+    description: "Date of visa issuance (YYYY-MM-DD or DD/MM/YYYY). Defaults to NULL if omitted.",
     sample: "2024-07-01",
-    aliases: ["visa_issue_date", "visa issue date", "visa issue", "visa_issue"]
+    aliases: ["visa_issue_date", "visa issue date", "visa_issue", "visa issued"]
   },
   {
     field: "visa_expiry",
     label: "Visa Expiry Date",
     category: "Visa",
     required: false,
-    description: "Date of visa expiration.",
-    sample: "2026-06-30",
-    aliases: ["visa_expiry", "visa expiry", "visa expiry date", "visa_expiry_date", "visa expiration", "visa valid until"]
+    description: "Visa validity expiration date (YYYY-MM-DD or DD/MM/YYYY). Used by reminder engine. Defaults to NULL if omitted.",
+    sample: "2025-06-30",
+    aliases: ["visa_expiry", "visa expiry date", "visa expiry", "visa expiration", "visa_expiry_date"]
   },
   {
     field: "visa_type",
-    label: "Visa Type",
+    label: "Visa Classification",
     category: "Visa",
     required: false,
-    description: "Student (S-1), Research (R-1), etc.",
+    description: "Visa category (e.g. Student (S-1), Research, Tourist). Defaults to Student (S-1) if omitted.",
     sample: "Student (S-1)",
-    aliases: ["visa_type", "visa type", "visa category"]
+    aliases: ["visa_type", "visa classification", "visa category", "visa type"]
   },
 
   // eFRRO Metadata
@@ -323,17 +323,17 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "eFRRO Registration Number",
     category: "eFRRO",
     required: false,
-    description: "FRRO / FRO registration certificate number.",
-    sample: "FRRO/GN/2024/00123",
-    aliases: ["efrro_number", "efrro number", "efrro no", "efrro_no", "frro number", "frro no", "efrro", "frro"]
+    description: "eFRRO / BoI Registration certificate number (metadata only). Defaults to NULL if omitted.",
+    sample: "FRRO/AHM/2024/00123",
+    aliases: ["efrro_number", "efrro no", "efrro_no", "efrro number", "efrro", "frro number", "frro no", "frro_number", "residential permit no", "rp no", "rc no", "registration certificate no"]
   },
   {
     field: "efrro_issue_date",
     label: "eFRRO Issue Date",
     category: "eFRRO",
     required: false,
-    description: "Date of eFRRO registration.",
-    sample: "2024-08-10",
+    description: "Date of eFRRO certificate issuance (YYYY-MM-DD or DD/MM/YYYY). Defaults to NULL if omitted.",
+    sample: "2024-07-15",
     aliases: ["efrro_issue_date", "efrro issue date", "frro issue date", "efrro_issue"]
   },
   {
@@ -341,9 +341,9 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "eFRRO Expiry Date",
     category: "eFRRO",
     required: false,
-    description: "Date of eFRRO certificate expiration.",
-    sample: "2025-08-09",
-    aliases: ["efrro_expiry", "efrro expiry", "efrro expiry date", "frro expiry", "efrro_expiry_date", "frro valid until"]
+    description: "eFRRO registration certificate validity expiration date (YYYY-MM-DD or DD/MM/YYYY). Used by reminder engine. Defaults to NULL if omitted.",
+    sample: "2025-07-14",
+    aliases: ["efrro_expiry", "efrro expiry date", "efrro expiry", "frro expiry date", "efrro_expiry_date", "rc expiry date", "rp expiry"]
   },
 
   // Embassy
@@ -352,7 +352,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Embassy / Consulate Name",
     category: "Embassy",
     required: false,
-    description: "Embassy or diplomatic mission in India.",
+    description: "Embassy or diplomatic mission in India. Defaults to NULL if omitted.",
     sample: "Embassy of Nepal, New Delhi",
     aliases: ["embassy_name", "embassy", "embassy name", "consulate name", "consulate"]
   },
@@ -361,7 +361,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Embassy Address",
     category: "Embassy",
     required: false,
-    description: "Street address of the embassy.",
+    description: "Street address of the embassy. Defaults to NULL if omitted.",
     sample: "Barakhamba Road, New Delhi",
     aliases: ["embassy_address", "embassy address"]
   },
@@ -370,7 +370,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Embassy City",
     category: "Embassy",
     required: false,
-    description: "City of the embassy (e.g. New Delhi, Mumbai).",
+    description: "City of the embassy (e.g. New Delhi, Mumbai). Defaults to NULL if omitted.",
     sample: "New Delhi",
     aliases: ["embassy_city", "embassy city"]
   },
@@ -379,7 +379,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Embassy Country",
     category: "Embassy",
     required: false,
-    description: "Country represented by embassy.",
+    description: "Country represented by embassy. Defaults to NULL if omitted.",
     sample: "Nepal",
     aliases: ["embassy_country", "embassy country"]
   },
@@ -388,7 +388,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Embassy Phone",
     category: "Embassy",
     required: false,
-    description: "Embassy contact phone number.",
+    description: "Embassy contact phone number. Defaults to NULL if omitted.",
     sample: "+91-11-23329969",
     aliases: ["embassy_phone", "embassy phone"]
   },
@@ -397,7 +397,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Embassy Email",
     category: "Embassy",
     required: false,
-    description: "Embassy consular contact email.",
+    description: "Embassy consular contact email. Defaults to NULL if omitted.",
     sample: "eonnewdelhi@mofa.gov.np",
     aliases: ["embassy_email", "embassy email"]
   }
@@ -434,12 +434,27 @@ export interface ValidationRowResult {
   };
 }
 
+export interface WarningsBreakdown {
+  passportExpiryMissing: number;
+  visaExpiryMissing: number;
+  efrroExpiryMissing: number;
+  emailMissing: number;
+  phoneMissing: number;
+  dobMissing: number;
+  addressMissing: number;
+  emergencyMissing: number;
+  otherWarnings: number;
+}
+
 export interface ValidationReport {
   totalRows: number;
   validCount: number;
+  cleanValidCount: number;
+  warningRowsCount: number;
   errorCount: number;
   duplicateCount: number;
   warningCount: number;
+  warningsBreakdown: WarningsBreakdown;
   rows: ValidationRowResult[];
   detectedColumns: string[];
   mapping: ColumnMapping;
@@ -469,6 +484,8 @@ export interface ImportExecutionResult {
   batchId: string;
   totalRows: number;
   importedCount: number;
+  cleanImportedCount: number;
+  warningImportedCount: number;
   skippedCount: number;
   failedCount: number;
   errors: Array<{ rowNumber: number; registrationNumber: string; error: string }>;

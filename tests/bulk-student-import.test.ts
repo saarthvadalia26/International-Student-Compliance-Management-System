@@ -186,7 +186,7 @@ async function runTestSuite() {
   assert(dupReport.duplicateCount === 1, "Second row is flagged as duplicate");
   assert(dupReport.rows[1].status === "duplicate", "Row 2 status is 'duplicate'");
   assert(
-    dupReport.rows[1].errors.some(e => e.problem.includes("Duplicate registration number in spreadsheet")),
+    dupReport.rows[1].errors.some(e => e.problem.toLowerCase().includes("duplicate enrollment number in spreadsheet") || e.problem.toLowerCase().includes("duplicate registration number")),
     "Identifies duplicate row index in spreadsheet"
   );
 

@@ -192,6 +192,35 @@ export async function fetchImportHistoryAction(): Promise<{
 }
 
 /**
+ * Server action: Generate and download import error and warnings report (.xlsx)
+ */
+export async function downloadImportErrorReportAction(
+  report: ValidationReport,
+  executionErrors?: Array<{ rowNumber: number; registrationNumber: string; error: string }>
+): Promise<{
+  success: boolean;
+  base64?: string;
+  fileName?: string;
+  mimeType?: string;
+  error?: string;
+}> {
+  try {
+    await getInternalUser();
+    const { buffer, fileName, mimeType } = BulkStudentImportService.generateErrorReport(report, executionErrors);
+    return {
+      success: true,
+      base64: buffer.toString("base64"),
+      fileName,
+      mimeType
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[DOWNLOAD_ERROR_REPORT_ERROR]", msg);
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * Server action: Controlled rollback of an import batch
  */
 export async function rollbackImportBatchAction(batchId: string): Promise<{
@@ -214,3 +243,4 @@ export async function rollbackImportBatchAction(batchId: string): Promise<{
     return { success: false, error: msg };
   }
 }
+
