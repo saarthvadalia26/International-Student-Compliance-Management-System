@@ -17,10 +17,10 @@ export class ReminderSchedulerServer {
       .from("students")
       .select(`
         id,
-        email,
-        phone,
         registration_number,
+        status,
         student_personal(full_name, preferred_language),
+        student_contact(email, phone_home, phone_local),
         student_academic(program_code),
         student_snapshot(
           passport_expiry, passport_number,
@@ -40,6 +40,7 @@ export class ReminderSchedulerServer {
 
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
+    const contact = Array.isArray(student.student_contact) ? student.student_contact[0] : student.student_contact;
     const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
 
     // Extract active approved document versions
@@ -113,8 +114,8 @@ export class ReminderSchedulerServer {
     const errors: string[] = [];
     const studentName = personal?.full_name || "Student";
     const enrollmentNumber = student.registration_number || "Pending Registration";
-    const studentEmail = student.email || "";
-    const studentPhone = student.phone || "";
+    const studentEmail = contact?.email || "";
+    const studentPhone = contact?.phone_local || contact?.phone_home || "";
     const institutionName = process.env.NEXT_PUBLIC_INSTITUTION_NAME || "Office of International Student Affairs";
     const programName = academic?.program_code || "Academic Program";
 

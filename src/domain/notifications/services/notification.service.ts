@@ -32,16 +32,17 @@ export class ReminderEngine {
       .from("students")
       .select(`
         id,
-        email,
-        phone,
         registration_number,
+        status,
         student_personal(full_name, preferred_language),
+        student_contact(email, phone_home, phone_local),
         student_academic(program_code),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry),
         passport_versions(version_number, is_active, expiry_date, verification_status, deleted_at),
         visa_versions(version_number, is_active, expiry_date, verification_status, deleted_at),
         efrro_versions(version_number, is_active, expiry_date, verification_status, deleted_at)
-      `);
+      `)
+      .is("deleted_at", null);
 
     if (error || !students) {
       console.error("[REMINDER_ENGINE_ERROR] Failed to load students for reminders:", error?.message);
@@ -53,6 +54,7 @@ export class ReminderEngine {
     for (const student of students) {
       const studentId = student.id;
       const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
+      const contact = Array.isArray(student.student_contact) ? student.student_contact[0] : student.student_contact;
       const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
       const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
 
@@ -60,6 +62,8 @@ export class ReminderEngine {
       const enrollmentNumber = student.registration_number || "N/A";
       const prefLang = personal?.preferred_language || "en";
       const programName = academic?.program_code || "Academic Program";
+      const studentPhone = contact?.phone_local || contact?.phone_home || null;
+      const studentEmail = contact?.email || null;
 
       // Resolve current verified active expiry dates for all 3 document types
       const activePassport = (student.passport_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
@@ -116,7 +120,7 @@ export class ReminderEngine {
           }
 
           const channel = "whatsapp";
-          const address = student.phone || student.email || "N/A";
+          const address = studentPhone || studentEmail || "N/A";
           
           // Enforce idempotency key mapping to prevent duplicates: studentId:docType:thresholdDays:channel:expiryDate
           const key = `${studentId}:${docType}:${rule.alertThresholdDays}:${channel}:${cleanExpiry}`;
@@ -302,19 +306,19 @@ export class NotificationEngine {
     const supabase = getAdminSupabase();
     
     // Get student details
-    const { data: studentAccount } = await supabase
-      .from("students")
-      .select("email, phone")
-      .eq("id", studentId)
-      .single();
+    const { data: studentContact } = await supabase
+      .from("student_contact")
+      .select("email, phone_home, phone_local")
+      .eq("student_id", studentId)
+      .maybeSingle();
       
     const { data: studentPersonal } = await supabase
       .from("student_personal")
       .select("full_name, preferred_language")
       .eq("student_id", studentId)
-      .single();
+      .maybeSingle();
 
-    if (!studentAccount || !studentPersonal) {
+    if (!studentPersonal) {
       console.error("[NOTIFICATION_ENGINE] Could not load student details for notification dispatch.");
       return;
     }
@@ -336,7 +340,7 @@ export class NotificationEngine {
     const channels = ["whatsapp"];
 
     for (const channel of channels) {
-      const address = studentAccount.phone || studentAccount.email;
+      const address = studentContact?.phone_local || studentContact?.phone_home || studentContact?.email;
       if (!address) continue;
 
       try {

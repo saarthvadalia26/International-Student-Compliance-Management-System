@@ -1591,9 +1591,10 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
       .from("students")
       .select(`
         id,
-        email,
-        phone,
-        student_personal(full_name),
+        registration_number,
+        status,
+        student_personal(full_name, preferred_language),
+        student_contact(email, phone_home, phone_local),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
         passport_versions(id, is_active, document_number, expiry_date, verification_status, file_path, deleted_at),
         visa_versions(id, is_active, document_number, expiry_date, verification_status, file_path, deleted_at),
@@ -1604,7 +1605,8 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
       .maybeSingle();
 
     if (sErr || !student) {
-      return { success: false, error: "Student not found." };
+      console.error("[REMINDER_SCHEDULE_STUDENT_NOT_FOUND]", { studentId, error: sErr?.message });
+      return { success: false, error: "This reminder references a student record that could not be found." };
     }
 
     const [{ data: notifData }, { data: dbRules }] = await Promise.all([
@@ -1739,13 +1741,20 @@ export async function getReminderDispatchPreviewAction(
       return { success: false, error: "Authentication required to preview reminder dispatch." };
     }
 
+    if (!studentId || typeof studentId !== "string" || studentId.trim() === "") {
+      return { success: false, error: "Invalid student identifier provided for reminder dispatch." };
+    }
+
     const adminSupabase = getAdminSupabase();
 
     const { data: student, error: sErr } = await adminSupabase
       .from("students")
       .select(`
-        id, email, phone, registration_number,
+        id,
+        registration_number,
+        status,
         student_personal(full_name, preferred_language),
+        student_contact(email, phone_home, phone_local),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
         passport_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
         visa_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
@@ -1757,10 +1766,11 @@ export async function getReminderDispatchPreviewAction(
 
     if (sErr || !student) {
       console.error("[REMINDER_PREVIEW_STUDENT_NOT_FOUND]", { studentId, docType, thresholdDays, error: sErr?.message });
-      return { success: false, error: "The student associated with this reminder could not be found." };
+      return { success: false, error: "This reminder references a student record that could not be found." };
     }
 
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
+    const contact = Array.isArray(student.student_contact) ? student.student_contact[0] : student.student_contact;
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
 
     const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
@@ -1790,8 +1800,8 @@ export async function getReminderDispatchPreviewAction(
     const daysRemaining = CalendarDateEngine.diffCalendarDays(cleanExpiry, CalendarDateEngine.getTodayISO());
     const expiryDateFormatted = CalendarDateEngine.formatDateDisplay(cleanExpiry, true);
 
-    const studentPhone = student.phone || null;
-    const cleanPhone = (student.phone || "").replace(/[^\d+]/g, "").trim();
+    const rawPhone = contact?.phone_local || contact?.phone_home || null;
+    const cleanPhone = (rawPhone || "").replace(/[^\d+]/g, "").trim();
     const hasValidPhone = Boolean(cleanPhone && cleanPhone.length >= 7);
 
     const { WhatsAppIntegrationService } = await import("@/domain/notifications/services/whatsapp-integration.service");
@@ -1824,7 +1834,7 @@ export async function getReminderDispatchPreviewAction(
     } else if (!hasValidPhone) {
       isDispatchable = false;
       blockedReason = "missing_phone";
-      blockedMessage = "This student does not have a valid WhatsApp number. Add a valid WhatsApp number before dispatching this reminder.";
+      blockedMessage = "This student does not have a valid WhatsApp number registered in their contact details.";
     } else if (!integration.isReady) {
       isDispatchable = false;
       blockedReason = "whatsapp_not_configured";
@@ -1838,7 +1848,7 @@ export async function getReminderDispatchPreviewAction(
       preview: {
         studentId,
         studentName: personal?.full_name || "Student",
-        studentPhone,
+        studentPhone: rawPhone,
         hasValidPhone,
         documentType: docType,
         documentTitle: docTitle,
@@ -1890,14 +1900,21 @@ export async function triggerReminderDispatchAction(
       return { success: false, status: "BLOCKED", reason: "auth_required", error: "Authentication required to trigger reminder dispatch." };
     }
 
+    if (!studentId || typeof studentId !== "string" || studentId.trim() === "") {
+      return { success: false, status: "BLOCKED", reason: "invalid_student_id", error: "Invalid student identifier provided for reminder dispatch." };
+    }
+
     const adminSupabase = getAdminSupabase();
 
-    // 1. Resolve student by UUID primary key
+    // 1. Resolve student by UUID primary key with normalized relations
     const { data: student, error: sErr } = await adminSupabase
       .from("students")
       .select(`
-        id, email, phone, registration_number,
+        id,
+        registration_number,
+        status,
         student_personal(full_name, preferred_language),
+        student_contact(email, phone_home, phone_local),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
         passport_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
         visa_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
@@ -1913,11 +1930,12 @@ export async function triggerReminderDispatchAction(
         success: false, 
         status: "BLOCKED", 
         reason: "student_not_found", 
-        error: "The student associated with this reminder could not be found." 
+        error: "This reminder references a student record that could not be found." 
       };
     }
 
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
+    const contact = Array.isArray(student.student_contact) ? student.student_contact[0] : student.student_contact;
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
 
     const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
@@ -1950,13 +1968,14 @@ export async function triggerReminderDispatchAction(
     const cleanExpiry = expiryDate.split("T")[0].trim();
 
     // 2. Validate student contact information
-    const cleanPhone = (student.phone || "").replace(/[^\d+]/g, "").trim();
+    const rawPhone = contact?.phone_local || contact?.phone_home || null;
+    const cleanPhone = (rawPhone || "").replace(/[^\d+]/g, "").trim();
     if (!cleanPhone || cleanPhone.length < 7) {
       return {
         success: false,
         status: "BLOCKED",
         reason: "missing_phone",
-        error: "This student does not have a valid WhatsApp number. Add a valid WhatsApp number before dispatching this reminder."
+        error: "This student does not have a valid WhatsApp number registered in their contact details."
       };
     }
 
