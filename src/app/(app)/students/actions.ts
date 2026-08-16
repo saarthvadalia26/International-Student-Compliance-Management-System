@@ -182,8 +182,8 @@ export async function registerStudentAction(input: RegisterStudentInput): Promis
 
     // Evaluate and initialize automated reminder schedule for any provided document metadata
     try {
-      const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
-      await ExpiryReminderEngine.evaluateAndQueueStudentDueReminders(created.student.id);
+      const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
+      await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(created.student.id);
     } catch (reminderErr) {
       console.warn("[REGISTER_STUDENT_REMINDER_EVALUATION_WARNING]", reminderErr);
     }
@@ -1001,8 +1001,8 @@ export async function updateDocumentVerificationAction(
           .eq("document_type", documentType)
           .in("status", ["queued", "sending", "processing"]);
 
-        const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
-        await ExpiryReminderEngine.evaluateAndQueueStudentDueReminders(studentId);
+        const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
+        await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
       }
 
       // Automatically consume/close any active early upload authorization for this document type
@@ -1448,8 +1448,8 @@ export async function correctDocumentMetadataAction(
         .in("status", ["queued", "sending", "processing"]);
     }
 
-    const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
-    await ExpiryReminderEngine.evaluateAndQueueStudentDueReminders(studentId);
+    const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
+    await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
 
     // 5. Audit log
     await adminSupabase.from("audit_log").insert({
@@ -1607,13 +1607,40 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
       return { success: false, error: "Student not found." };
     }
 
-    const { data: notifData } = await adminSupabase
-      .from("notifications")
-      .select("id, student_id, document_type, status, channel, scheduled_for, idempotency_key, notification_context, created_at, updated_at, notification_delivery_log(id, status, error_message, created_at)")
-      .eq("student_id", studentId)
-      .order("created_at", { ascending: false });
+    const [{ data: notifData }, { data: dbRules }] = await Promise.all([
+      adminSupabase
+        .from("notifications")
+        .select("id, student_id, document_type, status, channel, scheduled_for, idempotency_key, notification_context, created_at, updated_at, notification_delivery_log(id, status, error_message, created_at)")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false }),
+      adminSupabase
+        .from("reminder_rules")
+        .select("id, document_type, alert_threshold_days, channel, is_active, rule_name")
+        .eq("is_active", true)
+        .order("alert_threshold_days", { ascending: false })
+    ]);
 
     const notifications = (notifData || []) as unknown as import("@/domain/notifications/services/reminder-engine.service").RawNotificationRecord[];
+
+    const customRules: Record<"passport" | "visa" | "efrro", import("@/domain/notifications/services/reminder-engine.service").ReminderRuleConfig[]> = {
+      passport: [],
+      visa: [],
+      efrro: []
+    };
+
+    if (dbRules && dbRules.length > 0) {
+      for (const r of dbRules) {
+        const dType = r.document_type as "passport" | "visa" | "efrro";
+        if (customRules[dType]) {
+          customRules[dType].push({
+            id: r.id,
+            ruleName: r.rule_name || `${r.alert_threshold_days}-Day Reminder`,
+            thresholdDays: r.alert_threshold_days,
+            channel: r.channel as "email" | "whatsapp" | "both"
+          });
+        }
+      }
+    }
 
     const hasValidFile = (fp?: string | null) => Boolean(fp && fp.trim() !== "" && fp !== "pending_upload" && fp !== "null");
 
@@ -1654,7 +1681,8 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
         isUploaded: isEfrroUp,
         verificationStatus: (activeEfrro?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isEfrroUp ? "pending" : "not_uploaded")
       },
-      notifications
+      notifications,
+      customRules: dbRules && dbRules.length > 0 ? customRules : undefined
     });
 
     return {

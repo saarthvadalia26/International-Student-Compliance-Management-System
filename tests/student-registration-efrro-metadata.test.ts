@@ -266,13 +266,13 @@ async function runTestSuite() {
   const future15 = lateEfrroSched.schedule.find(r => r.thresholdDays === 15);
 
   assert.strictEqual(passed90?.status, "DUE", "Passed 90-day milestone is marked DUE");
-  assert.strictEqual(passed90?.statusLabel, "Due Now", "Indicates Due Now label");
+  assert.strictEqual(passed90?.statusLabel, "Passed", "Indicates Passed label");
   assert.strictEqual(passed60?.status, "DUE", "Passed 60-day milestone is marked DUE");
-  assert.strictEqual(passed60?.statusLabel, "Due Now", "Indicates Due Now label");
+  assert.strictEqual(passed60?.statusLabel, "Passed", "Indicates Passed label");
   assert.strictEqual(passed30?.status, "DUE", "Passed 30-day milestone is marked DUE");
-  assert.strictEqual(passed30?.statusLabel, "Due Now", "Indicates Due Now label");
+  assert.strictEqual(passed30?.statusLabel, "Due Now", "Indicates Due Now label for active milestone");
   assert.strictEqual(future15?.status, "NOT_DUE", "Future 15-day milestone is NOT_DUE (Scheduled)");
-  console.log("✅ [PASS] Historical milestones marked as Due Now and future milestones scheduled cleanly");
+  console.log("✅ [PASS] Historical milestones marked as Passed/Due Now and future milestones scheduled cleanly");
 
   console.log("\n==================================================================");
   console.log("  ALL 11 eFRRO REGISTRATION METADATA TESTS PASSED (100%)           ");

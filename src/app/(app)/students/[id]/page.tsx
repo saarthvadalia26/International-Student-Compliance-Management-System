@@ -60,6 +60,7 @@ import { RejectionDialog } from "@/components/ui/rejection-dialog";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
 import { AcademicProgram } from "@/domain/academic-programs/types";
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
+import { ExpiryReminderEngine } from "@/domain/notifications/services/reminder-engine.service";
 import { 
   StudentReminderScheduleResponse, 
   ReminderStatus 
@@ -347,6 +348,51 @@ export default function StudentDetailsPage({ params }: PageProps) {
       setIsLoadingReminders(false);
     }
   }, [studentId]);
+
+  const effectiveSchedule = React.useMemo(() => {
+    if (reminderSchedule) return reminderSchedule;
+    if (!student) return null;
+
+    return ExpiryReminderEngine.calculateStudentReminders({
+      studentId,
+      passport: student.passport ? {
+        number: student.passport.number,
+        expiryDate: student.passport.expiryDate,
+        isUploaded: student.passport.hasUploadedDocument,
+        verificationStatus: student.passport.verificationStatus
+      } : null,
+      visa: student.visa ? {
+        number: student.visa.number,
+        expiryDate: student.visa.expiryDate,
+        isUploaded: student.visa.hasUploadedDocument,
+        verificationStatus: student.visa.verificationStatus
+      } : null,
+      efrro: student.efrro ? {
+        number: student.efrro.number,
+        expiryDate: student.efrro.expiryDate,
+        isUploaded: student.efrro.hasUploadedDocument,
+        verificationStatus: student.efrro.verificationStatus
+      } : null,
+      notifications: []
+    });
+  }, [reminderSchedule, student, studentId]);
+
+  // Automatically select the first document tab that has an active expiry date if current tab has no expiry recorded
+  React.useEffect(() => {
+    if (effectiveSchedule) {
+      const hasPassport = Boolean(effectiveSchedule.passport?.expiryDate);
+      const hasVisa = Boolean(effectiveSchedule.visa?.expiryDate);
+      const hasEfrro = Boolean(effectiveSchedule.efrro?.expiryDate);
+
+      if (selectedReminderDoc === "passport" && !hasPassport) {
+        if (hasEfrro) {
+          setSelectedReminderDoc("efrro");
+        } else if (hasVisa) {
+          setSelectedReminderDoc("visa");
+        }
+      }
+    }
+  }, [effectiveSchedule, selectedReminderDoc]);
 
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -830,18 +876,35 @@ export default function StudentDetailsPage({ params }: PageProps) {
     switch (status) {
       case "DISPATCHED":
         return (
-          <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-medium">
+          <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium">
             {statusLabel || "Dispatched"}
           </Badge>
         );
       case "DUE":
+        if (statusLabel === "Passed") {
+          return (
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground/80 border-border/50 bg-muted/20 font-normal">
+              Passed
+            </Badge>
+          );
+        }
+        if (statusLabel === "Due Today") {
+          return (
+            <Badge 
+              variant="outline" 
+              className="text-[9px] px-1.5 py-0.5 h-4 bg-amber-500/25 text-amber-700 dark:text-amber-300 border-amber-500/50 font-bold animate-pulse"
+            >
+              Due Today
+            </Badge>
+          );
+        }
         return (
           <Badge 
             variant="outline" 
             className={`text-[9px] px-1.5 py-0.5 h-4 ${
               statusLabel === "Due Now" 
-                ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 font-bold animate-pulse" 
-                : "bg-amber-500/10 text-amber-600 border-amber-500/30 font-semibold"
+                ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 font-bold" 
+                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold"
             }`}
           >
             {statusLabel || "Due"}
@@ -850,7 +913,11 @@ export default function StudentDetailsPage({ params }: PageProps) {
       case "FAILED":
         return <Badge variant="destructive" className="text-[9px] px-1.5 py-0.5 h-4 font-medium">Failed</Badge>;
       case "EXPIRED":
-        return <Badge variant="destructive" className="text-[9px] px-1.5 py-0.5 h-4 bg-rose-500/10 text-rose-600 border-rose-500/20 font-medium">Expired</Badge>;
+        return (
+          <Badge variant="destructive" className="text-[9px] px-1.5 py-0.5 h-4 bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 font-medium">
+            {statusLabel === "Passed" ? "Passed" : "Expired"}
+          </Badge>
+        );
       case "CANCELLED":
         return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground border-border/60 bg-muted/20">Cancelled</Badge>;
       case "NOT_APPLICABLE":
@@ -1414,7 +1481,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted/40 rounded-lg border border-border/50 text-xs">
                 {(["passport", "visa", "efrro"] as const).map((docType) => {
                   const isSelected = selectedReminderDoc === docType;
-                  const docData = reminderSchedule?.[docType];
+                  const docData = effectiveSchedule?.[docType];
                   const hasExpiry = Boolean(docData?.expiryDate);
                   const docTheme = getDocumentTheme(docType);
                   const label = docType === "passport" ? "Passport" : docType === "visa" ? "Visa" : "eFRRO";
@@ -1448,12 +1515,12 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 })}
               </div>
 
-              {isLoadingReminders ? (
+              {isLoadingReminders && !effectiveSchedule ? (
                 <div className="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading reminder schedule...
                 </div>
               ) : (() => {
-                const currentDoc = reminderSchedule?.[selectedReminderDoc];
+                const currentDoc = effectiveSchedule?.[selectedReminderDoc];
                 const activeDocTheme = getDocumentTheme(selectedReminderDoc);
                 const docTitle = selectedReminderDoc === "passport" 
                   ? "Passport" 
@@ -1519,6 +1586,36 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         </Badge>
                       </div>
                     </div>
+
+                    {/* Expired State Warning Callout */}
+                    {currentDoc.isExpired && (
+                      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-700 dark:text-rose-300">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <XCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                          <span>
+                            <strong>{docTitle} expired {Math.abs(currentDoc.daysRemaining || 0)} days ago.</strong> No upcoming pre-expiry reminders remain.
+                          </span>
+                        </div>
+                        <Badge variant="destructive" className="text-[9px] font-semibold shrink-0">
+                          Expired
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Critical Alert Callout for Expiry within 15 Days */}
+                    {currentDoc.daysRemaining !== null && currentDoc.daysRemaining <= 15 && !currentDoc.isExpired && (
+                      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <span>
+                            <strong>{currentDoc.daysRemaining === 0 ? "Expires Today!" : `Critical Warning: Expires in ${currentDoc.daysRemaining} days!`}</strong> 15-Day reminder is triggered and due for dispatch.
+                          </span>
+                        </div>
+                        <Badge variant="outline" className="text-[9px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 animate-pulse">
+                          {currentDoc.daysRemaining === 0 ? "Due Today" : "Due Now"}
+                        </Badge>
+                      </div>
+                    )}
 
                     {/* Metadata Tracking Notice when physical document copy has not been uploaded */}
                     {!currentDoc.isUploaded && (

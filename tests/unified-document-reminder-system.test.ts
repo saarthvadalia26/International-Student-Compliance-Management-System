@@ -36,18 +36,18 @@ describe("Unified Document Reminder System Acceptance & Edge Case Test Suite", (
       assert.equal(schedule.daysRemaining, 15);
       assert.equal(schedule.isExpired, false);
 
-      // 3. 30-Day Reminder (scheduled for 2026-08-01): Passed 15 days ago -> Due Now
+      // 3. 30-Day Reminder (scheduled for 2026-08-01): Passed 15 days ago -> Passed
       const rule30 = schedule.schedule.find(s => s.thresholdDays === 30);
       assert.ok(rule30, "30-Day reminder must exist");
       assert.equal(rule30.status, "DUE");
-      assert.equal(rule30.statusLabel, "Due Now", "Late entry: 30-day threshold passed so it is Due Now");
+      assert.equal(rule30.statusLabel, "Passed", "Late entry: 30-day threshold passed so it is Passed");
       assert.equal(rule30.scheduledDateISO, "2026-08-01");
 
-      // 4. 15-Day Reminder (scheduled for 2026-08-16): Reached today -> Due
+      // 4. 15-Day Reminder (scheduled for 2026-08-16): Reached today -> Due Today
       const rule15 = schedule.schedule.find(s => s.thresholdDays === 15);
       assert.ok(rule15, "15-Day reminder must exist");
       assert.equal(rule15.status, "DUE");
-      assert.equal(rule15.statusLabel, "Due", "15-day threshold is today so it is Due");
+      assert.equal(rule15.statusLabel, "Due Today", "15-day threshold is today so it is Due Today");
       assert.equal(rule15.scheduledDateISO, "2026-08-16");
 
       // 5. 7-Day Reminder (scheduled for 2026-08-24): In future -> Scheduled (NOT_DUE)
@@ -57,13 +57,13 @@ describe("Unified Document Reminder System Acceptance & Edge Case Test Suite", (
       assert.equal(rule7.statusLabel, "Scheduled");
       assert.equal(rule7.scheduledDateISO, "2026-08-24");
 
-      // 6. 90-Day & 60-Day reminders: Both Due Now because student entered late inside 15-day window
+      // 6. 90-Day & 60-Day reminders: Passed because student entered late inside 15-day window
       const rule90 = schedule.schedule.find(s => s.thresholdDays === 90);
       const rule60 = schedule.schedule.find(s => s.thresholdDays === 60);
       assert.equal(rule90?.status, "DUE");
-      assert.equal(rule90?.statusLabel, "Due Now");
+      assert.equal(rule90?.statusLabel, "Passed");
       assert.equal(rule60?.status, "DUE");
-      assert.equal(rule60?.statusLabel, "Due Now");
+      assert.equal(rule60?.statusLabel, "Passed");
     });
   });
 
@@ -137,7 +137,7 @@ describe("Unified Document Reminder System Acceptance & Edge Case Test Suite", (
       const rule90 = res.schedule.find(s => s.thresholdDays === 90);
       const rule60 = res.schedule.find(s => s.thresholdDays === 60);
       assert.equal(rule90?.status, "DUE");
-      assert.equal(rule90?.statusLabel, "Due");
+      assert.equal(rule90?.statusLabel, "Due Today");
       assert.equal(rule60?.status, "NOT_DUE");
     });
 
@@ -212,7 +212,7 @@ describe("Unified Document Reminder System Acceptance & Edge Case Test Suite", (
       assert.equal(res.daysRemaining, 15);
       const rule15 = res.schedule.find(s => s.thresholdDays === 15);
       assert.equal(rule15?.status, "DUE");
-      assert.equal(rule15?.statusLabel, "Due");
+      assert.equal(rule15?.statusLabel, "Due Today");
       assert.equal(res.schedule.find(s => s.thresholdDays === 7)?.status, "NOT_DUE");
     });
 
@@ -391,11 +391,11 @@ describe("Unified Document Reminder System Acceptance & Edge Case Test Suite", (
       const rule15 = res.schedule.find(s => s.thresholdDays === 15);
 
       assert.equal(rule60?.status, "DUE");
-      assert.equal(rule60?.statusLabel, "Due Now");
+      assert.equal(rule60?.statusLabel, "Passed");
       assert.equal(rule30?.status, "DUE");
-      assert.equal(rule30?.statusLabel, "Due Now");
+      assert.equal(rule30?.statusLabel, "Passed");
       assert.equal(rule15?.status, "DUE");
-      assert.equal(rule15?.statusLabel, "Due");
+      assert.equal(rule15?.statusLabel, "Due Today");
     });
 
     // Edge Case Q: Reminder scheduler running repeatedly (Idempotency and duplicate prevention)
