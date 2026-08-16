@@ -10,11 +10,11 @@ export interface IStorageService {
 }
 
 export class SupabaseStorageService implements IStorageService {
-  private bucketName = "student-documents";
+  private bucketName = "iscms-documents";
 
   async uploadFile(studentId: string, type: ComplianceDocumentType, file: Buffer, fileName: string): Promise<string> {
     const supabase = getAdminSupabase();
-    const filePath = `${type}/${studentId}/${fileName}`;
+    const filePath = `students/${studentId}/${type}/v1/${fileName}`;
     
     console.log(`[STORAGE] Uploading ${type} file to: ${filePath}`);
     
@@ -83,14 +83,25 @@ export class SupabaseStorageService implements IStorageService {
 
   validatePath(path: string): boolean {
     if (!path.trim()) return false;
-    // Expected structure: type/studentId/fileName.pdf
+    // Expected structure: students/studentId/type/vVersion/fileName.pdf or legacy type/studentId/fileName.pdf
     const parts = path.split("/");
-    if (parts.length !== 3) return false;
-    const [type, studentId, fileName] = parts;
-    return (
-      ["passport", "visa", "efrro"].includes(type) &&
-      studentId.length > 10 &&
-      fileName.endsWith(".pdf")
-    );
+    if (parts.length === 5 && parts[0] === "students") {
+      const [, studentId, type, version, fileName] = parts;
+      return (
+        ["passport", "visa", "efrro"].includes(type) &&
+        studentId.length > 5 &&
+        version.startsWith("v") &&
+        fileName.length > 0
+      );
+    }
+    if (parts.length === 3) {
+      const [type, studentId, fileName] = parts;
+      return (
+        ["passport", "visa", "efrro"].includes(type) &&
+        studentId.length > 10 &&
+        fileName.endsWith(".pdf")
+      );
+    }
+    return false;
   }
 }

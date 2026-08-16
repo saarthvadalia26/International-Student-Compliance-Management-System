@@ -105,7 +105,7 @@ All migration files must reside under `supabase/migrations/` and follow the exac
 
 ### 013_storage.sql
 - **Purpose**: Secure document folders.
-- **Objects Created**: Private bucket `student-documents` and Radix folder access policies.
+- **Objects Created**: Private canonical bucket `iscms-documents` and application-managed prefix access policies.
 - **Dependencies**: `011_rls.sql`.
 - **Transaction**: Run inside a transaction. (Storage creation uses Supabase client APIs, but policies run inside standard SQL transactions).
 - **Placement**: Thirteenth. Enables secure folder structures.

@@ -92,7 +92,7 @@ async function simulateUploadRenewal(input: {
 
   // Immutable storage path
   const storagePath = `students/${studentId}/${documentType}/v${nextVersion}/${Date.now()}_${fileName}`;
-  mockStorageUploads.push({ bucket: "student-documents", path: storagePath, buffer: fileBuffer, contentType });
+  mockStorageUploads.push({ bucket: "iscms-documents", path: storagePath, buffer: fileBuffer, contentType });
 
   // Create pending version with is_active: false (previous active remains active!)
   const newRow: MockVersionRecord = {

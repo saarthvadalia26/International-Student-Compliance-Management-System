@@ -570,12 +570,12 @@ export async function getStudentDocumentDownloadUrlAction(
     }
 
     const storage = StorageProviderFactory.getProvider();
-    const exists = await storage.fileExists("student-documents", cleanPath);
+    const exists = await storage.fileExists("iscms-documents", cleanPath);
     if (!exists) {
       return { success: false, error: "The requested document file could not be located in storage." };
     }
 
-    const signedUrl = await storage.generateSignedUrl("student-documents", cleanPath, 300);
+    const signedUrl = await storage.generateSignedUrl("iscms-documents", cleanPath, 300);
 
     // Log student activity
     await portalRepo.logActivity(

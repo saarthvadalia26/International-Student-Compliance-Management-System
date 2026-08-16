@@ -101,7 +101,7 @@ export class ReportingService {
    * Generates a short-lived (5-minute) signed URL to download private documents.
    */
   async generateSignedUrl(filePath: string): Promise<string> {
-    return this.storageProvider.generateSignedUrl("student-documents", filePath, 300);
+    return this.storageProvider.generateSignedUrl("iscms-documents", filePath, 300);
   }
 
   /**

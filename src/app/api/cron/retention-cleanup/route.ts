@@ -64,7 +64,7 @@ export async function GET(req: Request) {
 
       try {
         // Physical deletion
-        const success = await storageProvider.delete('student-documents', record.storage_object_key);
+        const success = await storageProvider.delete('iscms-documents', record.storage_object_key);
         
         if (success) {
           // Update DB

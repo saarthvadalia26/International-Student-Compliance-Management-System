@@ -41,7 +41,7 @@ The module lives inside `src/domain/compliance/` and conforms to Domain-Driven D
 
 ## Service Layer
 *   **`IStorageService`**: Declares storage operations (upload, replace, delete, signed URL generation, and path checking).
-*   **`SupabaseStorageService`**: Implements the storage interface. Uploads files to student-isolated folders (e.g. `student-documents/passport/[student_id]/`) and serves them via short-lived signed URLs.
+*   **`SupabaseStorageService`**: Implements the storage interface. Uploads files to student-isolated prefixes in `iscms-documents` (e.g. `students/{student_id}/{type}/v{version}/`) and serves them via short-lived signed URLs.
 *   **`ComplianceDocumentService`**: Coordinates document uploads and replacements. It depends strictly on `IStorageService` and `IComplianceDocumentRepository`, keeping business logic agnostic of the storage provider.
 *   **`VerificationService`**: Updates the verification status ('verified', 'rejected') and triggers recalculations.
 *   **`ComplianceStatusService`**: Implements the shared Compliance Status Engine. It maps active documents to one of the 6 standard compliance status options (`COMPLIANT`, `WARNING`, `EXPIRED`, `PENDING_VERIFICATION`, `REJECTED`, `MISSING`) and calculates student compliance scores.

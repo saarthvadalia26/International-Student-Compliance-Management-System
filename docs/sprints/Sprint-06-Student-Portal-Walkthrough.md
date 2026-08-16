@@ -74,7 +74,7 @@ The upload action is fully transactional and runs the following checks:
 2.  **File Size Check**: Validates that the file stream does not exceed 5MB.
 3.  **Virus Scan Placeholder**: An extensible placeholder for virus scanner hook integrations.
 4.  **Duplicate Checksum Check**: Computes the SHA-256 hash of the uploaded PDF and queries `upload_audit_log` to reject identical duplicate uploads.
-5.  **Storage Write**: Stores the PDF in the `efrro-documents` bucket under `efrro/{student_id}/{year}/{version_uuid}.pdf`.
+5.  **Storage Write**: Stores the PDF in the `iscms-documents` bucket under `students/{student_id}/efrro/v{nextVersion}/{unique_file_id}.pdf`.
 6.  **Active Reminder Cancellation**: Cancels all queued automated notifications scheduled for the old eFRRO.
 7.  **Database Commit**: Creates a new record in `efrro_versions` with status `pending`, updates the compliance snapshot cache state, and logs the upload transaction to `upload_audit_log`.
 

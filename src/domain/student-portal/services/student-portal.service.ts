@@ -211,7 +211,7 @@ export class StudentPortalService {
 
     const ext = isPdf ? "pdf" : isPng ? "png" : "jpg";
     const mimeType = isPdf ? "application/pdf" : isPng ? "image/png" : "image/jpeg";
-    const bucketName = "student-documents";
+    const bucketName = "iscms-documents";
     const uniqueFileId = crypto.randomUUID();
     const storagePath = `students/${studentId}/${documentType}/v${nextVersion}/${uniqueFileId}.${ext}`;
 

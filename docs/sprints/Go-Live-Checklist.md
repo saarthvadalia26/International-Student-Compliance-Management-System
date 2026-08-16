@@ -11,7 +11,7 @@
 - [x] **Row-Level Security (RLS)**: Active on database schemas.
 - [x] **SSL certificates**: HTTPS active on domain `nfsu-iscms.in`.
 - [x] **MIME Type Validations**: Active on storage uploads verifying magic byte headers.
-- [x] **Private Buckets**: Verified `passport-documents`, `visa-documents`, and `efrro-documents` require signed links.
+- [x] **Private Storage Bucket**: Verified single production bucket `iscms-documents` with application-managed prefixes (`students/{studentId}/{type}/v{version}/`) requires signed links.
 - [x] **Secrets Isolation**: Confirm all production keys are in server environment variables.
 
 ---

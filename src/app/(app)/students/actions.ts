@@ -1172,7 +1172,7 @@ export async function uploadDocumentRenewalAction(
 
     try {
       const storage = StorageProviderFactory.getProvider();
-      await storage.upload("student-documents", storagePath, fileBuffer, file.type || "application/pdf");
+      await storage.upload("iscms-documents", storagePath, fileBuffer, file.type || "application/pdf");
     } catch (uploadErr: unknown) {
       console.error("[STORAGE_UPLOAD_ERROR]", uploadErr);
       return { success: false, error: `Failed to upload document file to storage: ${uploadErr instanceof Error ? uploadErr.message : "Storage error"}` };
@@ -1209,7 +1209,7 @@ export async function uploadDocumentRenewalAction(
       // Atomic Compensation: remove uploaded object from R2 if database persistence fails
       try {
         const storage = StorageProviderFactory.getProvider();
-        await storage.delete("student-documents", storagePath);
+        await storage.delete("iscms-documents", storagePath);
         console.log(`[STORAGE_COMPENSATION] Cleaned up orphaned file ${storagePath} after database insert failure.`);
       } catch (delErr) {
         console.error("[STORAGE_COMPENSATION_ERROR] Failed to roll back orphaned storage file:", delErr);
@@ -2159,13 +2159,13 @@ export async function getDocumentDownloadUrlAction(
     const storage = StorageProviderFactory.getProvider();
     
     // Check if the object actually exists in Cloudflare R2 / Storage
-    const exists = await storage.fileExists("student-documents", cleanPath);
+    const exists = await storage.fileExists("iscms-documents", cleanPath);
     if (!exists) {
       console.warn(`[STORAGE_MISSING_OBJECT] Document file not found in storage at path: ${cleanPath}`);
       return { success: false, error: "The requested document file could not be located in storage." };
     }
 
-    const signedUrl = await storage.generateSignedUrl("student-documents", cleanPath, 300);
+    const signedUrl = await storage.generateSignedUrl("iscms-documents", cleanPath, 300);
 
     // Audit log document access
     try {

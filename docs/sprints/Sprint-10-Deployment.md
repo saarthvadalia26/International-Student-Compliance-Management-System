@@ -11,10 +11,7 @@
 
 *   **Server Layer**: Next.js Server Components and serverless routing handlers hosted on Vercel Enterprise.
 *   **Database Layer**: Supabase PostgreSQL database instance with standard connection pooling.
-*   **File Storage**: Supabase Storage with dedicated private buckets:
-    *   `passport-documents`
-    *   `visa-documents`
-    *   `efrro-documents`
+*   **File Storage**: Cloudflare R2 single private bucket `iscms-documents` with application-managed prefixes (`students/{studentId}/{documentType}/v{version}/`).
 
 ---
 

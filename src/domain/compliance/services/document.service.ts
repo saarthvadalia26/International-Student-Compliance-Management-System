@@ -178,7 +178,7 @@ export class VerificationService {
     // Storage Lifecycle Hooks
     if (status === "rejected") {
       try {
-        await this.storageProvider.delete("student-documents", updated.filePath);
+        await this.storageProvider.delete("iscms-documents", updated.filePath);
         await this.repository.updateStorageLifecycle(id, type, "DELETED", reason || "Staff Rejected", false);
         await this.repository.logStorageAudit(updated.studentId, updated.id, type, "Rejection", actorId || "System", undefined, { reason });
       } catch (err) {
@@ -274,7 +274,7 @@ export class ComplianceDocumentService {
     const ext = fileType === "application/pdf" ? "pdf" : fileType === "image/png" ? "png" : "jpg";
     const uniqueFileId = crypto.randomUUID();
     const storagePath = await this.storageProvider.upload(
-      "student-documents",
+      "iscms-documents",
       `students/${studentId}/${type}/v${nextVersion}/${uniqueFileId}.${ext}`,
       fileBuffer,
       fileType

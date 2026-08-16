@@ -401,10 +401,10 @@ To ensure consistency in audit trails, all events written to `activity_log.event
 
 ## Section 14 – Storage Design
 
-- **Bucket name**: `student-documents` (Set to private, RLS enabled).
-- **Directory Layout**:
-  - `student-documents/[student_id]/[document_type]/[version_id].pdf`
-- **Security Policy**: Read access requires a signed URL (valid for 5 minutes). Upload actions require an administrator role.
+- **Bucket name**: `iscms-documents` (Set to private, single canonical bucket in Cloudflare R2 / Supabase Storage).
+- **Application-Managed Prefix Layout**:
+  - `students/{studentId}/{documentType}/v{version}/{filename}`
+- **Security Policy**: Read access requires an authorized signed URL (valid for 5 minutes). Direct bucket access is blocked; object keys are generated and accessed via server actions and authenticated API workflows.
 
 ---
 

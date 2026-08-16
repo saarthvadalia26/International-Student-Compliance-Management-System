@@ -95,12 +95,12 @@ The goal of Sprint 3 is to build the complete, reusable Compliance Document Fram
 *   **Actions**: Implement Verify/Reject dialog triggers, replace files, and discard edits prompts.
 
 ### 4. Storage Scope (DevOps/Backend Agent)
-*   **Bucket Configuration**: Set up private bucket `student-documents`.
-*   **Folder Layout**:
-    *   `student-documents/passport/[student_id]/`
-    *   `student-documents/visa/[student_id]/`
-    *   `student-documents/efrro/[student_id]/`
-*   **Access Protocols**: Access files exclusively using short-lived signed URLs (expires in 15 minutes).
+*   **Bucket Configuration**: Set up single private canonical bucket `iscms-documents`.
+*   **Application-Managed Prefix Layout**:
+    *   `students/{studentId}/passport/v{version}/{filename}`
+    *   `students/{studentId}/visa/v{version}/{filename}`
+    *   `students/{studentId}/efrro/v{version}/{filename}`
+*   **Access Protocols**: Access files exclusively using short-lived signed URLs (expires in 5–15 minutes).
 
 ### 5. Validation Rules
 *   **Dates**: `expiry_date` must be strictly after `issue_date`.

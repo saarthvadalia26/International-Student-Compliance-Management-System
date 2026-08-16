@@ -34,8 +34,10 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
     });
   }
 
+  public static readonly CANONICAL_BUCKET = "iscms-documents";
+
   private getTargetBucket(bucket?: string): string {
-    return process.env.R2_BUCKET_NAME?.trim() || bucket || "iscms-documents";
+    return process.env.R2_BUCKET_NAME?.trim() || (bucket && bucket.trim() ? bucket.trim() : CloudflareR2StorageProvider.CANONICAL_BUCKET);
   }
 
   private sanitizeError(err: unknown, fallbackMessage: string): Error {
