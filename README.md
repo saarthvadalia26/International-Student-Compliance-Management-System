@@ -1,523 +1,820 @@
-# International Student Compliance Management System (ISCMS)
+# ISCMS
 
-### ISCMS — Centralized International Student Compliance Management Platform
+<div align="center">
 
-A modern, enterprise-grade web platform engineered for higher-education institutions, universities, and international student offices to centralize international student record management, compliance document verification, expiration monitoring, automated alert workflows, operational reporting, and administrative governance.
+### International Student Compliance Management System
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.2-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+A centralized platform engineered for higher-education institutions, universities, and international student offices to manage international student immigration documents, compliance metadata, document versions, expiration monitoring, automated reminder workflows, and administrative governance.
+
+[![Next.js](https://img.shields.io/badge/Next.js-16.2.10-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19.2.4-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_RLS-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_15+-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Cloudflare R2](https://img.shields.io/badge/Storage-Cloudflare_R2-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://www.cloudflare.com/developer-platform/r2/)
 
-**Application Type:** Reusable Multi-Tenant Web Application  
-**Deployment Target:** Production Institutional / Organizational Deployment  
-**Product Status:** Production-Ready Web Application  
+</div>
 
 ---
 
-## 1. Product Overview
+## Table of Contents
 
-The **International Student Compliance Management System (ISCMS)** is a software platform designed to assist universities and educational organizations in managing foreign student records and maintaining continuous regulatory compliance.
-
-Managing international student administration involves critical immigration requirements, including passport validity, student visa statuses, and institutional compliance registrations (such as eFRRO). Manual tracking through disparate spreadsheets or legacy databases introduces operational risks, such as overlooked expiration dates, delayed document renewals, and regulatory non-compliance.
-
-ISCMS centralizes the complete international student compliance lifecycle into two distinct, role-isolated operational environments:
-
-### Administrative Workspace (`/dashboard`, `/students`, `/notifications`, `/reports`, `/settings`)
-Used by authorized university administrators, international student advisors, and compliance officers to manage student registries, review submitted compliance documents, conduct document verifications, monitor expiration timelines, generate compliance reports, and configure institutional settings.
-
-### Student Portal (`/student/dashboard`, `/student/notifications`, `/student/efrro`, `/student/settings`)
-Used by enrolled international students to view their real-time compliance status, upload required passport, visa, and registration document copies, receive account notifications, and manage portal preferences through passwordless authentication.
-
----
-
-## 2. Core Product Capabilities
-
-### Student Registry & Profile Management
-* **Centralized Student Registry**: Comprehensive digital registry for tracking international students across departments, campuses, and academic programs.
-* **Structured Student Profiles**: Tracks essential record fields, including passport numbers, visa details, registration IDs, contact details, home country addresses, and enrollment status.
-* **Instant Search & Filter**: Real-time filtering by student name, registration ID, nationality, academic program, or compliance standing.
-
-### Compliance Document Management
-* **Multi-Document Verification**: Dedicated inspection workflows for key compliance documents, including **Passports**, **Visas**, and **eFRRO / Registration Permits**.
-* **Status Lifecycle Tracking**: Automated document status states (`Pending Verification`, `Approved`, `Rejected`, `Expired`).
-* **Document Audit Trails**: Maintains historical records of document submission dates, inspection comments, and verification decisions.
-* **Secure Storage Integration**: Direct integration with private object storage (Cloudflare R2 / Supabase Storage) using short-lived, presigned URL access tokens.
-
-### Expiration & Compliance Monitoring
-* **Automated Expiration Engine**: Continuous evaluation of student document expiration dates against institutional compliance thresholds.
-* **Compliance Classifications**: Evaluates real-time compliance standing (`Compliant`, `Expiring Soon`, `Expired`, `Missing Documents`).
-* **Visual Expiry Timelines**: Color-coded badges, status indicators, and countdown timelines for upcoming passport, visa, and registration renewals.
-
-### Unified Notification Architecture
-* **Role-Aware Notification Center**: Centralized Notification Center (`/notifications` for staff, `/student/notifications` for students) featuring category filtering, search, priority levels, and unread badges.
-* **Realtime WebSocket Synchronization**: Live notification dispatch and unread count badge updates powered by Supabase Realtime WebSockets.
-* **Multi-Channel Delivery Support**: Architecture support for in-app alerts, institutional email (Resend API), and WhatsApp direct messaging (Meta Business API).
-
-### Operational Reporting & Analytics
-* **Executive Dashboard**: Visual metric cards displaying active student totals, pending document verifications, upcoming expirations, and system health status.
-* **Specialized Compliance Reports**: Dedicated report views for Student Registry, eFRRO Expirations, Audit Logs, and Notification Delivery status.
-* **System Health Diagnostics**: Status diagnostics for database connectivity, storage API readiness, and background services.
-
-### Administrative Governance & System Controls
-* **Initial Setup Wizard**: Guided system initialization workflow (`/setup`) for fresh database provisioning and initial administrator creation.
-* **Emergency Administrator Recovery**: Secure recovery mechanism allowing system restoration if administrator access requires resetting.
-* **System Audit Logging**: Comprehensive system log recording login events, verification decisions, administrative changes, and document uploads.
+- [Overview](#overview)
+- [What ISCMS Manages](#what-iscms-manages)
+- [Core Compliance Workflow](#core-compliance-workflow)
+- [Key Features](#key-features)
+- [System Architecture](#system-architecture)
+- [Technology Stack](#technology-stack)
+- [Core Data Model](#core-data-model)
+- [Document Lifecycle & Replacement](#document-lifecycle--replacement)
+- [Compliance Reminder Engine](#compliance-reminder-engine)
+- [Notification Templates](#notification-templates)
+- [Bulk Student Import](#bulk-student-import)
+- [Document Storage Architecture](#document-storage-architecture)
+- [Security Considerations](#security-considerations)
+- [Environment Variables](#environment-variables)
+- [Getting Started](#getting-started)
+- [Deployment](#deployment)
+- [Testing & Verification](#testing--verification)
+- [Project Structure](#project-structure)
+- [Operational Workflows](#operational-workflows)
+- [Integration Status](#integration-status)
+- [Documentation Index](#documentation-index)
+- [Ownership & Licensing](#ownership--licensing)
 
 ---
 
-## 3. User Roles & Access Hierarchy
+## Overview
 
-ISCMS enforces a strict, server-verified role and authorization hierarchy:
+Higher education institutions hosting international students are subject to strict statutory immigration and residency compliance regulations. Compliance tracking typically spans multiple mandatory documents—primarily **Passports**, **Student Visas**, and national foreigner registration certificates such as **eFRRO / Residential Permits**.
 
-| Role | Workspace Access | Primary Responsibilities & Permissions |
-|---|---|---|
-| **Administrator** | Administrative Workspace (`/*`) | Privileged operational control. Manages staff user accounts, executes system setup/recovery, configures retention policies, manages global settings, oversees all student records, conducts document verifications, and exports reports. |
-| **Staff** | Administrative Workspace (`/*`) | Authorized compliance staff and advisors. Manages student profiles, conducts document inspections (approve/reject), triggers reminder notifications, and views compliance reports. Cannot alter global system settings or execute setup recovery. |
-| **Student** | Student Portal (`/student/*`) | Restricted student portal. Authenticated via passwordless OTP. Views personal compliance standing, uploads passport/visa/registration document copies, receives student alerts, and adjusts portal theme settings. **Strictly isolated from administrative data.** |
+Managing these obligations via disconnected spreadsheets or manual filing introduces severe institutional risks:
+* **Overlooked Expiration Dates**: Document expirations lead to visa violations, deportation risks, and institutional penalties.
+* **Metadata vs. File Ambiguity**: Traditional systems often fail to distinguish between possessing confirmed document data and holding a verified physical copy.
+* **Manual Reminder Overhead**: Staff spend disproportionate hours manually checking expiry dates and sending individual emails or messages.
+* **Audit Trail Gaps**: Lack of historical version tracking when passports or visas are renewed during a multi-year academic program.
+
+**ISCMS** resolves these challenges by providing a centralized, role-isolated web platform:
+1. **Administrative Workspace (`/dashboard`, `/students`, `/reminders`, `/reports`, `/settings`)**: Empowers international student advisors and compliance officers to manage student registries, review uploaded documents side-by-side, approve or reject versions with audit notes, configure automated reminder schedules, and generate compliance reports.
+2. **Student Portal (`/student/dashboard`, `/student/notifications`, `/student/efrro`, `/student/profile`)**: Provides enrolled international students with a responsive, self-service interface to view their compliance standing, review document validity, upload renewed document copies, and receive notifications via passwordless authentication.
 
 ---
 
-## 4. Student Portal Experience
+## What ISCMS Manages
 
-The Student Portal (`/student`) provides international students with a responsive, accessible interface optimized for desktop, tablet, and mobile viewports:
+ISCMS tracks compliance across three core document classifications, maintaining a strict architectural boundary between **compliance metadata** (numbers, issue dates, expiration dates) and **physical document files** (uploaded PDFs or images).
 
 ```text
-                        Student Portal Operational Lifecycle
-                                         │
-                  ┌──────────────────────┴──────────────────────┐
-                  │                                             │
-       Passwordless Authentication                      Student Dashboard
-       (WhatsApp / Email OTP)                          (Status Summary)
-                  │                                             │
-                  ├─────────────────────────────────────────────┤
-                  │                                             │
-         Document Centre                              Student Notifications
-         (Passport / Visa / eFRRO Upload)             (/student/notifications)
+                      ISCMS Compliance Entities
+                                  │
+         ┌────────────────────────┼────────────────────────┐
+         │                        │                        │
+         ▼                        ▼                        ▼
+   ╔════════════╗           ╔════════════╗           ╔════════════╗
+   ║  Passport  ║           ║    Visa    ║           ║   eFRRO    ║
+   ╚════════════╝           ╚════════════╝           ╚════════════╝
+   • Number                 • Visa Number            • Certificate / Reg No
+   • Issue Date             • Visa Type / Category   • Issue Date
+   • Expiry Date            • Issue Date             • Expiry Date
+   • Place of Issue         • Expiry Date            • Expiry Date Tracking
+   • Uploaded Copy          • Uploaded Copy          • Uploaded Copy
+   • Version History        • Version History        • Version History
+   • Renewal Alerts         • Renewal Alerts         • Renewal Alerts
 ```
 
-* **Passwordless OTP Login**: Students authenticate securely using single-use OTP codes dispatched via WhatsApp or email.
-* **Compliance Overview**: High-level status cards displaying active validity for Passport, Visa, and eFRRO / Registration permits.
-* **Document Centre (`/student/efrro`)**: Document submission interface supporting file validation (PDF, JPEG, PNG, max 10MB) and progress indicators.
-* **Submission History (`/student/history`)**: Activity timeline showing historical verification approvals, rejections, and submission timestamps.
-* **Student Notification Center (`/student/notifications`)**: Dedicated workspace displaying account-specific compliance alerts and document approval notices.
-* **Light / Dark Mode**: Integrated theme toggle (`ThemeToggle`) supporting instant light and dark theme switching.
+### 1. Passport
+* **Metadata**: Passport number, issuing country, place of issue, issue date, and expiry date.
+* **Document Copies**: Physical copies stored in isolated storage paths, supporting PDF, JPEG, and PNG formats with magic-byte validation.
+* **Verification & Versioning**: Version sequence tracking (`v1`, `v2`, etc.) when students renew their passports during academic tenure.
+* **Reminder Schedule**: Proactive reminder rules evaluated at scheduled threshold intervals (90, 60, 30, 15, and 7 days prior to expiration).
+
+### 2. Visa
+* **Metadata**: Visa number, visa type/classification (e.g. *Student (S-1)*), issue date, and expiry date.
+* **Document Copies**: Verified or pending document files linked directly to the student record.
+* **Verification & Versioning**: Multi-version audit trail with staff approval/rejection notes.
+* **Reminder Schedule**: Scheduled expiry alerts dispatched via WhatsApp and in-app notifications.
+
+### 3. eFRRO / Residential Permit
+* **Metadata**: Registration/certificate number, issue date, and expiry date.
+* **Document Copies**: Scanned residential permit certificates uploaded by students or compliance officers.
+* **Verification & Versioning**: Full lifecycle management with staff verification workflows.
+* **Reminder Schedule**: Expiration monitoring with automated renewal notifications.
+
+> [!IMPORTANT]
+> **Metadata Independence**: In ISCMS, compliance metadata can exist independently of a physical document file. For instance, when student records are imported in bulk from institutional spreadsheets, their passport and visa numbers and expiry dates are stored in the authoritative metadata snapshot (`student_snapshot`) with a status of `MISSING` (or `not_uploaded`). No fake document versions or storage files are generated until a genuine document is uploaded.
 
 ---
 
-## 5. Administrative Workspace
+## Core Compliance Workflow
 
-The Administrative Workspace (`/dashboard`) equips international student advisors and compliance officers with operational tools:
-
-* **Dashboard (`/dashboard`)**: Operational dashboard featuring compliance breakdown charts, urgent document verification queues, and system health metrics.
-* **Student Management (`/students`)**: Searchable tabular registry supporting pagination, nationality filters, program filters, and quick actions.
-* **Student Registration (`/students/add`)**: Form wizard for onboarding new international students with field validation.
-* **Document Inspection (`/students/[id]/passport`, `/visa`, `/efrro`)**: Detailed side-by-side document viewer, verification status toggle, and audit comment recorder.
-* **Communication & Reminders (`/reminders`)**: Workspace for queuing and monitoring compliance alerts across email and messaging channels.
-* **Operational Reports (`/reports`)**: Specialized compliance reporting interfaces with data export options (`/reports/students`, `/reports/efrro`, `/reports/audit`, `/reports/notifications`).
-* **Settings & Governance (`/settings`)**: Multi-tab administration workspace for institutional details, document retention policies, user management, and security controls.
-
----
-
-## 6. Document Compliance Lifecycle
-
-The core operational workflow ensures seamless document submission, verification, and monitoring:
-
-```text
-  Student Registration (Staff or Admin Setup)
-                   │
-                   ▼
-  Student Uploads Compliance Documents (Student Portal)
-                   │
-                   ▼
-  Document Appears in Inspection Queue (Staff Dashboard)
-                   │
-                   ▼
-  Staff Verifies Document (Approved / Rejected with Audit Comment)
-                   │
-                   ▼
-  Compliance Engine Evaluates Expiration Date Continually
-                   │
-                   ▼
-  Pre-Expiry Warning Triggered (e.g., 30 Days Before Expiry)
-                   │
-                   ▼
-  Automated Reminder Dispatched (In-App + Email / Messaging)
-                   │
-                   ▼
-  Student Re-uploads Updated Document
-```
-
----
-
-## 7. Technology Stack
-
-ISCMS is built using modern, production-grade web technologies:
-
-| Layer | Technology | Specification / Version |
-|---|---|---|
-| **Framework** | Next.js (App Router, Turbopack) | `v16.2.10` |
-| **Frontend UI** | React | `v19.2.4` |
-| **Language** | TypeScript (Strict Mode) | `v5.x` |
-| **Styling** | Tailwind CSS / tw-animate-css | `v4.x` |
-| **UI Components** | shadcn/ui / Base UI / Lucide Icons | Latest |
-| **Database** | PostgreSQL (Supabase DB) | PostgreSQL 15+ |
-| **Authentication** | Supabase Auth (Cookie-based Sessions) | `@supabase/ssr v0.12.3` |
-| **Object Storage** | Cloudflare R2 / Supabase Storage | `@aws-sdk/client-s3 v3.1098.0` |
-| **State & Fetching** | TanStack React Query | `v5.101.2` |
-| **Realtime Engine** | Supabase Realtime WebSockets | `@supabase/supabase-js v2.110.1` |
-| **Form Validation** | React Hook Form + Zod | `zod v4.4.3` |
-| **Theme Management** | next-themes | `v0.4.6` |
-| **Monitoring** | Sentry Next.js SDK | `v10.68.0` |
-
----
-
-## 8. System Architecture
+The diagram below illustrates the end-to-end lifecycle from student onboarding to document verification, automated expiry monitoring, and document replacement:
 
 ```mermaid
 flowchart TD
-    subgraph Clients["Client Access Layer"]
-        StudentClient["Student Portal Client\n(Mobile & Desktop Viewports)"]
-        StaffClient["Staff / Admin Client\n(Desktop & Mobile Workspace)"]
-    end
-
-    subgraph AppServer["Next.js Application Layer"]
-        Middleware["Next.js Proxy / Middleware\n(Route Protection & Role Guard)"]
-        ServerActions["Server Actions & API Routes\n(Zod Validation & Business Logic)"]
-        RealtimeEngine["WebSocket Realtime Handler"]
-    end
-
-    subgraph DataStorage["Data & Storage Infrastructure"]
-        SupaAuth["Supabase Auth\n(Session Cookies & Metadata Roles)"]
-        PostgreSQL[("PostgreSQL Database\n(Row Level Security Policies)")]
-        CloudflareR2["Cloudflare R2 Object Storage\n(Presigned Dynamic S3 URLs)"]
-        NotificationGateways["Notification Services\n(Resend Email / Meta WhatsApp)"]
-    end
-
-    StudentClient -->|HTTP / HTTPS| Middleware
-    StaffClient -->|HTTP / HTTPS| Middleware
-
-    Middleware --> ServerActions
-    ServerActions --> SupaAuth
-    ServerActions --> PostgreSQL
-    ServerActions --> CloudflareR2
-    ServerActions --> NotificationGateways
-
-    RealtimeEngine <-->|WebSocket| StudentClient
-    RealtimeEngine <-->|WebSocket| StaffClient
-    PostgreSQL <-->|Realtime Publication| RealtimeEngine
+    A[Student Registration / Bulk Import] --> B[Compliance Metadata Initialized in student_snapshot]
+    B --> C{Physical File Uploaded?}
+    C -->|No| D[Document Status: MISSING / NOT_UPLOADED]
+    C -->|Yes| E[File Upload to Cloudflare R2 / Storage]
+    E --> F[Document Version Created: Pending Verification]
+    F --> G{Staff Inspection}
+    G -->|Rejected| H[Status: REJECTED with Reason & Audit Log]
+    G -->|Approved| I[Status: VERIFIED / Active Version]
+    D --> J[Expiry Engine Evaluates Thresholds]
+    I --> J
+    J --> K{Threshold Reached?}
+    K -->|Yes| L[Generate Idempotent Scheduled Reminder]
+    L --> M[Dispatch Notification via WhatsApp / In-App]
+    M --> N[Student Receives Alert & Renewal Link]
+    N --> O[Replacement Request / Upload Window]
+    O --> E
 ```
 
 ---
 
-## 9. Security Architecture & Controls
+## Key Features
 
-ISCMS enforces defense-in-depth security mechanisms:
+### Student Registry & Academic Management
+* **Centralized Registry**: Tabular student directory with real-time search across student names, university enrollment numbers, registration IDs, passport numbers, and nationalities.
+* **Academic Program Integration**: Configurable academic catalog tracking degree levels, schools, total semesters, and semester durations.
+* **Semester Progression Engine**: Automatic computation of current semester, expected graduation date, and academic stages based on admission date.
+* **Academic Adjustments**: Audited recording of student program changes, semester repeats, leaves of absence, and semester skips.
+* **Contact & Embassy Records**: Comprehensive tracking of permanent address, local residential address, emergency contacts, and embassy/consulate liaison details.
 
-* **Server-Side Permission Enforcement**: Every route and Server Action verifies user identity and role server-side. Frontend UI hiding is never relied upon as a primary security control.
-* **Row Level Security (RLS)**: PostgreSQL tables feature RLS policies (`SELECT_in_app_notifications_StudentSelf`, `SELECT_in_app_notifications_StaffAdmin`) ensuring students can only access records matching `user_id = auth.uid()`.
-* **Cookie-Based Session Management**: Built on `@supabase/ssr` using HTTP-only, secure, same-site session cookies.
-* **Private Object Storage**: Uploaded compliance PDFs and images are stored in private buckets. Access is mediated strictly via short-lived, presigned URL tokens.
-* **Input & File Validation**: Server-side Zod validation schemas inspect file MIME types (`application/pdf`, `image/jpeg`, `image/png`) and file size limits (10MB max).
-* **Audit Logging**: Administrative changes, verification approvals, rejections, and system recovery triggers are logged to system audit tables.
-* **Security Headers & CSP**: Configured with strict Content Security Policy (CSP), X-Frame-Options, X-Content-Type-Options, and Referrer Policy headers.
+### Compliance Document Management
+* **Separated Metadata & Version Architecture**: Authoritative calculation snapshots separate from immutable physical file version histories (`passport_versions`, `visa_versions`, `efrro_versions`).
+* **Side-by-Side Inspection Interface**: Staff workspace featuring synchronized PDF/image viewers, metadata comparison, and approval/rejection forms.
+* **Upload Lock & Eligibility Guard**: Upload controls preventing accidental or unauthorized overwrites; requires an active replacement request or staff-issued early authorization window.
+* **Document Replacement Workflows**: Student-initiated or staff-created replacement requests with approval queues and automatic lock resolution upon successful upload.
+
+### Compliance Tracking & Scoring
+* **Continuous Expiry Evaluation**: Calendar-day difference calculations determining real-time status: `COMPLIANT`, `WARNING` (<60 days remaining), `EXPIRED` (≤0 days), `PENDING_VERIFICATION`, or `NOT_UPLOADED`.
+* **Institutional Health Scoring**: Normalized compliance score calculation based on active verified document coverage.
+* **Visual Status Indicators**: Color-coded badges and countdown indicators across both administrative and student views.
+
+### Automated Notifications & Reminders
+* **Multi-Interval Reminder Rules**: Configurable alert thresholds at **90, 60, 30, 15, and 7 days** prior to document expiration.
+* **Idempotent Dispatch**: Unique idempotency keys (`{student_id}:{document_type}:{threshold_days}`) preventing duplicate notifications.
+* **Multilingual Template Manager**: Templated messages with dynamic placeholders (`{{student_name}}`, `{{expiry_date}}`, `{{days_remaining}}`, `{{enrollment_number}}`, `{{institution_name}}`) supporting English, Hindi, and Spanish.
+* **Realtime In-App Notifications**: WebSocket-backed notification center for staff and students powered by Supabase Realtime publications.
+* **Delivery Logging & Audit**: Complete delivery tracking recording status (`queued`, `sending`, `sent`, `failed`), timestamps, and gateway error messages.
+
+### Student Portal
+* **Passwordless Authentication**: Secure login via single-use 7-day magic links or time-based OTP codes.
+* **Self-Service Compliance Dashboard**: Mobile-optimized overview of document validity and required actions.
+* **Direct Document Upload**: Client-side validated file uploads with progress tracking and SHA-256 duplicate checksum detection.
+* **Activity & Version History**: Student visibility into historical document submissions and verification decisions.
+* **Developer Test Mode**: Configurable test flag (`STUDENT_PORTAL_TEST_MODE`) for rapid local UI evaluation without live OTP credentials.
+
+### Bulk Student Import Engine
+* **Spreadsheet Parsing**: Ingests `.xlsx`, `.xls`, and `.csv` files using SheetJS (`xlsx`).
+* **Intelligent Auto-Mapping**: Automatic column matching based on header alias dictionaries with manual override controls.
+* **Two-Pass Production Validation**: Comprehensive row-by-row validation distinguishing between fatal errors (blocking import) and non-blocking warnings (missing optional fields).
+* **Formula Injection Sanitization**: Strips spreadsheet formula injection vectors while preserving standard international phone prefixes (`+`).
+* **Batch Auditing & Atomic Rollback**: Imports are tracked under `import_batches` with batch numbers, error summaries, and one-click batch deletion.
+
+### System Governance & Administration
+* **Initial Setup Wizard (`/setup`)**: Automated detection of uninitialized databases directing administrators through health verification, credential creation, and institutional configuration.
+* **Emergency Recovery Mode**: Secure mechanism to restore primary administrative access without altering existing compliance data.
+* **Immutable Audit Trail**: System-wide audit log (`audit_log`) recording logins, verification actions, imports, and configuration updates.
+* **Live System Diagnostics (`/dashboard/health`)**: Real-time latency tracking for database connection pools, Cloudflare R2 object storage, and notification services.
 
 ---
 
-## 10. System Initialization & Emergency Recovery
+## System Architecture
 
-### Fresh System Initialization (`/setup`)
-When ISCMS is deployed against a new database, the application automatically detects the uninitialized state and directs administrators to the **Initial Setup Wizard** (`/setup`).
+ISCMS employs a modern layered architecture with strict separation between client interaction, server business logic, persistent data storage, and external providers:
 
 ```text
-  Fresh Deployment / Clean Database
-                 │
-                 ▼
-  System State Guard Detects No Admin Account
-                 │
-                 ▼
-  Redirects to Initial Setup Wizard (/setup)
-                 │
-                 ▼
-  Step 1: System Health & Database Connection Check
-  Step 2: Provision Primary Administrator Credentials
-  Step 3: Configure Institutional Details & Branding
-  Step 4: Execute Initial Schema Seed & Initialize State
-                 │
-                 ▼
-  Redirects to Administrative Workspace (/dashboard)
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           Client Presentation                           │
+│                                                                         │
+│   ┌────────────────────────────────┐   ┌────────────────────────────┐   │
+│   │   Admin / Staff Workspace      │   │       Student Portal       │   │
+│   │   (/dashboard, /students, etc.)│   │   (/student/dashboard, etc.)│   │
+│   └────────────────┬───────────────┘   └─────────────┬──────────────┘   │
+└────────────────────┼─────────────────────────────────┼──────────────────┘
+                     │                                 │
+                     ▼                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Next.js App Router (v16.2.10)                        │
+│                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────┐   │
+│   │   Edge Proxy Middleware (Route Protection, SSR Cookies, CSP)    │   │
+│   └────────────────┬────────────────────────────────────────────────┘   │
+│                    │                                                    │
+│   ┌────────────────▼────────────────────────────────────────────────┐   │
+│   │   Server Actions & Domain Services                              │   │
+│   │   • StudentService            • ExpiryReminderEngine            │   │
+│   │   • ComplianceDocumentService • BulkStudentImportService        │   │
+│   │   • SemesterProgressionEngine • SystemDiagnosticsService        │   │
+│   └───────┬──────────────────────────┬──────────────────────┬───────┘   │
+└───────────┼──────────────────────────┼──────────────────────┼───────────┘
+            │                          │                      │
+            ▼                          ▼                      ▼
+┌──────────────────────┐    ┌──────────────────────┐   ┌──────────────────┐
+│     Supabase DB      │    │    Cloudflare R2     │   │   Notification   │
+│   (PostgreSQL 15+)   │    │    Object Storage    │   │     Gateways     │
+│                      │    │                      │   │                  │
+│ • Row Level Security │    │ • Single Bucket      │   │ • Meta WhatsApp  │
+│ • 44 Migrations      │    │   (iscms-documents)  │   │   Business Cloud │
+│ • Triggers & Views   │    │ • Deterministic Keys │   │ • Resend Email   │
+│ • Realtime Pub/Sub   │    │ • Presigned URLs     │   │ • In-App Streams │
+└──────────────────────┘    └──────────────────────┘   └──────────────────┘
 ```
 
-### Emergency Administrator Recovery Mode (`/setup`)
-If administrative access is lost or emergency recovery is required, ISCMS features a secure **Administrator Recovery Mode**:
-* Accessible via `/setup` when recovery parameters are satisfied.
-* Allows restoring primary administrator credentials without resetting existing student compliance records.
-* Logs the emergency recovery action to the audit trail for security accountability.
+### Architectural Highlights
+1. **Next.js App Router & Server Actions**: Core business logic executes entirely on the server with Zod validation, ensuring client components never directly execute privileged database operations.
+2. **Supabase SSR Authentication**: Cookie-based session tokens validated against PostgreSQL Row Level Security policies.
+3. **Storage Abstraction**: Storage operations route through `StorageProviderFactory`, utilizing Cloudflare R2 via `@aws-sdk/client-s3` in production with fallback support for native Supabase Storage buckets.
+4. **Provider Pattern for Messaging**: Notification dispatch is decoupled behind `INotificationProvider`, allowing dynamic switching between Meta WhatsApp, Resend Email, and mock test providers.
 
 ---
 
-## 11. Project Structure
+## Technology Stack
+
+The versions and libraries below reflect the active dependencies declared in [`package.json`](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/package.json):
+
+| Layer | Technology | Specification / Version |
+| :--- | :--- | :--- |
+| **Framework** | Next.js (App Router, Turbopack) | `16.2.10` |
+| **UI Library** | React | `19.2.4` |
+| **Language** | TypeScript (Strict Mode) | `^5.x` |
+| **Styling** | Tailwind CSS / PostCSS | `^4.x` |
+| **UI Components** | shadcn/ui / Base UI / Lucide Icons | `@base-ui/react ^1.6.0`, `lucide-react ^1.23.0` |
+| **Database** | PostgreSQL on Supabase | PostgreSQL 15+ (`@supabase/supabase-js ^2.110.1`) |
+| **Authentication** | Supabase SSR (Secure Cookie Sessions) | `@supabase/ssr ^0.12.3` |
+| **Object Storage** | Cloudflare R2 (S3-Compatible Client) | `@aws-sdk/client-s3 ^3.1098.0`, `@aws-sdk/s3-request-presigner ^3.1098.0` |
+| **State & Fetching** | TanStack React Query | `^5.101.2` |
+| **Realtime Engine** | Supabase Realtime WebSockets | `@supabase/supabase-js ^2.110.1` |
+| **Validation** | Zod / React Hook Form | `zod ^4.4.3`, `react-hook-form ^7.80.0` |
+| **Spreadsheet Engine**| SheetJS | `xlsx ^0.18.5` |
+| **Charts & Metrics** | Recharts | `^3.9.2` |
+| **Monitoring** | Sentry Next.js SDK | `@sentry/nextjs ^10.68.0` |
+| **Testing** | Node Test Runner / Playwright | `@playwright/test ^1.62.0` |
+
+---
+
+## Core Data Model
+
+ISCMS is backed by a relational schema in PostgreSQL managed through 44 sequential database migrations.
+
+```mermaid
+erDiagram
+    students ||--|| student_snapshot : "authoritative compliance metadata"
+    students ||--o| student_academic : "enrollment details"
+    students ||--o{ student_academic_adjustments : "progression changes"
+    students ||--o{ passport_versions : "physical passport uploads"
+    students ||--o{ visa_versions : "physical visa uploads"
+    students ||--o{ efrro_versions : "physical efrro uploads"
+    students ||--o{ student_document_replacement_requests : "requests"
+    students ||--o{ student_early_upload_authorizations : "upload windows"
+    students ||--o{ student_upload_tokens : "single-use tokens"
+    students ||--o{ notifications : "scheduled alerts"
+    students }o--o| import_batches : "created by batch"
+    
+    notifications ||--o{ notification_delivery_log : "delivery attempts"
+    reminder_rules }o--o| notification_templates : "uses template"
+    academic_programs ||--o{ student_academic : "course curriculum"
+
+    students {
+        uuid id PK
+        string university_enrollment_number
+        string registration_number
+        string full_name
+        string email
+        string phone_home
+        string country_of_citizenship
+        string status
+        uuid import_batch_id FK
+    }
+
+    student_snapshot {
+        uuid student_id PK, FK
+        string passport_number
+        date passport_expiry
+        string passport_status
+        string visa_number
+        date visa_expiry
+        string visa_status
+        string efrro_number
+        date efrro_expiry
+        string efrro_status
+        int compliance_score
+        string compliance_status
+    }
+
+    passport_versions {
+        uuid id PK
+        uuid student_id FK
+        int version_number
+        string document_number
+        date expiry_date
+        string file_path
+        string verification_status
+        uuid verified_by
+        boolean is_active
+    }
+
+    visa_versions {
+        uuid id PK
+        uuid student_id FK
+        int version_number
+        string document_number
+        date expiry_date
+        string file_path
+        string verification_status
+        uuid verified_by
+        boolean is_active
+    }
+
+    efrro_versions {
+        uuid id PK
+        uuid student_id FK
+        int version_number
+        string document_number
+        date expiry_date
+        string file_path
+        string verification_status
+        uuid verified_by
+        boolean is_active
+    }
+
+    import_batches {
+        uuid id PK
+        string batch_number
+        string file_name
+        int total_rows
+        int imported_count
+        int failed_count
+        string status
+        jsonb error_summary
+    }
+
+    reminder_rules {
+        uuid id PK
+        string document_type
+        int alert_threshold_days
+        string channel
+        boolean is_active
+        string rule_name
+        uuid template_id FK
+    }
+```
+
+### Key Tables & Responsibilities
+* `students`: Core demographic record, university enrollment identifier, and nationality.
+* `student_snapshot`: Primary compliance metadata cache. Updated automatically upon document verification or import.
+* `passport_versions`, `visa_versions`, `efrro_versions`: Immutable audit tables containing verified or pending physical file uploads. The database enforces a `CHECK (file_path IS NOT NULL AND file_path <> '')` constraint on these tables.
+* `student_document_replacement_requests`: Formal audit requests to unlock and replace verified compliance documents.
+* `student_early_upload_authorizations`: Staff-granted time-bounded authorization windows to bypass standard document upload locks.
+* `notifications` & `notification_delivery_log`: Asynchronous notification queues, scheduled trigger dates, idempotency hashes, and gateway delivery receipts.
+* `notification_templates`: Multilingual notification content with versioning and parameter placeholders.
+* `reminder_rules`: Trigger thresholds and target channels for each document classification.
+* `import_batches`: Auditable records of bulk spreadsheet uploads enabling atomic review and rollback.
+* `audit_log`: System-wide audit log recording all administrative modifications.
+
+---
+
+## Document Lifecycle & Replacement
+
+ISCMS enforces a structured document lifecycle designed to guarantee that verified documents cannot be accidentally overwritten or corrupted:
 
 ```text
-International-Student-Compliance-Management-System/
-├── docs/                        # Architecture decision records, plans & walkthroughs
-├── documentation/               # Detailed QA matrices, security reports & architecture specs
-├── public/                      # Static assets & favicons
-├── src/
-│   ├── app/                     # Next.js App Router structure
-│   │   ├── (app)/               # Staff/Admin Workspace routes (/dashboard, /students, etc.)
-│   │   │   ├── dashboard/       # Executive dashboard & system health (/dashboard/health)
-│   │   │   ├── notifications/   # Staff Notification Center (/notifications)
-│   │   │   ├── reminders/       # Communication & reminder management
-│   │   │   ├── reports/         # Compliance reporting routes
-│   │   │   ├── settings/        # System administration settings
-│   │   │   └── students/        # Student management & document inspection routes
-│   │   ├── api/                 # Server API endpoints & webhooks (/api/webhooks/meta, etc.)
-│   │   ├── student/             # Student Portal routes (/student/dashboard, /student/notifications)
-│   │   │   ├── (authenticated)/ # Passwordless authenticated student views
-│   │   │   └── (public)/        # Student OTP login route
-│   │   ├── setup/               # System Initial Setup Wizard & Recovery Mode
-│   │   └── layout.tsx           # Global application root layout & providers
-│   ├── components/              # Reusable React components
-│   │   ├── header/              # Breadcrumbs, header bell, theme toggle, search
-│   │   ├── notifications/       # Shared NotificationCenterWorkspace & list items
-│   │   ├── settings/            # Settings tab workspaces
-│   │   ├── shell/               # Administrative app shell container
-│   │   └── ui/                  # shadcn/ui design system primitives
-│   ├── config/                  # Institutional branding, environment & route maps
-│   ├── domain/                  # Core domain logic, models, storage & notification providers
-│   ├── features/                # Feature-specific modules & UI elements
-│   ├── hooks/                   # Custom hooks (useNotificationCenter, useRealtime, etc.)
-│   ├── lib/                     # Supabase clients (browser, server, admin) & utilities
-│   ├── providers/               # React Query, Theme, & Realtime context providers
-│   ├── services/                # Legacy domain services & audit logger
-│   └── middleware.ts            # Proxy middleware for authentication & role protection
-├── supabase/
-│   ├── migrations/              # SQL schema migration files (001 through 029)
-│   └── seed/                    # Reference dataset seed files
-├── .env.local.example           # Environment variables configuration template
-├── next.config.js               # Next.js configuration & security headers
-├── package.json                 # Project dependencies & scripts
-└── README.md                    # Institutional product documentation
+  1. METADATA REGISTRATION
+     • Student is onboarded (manually or via bulk import).
+     • Expiry dates and document numbers recorded in `student_snapshot`.
+     • Document status initialized to MISSING / not_uploaded.
+                               │
+                               ▼
+  2. PHYSICAL FILE SUBMISSION
+     • Student or staff uploads PDF/image (max size dynamically enforced, default 10MB).
+     • Magic-number validation ensures file content matches extension.
+     • Stored in Cloudflare R2: `students/{id}/{type}/v1/{uuid}.pdf`.
+     • Version record created in `*_versions` table with status `pending`.
+                               │
+                               ▼
+  3. ADMINISTRATIVE INSPECTION
+     • Staff reviews document in side-by-side inspection view.
+     • Decision:
+       ├── REJECTED ──> Staff provides rejection reason; file scheduled for deletion.
+       └── VERIFIED ──> Status set to `verified`; `student_snapshot` refreshed;
+                        document is locked against further modification.
+                               │
+                               ▼
+  4. EXPIRATION MONITORING
+     • Daily evaluation calculates calendar-day difference to expiry.
+     • Scheduled reminder rules trigger automated alerts at 90, 60, 30, 15, and 7 days.
+                               │
+                               ▼
+  5. DOCUMENT REPLACEMENT (When renewed)
+     • Student or staff initiates a Replacement Request with renewal details.
+     • Staff approves request (or automatic renewal window opens).
+     • New document uploaded; version number increments to `v2`.
+     • Previous version deactivated and marked as superseded in audit logs.
 ```
 
 ---
 
-## 12. Local Development Guide
+## Compliance Reminder Engine
+
+The compliance reminder engine calculates, schedules, and dispatches multi-channel expiration alerts across all compliance documents.
+
+### Calculation Mechanics
+* **Timezone-Safe Calendar Diff**: Evaluates calendar-day differences between the target document's `expiry_date` and today's date using `CalendarDateEngine` to eliminate daylight saving or time-of-day offsets.
+* **Standard Thresholds**: Evaluates rules across five standard intervals:
+  * **90 Days**: Early warning notification.
+  * **60 Days**: Administrative renewal advisory.
+  * **30 Days**: Urgent expiration warning.
+  * **15 Days**: Critical renewal alert.
+  * **7 Days**: Final pre-expiration notice.
+* **Handling Missing Expiry Dates**: If a document has no recorded expiration date, the engine flags the schedule as `NOT_APPLICABLE` with the reason *"Expiry date has not been recorded"*.
+* **Handling Metadata-Only Records**: When document metadata exists without an uploaded file copy, reminders still evaluate against the recorded expiry date, prompting the student to submit their renewed physical document.
+* **Deduplication & Idempotency**: Before queueing or sending a notification, the engine verifies that no record exists with the unique key:
+  ```text
+  {student_id}:{document_type}:{threshold_days}
+  ```
+  This guarantees that duplicate alerts are never dispatched even if background jobs run repeatedly.
+
+---
+
+## Notification Templates
+
+ISCMS includes a template management architecture allowing compliance staff to customize notification messages.
+
+### Placeholders & Substitution
+Templates utilize double-curly-brace placeholder syntax:
+* `{{student_name}}`: Student's full name.
+* `{{enrollment_number}}`: University enrollment identifier.
+* `{{document_type}}`: Passport, Visa, or eFRRO.
+* `{{expiry_date}}`: Formatted expiration date (`YYYY-MM-DD`).
+* `{{days_remaining}}`: Integer countdown of days until expiry.
+* `{{institution_name}}`: Institutional branding name.
+
+### Multilingual Support
+The database seed includes pre-configured templates across multiple languages:
+* **English (`en`)**: Primary institutional alerts.
+* **Hindi (`hi`)**: Regional multilingual notifications.
+* **Spanish (`es`)**: International language variant.
+
+### Template Configuration vs. Provider Dispatch
+* **Template Storage**: Templates are stored and versioned in the `notification_templates` database table.
+* **Channel Architecture**: While templates support multi-channel formatting (`whatsapp`, `email`, `both`), migration `043` standardizes operational triggers to **WhatsApp** and **In-App** delivery pending active email gateway configuration.
+
+---
+
+## Bulk Student Import
+
+The Bulk Student Import subsystem enables compliance administrators to onboard entire cohorts from institutional spreadsheets.
+
+```text
+┌────────────────────────┐
+│  Upload Spreadsheet    │ (.xlsx, .xls, .csv via SheetJS)
+└───────────┬────────────┘
+            │
+            ▼
+┌────────────────────────┐
+│ Intelligent Mapping    │ Auto-detects headers (e.g. "Passport No" -> passport_number)
+└───────────┬────────────┘
+            │
+            ▼
+┌────────────────────────┐
+│ Two-Pass Validation    │ Evaluates duplicate emails, format regex, and missing fields
+└───────────┬────────────┘
+            │
+            ├── [Fatal Errors Exist] ──> Blocks execution, exports downloadable Error Report
+            │
+            └── [Validation Clean]   ──> Creates Import Batch Record
+                                                │
+                                                ▼
+                                         ┌────────────────────────┐
+                                         │ Atomic Insertion       │
+                                         │ • students             │
+                                         │ • student_contact      │
+                                         │ • student_academic     │
+                                         │ • student_snapshot     │
+                                         │ (NO fake file versions)│
+                                         └────────────────────────┘
+```
+
+### Import Principles & Safeguards
+1. **No Fake Document Versions**: Bulk import populates demographic, academic, and metadata snapshot records (`student_snapshot`). It **never** inserts fake version records into `passport_versions`, `visa_versions`, or `efrro_versions` when no physical file exists.
+2. **Handling Optional Fields**: Optional contact or embassy fields are stored cleanly as `NULL` without breaking relational constraints.
+3. **Spreadsheet Sanitization**: Strips leading formula injection characters (`=`, `+`, `-`, `@`) while preserving standard phone formatting.
+4. **Downloadable Template**: The system provides an instant template generator (`/students/import`) outputting a pre-formatted Excel file with headers and sample records.
+5. **Audited Rollback**: Each import is linked to a batch ID in `import_batches`. Administrators can rollback a batch, removing all associated student records in a single audited action.
+
+---
+
+## Document Storage Architecture
+
+ISCMS utilizes an S3-compatible private object storage architecture powered by **Cloudflare R2** with an automatic fallback to **Supabase Storage**.
+
+### Single Canonical Bucket Architecture
+The storage subsystem operates on a single canonical bucket:
+```text
+Bucket: iscms-documents
+```
+
+All uploaded compliance documents are organized using deterministic key prefixes:
+```text
+iscms-documents/
+└── students/
+    └── {student_id}/
+        ├── passport/
+        │   └── v{version_number}/
+        │       └── {uuid}.pdf
+        ├── visa/
+        │   └── v{version_number}/
+        │       └── {uuid}.png
+        └── efrro/
+            └── v{version_number}/
+                └── {uuid}.jpg
+```
+
+### Storage Security Controls
+* **Private Bucket Access**: The storage bucket has public read access disabled. Files can only be retrieved via time-bounded, server-generated presigned S3 URLs (`@aws-sdk/s3-request-presigner`) with a 15-minute expiration window.
+* **Magic-Number Signature Inspection**: File uploads are inspected server-side via `FileSignatureValidator` to ensure the binary magic bytes match the declared MIME type (`application/pdf`, `image/jpeg`, `image/png`).
+* **Configurable File Size Limits**: Dynamic single-source-of-truth validation (default: 10 MB).
+* **SHA-256 Checksum Verification**: Detects identical duplicate file uploads before committing storage writes.
+
+---
+
+## Security Considerations
+
+ISCMS implements defense-in-depth security principles across every tier:
+
+### 1. Authentication & Session Management
+* **Cookie-Based Sessions**: Built on `@supabase/ssr` with `HttpOnly`, `SameSite=Lax`, and `Secure` session cookies.
+* **Role Verification**: User roles (`admin`, `staff`, `student`) are embedded in cryptographically signed JWT metadata and validated server-side on every request.
+
+### 2. Database Authorization (Row Level Security)
+* PostgreSQL Row Level Security (RLS) is enabled and enforced across all core tables.
+* Students can only query records where `user_id = auth.uid()` or matching their assigned `student_id`.
+* Administrative endpoints utilize `getAdminSupabase()` only within authenticated Server Actions after verifying administrator role credentials.
+
+### 3. HTTP Headers & Content Security
+The application proxy enforces security headers on all responses:
+* `X-Frame-Options: DENY` (prevents clickjacking)
+* `X-Content-Type-Options: nosniff` (prevents MIME sniffing)
+* `Referrer-Policy: strict-origin-when-cross-origin`
+* `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+
+### 4. Input Sanitization
+* All Server Actions validate input payloads against strict **Zod schemas**.
+* Spreadsheet imports sanitize formula characters (`=`, `+`, `-`, `@`).
+
+---
+
+## Environment Variables
+
+The table below documents all environment variables used by ISCMS.
+
+> [!CAUTION]
+> **Never commit actual secret values, service role keys, or API tokens to source control.** Store production credentials securely in your hosting environment (e.g. Vercel Project Settings).
+
+| Variable | Description | Scope | Required |
+| :--- | :--- | :--- | :--- |
+| `NEXT_PUBLIC_SUPABASE_URL` | REST endpoint URL of your Supabase project instance | Browser & Server | **Yes** |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anonymous API key subject to Row Level Security | Browser & Server | **Yes** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Administrative service-role key capable of bypassing RLS | Server Only | **Yes** |
+| `SUPABASE_JWT_SECRET` | Secret used for verifying auth tokens and OTP generation | Server Only | Optional |
+| `STORAGE_PROVIDER` | Blob storage engine (`cloudflare-r2` or `supabase`) | Server Only | **Yes** |
+| `R2_ACCOUNT_ID` | Cloudflare account identifier for R2 API | Server Only | If R2 enabled |
+| `R2_ACCESS_KEY_ID` | Cloudflare R2 S3-compatible Access Key ID | Server Only | If R2 enabled |
+| `R2_SECRET_ACCESS_KEY` | Cloudflare R2 S3-compatible Secret Access Key | Server Only | If R2 enabled |
+| `R2_BUCKET_NAME` | Target R2 bucket name (defaults to `iscms-documents`) | Server Only | Optional |
+| `R2_ENDPOINT` | Custom S3 endpoint override URL for Cloudflare R2 | Server Only | Optional |
+| `WHATSAPP_PROVIDER` | WhatsApp engine (`meta` or `mock`) | Server Only | Optional |
+| `META_ACCESS_TOKEN` | Meta Business Cloud API access token for WhatsApp | Server Only | If Meta active |
+| `META_PHONE_NUMBER_ID` | Meta Business phone number ID for outbound messages | Server Only | If Meta active |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID` | Meta WhatsApp Business Account ID | Server Only | Optional |
+| `EMAIL_PROVIDER` | Email engine (`resend` or `mock`) | Server Only | Optional |
+| `RESEND_API_KEY` | Resend API key for outbound institutional email | Server Only | If Resend active |
+| `RESEND_FROM_EMAIL` | Verified sender email address for system notifications | Server Only | Optional |
+| `CRON_SECRET` | Bearer secret protecting scheduled background execution | Server Only | Optional |
+| `NEXT_PUBLIC_INSTITUTION_NAME` | Institutional branding name displayed in notifications | Browser & Server | Optional |
+| `NEXT_PUBLIC_STUDENT_PORTAL_TEST_MODE` | Set to `"false"` in production to enforce live OTP login | Browser & Server | Optional |
+
+---
+
+## Getting Started
+
+Follow these steps to configure and run ISCMS locally:
 
 ### Prerequisites
 * **Node.js**: `v20.x` or higher
 * **Package Manager**: `npm` (v10+)
-* **Supabase Instance**: A Supabase PostgreSQL project with Auth enabled
+* **Supabase Project**: A managed Supabase project or local Supabase CLI instance (PostgreSQL 15+)
+* **Cloudflare R2 Bucket**: (Optional for local testing; system falls back to Supabase Storage or mock)
 
-### Installation
+### 1. Installation
+Clone the repository and install dependencies:
+```bash
+git clone https://github.com/saarthvadalia26/International-Student-Compliance-Management-System.git
+cd International-Student-Compliance-Management-System
+npm install
+```
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/saarthvadalia26/International-Student-Compliance-Management-System.git
-   cd International-Student-Compliance-Management-System
-   ```
+### 2. Environment Configuration
+Create a `.env.local` file by copying the template:
+```bash
+cp .env.example .env.local
+```
+Open `.env.local` and supply your `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+### 3. Database Migrations
+Execute the SQL migration files in `supabase/migrations/` (files `001` through `044`) in sequential order in your Supabase SQL Editor to provision tables, security functions, indexes, triggers, and Row Level Security policies.
 
-3. **Configure Environment Variables**:
-   Create a `.env.local` file at the root of the project by copying the provided example template:
-
-   ```bash
-   cp .env.local.example .env.local
-   ```
-
-   Fill in the required configuration parameters:
-
-   ```env
-   # -----------------------------------------------------------------------------
-   # Public Supabase Configuration
-   # -----------------------------------------------------------------------------
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-   # -----------------------------------------------------------------------------
-   # Private Server Credentials (NEVER expose to client)
-   # -----------------------------------------------------------------------------
-   SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-   SUPABASE_JWT_SECRET=your-supabase-jwt-secret
-
-   # -----------------------------------------------------------------------------
-   # Object Storage Provider ("cloudflare-r2" or "supabase")
-   # -----------------------------------------------------------------------------
-   STORAGE_PROVIDER=cloudflare-r2
-   R2_ACCOUNT_ID=your-cloudflare-account-id
-   R2_ACCESS_KEY_ID=your-r2-access-key-id
-   R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
-
-   # -----------------------------------------------------------------------------
-   # Email & WhatsApp Gateway Configuration
-   # -----------------------------------------------------------------------------
-   EMAIL_PROVIDER=resend
-   RESEND_API_KEY=your-resend-api-key
-   RESEND_FROM_EMAIL=compliance@your-institution.edu
-
-   WHATSAPP_PROVIDER=meta
-   META_ACCESS_TOKEN=your-meta-access-token
-   META_PHONE_NUMBER_ID=your-meta-phone-number-id
-   META_APP_SECRET=your-meta-app-secret
-   META_WEBHOOK_VERIFY_TOKEN=your-meta-webhook-verify-token
-
-   # -----------------------------------------------------------------------------
-   # System Automation & Security Secrets
-   # -----------------------------------------------------------------------------
-   CRON_SECRET=your-cron-execution-secret
-   ```
-
-4. **Apply Database Migrations**:
-   Execute the SQL files in `supabase/migrations/` (001 through 029) in sequential order in your Supabase SQL Editor to provision tables, indexes, triggers, and Row Level Security policies.
-
-5. **Start the Development Server**:
-   ```bash
-   npm run dev
-   ```
-
-   Access the application at [http://localhost:3000](http://localhost:3000).
+### 4. Run Development Server
+Start the Next.js development server:
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser. If running on a fresh database, the system will automatically direct you to the **Initial Setup Wizard** (`/setup`).
 
 ---
 
-## 13. Production Verification & Build Pipeline
+## Deployment
 
-Before committing changes or deploying to production, execute the standard verification pipeline:
+ISCMS is engineered for deployment on **Vercel** connected to **Supabase Cloud** and **Cloudflare R2**.
 
+### 1. Build Verification
+Before deploying, verify that the project builds cleanly:
 ```bash
-# 1. Run ESLint code checks
+# 1. Lint checks
 npm run lint
 
-# 2. Run TypeScript strict type verification
+# 2. Strict TypeScript type check
 npx tsc --noEmit
 
-# 3. Execute Next.js production build
+# 3. Next.js production build
 npm run build
 ```
 
+### 2. Hosting Configuration
+1. Import the repository into your Vercel team account.
+2. In the Vercel Project Settings, add all required **Environment Variables** listed in the table above.
+3. Deploy the project.
+
+### 3. Health & Monitoring Endpoints
+ISCMS provides dedicated diagnostic endpoints:
+* `/dashboard/health`: Interactive administrator diagnostics dashboard.
+* `/health`: Core application health status check.
+* `/readiness`: Traffic readiness check verifying database and storage connectivity.
+* `/liveness`: Process liveness probe.
+
 ---
 
-## 14. Deployment Architecture
+## Testing & Verification
 
-ISCMS is designed for deployment on **Vercel** or containerized Node.js environments connected to **Supabase Cloud / Managed PostgreSQL** and **Cloudflare R2 Object Storage**.
+The repository includes a comprehensive test suite covering domain logic, validation engines, storage lifecycles, and compliance rules:
+
+```bash
+# Run unit & domain integration tests
+node --import ./tests/test-preload.ts --test tests/*.test.ts
+
+# Run End-to-End browser tests (Playwright)
+npx playwright test
+```
+
+### Verified Test Areas
+* **Academic Semester Progression**: Validates progression logic across program durations (`tests/academic-semester-progression.test.ts`).
+* **Bulk Student Import Validation**: Validates Excel parsing, column mapping, and duplicate checks (`tests/bulk-student-import.test.ts`).
+* **Document Metadata & Version Separation**: Verifies that metadata exists independently of file versions (`tests/document-metadata-version-separation.test.ts`).
+* **R2 Single Bucket Architecture**: Tests storage path structures and presigned URL operations (`tests/r2-single-bucket-architecture.test.ts`).
+* **Document Agnostic Reminders**: Tests schedule calculations for passport, visa, and eFRRO (`tests/document-agnostic-reminders.test.ts`).
+* **Upload Lock & Eligibility**: Tests security restrictions preventing unauthorized student overwrites (`tests/document-upload-eligibility.test.ts`).
+
+---
+
+## Project Structure
 
 ```text
-  GitHub Repository / Source Pipeline
-                 │
-                 ▼
-  Production Deployment Pipeline (Vercel / Node.js Host)
-                 │
-                 ▼
-  Next.js Production Bundle (Edge Proxy + Serverless Functions)
-                 │
-  ┌──────────────┼──────────────┬──────────────┐
-  │              │              │              │
-  ▼              ▼              ▼              ▼
-Supabase DB   Supabase Auth  Cloudflare R2   Notification APIs
-(PostgreSQL)  (Sessions)     (S3 Storage)   (Resend / Meta)
+.
+├── docs/                        # Architectural documentation, ADRs & design specs
+│   ├── architecture/            # Architecture Decision Records (ADR-001 through ADR-010)
+│   ├── compliance/              # Compliance rules & calculation specs
+│   ├── database/                # Database schema specifications & ER diagrams
+│   ├── deployment/              # Deployment guides & environment strategy
+│   └── user-guide/              # Administrator, staff & user manuals
+├── documentation/               # QA reports, security audit matrices & PDF manuals
+├── e2e/                         # Playwright end-to-end test specifications
+├── public/                      # Static assets, logos, favicons, and manifests
+├── src/
+│   ├── app/                     # Next.js App Router structure
+│   │   ├── (app)/               # Protected staff/admin workspace
+│   │   │   ├── dashboard/       # Metric cards, compliance queues & /dashboard/health
+│   │   │   ├── notifications/   # Realtime Staff Notification Center
+│   │   │   ├── reminders/       # Compliance reminder management
+│   │   │   ├── replacement-requests/ # Document replacement review queue
+│   │   │   ├── reports/         # Compliance reports (students, eFRRO, audit, delivery)
+│   │   │   ├── settings/        # Institutional details, academic programs, retention, templates
+│   │   │   └── students/        # Registry, /add, /import, /[id] inspection views
+│   │   ├── api/                 # Server API routes (cron, webhooks, setup, health)
+│   │   ├── student/             # Student Portal (/dashboard, /efrro, /history, /notifications)
+│   │   ├── setup/               # System Initial Setup Wizard & Recovery Mode
+│   │   └── layout.tsx           # Root application layout & global theme providers
+│   ├── components/              # Reusable React components (UI primitives, headers, shells)
+│   ├── config/                  # Institutional branding, feature flags, and navigation maps
+│   ├── domain/                  # Core domain logic
+│   │   ├── academic/            # Semester progression and academic adjustments
+│   │   ├── compliance/          # Document services, verification, and eligibility rules
+│   │   ├── import/              # Bulk student import engine and spreadsheet parser
+│   │   ├── notifications/       # Reminder engine, calendar calculations, and provider factory
+│   │   ├── storage/             # Cloudflare R2 and Supabase storage providers
+│   │   ├── student-portal/      # Student portal services and token verification
+│   │   └── system/              # Live diagnostics and health services
+│   ├── hooks/                   # Custom React hooks (realtime subscriptions, user role)
+│   ├── lib/                     # Supabase client helpers (browser, server, admin) and logger
+│   ├── middleware.ts            # Route protection, SSR session handling, and security headers
+│   ├── providers/               # Theme, Realtime, and React Query context providers
+│   └── services/                # Legacy domain services and system-state helpers
+├── supabase/
+│   ├── migrations/              # 44 sequential PostgreSQL SQL migration files
+│   └── seed/                    # Reference seed datasets
+├── tests/                       # 33 domain test files covering all compliance logic
+├── .env.example                 # Environment configuration template
+├── package.json                 # Project dependencies and script declarations
+├── playwright.config.ts         # Playwright test configuration
+└── tsconfig.json                # Strict TypeScript configuration
 ```
 
 ---
 
-## 15. File & Document Management
+## Operational Workflows
 
-* **Supported Document Types**: **Passport**, **Visa**, and **eFRRO / Registration Permit** documents.
-* **Allowed MIME Formats**: `application/pdf`, `image/jpeg`, `image/png`.
-* **Maximum File Size**: 10MB per file.
-* **Storage Provider Engine**: Supports Cloudflare R2 (S3-compatible API) or native Supabase Storage buckets.
-* **Access Control**: Uploaded files are private. Client components request presigned S3 URLs generated server-side with strict 15-minute expiration bounds.
+### 1. Student Onboarding & Registration
+* **Single Student Registration (`/students/add`)**: Guided multi-step form to register an individual student, entering demographic info, academic program, passport metadata, visa metadata, and eFRRO details.
+* **Bulk Cohort Onboarding (`/students/import`)**: Drag-and-drop Excel/CSV spreadsheet upload with column mapping and production validation.
 
----
+### 2. Document Inspection & Verification
+* Compliance officers open the inspection interface for a pending document (`/students/[id]/passport`, `/visa`, `/efrro`).
+* Officer compares the uploaded PDF/image against the recorded metadata.
+* Officer selects **Approve** (locking document and activating compliance status) or **Reject** (providing a mandatory reason for the student).
 
-## 16. Accessibility & UX Standards
+### 3. Document Replacement Workflow
+* When a student renews an immigration document, a replacement request is initiated.
+* Once approved by staff (or granted via an early upload window), the student uploads their new document.
+* The system increments the version sequence (`v2`), preserving historical records in the version audit table.
 
-* **Responsive Layouts**: Tested across Mobile (`320px - 414px`), Tablet (`768px`), and Desktop (`1024px+`) viewports. Zero horizontal scroll overflow on mobile cards or filter bars.
-* **Theme Support**: Native Light Mode and Dark Mode support with system theme detection via `next-themes`.
-* **Keyboard Accessibility**: Visible focus rings (`focus:ring-2 focus:ring-primary/20`), proper HTML button elements, and `aria-label` attributes on interactive elements.
-* **WCAG 2.1 Color Contrast**: High-contrast typography against light and dark card backgrounds.
-
----
-
-## 17. Operational Considerations
-
-* **Database Backups**: Automated daily PostgreSQL snapshots managed via Supabase Cloud.
-* **Document Retention Policy**: Automated cleanup service (`/api/cron/retention-cleanup`) evaluating document retention rules based on institutional settings.
-* **Audit Trail Records**: System-wide audit logs available for inspection under `/reports/audit`.
-* **System Diagnostics**: Health status dashboard available at `/dashboard/health` for monitoring memory, storage, and database connection pools.
+### 4. Expiry Monitoring & Reminder Dispatch
+* Expiration calculation engine runs automated evaluation passes against recorded expiry dates.
+* When a student enters a threshold window (90, 60, 30, 15, or 7 days), an idempotent notification record is generated and queued.
+* Alerts are dispatched to the student via WhatsApp and in-app notifications.
 
 ---
 
-## 18. Data Privacy & Confidentiality Notice
+## Integration Status
 
-ISCMS processes sensitive institutional and personal data belonging to international students, including passport identifiers, immigration documents, residential addresses, and academic records.
+The table below describes the actual implementation status of each external integration:
 
-* **Credentials Protection**: API keys, service role tokens, and database passwords must **NEVER** be committed to source control repositories.
-* **Institutional Governance**: Organizations deploying ISCMS are responsible for configuring and operating the system in accordance with their applicable institutional privacy policies, data protection frameworks, and legal obligations.
-
----
-
-## 19. Ownership & Licensing
-
-This section provides a high-level overview of the software ownership, licensing framework, and data governance model applicable to the International Student Compliance Management System (ISCMS). Specific rights and obligations are governed by the applicable written agreement.
-
-```text
-                     ISCMS Software Platform
-                                │
-          ┌─────────────────────┴─────────────────────┐
-          │                                           │
-  Proprietary Code & IP                    Institutional Data
-  (Software Owner)                         (Customer Sovereignty)
-          │                                           │
-          │ Authorized Deployment Use                 │
-          ▼                                           ▼
-  Institutional Customer                  Institutional Operations
-  (Deployed Instance)                     (Student & Compliance Records)
-```
-
-### 1. Software & Source Code Ownership
-* **Developer Intellectual Property**: ISCMS, including its underlying source code, system architecture, component implementations, database schema design, UI/UX workflows, documentation, and associated software assets, remains the intellectual property of the developer/owner unless otherwise explicitly assigned or transferred through a separate written agreement.
-* **Non-Transfer of Software Title**: Providing a customer or institution access to a deployed instance of ISCMS does not automatically transfer ownership of the underlying software or source code.
-
-### 2. Customer & Institutional Usage Rights
-* **Authorized Deployment Access**: Institutional customers receive licensed or otherwise authorized access to deployed instances of the ISCMS platform for their operational compliance management activities.
-* **Operational Scope**: Authorized access to and use of a deployed ISCMS instance does not constitute a transfer of ownership of the underlying software codebase, architecture, or intellectual property.
-
-### 3. Source Code Access Terms
-* **Deployment Access**: Authorized institutional deployment grants access to the operational web application service. Access to the deployed system does not automatically include access to or transfer of the underlying source code.
-* **Separate Agreement Required**: Any source-code access, transfer, assignment, modification rights, redistribution permissions, or sublicensing rights must be expressly established through a separate written agreement executed by the software owner.
-
-### 4. Customer Data Sovereignty
-* **Data Sovereignty**: A strict distinction is maintained between **software infrastructure ownership** and **customer data ownership**.
-* **Customer Data Rights**: The software owner makes **no claim of ownership** over customer or institutional operational data, student profiles, uploaded document files, or administrative compliance records. All customer and institutional data remains subject to the applicable customer agreement, institutional policies, and applicable law.
-
-### 5. No Open-Source License Grant
-* **Proprietary Classification**: ISCMS is **proprietary software** and is **not** released under an open-source license (such as MIT, Apache 2.0, GPL, BSD, or ISC).
-* **Repository Visibility**: Public or restricted availability of this repository (for demonstration, documentation, or technical evaluation purposes) does **not** grant permission to copy, modify, redistribute, sublicense, mirror, sell, or commercially exploit any portion of the software, database structures, or UI components.
-
-> **Note**: Specific commercial, licensing, intellectual property, hosting, maintenance, support, and operational terms between the developer and each customer are governed by the applicable written agreement.
+| Integration | Status | Implementation Details |
+| :--- | :--- | :--- |
+| **Supabase (PostgreSQL)** | **Connected** | Primary database engine with 44 migrations, triggers, views, and active Row Level Security (RLS) policies. |
+| **Supabase Auth** | **Connected** | Cookie-based session management (`@supabase/ssr`) with role-isolated metadata guards. |
+| **Supabase Realtime** | **Connected** | Live WebSocket subscriptions synchronizing in-app notifications and dashboard updates. |
+| **Cloudflare R2 Storage** | **Connected** | S3-compatible private object storage client (`@aws-sdk/client-s3`) using canonical bucket `iscms-documents` and presigned URLs. Fallback to Supabase Storage supported. |
+| **Meta WhatsApp Business** | **Architecture & Provider Ready** | `MetaWhatsAppProvider` implemented using Meta Cloud API. Active when `WHATSAPP_PROVIDER=meta` and credentials are supplied; defaults to `MockNotificationProvider` in development. |
+| **Resend Email Gateway** | **Architecture & Provider Ready** | `ResendEmailProvider` implemented via Resend API. Active when `EMAIL_PROVIDER=resend`. Operational reminder rules currently routed to WhatsApp via migration `043`. |
+| **Vercel Hosting** | **Configured** | Production deployment target with edge middleware, serverless functions, and live diagnostic introspection. |
 
 ---
 
-## 20. Production Project Status
+## Documentation Index
 
-**Current Status:** `Production-Ready Institutional Web Application`
+For in-depth technical specifications, architectural decision records, and operational manuals, refer to the repository documentation:
 
-ISCMS has completed full feature development, security hardening, RLS policy standardization, and production build verification for deployment across institutional web environments.
+### Architectural Specifications
+* [ADR-001: UUID Primary Key Strategy](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/architecture/ADR-001-UUID-Strategy.md)
+* [ADR-003: Student Compliance Snapshot](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/architecture/ADR-003-Student-Snapshot.md)
+* [ADR-004: Notification Engine Architecture](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/architecture/ADR-004-Notification-Engine.md)
+* [ADR-007: Cloudflare R2 Storage Strategy](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/architecture/ADR-007-Storage-Strategy.md)
+* [ADR-008: Security & Authorization Architecture](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/architecture/ADR-008-Security-Architecture.md)
+
+### User Guides & Manuals
+* [Administrator Guide](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/user-guide/Administrator-Guide.md)
+* [Student Registration Guide](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/user-guide/Student-Registration.md)
+* [Document Management Guide](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/user-guide/Document-Management.md)
+* [Notifications & Reminders Guide](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/user-guide/Notifications.md)
+
+### Compliance & Quality Assurance
+* [Compliance Rules Specification](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/docs/compliance/Compliance-Rules.md)
+* [Enterprise Security Audit Report](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Enterprise-Security-Audit-Report.md)
+* [Database Integration Architecture](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Database-Integration-Architecture.md)
+* [Unified Notification Architecture](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Unified-Notification-Architecture.md)
 
 ---
 
-## 21. Documentation Index
+## Ownership & Licensing
 
-For detailed architectural specifications and Quality Assurance reports, refer to the project documentation directory:
+### 1. Proprietary Software Notice
+The International Student Compliance Management System (ISCMS), including its source code, architecture design, database schemas, component implementations, and documentation, is proprietary software. All rights are reserved by the software owner.
 
-* **[Unified-Notification-Architecture.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Unified-Notification-Architecture.md)** — Architecture specification for staff and student notifications.
-* **[Student-Notification-Center-QA.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Student-Notification-Center-QA.md)** — QA matrix and viewport testing report for the Student Portal.
-* **[Notification-Security-QA.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Notification-Security-QA.md)** — Security audit and server-side authorization report.
-* **[Authentication-Flow.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Authentication-Flow.md)** — Authentication and middleware route protection design.
-* **[Operational-Runbook.md](file:///d:/Saarth/Saarth/International%20Student%20Compliance%20Management%20System/documentation/Operational-Runbook.md)** — System maintenance and operational procedures.
+### 2. Institutional Usage & Deployment
+Access to a deployed instance of ISCMS grants institutional customers operational usage rights for managing international student compliance. Access to or operation of a deployed instance does not constitute a transfer of title or intellectual property ownership of the underlying software codebase.
+
+### 3. Customer Data Sovereignty
+A strict distinction is maintained between **software intellectual property** and **customer operational data**. The software owner claims no ownership over institutional operational data, student records, uploaded compliance documents, or audit histories. All institutional data remains the property and responsibility of the deploying institution.
+
+### 4. License Clarification
+ISCMS is **not** licensed under open-source licenses (such as MIT, Apache 2.0, or GPL). Public or restricted availability of this repository for evaluation, demonstration, or technical review does not grant rights to copy, redistribute, mirror, or commercially exploit any portion of the software without an executed written agreement.
