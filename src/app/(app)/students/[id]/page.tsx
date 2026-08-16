@@ -69,6 +69,7 @@ import { DocumentUploadDialog, AllowEarlyUploadDialog } from "@/features/complia
 import { DispatchReminderDialog } from "@/features/compliance/components/dispatch-reminder-dialog";
 import { DOCUMENT_CONFIGS, getDocumentTheme } from "@/features/compliance/constants/constants";
 import { StudentDocumentCard } from "@/features/compliance/components/student-document-card";
+import { DocumentReminderSchedule } from "@/features/compliance/components/document-reminder-schedule";
 
 export interface StudentDocument {
   number: string;
@@ -983,31 +984,31 @@ export default function StudentDetailsPage({ params }: PageProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full max-w-full min-w-0">
       {/* Top Header / Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full min-w-0">
+        <div className="space-y-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <Link 
               href="/students" 
-              className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
             >
               <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to Directory
             </Link>
-            <span className="text-muted-foreground/40">/</span>
-            <span className="text-xs font-mono font-medium text-foreground">
+            <span className="text-muted-foreground/40 shrink-0">/</span>
+            <span className="text-xs font-mono font-medium text-foreground truncate">
               {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "Enrollment: Not provided"}
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-wrap">
             <CountryFlag countryCode={student.nationalityCode} size="md" />
-            <h1 className="text-xl font-h1 font-bold text-foreground tracking-tight">{student.fullName}</h1>
+            <h1 className="text-xl font-h1 font-bold text-foreground tracking-tight truncate">{student.fullName}</h1>
             {getComplianceHeaderBadge(student.complianceStatus)}
           </div>
         </div>
 
         {/* Global Action buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button 
             variant="outline" 
             size="sm" 
@@ -1025,11 +1026,11 @@ export default function StudentDetailsPage({ params }: PageProps) {
       </div>
 
       {/* Main Grid View */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3 w-full max-w-full min-w-0">
         {/* Left 2 Cols: Tabbed Content & Immigration Documents */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 w-full max-w-full min-w-0">
           {/* Sub-tabs for detailed drill-down */}
-          <div className="flex border-b border-border/60">
+          <div className="flex border-b border-border/60 overflow-x-auto w-full max-w-full min-w-0">
             <button
               onClick={() => setActiveSubTab("immigration")}
               className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
@@ -1376,7 +1377,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         </div>
 
         {/* Right Column: Emergency Contacts + Consular Info + DEDICATED REMINDER SCHEDULE */}
-        <div className="space-y-6">
+        <div className="space-y-6 w-full max-w-full min-w-0">
           {/* Emergency Contact */}
           <Card className="border border-border/60 shadow-sm">
             <CardHeader className="pb-3 border-b border-border/40 bg-muted/10">
@@ -1485,281 +1486,15 @@ export default function StudentDetailsPage({ params }: PageProps) {
           </Card>
 
           {/* UNIFIED DOCUMENT REMINDER SCHEDULE SECTION */}
-          <Card className="border border-border/70 shadow-sm overflow-hidden bg-card">
-            <CardHeader className="pb-3 border-b border-border/40 bg-muted/10 flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-primary" />
-                <div>
-                  <CardTitle className="text-xs font-bold text-foreground uppercase tracking-wider">Document Reminder Schedule</CardTitle>
-                  <CardDescription className="text-[10px] font-caption">Automated expiry-driven WhatsApp notification timetable</CardDescription>
-                </div>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={loadReminderSchedule} 
-                disabled={isLoadingReminders} 
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                title="Refresh reminder schedules"
-              >
-                <RotateCw className={`h-3.5 w-3.5 ${isLoadingReminders ? "animate-spin" : ""}`} />
-              </Button>
-            </CardHeader>
-
-            <CardContent className="p-4 space-y-4 text-xs">
-              {/* Document Type Selector Tabs */}
-              <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted/40 rounded-lg border border-border/50 text-xs">
-                {(["passport", "visa", "efrro"] as const).map((docType) => {
-                  const isSelected = selectedReminderDoc === docType;
-                  const docData = effectiveSchedule?.[docType];
-                  const hasExpiry = Boolean(docData?.expiryDate);
-                  const docTheme = getDocumentTheme(docType);
-                  const label = docType === "passport" ? "Passport" : docType === "visa" ? "Visa" : "eFRRO";
-                  
-                  return (
-                    <button
-                      key={docType}
-                      type="button"
-                      onClick={() => setSelectedReminderDoc(docType)}
-                      className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                        isSelected
-                          ? `${docTheme.badgeActiveClass} font-semibold ring-1 ${docTheme.ringClass}`
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      }`}
-                    >
-                      <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${isSelected ? "bg-white" : docTheme.dotClass}`} />
-                      <span className="truncate">{label}</span>
-                      {hasExpiry && docData && !isSelected && (
-                        <span 
-                          className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                            docData.isExpired 
-                              ? "bg-rose-500" 
-                              : (docData.daysRemaining !== null && docData.daysRemaining <= 30) 
-                              ? "bg-amber-500" 
-                              : "bg-emerald-500"
-                          }`} 
-                        />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {isLoadingReminders && !effectiveSchedule ? (
-                <div className="py-8 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" /> Loading reminder schedule...
-                </div>
-              ) : (() => {
-                const currentDoc = effectiveSchedule?.[selectedReminderDoc];
-                const activeDocTheme = getDocumentTheme(selectedReminderDoc);
-                const docTitle = selectedReminderDoc === "passport" 
-                  ? "Passport" 
-                  : selectedReminderDoc === "visa" 
-                  ? "Visa" 
-                  : "eFRRO / Residential Permit";
-
-                if (!currentDoc?.expiryDate) {
-                  return (
-                    <div className="py-6 text-center space-y-2 rounded-lg border border-dashed border-border/70 p-4 bg-muted/5">
-                      <CalendarDays className="h-8 w-8 text-muted-foreground/60 mx-auto" />
-                      <p className="font-semibold text-xs text-foreground">{docTitle} expiry date not available</p>
-                      <p className="text-[11px] text-muted-foreground max-w-xs mx-auto font-caption">
-                        Add or verify the student&apos;s {docTitle.toLowerCase()} expiry date to generate the automated WhatsApp reminder schedule.
-                      </p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-3.5">
-                    {/* Active Source Expiry Date Banner */}
-                    <div className={`p-2.5 rounded-lg border flex flex-wrap items-center justify-between gap-2 ${activeDocTheme.bannerClass}`}>
-                      <div className="space-y-0.5">
-                        <span className={`text-[10px] uppercase tracking-wider font-semibold font-caption ${activeDocTheme.bannerTitleClass}`}>
-                          Active {docTitle} Expiry
-                        </span>
-                        <div className="text-xs font-semibold text-foreground flex items-center gap-1.5 font-mono">
-                          <Calendar className={`h-3.5 w-3.5 shrink-0 ${activeDocTheme.bannerIconClass}`} />
-                          <span>{currentDoc.expiryDateFormatted}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        {/* Physical Document State Badge */}
-                        {!currentDoc.isUploaded || currentDoc.verificationStatus === "not_uploaded" ? (
-                          <Badge variant="outline" className="text-[9px] h-5 font-medium text-muted-foreground border-border/60 bg-muted/20">
-                            Document Not Uploaded
-                          </Badge>
-                        ) : currentDoc.verificationStatus === "pending" ? (
-                          <Badge variant="outline" className="text-[9px] h-5 font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30">
-                            Document Pending Verification
-                          </Badge>
-                        ) : currentDoc.verificationStatus === "verified" ? (
-                          <Badge variant="outline" className="text-[9px] h-5 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30">
-                            Document Verified
-                          </Badge>
-                        ) : currentDoc.verificationStatus === "rejected" ? (
-                          <Badge variant="destructive" className="text-[9px] h-5 font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30">
-                            Document Rejected
-                          </Badge>
-                        ) : null}
-
-                        {currentDoc.isExpired ? (
-                          <Badge variant="destructive" className="text-[10px] h-5">Expired</Badge>
-                        ) : (
-                          <Badge variant="outline" className={`text-[10px] h-5 font-mono ${activeDocTheme.badgeClass}`}>
-                            {currentDoc.daysRemaining} days left
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="text-[9px] h-5 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 font-medium">
-                          WhatsApp
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Expired State Warning Callout */}
-                    {currentDoc.isExpired && (
-                      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-700 dark:text-rose-300">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <XCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                          <span>
-                            <strong>{docTitle} expired {Math.abs(currentDoc.daysRemaining || 0)} days ago.</strong> No upcoming pre-expiry reminders remain.
-                          </span>
-                        </div>
-                        <Badge variant="destructive" className="text-[9px] font-semibold shrink-0">
-                          Expired
-                        </Badge>
-                      </div>
-                    )}
-
-                    {/* Critical Alert Callout for Expiry within 15 Days */}
-                    {currentDoc.daysRemaining !== null && currentDoc.daysRemaining <= 15 && !currentDoc.isExpired && (
-                      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                          <span>
-                            <strong>{currentDoc.daysRemaining === 0 ? "Expires Today!" : `Critical Warning: Expires in ${currentDoc.daysRemaining} days!`}</strong> 15-Day reminder is triggered and due for dispatch.
-                          </span>
-                        </div>
-                        <Badge variant="outline" className="text-[9px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 animate-pulse">
-                          {currentDoc.daysRemaining === 0 ? "Due Today" : "Due Now"}
-                        </Badge>
-                      </div>
-                    )}
-
-                    {/* Metadata Tracking Notice when physical document copy has not been uploaded */}
-                    {!currentDoc.isUploaded && (
-                      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-muted/30 border border-border/50 text-[11px] text-muted-foreground">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <span className="truncate">The system knows when the {docTitle.toLowerCase()} expires, but the physical document has not yet been uploaded.</span>
-                        </div>
-                        <Badge variant="outline" className={`text-[9px] font-semibold shrink-0 ${activeDocTheme.badgeClass}`}>
-                          Metadata Tracking
-                        </Badge>
-                      </div>
-                    )}
-
-                    {/* Desktop & Tablet Table View (hidden on very small screens) */}
-                    <div className="hidden sm:block rounded-lg border border-border/60 overflow-hidden bg-card">
-                      <table className="w-full text-[11px] text-left">
-                        <thead className="bg-muted/40 text-[10px] text-muted-foreground uppercase border-b border-border/50">
-                          <tr>
-                            <th className="py-2 px-2.5 font-semibold">Reminder</th>
-                            <th className="py-2 px-2 font-semibold">Trigger</th>
-                            <th className="py-2 px-2 font-semibold">Scheduled Date</th>
-                            <th className="py-2 px-2 font-semibold text-right">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/30">
-                          {currentDoc.schedule.map((item) => (
-                            <tr key={item.ruleId} className="hover:bg-muted/20 transition-colors">
-                              <td className="py-2.5 px-2.5">
-                                <span className="font-semibold text-foreground block">{item.ruleName}</span>
-                                <span className="text-[9px] text-muted-foreground font-caption">
-                                  via WhatsApp
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-2 text-muted-foreground whitespace-nowrap">
-                                {item.thresholdDays} days before expiry
-                              </td>
-                              <td className="py-2.5 px-2 font-medium text-foreground whitespace-nowrap font-mono">
-                                {item.scheduledDate || <span className="text-muted-foreground font-normal font-sans">N/A</span>}
-                              </td>
-                              <td className="py-2.5 px-2 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {getReminderStatusBadge(item.status, item.statusLabel)}
-                                  {item.status === "DUE" && (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => openDispatchDialog(selectedReminderDoc, item.thresholdDays, item.ruleId, item.ruleName)}
-                                      disabled={isDispatchingReminder === item.ruleId}
-                                      className={`h-5 px-1.5 text-[9px] cursor-pointer ${activeDocTheme.buttonOutlineClass}`}
-                                      title="Dispatch WhatsApp notification now"
-                                    >
-                                      {isDispatchingReminder === item.ruleId ? (
-                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                      ) : (
-                                        <Send className="h-2.5 w-2.5" />
-                                      )}
-                                    </Button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Mobile Card Stack View (clean vertical stack on mobile) */}
-                    <div className="block sm:hidden space-y-2">
-                      {currentDoc.schedule.map((item) => (
-                        <div 
-                          key={item.ruleId} 
-                          className="p-3 rounded-lg border border-border/60 bg-muted/15 space-y-2"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="font-semibold text-foreground text-xs">{item.ruleName}</p>
-                              <p className="text-[10px] text-muted-foreground font-caption">
-                                {item.thresholdDays} days before expiry · WhatsApp
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {getReminderStatusBadge(item.status, item.statusLabel)}
-                              {item.status === "DUE" && (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openDispatchDialog(selectedReminderDoc, item.thresholdDays, item.ruleId, item.ruleName)}
-                                  disabled={isDispatchingReminder === item.ruleId}
-                                  className={`h-5 px-1.5 text-[9px] cursor-pointer ${activeDocTheme.buttonOutlineClass}`}
-                                  title="Dispatch WhatsApp notification"
-                                >
-                                  <Send className="h-2.5 w-2.5" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-border/30">
-                            <span className="text-muted-foreground font-caption">Scheduled For:</span>
-                            <span className="font-mono font-medium text-foreground">
-                              {item.scheduledDate || "N/A"}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
+          <DocumentReminderSchedule
+            schedule={effectiveSchedule}
+            selectedDocType={selectedReminderDoc}
+            onSelectDocType={setSelectedReminderDoc}
+            isLoading={isLoadingReminders}
+            onRefresh={loadReminderSchedule}
+            onOpenDispatch={openDispatchDialog}
+            isDispatchingReminderId={isDispatchingReminder}
+          />
         </div>
       </div>
 

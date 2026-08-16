@@ -353,7 +353,7 @@ async function runTestSuite() {
   ];
 
   const mapping10 = BulkStudentImportService.generateAutoMapping(Object.keys(mixedData[0]));
-  const report10 = await BulkStudentImportService.validateSpreadsheetData(mixedData, mapping10, {
+  const report10 = await BulkStudentImportService.validateSpreadsheetData(mixedData as Record<string, string>[], mapping10, {
     academicPrograms: mockPrograms
   });
 
