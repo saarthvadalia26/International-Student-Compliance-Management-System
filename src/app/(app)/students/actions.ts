@@ -180,6 +180,14 @@ export async function registerStudentAction(input: RegisterStudentInput): Promis
 
     const created = await studentService.registerStudent(input, user.id);
 
+    // Evaluate and initialize automated reminder schedule for any provided document metadata
+    try {
+      const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
+      await ExpiryReminderEngine.evaluateAndQueueStudentDueReminders(created.student.id);
+    } catch (reminderErr) {
+      console.warn("[REGISTER_STUDENT_REMINDER_EVALUATION_WARNING]", reminderErr);
+    }
+
     revalidatePath("/students");
     revalidatePath("/dashboard");
     revalidatePath("/reports");
@@ -1632,19 +1640,19 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
         number: activePassport?.document_number || snapshot?.passport_number || "",
         expiryDate: passportExpiry,
         isUploaded: isPassportUp,
-        verificationStatus: (activePassport?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isPassportUp ? "pending" : (passportExpiry ? "verified" : "not_uploaded"))
+        verificationStatus: (activePassport?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isPassportUp ? "pending" : "not_uploaded")
       },
       visa: {
         number: activeVisa?.document_number || snapshot?.visa_number || "",
         expiryDate: visaExpiry,
         isUploaded: isVisaUp,
-        verificationStatus: (activeVisa?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isVisaUp ? "pending" : (visaExpiry ? "verified" : "not_uploaded"))
+        verificationStatus: (activeVisa?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isVisaUp ? "pending" : "not_uploaded")
       },
       efrro: {
         number: activeEfrro?.document_number || snapshot?.efrro_number || "",
         expiryDate: efrroExpiry,
         isUploaded: isEfrroUp,
-        verificationStatus: (activeEfrro?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isEfrroUp ? "pending" : (efrroExpiry ? "verified" : "not_uploaded"))
+        verificationStatus: (activeEfrro?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isEfrroUp ? "pending" : "not_uploaded")
       },
       notifications
     });

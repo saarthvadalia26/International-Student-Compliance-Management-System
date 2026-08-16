@@ -249,6 +249,19 @@ export class SupabaseStudentRepository implements IStudentRepository {
       const visaNum = input.visaNumber?.trim() || null;
       const visaType = input.visaType?.trim() || "Student (S-1)";
 
+      const efrroExp = this.formatDate(input.efrroExpiry);
+      const efrroIssue = this.formatDate(input.efrroIssueDate);
+      const efrroNum = input.efrroNumber?.trim() || null;
+
+      let daysUntilEfrro: number | null = null;
+      if (efrroExp) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const exp = new Date(efrroExp);
+        exp.setHours(0, 0, 0, 0);
+        daysUntilEfrro = Math.round((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      }
+
       // 8. Insert student_snapshot row for instant compliance and directory queries
       await supabase.from("student_snapshot").insert({
         student_id: studentId,
@@ -263,6 +276,10 @@ export class SupabaseStudentRepository implements IStudentRepository {
         visa_expiry: visaExp,
         visa_type: visaType,
         efrro_status: "MISSING",
+        efrro_number: efrroNum,
+        efrro_issue_date: efrroIssue,
+        efrro_expiry: efrroExp,
+        days_until_efrro_expiry: daysUntilEfrro,
         compliance_score: 0,
         compliance_status: "MISSING"
       });

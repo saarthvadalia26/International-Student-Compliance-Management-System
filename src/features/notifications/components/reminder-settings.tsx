@@ -31,6 +31,7 @@ import {
   ReminderRuleDto, 
   NotificationTemplateDto 
 } from "@/app/(app)/reminders/actions";
+import { getDocumentBadgeClass } from "@/features/compliance/constants/constants";
 
 interface CustomSwitchProps {
   checked: boolean;
@@ -177,12 +178,7 @@ export function ReminderSettings(): React.JSX.Element {
   };
 
   const getDocBadgeColor = (type: string) => {
-    switch (type) {
-      case "passport": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30";
-      case "visa": return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30";
-      case "efrro": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30";
-      default: return "bg-muted text-muted-foreground border-border";
-    }
+    return getDocumentBadgeClass(type);
   };
 
   // Filter available templates for modal dropdown based on current document type
@@ -234,7 +230,7 @@ export function ReminderSettings(): React.JSX.Element {
             onClick={() => setSelectedDocFilter("efrro")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               selectedDocFilter === "efrro"
-                ? "bg-emerald-600 text-white shadow-sm"
+                ? "bg-amber-600 text-white shadow-sm"
                 : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
             }`}
           >

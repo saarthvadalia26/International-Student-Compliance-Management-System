@@ -52,6 +52,7 @@ import {
   DocumentReplacementReason,
   REASON_LABELS 
 } from "@/domain/compliance/types/replacement-request.types";
+import { getDocumentBadgeClass } from "@/features/compliance/constants/constants";
 
 export default function DocumentReplacementRequestsPage() {
   const [requests, setRequests] = React.useState<DocumentReplacementRequestRecord[]>([]);
@@ -258,7 +259,7 @@ export default function DocumentReplacementRequestsPage() {
                     {/* Left: Student & Request Details */}
                     <div className="space-y-2.5 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="uppercase font-bold tracking-wider text-[10px] px-2 py-0.5 bg-primary/5 text-primary border-primary/20">
+                        <Badge variant="outline" className={`uppercase font-bold tracking-wider text-[10px] px-2 py-0.5 ${getDocumentBadgeClass(req.documentType)}`}>
                           {req.documentType}
                         </Badge>
 

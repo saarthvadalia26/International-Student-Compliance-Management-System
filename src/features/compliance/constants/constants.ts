@@ -39,3 +39,10 @@ export const DOCUMENT_CONFIGS: Record<ComplianceDocumentType, DocumentConfig> = 
     bucketFolder: "efrro"
   }
 };
+
+export {
+  DOCUMENT_THEMES,
+  getDocumentTheme,
+  getDocumentBadgeClass
+} from "./document-theme";
+export type { DocumentTheme } from "./document-theme";

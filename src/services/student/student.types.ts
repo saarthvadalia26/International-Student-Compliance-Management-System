@@ -133,6 +133,9 @@ export interface RegisterStudentInput {
   visaIssueDate?: Date | string;
   visaExpiry?: Date | string;
   visaType?: string;
+  efrroNumber?: string;
+  efrroIssueDate?: Date | string;
+  efrroExpiry?: Date | string;
 }
 
 export interface UpdateStudentInput {

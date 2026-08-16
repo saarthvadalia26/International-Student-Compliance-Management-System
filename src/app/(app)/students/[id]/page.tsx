@@ -29,7 +29,8 @@ import {
   SlidersHorizontal,
   Sparkles,
   Layers,
-  GraduationCap
+  GraduationCap,
+  Info
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
@@ -64,7 +65,7 @@ import {
   ReminderStatus 
 } from "@/domain/notifications/types/reminder.types";
 import { DocumentUploadDialog, AllowEarlyUploadDialog } from "@/features/compliance/components/document-dialogs";
-import { DOCUMENT_CONFIGS } from "@/features/compliance/constants/constants";
+import { DOCUMENT_CONFIGS, getDocumentTheme } from "@/features/compliance/constants/constants";
 import { StudentDocumentCard } from "@/features/compliance/components/student-document-card";
 
 export interface StudentDocument {
@@ -1410,11 +1411,12 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
             <CardContent className="p-4 space-y-4 text-xs">
               {/* Document Type Selector Tabs */}
-              <div className="grid grid-cols-3 gap-1 p-1 bg-muted/40 rounded-lg border border-border/50 text-xs">
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted/40 rounded-lg border border-border/50 text-xs">
                 {(["passport", "visa", "efrro"] as const).map((docType) => {
                   const isSelected = selectedReminderDoc === docType;
                   const docData = reminderSchedule?.[docType];
                   const hasExpiry = Boolean(docData?.expiryDate);
+                  const docTheme = getDocumentTheme(docType);
                   const label = docType === "passport" ? "Passport" : docType === "visa" ? "Visa" : "eFRRO";
                   
                   return (
@@ -1424,12 +1426,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       onClick={() => setSelectedReminderDoc(docType)}
                       className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-background text-foreground shadow-xs font-semibold ring-1 ring-border/50"
+                          ? `${docTheme.badgeActiveClass} font-semibold ring-1 ${docTheme.ringClass}`
                           : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                       }`}
                     >
+                      <div className={`h-1.5 w-1.5 rounded-full shrink-0 ${isSelected ? "bg-white" : docTheme.dotClass}`} />
                       <span className="truncate">{label}</span>
-                      {hasExpiry && docData && (
+                      {hasExpiry && docData && !isSelected && (
                         <span 
                           className={`h-1.5 w-1.5 rounded-full shrink-0 ${
                             docData.isExpired 
@@ -1451,6 +1454,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 </div>
               ) : (() => {
                 const currentDoc = reminderSchedule?.[selectedReminderDoc];
+                const activeDocTheme = getDocumentTheme(selectedReminderDoc);
                 const docTitle = selectedReminderDoc === "passport" 
                   ? "Passport" 
                   : selectedReminderDoc === "visa" 
@@ -1472,22 +1476,41 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 return (
                   <div className="space-y-3.5">
                     {/* Active Source Expiry Date Banner */}
-                    <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60 flex flex-wrap items-center justify-between gap-2">
+                    <div className={`p-2.5 rounded-lg border flex flex-wrap items-center justify-between gap-2 ${activeDocTheme.bannerClass}`}>
                       <div className="space-y-0.5">
-                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold font-caption">
+                        <span className={`text-[10px] uppercase tracking-wider font-semibold font-caption ${activeDocTheme.bannerTitleClass}`}>
                           Active {docTitle} Expiry
                         </span>
                         <div className="text-xs font-semibold text-foreground flex items-center gap-1.5 font-mono">
-                          <Calendar className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <Calendar className={`h-3.5 w-3.5 shrink-0 ${activeDocTheme.bannerIconClass}`} />
                           <span>{currentDoc.expiryDateFormatted}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Physical Document State Badge */}
+                        {!currentDoc.isUploaded || currentDoc.verificationStatus === "not_uploaded" ? (
+                          <Badge variant="outline" className="text-[9px] h-5 font-medium text-muted-foreground border-border/60 bg-muted/20">
+                            Document Not Uploaded
+                          </Badge>
+                        ) : currentDoc.verificationStatus === "pending" ? (
+                          <Badge variant="outline" className="text-[9px] h-5 font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30">
+                            Document Pending Verification
+                          </Badge>
+                        ) : currentDoc.verificationStatus === "verified" ? (
+                          <Badge variant="outline" className="text-[9px] h-5 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30">
+                            Document Verified
+                          </Badge>
+                        ) : currentDoc.verificationStatus === "rejected" ? (
+                          <Badge variant="destructive" className="text-[9px] h-5 font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30">
+                            Document Rejected
+                          </Badge>
+                        ) : null}
+
                         {currentDoc.isExpired ? (
                           <Badge variant="destructive" className="text-[10px] h-5">Expired</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px] h-5 font-mono bg-primary/5 text-primary border-primary/20">
+                          <Badge variant="outline" className={`text-[10px] h-5 font-mono ${activeDocTheme.badgeClass}`}>
                             {currentDoc.daysRemaining} days left
                           </Badge>
                         )}
@@ -1496,6 +1519,19 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         </Badge>
                       </div>
                     </div>
+
+                    {/* Metadata Tracking Notice when physical document copy has not been uploaded */}
+                    {!currentDoc.isUploaded && (
+                      <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-muted/30 border border-border/50 text-[11px] text-muted-foreground">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="truncate">The system knows when the {docTitle.toLowerCase()} expires, but the physical document has not yet been uploaded.</span>
+                        </div>
+                        <Badge variant="outline" className={`text-[9px] font-semibold shrink-0 ${activeDocTheme.badgeClass}`}>
+                          Metadata Tracking
+                        </Badge>
+                      </div>
+                    )}
 
                     {/* Desktop & Tablet Table View (hidden on very small screens) */}
                     <div className="hidden sm:block rounded-lg border border-border/60 overflow-hidden bg-card">
@@ -1533,7 +1569,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                                       variant="outline"
                                       onClick={() => handleManualDispatch(selectedReminderDoc, item.thresholdDays, item.ruleId)}
                                       disabled={isDispatchingReminder === item.ruleId}
-                                      className="h-5 px-1.5 text-[9px] bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary cursor-pointer"
+                                      className={`h-5 px-1.5 text-[9px] cursor-pointer ${activeDocTheme.buttonOutlineClass}`}
                                       title="Dispatch WhatsApp notification now"
                                     >
                                       {isDispatchingReminder === item.ruleId ? (
@@ -1574,7 +1610,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                                   variant="outline"
                                   onClick={() => handleManualDispatch(selectedReminderDoc, item.thresholdDays, item.ruleId)}
                                   disabled={isDispatchingReminder === item.ruleId}
-                                  className="h-5 px-1.5 text-[9px] bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary cursor-pointer"
+                                  className={`h-5 px-1.5 text-[9px] cursor-pointer ${activeDocTheme.buttonOutlineClass}`}
                                   title="Dispatch WhatsApp notification now"
                                 >
                                   {isDispatchingReminder === item.ruleId ? (

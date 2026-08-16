@@ -153,6 +153,7 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
               <CardContent className="p-4 space-y-4">
                 <ComplianceDocumentTable 
                   versions={versions} 
+                  documentType={documentType}
                   onDownloadClick={async (v) => {
                     if (!v.filePath) {
                       toast.error("File Unavailable", { description: "No physical file is attached to this document version." });
@@ -190,7 +191,7 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
           <Card className="border border-border/60 shadow-sm bg-card/65">
             <CardContent className="p-4 space-y-4">
               <h2 className="text-xs font-semibold text-foreground uppercase tracking-wider">Activity Timeline</h2>
-              <ComplianceDocumentTimeline versions={versions} />
+              <ComplianceDocumentTimeline versions={versions} documentType={documentType} />
             </CardContent>
           </Card>
         </div>

@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
 
+import { DOCUMENT_CONFIGS, getDocumentTheme } from "../constants/constants";
+
 export interface DocumentField {
   label: string;
   value?: string | null;
@@ -97,6 +99,10 @@ export function StudentDocumentCard({
   isRejecting = false,
   customFields = []
 }: StudentDocumentCardProps): React.JSX.Element {
+  const theme = getDocumentTheme(documentType);
+  const docConfig = DOCUMENT_CONFIGS[documentType];
+  const DocumentIcon = docConfig?.icon || FileText;
+
   // 1. Authoritative Expiry & Health Computation
   const cleanExpiry = expiryDate ? expiryDate.split("T")[0].trim() : "";
   const hasValidExpiry = Boolean(
@@ -191,7 +197,7 @@ export function StudentDocumentCard({
   const renderStatusIcon = () => {
     if (!hasUploadedDocument || verificationStatus === "not_uploaded") {
       if (hasMetadataOnly) {
-        return <div className="h-3.5 w-3.5 rounded-full bg-blue-500 shrink-0" />;
+        return <div className={`h-3.5 w-3.5 rounded-full shrink-0 ${theme.dotClass}`} />;
       }
       return <div className="h-3.5 w-3.5 rounded-full bg-muted-foreground/30 shrink-0" />;
     }
@@ -215,7 +221,7 @@ export function StudentDocumentCard({
     if (!hasUploadedDocument || verificationStatus === "not_uploaded") {
       if (hasMetadataOnly) {
         return (
-          <Badge variant="outline" className="text-[10px] h-5 font-semibold text-blue-700 dark:text-blue-400 border-blue-500/30 bg-blue-500/10 flex items-center gap-1">
+          <Badge variant="outline" className={`text-[10px] h-5 font-semibold flex items-center gap-1 ${theme.badgeClass}`}>
             <Info className="h-3 w-3" /> Metadata Only
           </Badge>
         );
@@ -283,13 +289,18 @@ export function StudentDocumentCard({
     <Card className="border border-border/70 shadow-xs overflow-hidden bg-card transition-all">
       {/* 1. DOCUMENT HEADER */}
       <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/15 border-b border-border/40 gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          {renderStatusIcon()}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${theme.iconContainerClass}`}>
+            <DocumentIcon className="h-4 w-4" />
+          </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-xs sm:text-sm font-bold tracking-tight uppercase text-foreground truncate">
-                {title}
-              </CardTitle>
+              <div className="flex items-center gap-1.5">
+                <div className={`h-2 w-2 rounded-full shrink-0 ${theme.dotClass}`} />
+                <CardTitle className="text-xs sm:text-sm font-bold tracking-tight uppercase text-foreground truncate">
+                  {title}
+                </CardTitle>
+              </div>
               {hasUploadedDocument && versionNumber ? (
                 <Badge variant="outline" className="text-[9px] uppercase tracking-wider font-mono px-1.5 py-0.2 h-4 text-muted-foreground border-border/60 bg-muted/20 shrink-0">
                   CURRENT · V{versionNumber}
@@ -340,10 +351,10 @@ export function StudentDocumentCard({
 
         {/* Metadata Available Notice when physical document file is pending upload */}
         {hasMetadataOnly && (
-          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-900 dark:text-blue-200">
-            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+          <div className={`flex items-start gap-2.5 p-3 rounded-lg ${theme.bannerClass}`}>
+            <Info className={`h-4 w-4 shrink-0 mt-0.5 ${theme.bannerIconClass}`} />
             <div className="space-y-0.5">
-              <span className="font-semibold text-xs text-blue-800 dark:text-blue-300">Metadata Available — Document Copy Not Uploaded</span>
+              <span className={`font-semibold text-xs ${theme.bannerTitleClass}`}>Metadata Available — Document Copy Not Uploaded</span>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 Compliance expiry tracking and reminders are active from recorded registration data. Physical document copy is pending student upload and verification.
               </p>
@@ -357,11 +368,11 @@ export function StudentDocumentCard({
             <div className="space-y-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider font-caption flex items-center gap-1.5">
-                  <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <CalendarDays className={`h-3.5 w-3.5 shrink-0 ${theme.accentColor}`} />
                   {documentType === "efrro" ? "Expiration & Compliance" : "Expiration & Validity"}
                 </span>
-                {documentType === "efrro" && hasValidExpiry && (
-                  <Badge variant="outline" className="text-[9px] h-4 font-normal text-primary border-primary/30 bg-primary/5">
+                {hasValidExpiry && (
+                  <Badge variant="outline" className={`text-[9px] h-4 font-medium ${theme.badgeClass}`}>
                     Reminder schedule active
                   </Badge>
                 )}
@@ -399,7 +410,7 @@ export function StudentDocumentCard({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs font-semibold px-3 border-primary/30 hover:bg-primary/5 text-primary shadow-2xs"
+                className={`h-8 text-xs font-semibold px-3 ${theme.buttonOutlineClass} shadow-2xs`}
                 onClick={onUploadRenewalClick}
               >
                 <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> Upload New Document
@@ -451,7 +462,7 @@ export function StudentDocumentCard({
           <div className="flex flex-wrap items-center gap-2">
             <Link 
               href={`/students/${studentId}/${documentType}`} 
-              className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1.5 py-1 px-1.5 rounded-md hover:bg-primary/5 transition-colors"
+              className={`text-xs font-medium ${theme.accentColor} hover:underline inline-flex items-center gap-1.5 py-1 px-1.5 rounded-md ${theme.bgHover} transition-colors`}
             >
               <FileText className="h-3.5 w-3.5" /> View Document & History
             </Link>

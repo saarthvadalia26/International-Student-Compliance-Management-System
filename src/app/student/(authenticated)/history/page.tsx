@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentActivityHistory } from "../../actions";
 import { StudentHistoryRow, StudentReminderHistoryRow } from "@/domain/student-portal/types";
+import { getDocumentBadgeClass } from "@/features/compliance/constants/constants";
 import { cn } from "@/lib/utils";
 
 export default function StudentHistoryPage() {
@@ -74,12 +75,7 @@ export default function StudentHistoryPage() {
   };
 
   const getDocBadgeColor = (type?: string) => {
-    switch (type) {
-      case "passport": return "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30";
-      case "visa": return "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30";
-      case "efrro": return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
-      default: return "bg-muted text-muted-foreground border-border";
-    }
+    return getDocumentBadgeClass(type);
   };
 
   if (isLoading) {

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ComplianceDocumentType, getDocumentTheme } from "../constants/constants";
 
 export interface DocumentVersion {
   id: string;
@@ -31,10 +32,13 @@ export interface DocumentVersion {
 
 interface ComplianceDocumentTableProps {
   versions: DocumentVersion[];
+  documentType?: ComplianceDocumentType;
   onDownloadClick?: (version: DocumentVersion) => void;
 }
 
-export function ComplianceDocumentTable({ versions, onDownloadClick }: ComplianceDocumentTableProps): React.JSX.Element {
+export function ComplianceDocumentTable({ versions, documentType = "passport", onDownloadClick }: ComplianceDocumentTableProps): React.JSX.Element {
+  const theme = getDocumentTheme(documentType);
+
   const getVerificationBadge = (status: DocumentVersion["verificationStatus"]) => {
     switch (status) {
       case "verified":
@@ -90,10 +94,10 @@ export function ComplianceDocumentTable({ versions, onDownloadClick }: Complianc
         </TableHeader>
         <TableBody>
           {versions.map((ver) => (
-            <TableRow key={ver.id} className={ver.isActive ? "bg-primary/5 hover:bg-primary/10" : ""}>
+            <TableRow key={ver.id} className={ver.isActive ? `${theme.bgSoft}` : ""}>
               <TableCell className="font-medium">
                 {ver.isActive ? (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-primary/40 text-primary font-semibold bg-primary/10">
+                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0.5 font-semibold ${theme.badgeClass}`}>
                     CURRENT · V{ver.versionNumber}
                   </Badge>
                 ) : (
@@ -104,7 +108,7 @@ export function ComplianceDocumentTable({ versions, onDownloadClick }: Complianc
               </TableCell>
               <TableCell className="max-w-[180px]">
                 <div className="flex items-center gap-1.5 min-w-0" title={ver.filePath || undefined}>
-                  <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <FileText className={`h-3.5 w-3.5 shrink-0 ${theme.accentColor}`} />
                   <span className="truncate font-medium text-foreground text-xs">
                     {getFileName(ver.filePath)}
                   </span>
@@ -130,7 +134,7 @@ export function ComplianceDocumentTable({ versions, onDownloadClick }: Complianc
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-7 px-2 text-xs text-primary hover:bg-primary/10 flex items-center gap-1"
+                    className={`h-7 px-2 text-xs ${theme.accentColor} ${theme.bgHover} flex items-center gap-1`}
                     onClick={() => onDownloadClick(ver)} 
                     title="Download physical document file"
                   >
@@ -147,7 +151,9 @@ export function ComplianceDocumentTable({ versions, onDownloadClick }: Complianc
   );
 }
 
-export function ComplianceDocumentTimeline({ versions }: { versions: DocumentVersion[] }): React.JSX.Element {
+export function ComplianceDocumentTimeline({ versions, documentType = "passport" }: { versions: DocumentVersion[]; documentType?: ComplianceDocumentType }): React.JSX.Element {
+  const theme = getDocumentTheme(documentType);
+
   if (versions.length === 0) {
     return <div className="text-center text-xs text-muted-foreground py-4">This student has not uploaded any document versions yet.</div>;
   }
@@ -169,7 +175,7 @@ export function ComplianceDocumentTimeline({ versions }: { versions: DocumentVer
             <div className="flex flex-wrap items-center gap-x-2">
               <span className="font-semibold text-foreground">Version v{ver.versionNumber} Uploaded</span>
               {ver.isActive && (
-                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 border-primary text-primary font-semibold bg-primary/5">
+                <Badge variant="outline" className={`text-[9px] px-1 py-0 h-4 font-semibold ${theme.badgeClass}`}>
                   Current Active
                 </Badge>
               )}

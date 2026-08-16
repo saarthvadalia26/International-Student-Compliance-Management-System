@@ -204,7 +204,7 @@ async function runTestSuite() {
 
   assert(efrroReminderSchedule.daysRemaining === 90, "Calculated 90 days remaining from recorded metadata");
   assert(efrroReminderSchedule.isUploaded === false, "Reminder group reflects isUploaded: false");
-  assert(efrroReminderSchedule.schedule.length === 4, "Generated 4 reminder schedule tiers (90d, 60d, 30d, 15d)");
+  assert(efrroReminderSchedule.schedule.length === 5, "Generated 5 reminder schedule tiers (90d, 60d, 30d, 15d, 7d)");
   
   const rule90 = efrroReminderSchedule.schedule.find(r => r.thresholdDays === 90);
   assert(rule90 !== undefined, "90-day warning rule is scheduled");

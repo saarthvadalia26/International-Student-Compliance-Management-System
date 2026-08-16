@@ -56,6 +56,7 @@ export interface RawNotificationRecord {
 
 export interface DocumentInfoParam {
   number?: string | null;
+  issueDate?: string | null;
   expiryDate?: string | null;
   isUploaded?: boolean;
   verificationStatus?: "not_uploaded" | "pending" | "verified" | "rejected";

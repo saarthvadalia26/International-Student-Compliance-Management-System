@@ -37,7 +37,10 @@ export const RegisterStudentValidationSchema = z.object({
   visaNumber: z.string().optional().refine(val => !val || val.length >= 5, { message: "Visa number must contain at least 5 characters" }),
   visaIssueDate: z.string().optional(),
   visaExpiry: z.string().optional(),
-  visaType: z.string().optional()
+  visaType: z.string().optional(),
+  efrroNumber: z.string().optional().refine(val => !val || val.trim().length >= 3, { message: "eFRRO number must contain at least 3 characters" }),
+  efrroIssueDate: z.string().optional(),
+  efrroExpiry: z.string().optional()
 }).refine((data) => {
   if (data.passportIssueDate && data.passportExpiry) {
     const pi = new Date(data.passportIssueDate);
@@ -58,6 +61,16 @@ export const RegisterStudentValidationSchema = z.object({
 }, {
   message: "Visa expiration date must be strictly after the issue date",
   path: ["visaExpiry"]
+}).refine((data) => {
+  if (data.efrroIssueDate && data.efrroExpiry) {
+    const ei = new Date(data.efrroIssueDate);
+    const ee = new Date(data.efrroExpiry);
+    return ee > ei;
+  }
+  return true;
+}, {
+  message: "eFRRO expiration date must be strictly after the issue date",
+  path: ["efrroExpiry"]
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation) {
     const ad = new Date(data.admissionDate);

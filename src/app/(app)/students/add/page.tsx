@@ -70,7 +70,10 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   visaNumber: { tab: "documents", elementId: "visaNumber", label: "Visa Number" },
   visaIssueDate: { tab: "documents", elementId: "visaIssueDate", label: "Visa Issue Date" },
   visaExpiry: { tab: "documents", elementId: "visaExpiry", label: "Visa Expiry Date" },
-  visaType: { tab: "documents", elementId: "visaType", label: "Visa Classification" }
+  visaType: { tab: "documents", elementId: "visaType", label: "Visa Classification" },
+  efrroNumber: { tab: "documents", elementId: "efrroNumber", label: "eFRRO / Registration Number" },
+  efrroIssueDate: { tab: "documents", elementId: "efrroIssueDate", label: "eFRRO Issue Date" },
+  efrroExpiry: { tab: "documents", elementId: "efrroExpiry", label: "eFRRO Expiration Date" }
 };
 
 /**
@@ -158,6 +161,9 @@ export default function StudentRegistrationPage() {
     visaIssueDate: "",
     visaExpiry: "",
     visaType: "Student (S-1)",
+    efrroNumber: "",
+    efrroIssueDate: "",
+    efrroExpiry: "",
   });
 
   // Calculate error counts per tab
@@ -275,6 +281,8 @@ export default function StudentRegistrationPage() {
     const sanitizedPassExp = normalizeDateToISO(formData.passportExpiry);
     const sanitizedVisaIssue = normalizeDateToISO(formData.visaIssueDate);
     const sanitizedVisaExp = normalizeDateToISO(formData.visaExpiry);
+    const sanitizedEfrroIssue = normalizeDateToISO(formData.efrroIssueDate);
+    const sanitizedEfrroExp = normalizeDateToISO(formData.efrroExpiry);
 
     // Zod payload assembly
     const validationPayload: RegisterStudentInput = {
@@ -302,7 +310,10 @@ export default function StudentRegistrationPage() {
       visaNumber: formData.visaNumber.trim() || undefined,
       visaIssueDate: sanitizedVisaIssue || undefined,
       visaExpiry: sanitizedVisaExp || undefined,
-      visaType: formData.visaType.trim() || undefined
+      visaType: formData.visaType.trim() || undefined,
+      efrroNumber: formData.efrroNumber.trim() || undefined,
+      efrroIssueDate: sanitizedEfrroIssue || undefined,
+      efrroExpiry: sanitizedEfrroExp || undefined
     };
 
     // Safe development diagnostics
@@ -323,7 +334,9 @@ export default function StudentRegistrationPage() {
         passportNumber: validationPayload.passportNumber ? `${validationPayload.passportNumber.slice(0, 2)}***` : undefined,
         passportExpiry: validationPayload.passportExpiry,
         visaNumber: validationPayload.visaNumber ? `${validationPayload.visaNumber.slice(0, 2)}***` : undefined,
-        visaExpiry: validationPayload.visaExpiry
+        visaExpiry: validationPayload.visaExpiry,
+        efrroNumber: validationPayload.efrroNumber ? `${validationPayload.efrroNumber.slice(0, 2)}***` : undefined,
+        efrroExpiry: validationPayload.efrroExpiry
       });
     }
 
@@ -1138,6 +1151,75 @@ export default function StudentRegistrationPage() {
                       {validationErrors.visaExpiry && (
                         <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                           {validationErrors.visaExpiry}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* eFRRO / Residential Permit Details */}
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                      eFRRO / Residential Permit Details
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground font-caption mt-0.5">
+                      Local registration details with Indian immigration authorities.
+                    </p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-medium text-foreground" htmlFor="efrroNumber">
+                        eFRRO / Registration Number
+                      </label>
+                      <Input
+                        id="efrroNumber"
+                        placeholder="e.g. FRRO123456789"
+                        value={formData.efrroNumber}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.efrroNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {validationErrors.efrroNumber && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.efrroNumber}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="efrroIssueDate">
+                        eFRRO Issue Date
+                      </label>
+                      <DatePicker
+                        id="efrroIssueDate"
+                        value={formData.efrroIssueDate}
+                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                        onValueChange={(v) => handleSelectChange("efrroIssueDate", v)}
+                        disabled={isSubmitting}
+                        placeholder="Select eFRRO issue date..."
+                        error={validationErrors.efrroIssueDate}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="efrroExpiry">
+                        eFRRO Expiration Date
+                      </label>
+                      <DatePicker
+                        id="efrroExpiry"
+                        value={formData.efrroExpiry}
+                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                        onValueChange={(v) => handleSelectChange("efrroExpiry", v)}
+                        disabled={isSubmitting}
+                        placeholder="Select eFRRO expiry date..."
+                        error={validationErrors.efrroExpiry}
+                      />
+                      {validationErrors.efrroExpiry && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.efrroExpiry}
                         </p>
                       )}
                     </div>

@@ -19,6 +19,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { STATUS_CONFIGS, DeliveryStatus } from "../constants/constants";
 import { fetchCommunicationLogs, CommunicationLogItem, ReminderSummaryMetrics } from "@/app/(app)/reminders/actions";
+import { getDocumentBadgeClass } from "@/features/compliance/constants/constants";
 
 export interface NotificationHealthMetricsProps {
   summary: ReminderSummaryMetrics | null;
@@ -227,12 +228,7 @@ export function NotificationQueueTable(): React.JSX.Element {
   };
 
   const getDocBadgeColor = (type: string) => {
-    switch (type) {
-      case "passport": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30";
-      case "visa": return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30";
-      case "efrro": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30";
-      default: return "bg-muted text-muted-foreground border-border";
-    }
+    return getDocumentBadgeClass(type);
   };
 
   return (

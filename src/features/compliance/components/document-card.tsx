@@ -3,7 +3,7 @@ import { UploadCloud, Eye, FileText, Edit3, ShieldCheck, Info } from "lucide-rea
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ComplianceStatusBadge, ExpiryStatusBadge } from "./compliance-status";
-import { DocumentConfig, ComplianceStatus } from "../constants/constants";
+import { DocumentConfig, ComplianceStatus, getDocumentTheme } from "../constants/constants";
 
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
 
@@ -35,6 +35,7 @@ export function ComplianceDocumentCard({
   onVerifyClick,
   onViewPdfClick
 }: DocumentCardProps): React.JSX.Element {
+  const theme = getDocumentTheme(config.type);
   const DocumentIcon = config.icon;
   const isDocumentUploaded = status !== "MISSING" && status !== "NOT_UPLOADED" && status !== "METADATA_ONLY";
 
@@ -64,11 +65,14 @@ export function ComplianceDocumentCard({
       <CardHeader className="pb-3 border-b border-border/40 bg-muted/15">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${theme.iconContainerClass}`}>
               <DocumentIcon className="h-4 w-4" />
             </div>
             <div>
-              <CardTitle className="text-sm font-semibold">{config.title}</CardTitle>
+              <div className="flex items-center gap-1.5">
+                <div className={`h-2 w-2 rounded-full shrink-0 ${theme.dotClass}`} />
+                <CardTitle className="text-sm font-semibold">{config.title}</CardTitle>
+              </div>
               <CardDescription className="text-xs font-caption">{config.description}</CardDescription>
             </div>
           </div>
@@ -80,10 +84,10 @@ export function ComplianceDocumentCard({
         {isDocumentUploaded || hasMetadata ? (
           <div className="space-y-4">
             {!isDocumentUploaded && hasMetadata && (
-              <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-900 dark:text-blue-200 text-xs">
-                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className={`flex items-start gap-2.5 p-3 rounded-lg ${theme.bannerClass} text-xs`}>
+                <Info className={`h-4 w-4 shrink-0 mt-0.5 ${theme.bannerIconClass}`} />
                 <div className="space-y-0.5">
-                  <span className="font-semibold text-xs text-blue-800 dark:text-blue-300">Metadata Available — Document Copy Not Uploaded</span>
+                  <span className={`font-semibold text-xs ${theme.bannerTitleClass}`}>Metadata Available — Document Copy Not Uploaded</span>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
                     This student record contains {config.title.toLowerCase()} metadata from registration / Excel migration. Expiry tracking is active, but no physical PDF/image file has been uploaded yet.
                   </p>
@@ -126,7 +130,7 @@ export function ComplianceDocumentCard({
                       <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Correct Info
                     </Button>
                   )}
-                  <Button variant="outline" size="sm" className="h-8 text-xs flex-1 md:flex-initial border-primary/30 text-primary hover:bg-primary/5" onClick={onReplaceClick}>
+                  <Button variant="outline" size="sm" className={`h-8 text-xs flex-1 md:flex-initial ${theme.buttonOutlineClass}`} onClick={onReplaceClick}>
                     <UploadCloud className="mr-1.5 h-3.5 w-3.5" /> {isDocumentUploaded ? "Upload New Version" : "Upload Document File"}
                   </Button>
                   {status === "PENDING_VERIFICATION" && onVerifyClick && (
