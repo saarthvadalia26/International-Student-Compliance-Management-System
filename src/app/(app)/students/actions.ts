@@ -1699,38 +1699,222 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
 }
 
 /**
- * Server Action: Manually trigger reminder dispatch for testing or immediate notification across any document type (WhatsApp only)
+ * Server Action: Preview reminder dispatch prerequisites, student contact, and WhatsApp integration status
  */
-export async function triggerReminderDispatchAction(
+export async function getReminderDispatchPreviewAction(
   studentId: string,
   docType: "efrro" | "passport" | "visa",
   thresholdDays: number
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  preview?: {
+    studentId: string;
+    studentName: string;
+    studentPhone: string | null;
+    hasValidPhone: boolean;
+    documentType: "passport" | "visa" | "efrro";
+    documentTitle: string;
+    expiryDate: string;
+    expiryDateFormatted: string;
+    daysRemaining: number;
+    thresholdDays: number;
+    ruleName: string;
+    templateCode: string;
+    templateName: string;
+    integrationStatus: import("@/domain/notifications/services/whatsapp-integration.service").WhatsAppIntegrationStatus;
+    integrationMessage: string;
+    isDispatchable: boolean;
+    blockedReason?: string;
+    blockedMessage?: string;
+    alreadyDispatched: boolean;
+    dispatchedAt?: string | null;
+  };
+  error?: string;
+}> {
   try {
     const supabase = await getServerSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return { success: false, error: "Authentication required to trigger reminder dispatch." };
+      return { success: false, error: "Authentication required to preview reminder dispatch." };
     }
 
     const adminSupabase = getAdminSupabase();
 
-    const { data: student } = await adminSupabase
+    const { data: student, error: sErr } = await adminSupabase
       .from("students")
       .select(`
-        id, email, phone,
-        student_personal(full_name),
-        student_snapshot(passport_expiry, visa_expiry, efrro_expiry),
-        passport_versions(id, is_active, expiry_date, deleted_at),
-        visa_versions(id, is_active, expiry_date, deleted_at),
-        efrro_versions(id, is_active, expiry_date, deleted_at)
+        id, email, phone, registration_number,
+        student_personal(full_name, preferred_language),
+        student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
+        passport_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
+        visa_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
+        efrro_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at)
       `)
       .eq("id", studentId)
-      .single();
+      .is("deleted_at", null)
+      .maybeSingle();
 
-    if (!student) {
-      return { success: false, error: "Student not found." };
+    if (sErr || !student) {
+      console.error("[REMINDER_PREVIEW_STUDENT_NOT_FOUND]", { studentId, docType, thresholdDays, error: sErr?.message });
+      return { success: false, error: "The student associated with this reminder could not be found." };
+    }
+
+    const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
+    const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
+
+    const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
+    const activeVisa = (student.visa_versions || []).find((v: { is_active?: boolean; deleted_at?: string | null }) => v.is_active && !v.deleted_at);
+    const activeEfrro = (student.efrro_versions || []).find((e: { is_active?: boolean; deleted_at?: string | null }) => e.is_active && !e.deleted_at);
+
+    let expiryDate: string | null = null;
+    let docTitle = "Document";
+
+    if (docType === "passport") {
+      expiryDate = activePassport?.expiry_date || snapshot?.passport_expiry || null;
+      docTitle = "Passport";
+    } else if (docType === "visa") {
+      expiryDate = activeVisa?.expiry_date || snapshot?.visa_expiry || null;
+      docTitle = "Visa";
+    } else {
+      expiryDate = activeEfrro?.expiry_date || snapshot?.efrro_expiry || null;
+      docTitle = "eFRRO / Residential Permit";
+    }
+
+    if (!expiryDate) {
+      return { success: false, error: `Cannot dispatch reminder: No ${docTitle} expiry date recorded.` };
+    }
+
+    const cleanExpiry = expiryDate.split("T")[0].trim();
+    const { CalendarDateEngine } = await import("@/domain/notifications/services/calendar-date");
+    const daysRemaining = CalendarDateEngine.diffCalendarDays(cleanExpiry, CalendarDateEngine.getTodayISO());
+    const expiryDateFormatted = CalendarDateEngine.formatDateDisplay(cleanExpiry, true);
+
+    const studentPhone = student.phone || null;
+    const cleanPhone = (student.phone || "").replace(/[^\d+]/g, "").trim();
+    const hasValidPhone = Boolean(cleanPhone && cleanPhone.length >= 7);
+
+    const { WhatsAppIntegrationService } = await import("@/domain/notifications/services/whatsapp-integration.service");
+    const integration = WhatsAppIntegrationService.getIntegrationStatus();
+
+    // Check template
+    const templateCode = `${docType.toUpperCase()}_EXPIRY_${thresholdDays}D`;
+    const templateName = `${docType}_${thresholdDays}_day_${thresholdDays <= 15 ? "critical" : thresholdDays <= 30 ? "urgent" : "reminder"}`;
+
+    // Check existing dispatch
+    const idempotencyKey = `${studentId}:${docType}:${thresholdDays}:whatsapp:${cleanExpiry}`;
+    const { data: existingNotif } = await adminSupabase
+      .from("notifications")
+      .select("id, status, created_at, updated_at")
+      .eq("idempotency_key", idempotencyKey)
+      .in("status", ["sent", "delivered"])
+      .maybeSingle();
+
+    const alreadyDispatched = Boolean(existingNotif);
+    const dispatchedAt = existingNotif ? (existingNotif.updated_at || existingNotif.created_at) : null;
+
+    let isDispatchable = true;
+    let blockedReason: string | undefined;
+    let blockedMessage: string | undefined;
+
+    if (alreadyDispatched) {
+      isDispatchable = false;
+      blockedReason = "already_dispatched";
+      blockedMessage = "This reminder has already been dispatched.";
+    } else if (!hasValidPhone) {
+      isDispatchable = false;
+      blockedReason = "missing_phone";
+      blockedMessage = "This student does not have a valid WhatsApp number. Add a valid WhatsApp number before dispatching this reminder.";
+    } else if (!integration.isReady) {
+      isDispatchable = false;
+      blockedReason = "whatsapp_not_configured";
+      blockedMessage = "WhatsApp Business API is not configured yet. Configure the WhatsApp Business API before dispatching this reminder.";
+    }
+
+    const ruleName = `${thresholdDays}-Day ${thresholdDays <= 15 ? "Critical Alert" : thresholdDays <= 30 ? "Urgent Renewal" : thresholdDays <= 60 ? "Administrative Reminder" : "Early Warning"}`;
+
+    return {
+      success: true,
+      preview: {
+        studentId,
+        studentName: personal?.full_name || "Student",
+        studentPhone,
+        hasValidPhone,
+        documentType: docType,
+        documentTitle: docTitle,
+        expiryDate: cleanExpiry,
+        expiryDateFormatted,
+        daysRemaining,
+        thresholdDays,
+        ruleName,
+        templateCode,
+        templateName,
+        integrationStatus: integration.status,
+        integrationMessage: integration.message,
+        isDispatchable,
+        blockedReason,
+        blockedMessage,
+        alreadyDispatched,
+        dispatchedAt
+      }
+    };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "getReminderDispatchPreviewAction", route: `/students/${studentId}` });
+    return {
+      success: false,
+      error: sanitized.message
+    };
+  }
+}
+
+/**
+ * Server Action: Manually trigger reminder dispatch across any document type (Production-safe WhatsApp only)
+ */
+export async function triggerReminderDispatchAction(
+  studentId: string,
+  docType: "efrro" | "passport" | "visa",
+  thresholdDays: number
+): Promise<{
+  success: boolean;
+  status: "DISPATCHED" | "BLOCKED" | "FAILED" | "ALREADY_DISPATCHED";
+  reason?: string;
+  integrationStatus?: string;
+  notificationId?: string;
+  error?: string;
+}> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, status: "BLOCKED", reason: "auth_required", error: "Authentication required to trigger reminder dispatch." };
+    }
+
+    const adminSupabase = getAdminSupabase();
+
+    // 1. Resolve student by UUID primary key
+    const { data: student, error: sErr } = await adminSupabase
+      .from("students")
+      .select(`
+        id, email, phone, registration_number,
+        student_personal(full_name, preferred_language),
+        student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
+        passport_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
+        visa_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
+        efrro_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at)
+      `)
+      .eq("id", studentId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (sErr || !student) {
+      console.error("[REMINDER_DISPATCH_STUDENT_NOT_FOUND]", { studentId, docType, thresholdDays, error: sErr?.message });
+      return { 
+        success: false, 
+        status: "BLOCKED", 
+        reason: "student_not_found", 
+        error: "The student associated with this reminder could not be found." 
+      };
     }
 
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
@@ -1755,31 +1939,91 @@ export async function triggerReminderDispatchAction(
     }
 
     if (!expiryDate) {
-      return { success: false, error: `Cannot dispatch reminder: No ${docTitle} expiry date recorded.` };
+      return { 
+        success: false, 
+        status: "BLOCKED", 
+        reason: "missing_expiry", 
+        error: `Cannot dispatch reminder: No ${docTitle} expiry date recorded.` 
+      };
     }
 
-    // Strict WhatsApp channel
-    const channel = "whatsapp";
-    const idempotencyKey = `${studentId}:${docType}:${thresholdDays}:${channel}:${expiryDate}`;
-    const recipientAddress = student.phone || student.email || "international-office@university.edu";
+    const cleanExpiry = expiryDate.split("T")[0].trim();
 
+    // 2. Validate student contact information
+    const cleanPhone = (student.phone || "").replace(/[^\d+]/g, "").trim();
+    if (!cleanPhone || cleanPhone.length < 7) {
+      return {
+        success: false,
+        status: "BLOCKED",
+        reason: "missing_phone",
+        error: "This student does not have a valid WhatsApp number. Add a valid WhatsApp number before dispatching this reminder."
+      };
+    }
+
+    // 3. Validate WhatsApp configuration
+    const { WhatsAppIntegrationService } = await import("@/domain/notifications/services/whatsapp-integration.service");
+    const integration = WhatsAppIntegrationService.getIntegrationStatus();
+
+    if (!integration.isReady) {
+      return {
+        success: false,
+        status: "BLOCKED",
+        reason: "whatsapp_not_configured",
+        integrationStatus: integration.status,
+        error: "WhatsApp Business API is not configured yet. Configure the WhatsApp Business API before dispatching this reminder."
+      };
+    }
+
+    // 4. Validate template
+    const templateCode = `${docType.toUpperCase()}_EXPIRY_${thresholdDays}D`;
+    const { data: template } = await adminSupabase
+      .from("notification_templates")
+      .select("id, code, title, body_template, is_active")
+      .in("code", [templateCode, `${docType.toUpperCase()}_EXPIRY_ALERT`, "EXPIRY_ALERT"])
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+
+    // 5. Check Idempotency
+    const channel = "whatsapp";
+    const idempotencyKey = `${studentId}:${docType}:${thresholdDays}:${channel}:${cleanExpiry}`;
+
+    const { data: existingNotif } = await adminSupabase
+      .from("notifications")
+      .select("id, status")
+      .eq("idempotency_key", idempotencyKey)
+      .in("status", ["sent", "delivered"])
+      .maybeSingle();
+
+    if (existingNotif) {
+      return {
+        success: false,
+        status: "ALREADY_DISPATCHED",
+        reason: "already_dispatched",
+        notificationId: existingNotif.id,
+        error: "This reminder has already been dispatched."
+      };
+    }
+
+    // 6. Create dispatch attempt record (status: 'sending')
+    const studentName = personal?.full_name || "Student";
     const { data: notif, error: notifErr } = await adminSupabase
       .from("notifications")
       .insert({
         student_id: studentId,
         document_type: docType,
-        status: "sent",
+        status: "sending",
         channel,
-        recipient_address: recipientAddress,
+        recipient_address: cleanPhone,
         scheduled_for: new Date().toISOString(),
         trigger_source: "manual_admin_dispatch",
         idempotency_key: idempotencyKey,
         notification_context: {
-          student_name: personal?.full_name || "Student",
+          student_name: studentName,
           document_type: docTitle,
           days_left: String(thresholdDays),
           days_remaining: String(thresholdDays),
-          expiry_date: expiryDate,
+          expiry_date: cleanExpiry,
           scheduled_date: new Date().toISOString(),
           dispatched_by: user.id
         }
@@ -1787,36 +2031,79 @@ export async function triggerReminderDispatchAction(
       .select()
       .single();
 
-    if (notifErr) {
-      if (notifErr.message.includes("unique") || notifErr.message.includes("duplicate")) {
-        return { success: true };
-      }
-      return { success: false, error: notifErr.message };
+    if (notifErr || !notif) {
+      return {
+        success: false,
+        status: "FAILED",
+        error: notifErr?.message || "Failed to initialize dispatch attempt record."
+      };
     }
 
-    if (notif) {
+    // 7. Execute real Meta WhatsApp Provider dispatch
+    const { MetaWhatsAppProvider } = await import("@/domain/notifications/services/providers/meta-whatsapp.provider");
+    const provider = new MetaWhatsAppProvider();
+
+    const providerResult = await provider.sendTemplateMessage({
+      to: cleanPhone,
+      templateName: template?.code || `${docType}_${thresholdDays}_day_alert`,
+      bodyParameters: [studentName, docTitle, String(thresholdDays), cleanExpiry]
+    });
+
+    if (providerResult.success) {
+      await adminSupabase
+        .from("notifications")
+        .update({ status: "sent", updated_at: new Date().toISOString() })
+        .eq("id", notif.id);
+
       await adminSupabase.from("notification_delivery_log").insert({
         notification_id: notif.id,
         attempt_number: 1,
         status: "sent",
-        gateway_response: { provider: "whatsapp_cloud_api", delivered_at: new Date().toISOString() },
+        gateway_response: (providerResult.rawResponse as Record<string, unknown>) || { gateway_id: providerResult.gatewayId },
+        latency_ms: providerResult.latencyMs,
+        provider_name: provider.name,
         error_message: null
       });
+
+      await adminSupabase.from("audit_log").insert({
+        actor_id: user.id,
+        action: "REMINDER_DISPATCHED",
+        resource: `students/${studentId}/reminders/${docType}`,
+        filters_applied: { studentId, docType, thresholdDays, idempotencyKey, channel, gatewayId: providerResult.gatewayId }
+      });
+
+      revalidatePath(`/students/${studentId}`);
+      return {
+        success: true,
+        status: "DISPATCHED",
+        notificationId: notif.id
+      };
+    } else {
+      await adminSupabase
+        .from("notifications")
+        .update({ status: "failed", updated_at: new Date().toISOString() })
+        .eq("id", notif.id);
+
+      await adminSupabase.from("notification_delivery_log").insert({
+        notification_id: notif.id,
+        attempt_number: 1,
+        status: "failed",
+        error_message: providerResult.error || "WhatsApp provider rejected dispatch request",
+        latency_ms: providerResult.latencyMs,
+        provider_name: provider.name
+      });
+
+      return {
+        success: false,
+        status: "FAILED",
+        error: "WhatsApp could not accept the message. The reminder was not marked as dispatched."
+      };
     }
-
-    await adminSupabase.from("audit_log").insert({
-      actor_id: user.id,
-      action: "REMINDER_DISPATCHED",
-      resource: `students/${studentId}/reminders/${docType}`,
-      filters_applied: { studentId, docType, thresholdDays, idempotencyKey, channel }
-    });
-
-    revalidatePath(`/students/${studentId}`);
-    return { success: true };
   } catch (err: unknown) {
     const sanitized = sanitizeError(err, { action: "triggerReminderDispatchAction", route: `/students/${studentId}` });
     return {
       success: false,
+      status: "FAILED",
       error: sanitized.message
     };
   }

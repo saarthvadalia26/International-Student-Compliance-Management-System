@@ -7,25 +7,43 @@ import {
   ProviderUnavailableError,
   RateLimitError
 } from "../../types/provider.types";
+import { WhatsAppIntegrationService } from "../whatsapp-integration.service";
+
+export interface WhatsAppTemplateMessageParams {
+  to: string;
+  templateName: string;
+  languageCode?: string;
+  bodyParameters?: string[];
+}
 
 export class MetaWhatsAppProvider implements INotificationProvider {
   name = "meta-whatsapp-provider";
   private lastSuccess: Date | null = null;
   private lastFailure: Date | null = null;
 
-  async sendWhatsApp(to: string, body: string): Promise<ProviderResponse> {
-    const accessToken = process.env.META_ACCESS_TOKEN;
-    const phoneId = process.env.META_PHONE_NUMBER_ID;
-    const templateName = process.env.WHATSAPP_TEMPLATE_NAME || "efrro_expiry_alert";
+  async sendTemplateMessage(params: WhatsAppTemplateMessageParams): Promise<ProviderResponse> {
+    const { to, templateName, languageCode = "en", bodyParameters = [] } = params;
+    const integration = WhatsAppIntegrationService.getIntegrationStatus();
 
-    if (!accessToken || !phoneId) {
+    if (!integration.isReady || !integration.phoneNumberId) {
       this.lastFailure = new Date();
-      throw new AuthenticationError("Meta WhatsApp credentials (Access Token or Phone ID) are missing.");
+      throw new AuthenticationError("Meta WhatsApp Business API credentials (META_ACCESS_TOKEN or META_PHONE_NUMBER_ID) are not configured.");
     }
 
+    const accessToken = process.env.META_ACCESS_TOKEN?.trim();
+    const phoneId = integration.phoneNumberId;
     const start = Date.now();
+
     try {
       const cleanPhone = to.replace(/[\s\+\-]/g, "");
+
+      const components: Array<{ type: string; parameters: Array<{ type: string; text: string }> }> = [];
+      if (bodyParameters.length > 0) {
+        components.push({
+          type: "body",
+          parameters: bodyParameters.map(param => ({ type: "text", text: param }))
+        });
+      }
 
       const response = await fetch(`https://graph.facebook.com/v17.0/${phoneId}/messages`, {
         method: "POST",
@@ -39,15 +57,8 @@ export class MetaWhatsAppProvider implements INotificationProvider {
           type: "template",
           template: {
             name: templateName,
-            language: { code: "en" },
-            components: [
-              {
-                type: "body",
-                parameters: [
-                  { type: "text", text: body }
-                ]
-              }
-            ]
+            language: { code: languageCode },
+            ...(components.length > 0 ? { components } : {})
           }
         })
       });
@@ -89,6 +100,16 @@ export class MetaWhatsAppProvider implements INotificationProvider {
     }
   }
 
+  async sendWhatsApp(to: string, body: string): Promise<ProviderResponse> {
+    const templateName = process.env.WHATSAPP_TEMPLATE_NAME || "efrro_expiry_alert";
+    return this.sendTemplateMessage({
+      to,
+      templateName,
+      languageCode: "en",
+      bodyParameters: [body]
+    });
+  }
+
   async sendEmail(to: string, subject: string, body: string): Promise<ProviderResponse> {
     throw new Error("Meta WhatsApp provider does not support email channel.");
   }
@@ -117,10 +138,21 @@ export class MetaWhatsAppProvider implements INotificationProvider {
   }
 
   async validateConfiguration(): Promise<boolean> {
-    return !!process.env.META_ACCESS_TOKEN && !!process.env.META_PHONE_NUMBER_ID;
+    return WhatsAppIntegrationService.isDispatchReady();
   }
 
   async healthCheck(): Promise<ProviderHealth> {
+    const isConfigured = WhatsAppIntegrationService.isDispatchReady();
+    if (!isConfigured) {
+      return {
+        providerName: this.name,
+        status: "unhealthy",
+        apiReachability: false,
+        lastSuccessfulDelivery: this.lastSuccess,
+        lastFailedDelivery: this.lastFailure
+      };
+    }
+
     let apiReachability = false;
     try {
       const controller = new AbortController();

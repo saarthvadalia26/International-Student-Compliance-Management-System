@@ -66,6 +66,7 @@ import {
   ReminderStatus 
 } from "@/domain/notifications/types/reminder.types";
 import { DocumentUploadDialog, AllowEarlyUploadDialog } from "@/features/compliance/components/document-dialogs";
+import { DispatchReminderDialog } from "@/features/compliance/components/dispatch-reminder-dialog";
 import { DOCUMENT_CONFIGS, getDocumentTheme } from "@/features/compliance/constants/constants";
 import { StudentDocumentCard } from "@/features/compliance/components/student-document-card";
 
@@ -192,6 +193,35 @@ export default function StudentDetailsPage({ params }: PageProps) {
   // Renewal / New Version Upload Dialog State
   const [isRenewalUploadOpen, setIsRenewalUploadOpen] = React.useState(false);
   const [renewalDocType, setRenewalDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
+
+  // Dispatch Reminder Dialog State
+  const [dispatchDialogState, setDispatchDialogState] = React.useState<{
+    isOpen: boolean;
+    docType: "passport" | "visa" | "efrro";
+    thresholdDays: number;
+    ruleId: string;
+    ruleName: string;
+  }>({
+    isOpen: false,
+    docType: "passport",
+    thresholdDays: 15,
+    ruleId: "",
+    ruleName: ""
+  });
+
+  const openDispatchDialog = (docType: "passport" | "visa" | "efrro", thresholdDays: number, ruleId: string, ruleName: string) => {
+    setDispatchDialogState({
+      isOpen: true,
+      docType,
+      thresholdDays,
+      ruleId,
+      ruleName
+    });
+  };
+
+  const closeDispatchDialog = () => {
+    setDispatchDialogState(prev => ({ ...prev, isOpen: false }));
+  };
 
   const openRenewalDialog = (docType: "passport" | "visa" | "efrro") => {
     setRenewalDocType(docType);
@@ -1664,7 +1694,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                                       type="button"
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => handleManualDispatch(selectedReminderDoc, item.thresholdDays, item.ruleId)}
+                                      onClick={() => openDispatchDialog(selectedReminderDoc, item.thresholdDays, item.ruleId, item.ruleName)}
                                       disabled={isDispatchingReminder === item.ruleId}
                                       className={`h-5 px-1.5 text-[9px] cursor-pointer ${activeDocTheme.buttonOutlineClass}`}
                                       title="Dispatch WhatsApp notification now"
@@ -1705,16 +1735,12 @@ export default function StudentDetailsPage({ params }: PageProps) {
                                   type="button"
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleManualDispatch(selectedReminderDoc, item.thresholdDays, item.ruleId)}
+                                  onClick={() => openDispatchDialog(selectedReminderDoc, item.thresholdDays, item.ruleId, item.ruleName)}
                                   disabled={isDispatchingReminder === item.ruleId}
                                   className={`h-5 px-1.5 text-[9px] cursor-pointer ${activeDocTheme.buttonOutlineClass}`}
-                                  title="Dispatch WhatsApp notification now"
+                                  title="Dispatch WhatsApp notification"
                                 >
-                                  {isDispatchingReminder === item.ruleId ? (
-                                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                                  ) : (
-                                    <Send className="h-2.5 w-2.5" />
-                                  )}
+                                  <Send className="h-2.5 w-2.5" />
                                 </Button>
                               )}
                             </div>
@@ -2417,6 +2443,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
           }}
         />
       )}
+
+      {/* WhatsApp Reminder Dispatch Preview & Confirmation Modal */}
+      <DispatchReminderDialog
+        isOpen={dispatchDialogState.isOpen}
+        onClose={closeDispatchDialog}
+        studentId={studentId}
+        docType={dispatchDialogState.docType}
+        thresholdDays={dispatchDialogState.thresholdDays}
+        ruleId={dispatchDialogState.ruleId}
+        ruleName={dispatchDialogState.ruleName}
+        onDispatched={async () => {
+          await loadReminderSchedule();
+        }}
+      />
     </div>
   );
 }
