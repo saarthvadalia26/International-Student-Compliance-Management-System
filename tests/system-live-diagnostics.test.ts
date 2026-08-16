@@ -77,7 +77,7 @@ describe("ISCMS Real Live Production Diagnostics Acceptance Tests", () => {
 
     assert.equal(runtime.platform, "Local Environment", "Platform must reflect local environment");
     assert.equal(runtime.environment, "Development");
-    assert.equal(runtime.region, "Not available locally", "Region must state Not available locally");
+    assert.equal(runtime.region, "Not available", "Region must state Not available");
     assert.equal(deployment.deploymentId, null);
     assert.equal(deployment.commitSha, null);
     assert.equal(deployment.shortCommitSha, null);
@@ -94,15 +94,17 @@ describe("ISCMS Real Live Production Diagnostics Acceptance Tests", () => {
 
     const waHealth = await SystemDiagnosticsService.checkWhatsAppHealth();
     assert.equal(waHealth.status, "not_configured");
-    assert.equal(waHealth.providerName, "WhatsApp Business API");
+    assert.equal(waHealth.providerName, "Meta WhatsApp Business Platform");
+    assert.equal(waHealth.message, "WhatsApp Business API credentials have not been configured.");
     assert.ok(!waHealth.providerName.includes("mock"), "Must never report mock-whatsapp-provider");
   });
 
-  // 5. Email Provider: Strictly Not Integrated
-  it("Test 5: Email provider reports strictly 'not_integrated' (no mock provider, no fake unhealthy status)", () => {
+  // 5. Email Provider: Strictly Not Configured
+  it("Test 5: Email provider reports strictly 'not_configured' (no mock provider, no fake unhealthy status)", () => {
     const emailHealth = SystemDiagnosticsService.checkEmailHealth();
-    assert.equal(emailHealth.status, "not_integrated");
-    assert.equal(emailHealth.providerName, "Email");
+    assert.equal(emailHealth.status, "not_configured");
+    assert.equal(emailHealth.providerName, "Email Service");
+    assert.equal(emailHealth.message, "Email service is not configured.");
     assert.ok(!emailHealth.providerName.includes("mock"), "Must never report mock-email-provider");
   });
 
@@ -124,7 +126,7 @@ describe("ISCMS Real Live Production Diagnostics Acceptance Tests", () => {
   });
 
   // 7. Cloudflare R2 Storage Health Check: Unconfigured state
-  it("Test 7: Cloudflare R2 reports 'not_configured' when credentials are missing", async () => {
+  it("Test 7: Cloudflare R2 reports 'not_configured' with single bucket 'iscms-documents' when credentials are missing", async () => {
     delete process.env.R2_ACCOUNT_ID;
     delete process.env.R2_ACCESS_KEY_ID;
     delete process.env.R2_SECRET_ACCESS_KEY;
@@ -135,6 +137,7 @@ describe("ISCMS Real Live Production Diagnostics Acceptance Tests", () => {
 
     assert.equal(result.status, "not_configured");
     assert.equal(result.providerName, "Cloudflare R2");
+    assert.equal(result.bucket, "iscms-documents");
     assert.equal(result.latencyMs, null);
   });
 

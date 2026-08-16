@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { UserManagementTab } from "@/components/settings/user-management-tab";
 import { AcademicProgramsTab } from "@/components/settings/academic-programs-tab";
+import { PlatformInfrastructureTab } from "@/components/settings/platform-infrastructure-tab";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -662,7 +663,7 @@ function SettingsPageContent() {
                     <div className="flex items-center justify-between border-t border-border/40 pt-3">
                       <div>
                         <label className="text-xs font-semibold text-foreground">WhatsApp Notifications</label>
-                        <p className="text-[10px] text-muted-foreground">Dispatches direct reminder alerts to student contact numbers via Twilio.</p>
+                        <p className="text-[10px] text-muted-foreground">Dispatches direct reminder alerts to student contact numbers via Meta WhatsApp Business Platform.</p>
                       </div>
                       <input
                         type="checkbox"
@@ -858,48 +859,7 @@ function SettingsPageContent() {
         {/* Tab 4: System Health */}
         {activeTab === "system" && (
           <div className="grid gap-6">
-            <Card className="border border-border/60 shadow-sm">
-              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
-                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                  <Database className="h-4 w-4 text-muted-foreground" /> Platform Infrastructure Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded border border-border/60 bg-muted/10">
-                    <span className="text-[10px] uppercase font-semibold text-muted-foreground">Email Service</span>
-                    <div className="text-xs font-semibold mt-1 text-green-700 flex items-center gap-1">
-                      <Check className="h-4 w-4" /> Gateway Connected (Resend)
-                    </div>
-                  </div>
-                  <div className="p-4 rounded border border-border/60 bg-muted/10">
-                    <span className="text-[10px] uppercase font-semibold text-muted-foreground">WhatsApp Service</span>
-                    <div className="text-xs font-semibold mt-1 text-green-700 flex items-center gap-1">
-                      <Check className="h-4 w-4" /> Gateway Connected (Twilio)
-                    </div>
-                  </div>
-                  <div className="p-4 rounded border border-border/60 bg-muted/10">
-                    <span className="text-[10px] uppercase font-semibold text-muted-foreground">Storage Engine Status</span>
-                    <div className="text-xs font-semibold mt-1 text-green-700 flex items-center gap-1">
-                      <Check className="h-4 w-4" /> 3 Buckets Mount Online
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-xs text-muted-foreground space-y-2 mt-2">
-                  <p><strong>Database System:</strong> Supabase PostgreSQL (Managed Relational Instance)</p>
-                  <p><strong>Storage Buckets:</strong> passport-documents, visa-documents, efrro-documents</p>
-                  <p><strong>API Endpoint:</strong> PostgREST cache dynamic reload active</p>
-                </div>
-                <div className="pt-4 border-t border-border/40 mt-4">
-                  <Link href="/dashboard/health">
-                    <Button size="sm" className="h-8 text-xs flex items-center gap-1.5">
-                      Launch System Health Monitoring Dashboard
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+            <PlatformInfrastructureTab />
 
             {/* Factory Reset — Administrator only */}
             {isAdministrator && (

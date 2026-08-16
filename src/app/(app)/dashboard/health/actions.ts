@@ -50,12 +50,12 @@ export interface SystemHealthMetrics {
 /**
  * Server action to fetch real live production diagnostics for client refresh
  */
-export async function fetchSystemDiagnosticsAction(): Promise<SystemInfrastructureDiagnostics> {
+export async function fetchSystemDiagnosticsAction(forceRefresh: boolean = false): Promise<SystemInfrastructureDiagnostics> {
   const serverSupabase = await getServerSupabase();
   const { data: { user } } = await serverSupabase.auth.getUser();
   requireAdministrator(user);
 
-  return SystemDiagnosticsService.getDiagnostics();
+  return SystemDiagnosticsService.getDiagnostics(forceRefresh);
 }
 
 export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
@@ -112,7 +112,7 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     supabase.from(NOTIFICATION_TABLE_NAME).select("id", { count: "exact", head: true })
       .eq("status", "queued"),
 
-    // Storage object files counts estimation
+    // Storage object files counts
     supabase.from("passport_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("visa_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("efrro_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
@@ -169,6 +169,9 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     averageProcessingTimeMs = times.length > 0 ? Math.floor(times.reduce((a, b) => a + b, 0) / times.length) : 0;
   }
 
+  const isDbConnected = diagnostics.services.database.status === "connected" || diagnostics.services.database.status === "healthy";
+  const isStorageConnected = diagnostics.services.storage.status === "connected" || diagnostics.services.storage.status === "healthy";
+
   return {
     totalStudents,
     efrroExpiringSoon,
@@ -196,8 +199,8 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     nodeVersion: diagnostics.runtime.nodeVersion,
     nextVersion: diagnostics.runtime.nextVersion,
     
-    databaseStatus: diagnostics.services.database.status === "healthy" ? "Connected" : "Unhealthy",
-    storageStatus: diagnostics.services.storage.status === "healthy" 
+    databaseStatus: isDbConnected ? "Connected" : diagnostics.services.database.status === "not_configured" ? "Not configured" : "Unhealthy",
+    storageStatus: isStorageConnected 
       ? "Connected" 
       : diagnostics.services.storage.status === "not_configured" 
         ? "Not configured" 

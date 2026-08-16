@@ -17,7 +17,7 @@ import {
   Layers, 
   Copy, 
   Check,
-  AlertCircle
+  FolderArchive
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,9 +50,9 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      const updated = await fetchSystemDiagnosticsAction();
+      const updated = await fetchSystemDiagnosticsAction(true);
       setDiagnostics(updated);
-      toast.success("Diagnostics refreshed successfully");
+      toast.success("Live diagnostics refreshed");
     } catch (err: unknown) {
       console.error("[DIAGNOSTICS_REFRESH_FAILED]", err);
       toast.error("Failed to refresh system diagnostics");
@@ -81,12 +81,21 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
     }
   };
 
+  const formatBytes = (bytes?: number) => {
+    if (!bytes || bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
   const renderServiceBadge = (service: ServiceHealth) => {
     switch (service.status) {
+      case "connected":
       case "healthy":
         return (
           <div className="flex items-center gap-2">
-            {service.latencyMs !== null && (
+            {service.latencyMs !== null && service.latencyMs !== undefined && (
               <span className="text-[11px] font-mono text-muted-foreground">
                 {service.latencyMs} ms
               </span>
@@ -100,11 +109,6 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
       case "configured":
         return (
           <div className="flex items-center gap-2">
-            {service.latencyMs !== null && (
-              <span className="text-[11px] font-mono text-muted-foreground">
-                {service.latencyMs} ms
-              </span>
-            )}
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               Configured
@@ -115,14 +119,15 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
         return (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-muted/60 text-muted-foreground border border-border/40">
             <span className="h-1.5 w-1.5 rounded-full border border-muted-foreground" />
-            Not configured
+            Not Configured
           </span>
         );
+      case "disabled":
       case "not_integrated":
         return (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-muted/60 text-muted-foreground border border-border/40">
             <span className="h-1.5 w-1.5 rounded-full border border-muted-foreground" />
-            Not integrated
+            Not Configured
           </span>
         );
       case "unhealthy":
@@ -130,14 +135,14 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
       default:
         return (
           <div className="flex items-center gap-2">
-            {service.latencyMs !== null && (
+            {service.latencyMs !== null && service.latencyMs !== undefined && (
               <span className="text-[11px] font-mono text-muted-foreground">
                 {service.latencyMs} ms
               </span>
             )}
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-500/10 text-rose-500 border border-rose-500/20">
               <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-              {service.status === "unavailable" ? "Unavailable" : "Unhealthy"}
+              Unhealthy
             </span>
           </div>
         );
@@ -147,7 +152,7 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
   const { runtime, deployment, services } = diagnostics;
 
   return (
-    <Card className="border border-border/60 shadow-sm overflow-hidden">
+    <Card className="border border-border/60 shadow-sm overflow-hidden font-sans">
       {/* Panel Header */}
       <CardHeader className="bg-muted/10 border-b border-border/40 py-3.5 px-6 flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
@@ -289,7 +294,7 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
           </div>
         </div>
 
-        {/* Section 3: Services & Health */}
+        {/* Section 3: Services & Integrations */}
         <div>
           <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2.5 flex items-center gap-1.5">
             <Database className="h-3.5 w-3.5 text-muted-foreground" />
@@ -301,43 +306,65 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2">
                 <Database className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium text-foreground">Database</span>
+                <span className="font-medium text-foreground">Database (PostgreSQL / Supabase)</span>
               </div>
               {renderServiceBadge(services.database)}
             </div>
 
-            {/* Cloudflare R2 */}
-            <div className="flex items-center justify-between py-2.5">
-              <div className="flex items-center gap-2">
-                <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium text-foreground">{services.storage.providerName}</span>
+            {/* Cloudflare R2 Storage */}
+            <div className="py-2.5 space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="font-medium text-foreground">Storage (Cloudflare R2)</span>
+                </div>
+                {renderServiceBadge(services.storage)}
               </div>
-              {renderServiceBadge(services.storage)}
+              <div className="flex items-center justify-between pl-5 text-[11px] text-muted-foreground font-mono">
+                <span>Bucket: <strong className="text-foreground">{services.storage.bucket || "iscms-documents"}</strong></span>
+                {services.storage.objectCount !== undefined && (
+                  <span>{services.storage.objectCount} documents • {formatBytes(services.storage.approximateStorageBytes)}</span>
+                )}
+              </div>
             </div>
 
             {/* WhatsApp Business API */}
-            <div className="flex items-center justify-between py-2.5">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium text-foreground">{services.whatsapp.providerName}</span>
+            <div className="py-2.5 space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="font-medium text-foreground">WhatsApp Business API</span>
+                </div>
+                {renderServiceBadge(services.whatsapp)}
               </div>
-              {renderServiceBadge(services.whatsapp)}
+              {services.whatsapp.status === "not_configured" && (
+                <p className="text-[11px] text-muted-foreground pl-5">
+                  WhatsApp Business API credentials have not been configured.
+                </p>
+              )}
             </div>
 
-            {/* Email */}
-            <div className="flex items-center justify-between py-2.5">
-              <div className="flex items-center gap-2">
-                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium text-foreground">{services.email.providerName}</span>
+            {/* Email Service */}
+            <div className="py-2.5 space-y-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="font-medium text-foreground">Email Service</span>
+                </div>
+                {renderServiceBadge(services.email)}
               </div>
-              {renderServiceBadge(services.email)}
+              {services.email.status === "not_configured" && (
+                <p className="text-[11px] text-muted-foreground pl-5">
+                  Email service is not configured.
+                </p>
+              )}
             </div>
 
             {/* Bot Protection */}
             <div className="flex items-center justify-between py-2.5">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium text-foreground">{services.botProtection.providerName}</span>
+                <span className="font-medium text-foreground">Bot Protection (Cloudflare Turnstile)</span>
               </div>
               {renderServiceBadge(services.botProtection)}
             </div>

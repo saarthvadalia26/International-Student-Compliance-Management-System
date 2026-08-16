@@ -1,5 +1,13 @@
 import { IStorageProvider, StorageMetadata, StorageHealthCheckResult } from "./storage.provider";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+import { 
+  S3Client, 
+  PutObjectCommand, 
+  GetObjectCommand, 
+  DeleteObjectCommand, 
+  HeadObjectCommand, 
+  HeadBucketCommand,
+  ListObjectsV2Command
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export class CloudflareR2StorageProvider implements IStorageProvider {
@@ -156,40 +164,55 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
     }
   }
 
+  /**
+   * Performs an authoritative, non-destructive health check against the Cloudflare R2 bucket.
+   */
   async healthCheck(): Promise<StorageHealthCheckResult> {
     const accountId = process.env.R2_ACCOUNT_ID?.trim();
     const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
     const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
-    const bucketName = process.env.R2_BUCKET_NAME?.trim();
+    const targetBucket = this.getTargetBucket();
+    const checkedAt = new Date().toISOString();
 
-    if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
+    if (!accountId || !accessKeyId || !secretAccessKey) {
       return {
         status: "not_configured",
         providerName: "Cloudflare R2",
+        bucket: targetBucket,
+        checkedAt,
         latencyMs: null
       };
     }
 
-    const targetBucket = this.getTargetBucket();
     const start = Date.now();
 
     try {
-      const command = new HeadBucketCommand({ Bucket: targetBucket });
-      const sendPromise = this.s3Client.send(command);
+      // 1. Check bucket existence and permissions
+      const headBucketCommand = new HeadBucketCommand({ Bucket: targetBucket });
+      const headPromise = this.s3Client.send(headBucketCommand);
+
+      // 2. Perform harmless read check (fetch max 1 key)
+      const listCommand = new ListObjectsV2Command({ Bucket: targetBucket, MaxKeys: 1 });
+      const listPromise = this.s3Client.send(listCommand);
 
       let timeoutHandle: NodeJS.Timeout;
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(() => reject(new Error("Cloudflare R2 connectivity check timed out after 4000ms")), 4000);
       });
 
-      await Promise.race([sendPromise, timeoutPromise]).finally(() => {
+      await Promise.race([
+        Promise.all([headPromise, listPromise]),
+        timeoutPromise
+      ]).finally(() => {
         clearTimeout(timeoutHandle);
       });
 
       const latencyMs = Date.now() - start;
       return {
-        status: "healthy",
+        status: "connected",
         providerName: "Cloudflare R2",
+        bucket: targetBucket,
+        checkedAt,
         latencyMs
       };
     } catch (err: unknown) {
@@ -198,6 +221,8 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
       return {
         status: "unhealthy",
         providerName: "Cloudflare R2",
+        bucket: targetBucket,
+        checkedAt,
         latencyMs,
         error: sanitized.message
       };

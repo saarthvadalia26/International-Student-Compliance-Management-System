@@ -58,14 +58,18 @@ export interface IStorageProvider {
 
   /**
    * Performs a safe, non-mutating connectivity check to the storage provider.
-   * @returns Health status, latency in milliseconds, and provider name.
+   * @returns Health status, latency in milliseconds, bucket name, and provider name.
    */
   healthCheck(): Promise<StorageHealthCheckResult>;
 }
 
 export interface StorageHealthCheckResult {
-  status: "healthy" | "unhealthy" | "not_configured" | "unavailable";
+  status: "connected" | "healthy" | "unhealthy" | "not_configured" | "unavailable";
   providerName: string;
+  bucket?: string;
   latencyMs: number | null;
+  checkedAt?: string;
+  objectCount?: number;
+  approximateStorageBytes?: number;
   error?: string;
 }

@@ -10,7 +10,7 @@ export async function GET() {
   
   try {
     const diagnostics = await SystemDiagnosticsService.getDiagnostics();
-    const isDbHealthy = diagnostics.services.database.status === "healthy";
+    const isDbHealthy = diagnostics.services.database.status === "healthy" || diagnostics.services.database.status === "connected";
 
     const payload = {
       status: isDbHealthy ? "operational" : "degraded",

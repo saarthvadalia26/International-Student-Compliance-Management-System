@@ -662,8 +662,8 @@ async function runLifecycleTests() {
     todayISO
   });
 
-  assert(oldSchedule.schedule.length === 4, "Old schedule has 4 reminder milestones (90, 60, 30, 15 days)");
-  assert(newSchedule.schedule.length === 4, "New schedule has 4 reminder milestones (90, 60, 30, 15 days)");
+  assert(oldSchedule.schedule.length === 5, "Old schedule has 5 reminder milestones (90, 60, 30, 15, 7 days)");
+  assert(newSchedule.schedule.length === 5, "New schedule has 5 reminder milestones (90, 60, 30, 15, 7 days)");
 
   const old90 = oldSchedule.schedule.find(s => s.thresholdDays === 90);
   const new90 = newSchedule.schedule.find(s => s.thresholdDays === 90);

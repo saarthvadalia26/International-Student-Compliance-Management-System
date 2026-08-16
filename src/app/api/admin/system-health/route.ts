@@ -29,28 +29,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get("refresh") === "true" || searchParams.get("force") === "true";
 
-    const diagnostics = await SystemDiagnosticsService.getDiagnostics(forceRefresh);
+    const payload = await SystemDiagnosticsService.getSystemHealthApiResponse(forceRefresh);
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: diagnostics
-      },
-      {
-        status: 200,
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-          "Pragma": "no-cache",
-          "Expires": "0"
-        }
+    return NextResponse.json(payload, {
+      status: 200,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0"
       }
-    );
+    });
   } catch (error: unknown) {
-    console.error("[API_SYSTEM_HEALTH_ERROR]", error);
+    console.error("[API_ADMIN_SYSTEM_HEALTH_ERROR]", error);
     return NextResponse.json(
       {
-        success: false,
-        error: error instanceof Error ? error.message : "Internal system diagnostics error"
+        error: error instanceof Error ? error.message : "Internal system health diagnostics error"
       },
       { status: 500 }
     );

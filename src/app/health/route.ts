@@ -1,89 +1,52 @@
 import { NextResponse } from "next/server";
-import { getAdminSupabase } from "@/lib/supabase/admin";
-import { NotificationProviderFactory } from "@/domain/notifications/services/provider-factory";
+import { SystemDiagnosticsService } from "@/domain/system/services/system-diagnostics.service";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
-  const supabase = getAdminSupabase();
-  const timestamp = new Date().toISOString();
-  
-  // 1. Check Database Connectivity
-  let databaseStatus = "unhealthy";
-  let dbLatency = 0;
-  const dbStart = Date.now();
   try {
-    const { error } = await supabase.from("students").select("id").limit(1);
-    if (!error) {
-      databaseStatus = "healthy";
-    }
-    dbLatency = Date.now() - dbStart;
-  } catch (err) {
-    databaseStatus = "unhealthy";
-  }
+    const diagnostics = await SystemDiagnosticsService.getDiagnostics();
+    const isDbConnected = diagnostics.services.database.status === "connected" || diagnostics.services.database.status === "healthy";
+    const isStorageConnected = diagnostics.services.storage.status === "connected" || diagnostics.services.storage.status === "healthy";
 
-  // 2. Check Storage Connectivity
-  let storageStatus = "unhealthy";
-  try {
-    const { data, error } = await supabase.storage.listBuckets();
-    if (!error && data) {
-      storageStatus = "healthy";
-    }
-  } catch (err) {
-    storageStatus = "unhealthy";
-  }
+    const isHealthy = isDbConnected && (isStorageConnected || diagnostics.services.storage.status === "not_configured");
 
-  // 3. Check Email Provider Health
-  let emailStatus = "unhealthy";
-  let emailMetrics = null;
-  try {
-    const emailProvider = NotificationProviderFactory.getEmailProvider();
-    emailMetrics = await emailProvider.healthCheck();
-    emailStatus = emailMetrics.status;
-  } catch (err) {
-    emailStatus = "unhealthy";
-  }
-
-  // 4. Check WhatsApp Provider Health
-  let whatsappStatus = "unhealthy";
-  let whatsappMetrics = null;
-  try {
-    const whatsappProvider = NotificationProviderFactory.getWhatsAppProvider();
-    whatsappMetrics = await whatsappProvider.healthCheck();
-    whatsappStatus = whatsappMetrics.status;
-  } catch (err) {
-    whatsappStatus = "unhealthy";
-  }
-
-  const isHealthy = 
-    databaseStatus === "healthy" && 
-    storageStatus === "healthy" && 
-    emailStatus === "healthy" && 
-    whatsappStatus === "healthy";
-
-  return NextResponse.json(
-    {
-      status: isHealthy ? "healthy" : "unhealthy",
-      timestamp,
-      environment: process.env.NODE_ENV || "development",
-      services: {
-        database: {
-          status: databaseStatus,
-          latencyMs: dbLatency
-        },
-        storage: {
-          status: storageStatus
-        },
-        emailProvider: {
-          status: emailStatus,
-          details: emailMetrics
-        },
-        whatsappProvider: {
-          status: whatsappStatus,
-          details: whatsappMetrics
+    return NextResponse.json(
+      {
+        status: isHealthy ? "healthy" : "unhealthy",
+        timestamp: diagnostics.checkedAt,
+        environment: diagnostics.runtime.environment.toLowerCase(),
+        services: {
+          database: {
+            status: diagnostics.services.database.status,
+            latencyMs: diagnostics.services.database.latencyMs
+          },
+          storage: {
+            provider: diagnostics.services.storage.providerName,
+            status: diagnostics.services.storage.status,
+            bucket: diagnostics.services.storage.bucket
+          },
+          whatsappProvider: {
+            status: diagnostics.services.whatsapp.status,
+            message: diagnostics.services.whatsapp.message
+          },
+          emailProvider: {
+            status: diagnostics.services.email.status,
+            message: diagnostics.services.email.message
+          }
         }
-      }
-    },
-    { status: isHealthy ? 200 : 503 }
-  );
+      },
+      { status: isHealthy ? 200 : 503 }
+    );
+  } catch (err: unknown) {
+    return NextResponse.json(
+      {
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        error: err instanceof Error ? err.message : "Health check failure"
+      },
+      { status: 503 }
+    );
+  }
 }

@@ -325,9 +325,9 @@ async function runTestSuite() {
     existingNotifications: []
   });
 
-  assert.strictEqual(efrroReminders.schedule.length, 4, "Calculated 4 scheduled tiers (90d, 60d, 30d, 15d) without needing R2 file");
+  assert.strictEqual(efrroReminders.schedule.length, 5, "Calculated 5 scheduled tiers (90d, 60d, 30d, 15d, 7d) without needing R2 file");
 
-  // Confirm passport does not auto-generate eFRRO-style reminder queues
+  // Confirm passport calculates unified reminder tiers without requiring physical R2 file
   const passportReminders = ExpiryReminderEngine.calculateDocumentReminders({
     documentType: "passport",
     documentTitle: "Passport",
@@ -337,7 +337,7 @@ async function runTestSuite() {
     verificationStatus: "not_uploaded",
     existingNotifications: []
   });
-  assert.strictEqual(passportReminders.schedule.length, 0, "Passport does not auto-generate reminders");
+  assert.strictEqual(passportReminders.schedule.length, 5, "Passport calculates 5 reminder schedule tiers under unified architecture");
 
   console.log("✅ [PASS] eFRRO reminder calculations work reliably on metadata alone without requiring physical files");
 

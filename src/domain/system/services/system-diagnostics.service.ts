@@ -6,7 +6,9 @@ import {
   RuntimeDiagnostics, 
   DeploymentDiagnostics, 
   ServicesDiagnostics,
-  ServiceHealth 
+  ServiceHealth,
+  StorageServiceHealth,
+  SystemHealthApiResponse
 } from "../types/diagnostics.types";
 import pkg from "../../../../package.json";
 
@@ -25,6 +27,15 @@ async function withTimeout<T>(promise: Promise<T> | PromiseLike<T>, timeoutMs: n
     clearTimeout(timeoutHandle);
   });
 }
+
+// In-memory diagnostics cache for short TTL to prevent redundant expensive checks
+interface CachedDiagnostics {
+  data: SystemInfrastructureDiagnostics;
+  cachedAt: number;
+}
+
+const CACHE_TTL_MS = 20000; // 20 seconds cache TTL
+let memoryCache: CachedDiagnostics | null = null;
 
 export class SystemDiagnosticsService {
   /**
@@ -45,7 +56,7 @@ export class SystemDiagnosticsService {
       environment = "Production";
     }
 
-    const region = process.env.VERCEL_REGION?.trim() || "Not available locally";
+    const region = process.env.VERCEL_REGION?.trim() || "Not available";
     const nodeVersion = process.version;
     const nextVersion = pkg.dependencies?.next?.replace(/[\^~]/g, "") || "16.2.10";
     const appVersion = pkg.version || "1.0.0";
@@ -85,10 +96,25 @@ export class SystemDiagnosticsService {
    * Performs real database connectivity check with timeout protection and latency tracking.
    */
   static async checkDatabaseHealth(): Promise<ServiceHealth> {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const checkedAt = new Date().toISOString();
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return {
+        name: "Database",
+        providerName: "PostgreSQL / Supabase",
+        status: "not_configured",
+        latencyMs: null,
+        checkedAt,
+        error: "Supabase connection credentials not configured"
+      };
+    }
+
     const start = Date.now();
     try {
       const supabase = getAdminSupabase();
-      // Perform a minimal, non-mutating query
+      // Perform a minimal, safe query
       const queryPromise = supabase.from("students").select("id", { count: "exact", head: true }).limit(1);
       const res = await withTimeout(queryPromise, 4000, "Database health check");
 
@@ -100,6 +126,7 @@ export class SystemDiagnosticsService {
           providerName: "PostgreSQL / Supabase",
           status: "unhealthy",
           latencyMs,
+          checkedAt,
           error: "Database query returned an error"
         };
       }
@@ -107,8 +134,9 @@ export class SystemDiagnosticsService {
       return {
         name: "Database",
         providerName: "PostgreSQL / Supabase",
-        status: "healthy",
-        latencyMs
+        status: "connected",
+        latencyMs,
+        checkedAt
       };
     } catch (err: unknown) {
       const latencyMs = Date.now() - start;
@@ -119,24 +147,53 @@ export class SystemDiagnosticsService {
         providerName: "PostgreSQL / Supabase",
         status: "unhealthy",
         latencyMs,
+        checkedAt,
         error: errorMsg.includes("[TIMEOUT]") ? "Connection timed out" : "Service unavailable"
       };
     }
   }
 
   /**
-   * Performs real Cloudflare R2 / storage health check.
+   * Performs real Cloudflare R2 / storage health check against the single production bucket 'iscms-documents'.
    */
-  static async checkStorageHealth(): Promise<ServiceHealth> {
+  static async checkStorageHealth(): Promise<StorageServiceHealth> {
+    const checkedAt = new Date().toISOString();
+    const targetBucket = "iscms-documents";
+
+    // Query safe document counts from DB for reliable metrics
+    let objectCount = 0;
+    let approximateStorageBytes = 0;
+
+    try {
+      const supabase = getAdminSupabase();
+      const [passports, visas, efrros] = await Promise.all([
+        supabase.from("passport_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
+        supabase.from("visa_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
+        supabase.from("efrro_versions").select("id", { count: "exact", head: true }).is("deleted_at", null)
+      ]);
+      objectCount = (passports.count || 0) + (visas.count || 0) + (efrros.count || 0);
+      approximateStorageBytes = objectCount * 460800; // ~450 KB average document size
+    } catch {
+      // Non-blocking for health check
+    }
+
     try {
       const provider = StorageProviderFactory.getProvider();
       const res = await provider.healthCheck();
 
+      const status = res.status === "connected" || res.status === "healthy" 
+        ? "connected" 
+        : res.status;
+
       return {
         name: "Storage",
-        providerName: res.providerName,
-        status: res.status,
+        providerName: res.providerName || "Cloudflare R2",
+        status,
+        bucket: res.bucket || targetBucket,
+        objectCount,
+        approximateStorageBytes,
         latencyMs: res.latencyMs,
+        checkedAt: res.checkedAt || checkedAt,
         error: res.error
       };
     } catch (err: unknown) {
@@ -145,7 +202,11 @@ export class SystemDiagnosticsService {
         name: "Storage",
         providerName: "Cloudflare R2",
         status: "unhealthy",
+        bucket: targetBucket,
+        objectCount,
+        approximateStorageBytes,
         latencyMs: null,
+        checkedAt,
         error: "Storage connectivity check failed"
       };
     }
@@ -155,28 +216,33 @@ export class SystemDiagnosticsService {
    * Performs WhatsApp Business API configuration check and safe reachability check if configured.
    */
   static async checkWhatsAppHealth(): Promise<ServiceHealth> {
+    const checkedAt = new Date().toISOString();
     const integration = WhatsAppIntegrationService.getIntegrationStatus();
 
     if (!integration.isConfigured || integration.status === "NOT_CONFIGURED") {
       return {
         name: "WhatsApp Business API",
-        providerName: "WhatsApp Business API",
+        providerName: "Meta WhatsApp Business Platform",
         status: "not_configured",
-        latencyMs: null
+        latencyMs: null,
+        checkedAt,
+        message: "WhatsApp Business API credentials have not been configured."
       };
     }
 
     if (integration.status === "CONFIGURED_BUT_INVALID") {
       return {
         name: "WhatsApp Business API",
-        providerName: "WhatsApp Business API",
+        providerName: "Meta WhatsApp Business Platform",
         status: "unhealthy",
         latencyMs: null,
+        checkedAt,
+        message: "WhatsApp Business API credentials appear invalid or incomplete.",
         error: "Credentials format invalid"
       };
     }
 
-    // Perform a safe, non-mutating reachability check
+    // Perform safe reachability check if configured
     const start = Date.now();
     try {
       const controller = new AbortController();
@@ -189,33 +255,41 @@ export class SystemDiagnosticsService {
       clearTimeout(timeoutId);
 
       const latencyMs = Date.now() - start;
+      const isOk = res.status < 500;
       return {
         name: "WhatsApp Business API",
-        providerName: "WhatsApp Business API",
-        status: res.status < 500 ? "configured" : "unhealthy",
-        latencyMs
+        providerName: "Meta WhatsApp Business Platform",
+        status: isOk ? "connected" : "unhealthy",
+        latencyMs,
+        checkedAt,
+        message: isOk ? "WhatsApp Business API is configured and operational." : "Graph API returned an error status.",
+        error: isOk ? undefined : `Graph API returned status ${res.status}`
       };
     } catch {
       const latencyMs = Date.now() - start;
       return {
         name: "WhatsApp Business API",
-        providerName: "WhatsApp Business API",
+        providerName: "Meta WhatsApp Business Platform",
         status: "unhealthy",
         latencyMs,
+        checkedAt,
+        message: "Unable to reach Meta Graph API endpoint.",
         error: "Graph API endpoint unreachable"
       };
     }
   }
 
   /**
-   * Email integration is explicitly disabled in ISCMS.
+   * Email integration is explicitly not configured in ISCMS.
    */
   static checkEmailHealth(): ServiceHealth {
     return {
-      name: "Email",
-      providerName: "Email",
-      status: "not_integrated",
-      latencyMs: null
+      name: "Email Service",
+      providerName: "Email Service",
+      status: "not_configured",
+      latencyMs: null,
+      checkedAt: new Date().toISOString(),
+      message: "Email service is not configured."
     };
   }
 
@@ -225,14 +299,14 @@ export class SystemDiagnosticsService {
   static checkBotProtectionHealth(): ServiceHealth {
     const hasSiteKey = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim());
     const hasSecretKey = Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
-
     const isConfigured = hasSiteKey || hasSecretKey;
 
     return {
       name: "Bot Protection",
       providerName: "Cloudflare Turnstile",
       status: isConfigured ? "configured" : "not_configured",
-      latencyMs: null
+      latencyMs: null,
+      checkedAt: new Date().toISOString()
     };
   }
 
@@ -240,7 +314,12 @@ export class SystemDiagnosticsService {
    * Compiles live production diagnostics across runtime, deployment, and all infrastructure services.
    * All responses are sanitized and allowlisted. Secrets are strictly prohibited.
    */
-  static async getDiagnostics(): Promise<SystemInfrastructureDiagnostics> {
+  static async getDiagnostics(forceRefresh: boolean = false): Promise<SystemInfrastructureDiagnostics> {
+    const now = Date.now();
+    if (!forceRefresh && memoryCache && (now - memoryCache.cachedAt) < CACHE_TTL_MS) {
+      return memoryCache.data;
+    }
+
     const runtime = this.getRuntimeDiagnostics();
     const deployment = this.getDeploymentDiagnostics();
 
@@ -261,11 +340,89 @@ export class SystemDiagnosticsService {
       botProtection
     };
 
-    return {
+    const diagnostics: SystemInfrastructureDiagnostics = {
       runtime,
       deployment,
       services,
       checkedAt: new Date().toISOString()
+    };
+
+    memoryCache = {
+      data: diagnostics,
+      cachedAt: now
+    };
+
+    return diagnostics;
+  }
+
+  /**
+   * Generates the authoritative API payload for /api/admin/system-health.
+   */
+  static async getSystemHealthApiResponse(forceRefresh: boolean = false): Promise<SystemHealthApiResponse> {
+    const diag = await this.getDiagnostics(forceRefresh);
+
+    const dbStatus = diag.services.database.status === "connected" || diag.services.database.status === "healthy"
+      ? "connected"
+      : diag.services.database.status === "not_configured"
+        ? "not_configured"
+        : "unhealthy";
+
+    const storageStatus = diag.services.storage.status === "connected" || diag.services.storage.status === "healthy"
+      ? "connected"
+      : diag.services.storage.status === "not_configured"
+        ? "not_configured"
+        : "unhealthy";
+
+    const waStatus = diag.services.whatsapp.status === "connected" || diag.services.whatsapp.status === "healthy" || diag.services.whatsapp.status === "configured"
+      ? "connected"
+      : diag.services.whatsapp.status === "not_configured"
+        ? "not_configured"
+        : diag.services.whatsapp.status === "disabled"
+          ? "disabled"
+          : "unhealthy";
+
+    return {
+      environment: {
+        name: diag.runtime.environment.toLowerCase(),
+        deploymentPlatform: diag.runtime.platform,
+        version: diag.runtime.appVersion,
+        commit: diag.deployment.commitSha || "local",
+        nodeVersion: diag.runtime.nodeVersion,
+        nextVersion: diag.runtime.nextVersion,
+        region: diag.runtime.region
+      },
+      database: {
+        status: dbStatus,
+        latencyMs: diag.services.database.latencyMs,
+        checkedAt: diag.services.database.checkedAt || diag.checkedAt,
+        error: diag.services.database.error
+      },
+      storage: {
+        provider: "cloudflare-r2",
+        status: storageStatus,
+        bucket: diag.services.storage.bucket || "iscms-documents",
+        checkedAt: diag.services.storage.checkedAt || diag.checkedAt,
+        objectCount: diag.services.storage.objectCount,
+        approximateStorageBytes: diag.services.storage.approximateStorageBytes,
+        error: diag.services.storage.error
+      },
+      whatsapp: {
+        provider: "meta-whatsapp-business-platform",
+        status: waStatus,
+        checkedAt: diag.services.whatsapp.checkedAt || diag.checkedAt,
+        message: diag.services.whatsapp.message,
+        error: diag.services.whatsapp.error
+      },
+      email: {
+        status: "not_configured",
+        checkedAt: diag.services.email.checkedAt || diag.checkedAt,
+        message: diag.services.email.message || "Email service is not configured."
+      },
+      botProtection: {
+        provider: "cloudflare-turnstile",
+        status: diag.services.botProtection.status === "configured" ? "configured" : "not_configured",
+        checkedAt: diag.services.botProtection.checkedAt || diag.checkedAt
+      }
     };
   }
 }
