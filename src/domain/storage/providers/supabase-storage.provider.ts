@@ -1,4 +1,4 @@
-import { IStorageProvider, StorageMetadata } from "./storage.provider";
+import { IStorageProvider, StorageMetadata, StorageHealthCheckResult } from "./storage.provider";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 
 export class SupabaseStorageProvider implements IStorageProvider {
@@ -100,5 +100,45 @@ export class SupabaseStorageProvider implements IStorageProvider {
       contentType: fileMeta.metadata?.mimetype || "application/octet-stream",
       lastModified: new Date(fileMeta.updated_at || fileMeta.created_at || Date.now())
     };
+  }
+
+  async healthCheck(): Promise<StorageHealthCheckResult> {
+    const start = Date.now();
+    try {
+      const supabase = getAdminSupabase();
+      const listPromise = supabase.storage.listBuckets();
+
+      let timeoutHandle: NodeJS.Timeout;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error("Supabase storage health check timed out after 4000ms")), 4000);
+      });
+
+      const { error } = await Promise.race([listPromise, timeoutPromise]).finally(() => {
+        clearTimeout(timeoutHandle);
+      });
+
+      const latencyMs = Date.now() - start;
+      if (error) {
+        return {
+          status: "unhealthy",
+          providerName: "Supabase Storage",
+          latencyMs,
+          error: error.message
+        };
+      }
+
+      return {
+        status: "healthy",
+        providerName: "Supabase Storage",
+        latencyMs
+      };
+    } catch (err: unknown) {
+      return {
+        status: "unhealthy",
+        providerName: "Supabase Storage",
+        latencyMs: Date.now() - start,
+        error: err instanceof Error ? err.message : String(err)
+      };
+    }
   }
 }

@@ -1,5 +1,5 @@
-import { IStorageProvider, StorageMetadata } from "./storage.provider";
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { IStorageProvider, StorageMetadata, StorageHealthCheckResult } from "./storage.provider";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export class CloudflareR2StorageProvider implements IStorageProvider {
@@ -153,6 +153,54 @@ export class CloudflareR2StorageProvider implements IStorageProvider {
       };
     } catch (error: unknown) {
       throw this.sanitizeError(error, "[STORAGE_METADATA_FAILED]");
+    }
+  }
+
+  async healthCheck(): Promise<StorageHealthCheckResult> {
+    const accountId = process.env.R2_ACCOUNT_ID?.trim();
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
+    const bucketName = process.env.R2_BUCKET_NAME?.trim();
+
+    if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
+      return {
+        status: "not_configured",
+        providerName: "Cloudflare R2",
+        latencyMs: null
+      };
+    }
+
+    const targetBucket = this.getTargetBucket();
+    const start = Date.now();
+
+    try {
+      const command = new HeadBucketCommand({ Bucket: targetBucket });
+      const sendPromise = this.s3Client.send(command);
+
+      let timeoutHandle: NodeJS.Timeout;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error("Cloudflare R2 connectivity check timed out after 4000ms")), 4000);
+      });
+
+      await Promise.race([sendPromise, timeoutPromise]).finally(() => {
+        clearTimeout(timeoutHandle);
+      });
+
+      const latencyMs = Date.now() - start;
+      return {
+        status: "healthy",
+        providerName: "Cloudflare R2",
+        latencyMs
+      };
+    } catch (err: unknown) {
+      const latencyMs = Date.now() - start;
+      const sanitized = this.sanitizeError(err, "[R2_CONNECTIVITY_FAILED]");
+      return {
+        status: "unhealthy",
+        providerName: "Cloudflare R2",
+        latencyMs,
+        error: sanitized.message
+      };
     }
   }
 }

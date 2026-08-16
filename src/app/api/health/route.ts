@@ -1,40 +1,58 @@
 import { NextResponse } from "next/server";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { SystemDiagnosticsService } from "@/domain/system/services/system-diagnostics.service";
 
 const startTime = Date.now();
+
+export const revalidate = 0;
 
 export async function GET() {
   const uptime = Math.floor((Date.now() - startTime) / 1000);
   
-  let dbStatus = "unknown";
   try {
-    const supabase = await getServerSupabase();
-    const { error } = await supabase.from("students").select("id").limit(1);
-    dbStatus = error ? "unhealthy" : "healthy";
-  } catch (err) {
-    dbStatus = "unhealthy";
+    const diagnostics = await SystemDiagnosticsService.getDiagnostics();
+    const isDbHealthy = diagnostics.services.database.status === "healthy";
+
+    const payload = {
+      status: isDbHealthy ? "operational" : "degraded",
+      uptime,
+      timestamp: diagnostics.checkedAt,
+      version: diagnostics.runtime.appVersion,
+      commit: diagnostics.deployment.commitSha || "local",
+      environment: diagnostics.runtime.environment,
+      platform: diagnostics.runtime.platform,
+      region: diagnostics.runtime.region,
+      services: {
+        database: diagnostics.services.database.status,
+        storage: diagnostics.services.storage.status,
+        whatsappProvider: diagnostics.services.whatsapp.status,
+        emailProvider: diagnostics.services.email.status,
+        botProtection: diagnostics.services.botProtection.status
+      },
+      system: {
+        memoryUsage: process.memoryUsage().heapUsed,
+        nodeVersion: diagnostics.runtime.nodeVersion,
+        nextVersion: diagnostics.runtime.nextVersion
+      }
+    };
+
+    const statusCode = payload.status === "operational" ? 200 : 503;
+
+    return NextResponse.json(payload, { 
+      status: statusCode,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Pragma": "no-cache"
+      }
+    });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      {
+        status: "unhealthy",
+        uptime,
+        timestamp: new Date().toISOString(),
+        error: err instanceof Error ? err.message : "Health check failure"
+      },
+      { status: 503 }
+    );
   }
-
-  const payload = {
-    status: dbStatus === "healthy" ? "operational" : "degraded",
-    uptime,
-    timestamp: new Date().toISOString(),
-    version: process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0",
-    commit: process.env.VERCEL_GIT_COMMIT_SHA || "local",
-    services: {
-      database: dbStatus,
-      storage: "unknown", // To be implemented with storage ping
-      emailProvider: "unknown",
-      whatsappProvider: "unknown",
-      scheduler: "unknown"
-    },
-    system: {
-      memoryUsage: process.memoryUsage().heapUsed,
-      nodeVersion: process.version,
-    }
-  };
-
-  const statusCode = payload.status === "operational" ? 200 : 503;
-
-  return NextResponse.json(payload, { status: statusCode });
 }

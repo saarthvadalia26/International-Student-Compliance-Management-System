@@ -55,4 +55,17 @@ export interface IStorageProvider {
    * @returns The storage metadata.
    */
   getMetadata(bucket: string, path: string): Promise<StorageMetadata>;
+
+  /**
+   * Performs a safe, non-mutating connectivity check to the storage provider.
+   * @returns Health status, latency in milliseconds, and provider name.
+   */
+  healthCheck(): Promise<StorageHealthCheckResult>;
+}
+
+export interface StorageHealthCheckResult {
+  status: "healthy" | "unhealthy" | "not_configured" | "unavailable";
+  providerName: string;
+  latencyMs: number | null;
+  error?: string;
 }

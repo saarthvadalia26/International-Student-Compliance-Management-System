@@ -4,8 +4,8 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { requireAdministrator } from "@/lib/auth/permissions";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
-import { NotificationProviderFactory } from "@/domain/notifications/services/provider-factory";
-
+import { SystemDiagnosticsService } from "@/domain/system/services/system-diagnostics.service";
+import { SystemInfrastructureDiagnostics } from "@/domain/system/types/diagnostics.types";
 
 export interface SystemHealthMetrics {
   totalStudents: number;
@@ -20,7 +20,10 @@ export interface SystemHealthMetrics {
   lastCleanupStatus: string;
   lastCleanupTime: string;
 
-  // Sprint 08 Operations Metrics
+  // Real production infrastructure diagnostics
+  diagnostics: SystemInfrastructureDiagnostics;
+
+  // Legacy field compatibility
   applicationVersion: string;
   environment: string;
   deploymentPlatform: string;
@@ -44,6 +47,17 @@ export interface SystemHealthMetrics {
   averageProcessingTimeMs: number;
 }
 
+/**
+ * Server action to fetch real live production diagnostics for client refresh
+ */
+export async function fetchSystemDiagnosticsAction(): Promise<SystemInfrastructureDiagnostics> {
+  const serverSupabase = await getServerSupabase();
+  const { data: { user } } = await serverSupabase.auth.getUser();
+  requireAdministrator(user);
+
+  return SystemDiagnosticsService.getDiagnostics();
+}
+
 export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
   // Backend authorization — Administrator only
   const serverSupabase = await getServerSupabase();
@@ -53,11 +67,7 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
   const supabase = getAdminSupabase();
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
 
-  // Load provider singletons
-  const emailProvider = NotificationProviderFactory.getEmailProvider();
-  const whatsappProvider = NotificationProviderFactory.getWhatsAppProvider();
-
-  // Execute database counts in parallel
+  // Execute database counts and real infrastructure diagnostics in parallel
   const [
     studentsRes,
     expiringSoonRes,
@@ -73,8 +83,7 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     efrroCountRes,
     cleanupRes,
     latestJobRes,
-    emailHealthRes,
-    whatsappHealthRes
+    diagnostics
   ] = await Promise.all([
     supabase.from("students").select("id", { count: "exact", head: true }),
     supabase.from("student_snapshot").select("student_id", { count: "exact", head: true }).eq("efrro_status", "WARNING"),
@@ -114,9 +123,8 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     // Latest scheduled job execution
     supabase.from("scheduled_jobs").select("*").order("created_at", { ascending: false }).limit(5),
 
-    // Provider health checks
-    emailProvider.healthCheck(),
-    whatsappProvider.healthCheck()
+    // Live production diagnostics
+    SystemDiagnosticsService.getDiagnostics()
   ]);
 
   const totalStudents = studentsRes.count || 0;
@@ -174,22 +182,33 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     lastCleanupStatus,
     lastCleanupTime,
 
-    applicationVersion: process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || "v1.2.0-release",
-    environment: process.env.NODE_ENV === "production" ? "Production" : "Development",
-    deploymentPlatform: process.env.VERCEL ? "Vercel" : "Local Environment",
-    deploymentType: process.env.VERCEL_ENV ? (process.env.VERCEL_ENV.charAt(0).toUpperCase() + process.env.VERCEL_ENV.slice(1)) : "Local",
-    deploymentTime: process.env.VERCEL ? new Date().toLocaleString() : "Live", // Best approximation without external build scripts
-    deploymentRegion: process.env.VERCEL_REGION || "Local/Unknown",
-    nodeVersion: process.version,
-    nextVersion: "16.2.10",
+    diagnostics,
+
+    // Real values mapped to legacy fields
+    applicationVersion: diagnostics.runtime.appVersion,
+    environment: diagnostics.runtime.environment,
+    deploymentPlatform: diagnostics.runtime.platform,
+    deploymentType: diagnostics.runtime.environment,
+    deploymentTime: diagnostics.deployment.deployedAt 
+      ? new Date(diagnostics.deployment.deployedAt).toLocaleString() 
+      : "Local / Development",
+    deploymentRegion: diagnostics.runtime.region,
+    nodeVersion: diagnostics.runtime.nodeVersion,
+    nextVersion: diagnostics.runtime.nextVersion,
     
-    databaseStatus: studentsRes.error ? "Offline" : "Connected",
-    storageStatus: process.env.STORAGE_PROVIDER === "cloudflare-r2" ? "Cloudflare R2 Connected" : "Connected", 
-    emailProviderName: emailHealthRes.providerName,
-    emailProviderStatus: emailHealthRes.status,
-    whatsappProviderName: whatsappHealthRes.providerName,
-    whatsappProviderStatus: whatsappHealthRes.status,
-    botProtectionStatus: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? "Cloudflare Turnstile Active" : "Disabled",
+    databaseStatus: diagnostics.services.database.status === "healthy" ? "Connected" : "Unhealthy",
+    storageStatus: diagnostics.services.storage.status === "healthy" 
+      ? "Connected" 
+      : diagnostics.services.storage.status === "not_configured" 
+        ? "Not configured" 
+        : "Unhealthy",
+    emailProviderName: diagnostics.services.email.providerName,
+    emailProviderStatus: diagnostics.services.email.status,
+    whatsappProviderName: diagnostics.services.whatsapp.providerName,
+    whatsappProviderStatus: diagnostics.services.whatsapp.status,
+    botProtectionStatus: diagnostics.services.botProtection.status === "configured" 
+      ? "Cloudflare Turnstile Active" 
+      : "Not configured",
     
     lastSchedulerRun,
     nextSchedulerRun,
