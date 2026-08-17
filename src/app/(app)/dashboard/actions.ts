@@ -92,12 +92,12 @@ async function _fetchAnalyticsChartsInternal() {
     const courseName = refMap[row.program_code] || row.program_code || "Unknown";
     courseCounts[courseName] = (courseCounts[courseName] || 0) + 1;
 
-    // School mapping fallback
-    const schoolName = "School of Forensic Sciences";
-    schoolCounts[schoolName] = (schoolCounts[schoolName] || 0) + 1;
+    // School grouping — uses course name as proxy (school field is not in current data model)
+    schoolCounts[courseName] = (schoolCounts[courseName] || 0) + 1;
   });
   const studentsByCourse = Object.entries(courseCounts).map(([name, value]) => ({ name, value }));
   const studentsBySchool = Object.entries(schoolCounts).map(([name, value]) => ({ name, value }));
+
 
   // 4. Monthly Admissions
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

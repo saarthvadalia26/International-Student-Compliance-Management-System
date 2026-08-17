@@ -106,4 +106,65 @@ describe("Staff & Administrator Identity System Test Suite", () => {
       assert.notStrictEqual(staffAccount.fullName, staffAccount.authIdentifier.split("@")[0]);
     });
   });
+
+  describe("5. Audit Log Identity Support (User Deletion & Privileged Actions)", () => {
+    it("should preserve real administrator name on UserDeletionAuditEntry", () => {
+      const deletionEntry: import("../src/lib/audit/audit.service").UserDeletionAuditEntry = {
+        adminId: "admin-uuid-1234",
+        adminEmail: "admin@nfsu.ac.in",
+        adminName: "Dr. Skvadalia Shah",
+        targetUserId: "staff-uuid-5678",
+        targetUserEmail: "staff.john@nfsu.ac.in",
+        targetRole: "staff",
+        sessionsTerminated: 1,
+        ipAddress: "127.0.0.1",
+        userAgent: "Mozilla/5.0",
+        reason: "Administrator Account Deletion",
+        success: true,
+      };
+
+      assert.strictEqual(deletionEntry.adminName, "Dr. Skvadalia Shah");
+      assert.strictEqual(deletionEntry.adminEmail, "admin@nfsu.ac.in");
+      assert.strictEqual(deletionEntry.targetUserId, "staff-uuid-5678");
+      assert.strictEqual(deletionEntry.success, true);
+    });
+
+    it("should allow optional adminName on UserDeletionAuditEntry when unpopulated", () => {
+      const deletionEntry: import("../src/lib/audit/audit.service").UserDeletionAuditEntry = {
+        adminId: "admin-uuid-1234",
+        adminEmail: "admin@nfsu.ac.in",
+        targetUserId: "staff-uuid-5678",
+        targetUserEmail: "staff.john@nfsu.ac.in",
+        targetRole: "staff",
+        sessionsTerminated: 0,
+        success: false,
+      };
+
+      assert.strictEqual(deletionEntry.adminName, undefined);
+      assert.strictEqual(deletionEntry.success, false);
+    });
+
+    it("should preserve real administrator name on FactoryResetAuditEntry", () => {
+      const resetEntry: import("../src/lib/audit/audit.service").FactoryResetAuditEntry = {
+        adminId: "admin-uuid-1234",
+        adminEmail: "admin@nfsu.ac.in",
+        adminName: "Dr. Skvadalia Shah",
+        reason: "Pre-handover factory reset",
+        deletedCounts: {
+          users: 10,
+          students: 50,
+          passportVersions: 50,
+          visaVersions: 50,
+          efrroVersions: 50,
+          notifications: 100,
+          auditLogs: 500,
+          configRows: 5,
+        },
+      };
+
+      assert.strictEqual(resetEntry.adminName, "Dr. Skvadalia Shah");
+      assert.strictEqual(resetEntry.deletedCounts.users, 10);
+    });
+  });
 });
+

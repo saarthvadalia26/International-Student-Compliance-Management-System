@@ -17,7 +17,11 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null);
+  // When Turnstile is not configured (no site key), skip the token requirement.
+  const isTurnstileConfigured = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim());
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(
+    isTurnstileConfigured ? null : "no-turnstile-configured"
+  );
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
@@ -39,7 +43,7 @@ export default function LoginPage() {
       return;
     }
     
-    if (!turnstileToken) {
+    if (!turnstileToken && isTurnstileConfigured) {
       setError("Please complete the security check.");
       return;
     }
@@ -164,19 +168,21 @@ export default function LoginPage() {
                 />
               </div>
 
-              <div className="pt-2 flex justify-center w-full">
-                <TurnstileStub 
-                  onVerify={(token) => setTurnstileToken(token)} 
-                  onError={() => setError("Security check failed. Please refresh the page.")}
-                />
-              </div>
+              {isTurnstileConfigured && (
+                <div className="pt-2 flex justify-center w-full">
+                  <TurnstileStub 
+                    onVerify={(token) => setTurnstileToken(token)} 
+                    onError={() => setError("Security check failed. Please refresh the page.")}
+                  />
+                </div>
+              )}
             </CardContent>
 
             <CardFooter className="flex flex-col gap-3 pt-6">
               <AsyncActionButton
                 type="submit"
                 className="w-full h-9 text-sm"
-                disabled={!turnstileToken || isLoading}
+                disabled={(isTurnstileConfigured && !turnstileToken) || isLoading}
                 isLoading={isLoading}
                 isSuccess={isSuccess}
                 isError={isError}

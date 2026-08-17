@@ -121,12 +121,14 @@ export async function POST(req: Request) {
     await auditService.logInitialAdminSetup({
       adminId: user.id,
       adminEmail: user.email ?? admin.email,
+      adminName: admin.fullName,
       ipAddress,
     });
 
     await auditService.logConfigChange({
       userId: user.id,
       userEmail: user.email ?? admin.email,
+      userName: admin.fullName,
       setting: "INITIAL_SETUP_WIZARD_COMPLETED",
       previousValue: "uninitialized",
       newValue: "initialized",

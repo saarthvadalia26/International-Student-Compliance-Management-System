@@ -344,8 +344,8 @@ export class DocumentUploadEligibilityEngine {
     const { DocumentReplacementRequestService } = await import("./replacement-request.service");
     const activeReplacementRequest = await DocumentReplacementRequestService.getActiveRequest(studentId, documentType);
 
-    // Fallback for demo student when database rows do not exist
-    let resolvedActiveDoc = activeDoc ? {
+    // Resolve active document version info
+    const resolvedActiveDoc = activeDoc ? {
       versionNumber: activeDoc.version_number,
       filePath: activeDoc.file_path,
       verificationStatus: isVerified(activeDoc.verification_status) ? "verified" as const : "pending" as const,
@@ -353,18 +353,6 @@ export class DocumentUploadEligibilityEngine {
       expiryDate: activeDoc.expiry_date,
       issueDate: activeDoc.issue_date
     } : null;
-
-    if (!resolvedActiveDoc && !pendingDoc && (studentId === "demo-student-id-101")) {
-      const demoExpiry = documentType === "passport" ? "2029-10-15" : "2027-07-31";
-      resolvedActiveDoc = {
-        versionNumber: 1,
-        filePath: `mock/${studentId}/${documentType}.pdf`,
-        verificationStatus: "verified",
-        isActive: true,
-        expiryDate: demoExpiry,
-        issueDate: "2024-01-01"
-      };
-    }
 
     return this.calculateEligibility({
       documentType,

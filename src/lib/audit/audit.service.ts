@@ -61,6 +61,7 @@ export interface ConfigChangeAuditEntry {
 export interface UserDeletionAuditEntry {
   adminId: string;
   adminEmail: string;
+  adminName?: string;
   targetUserId: string;
   targetUserEmail: string;
   targetRole: string;
@@ -74,6 +75,7 @@ export interface UserDeletionAuditEntry {
 export interface FactoryResetAuditEntry {
   adminId: string;
   adminEmail: string;
+  adminName?: string;
   ipAddress?: string;
   userAgent?: string;
   reason: string;
@@ -235,6 +237,7 @@ const auditService = {
     await admin.from("audit_log").insert({
       actor_id: entry.adminId,
       actor_email: entry.adminEmail,
+      actor_name: entry.adminName ?? null,
       action: "FACTORY_RESET",
       resource: "system",
       category: "security",

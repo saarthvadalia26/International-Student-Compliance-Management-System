@@ -595,6 +595,7 @@ export async function deleteStaffAccountAction(targetUserId: string): Promise<vo
     await auditService.logUserDeletion({
       adminId: adminUser.id,
       adminEmail: adminUser.email ?? "unknown",
+      adminName: (adminUser.user_metadata?.full_name as string) || undefined,
       targetUserId,
       targetUserEmail: targetUser.email ?? "unknown",
       targetRole,
@@ -611,6 +612,7 @@ export async function deleteStaffAccountAction(targetUserId: string): Promise<vo
   await auditService.logUserDeletion({
     adminId: adminUser.id,
     adminEmail: adminUser.email ?? "unknown",
+    adminName: (adminUser.user_metadata?.full_name as string) || undefined,
     targetUserId,
     targetUserEmail: targetUser.email ?? "unknown",
     targetRole,
@@ -731,6 +733,7 @@ export async function factoryResetAction(password: string): Promise<FactoryReset
   await auditService.logFactoryReset({
     adminId: adminUser.id,
     adminEmail: adminUser.email ?? "unknown",
+    adminName: (adminUser.user_metadata?.full_name as string) || undefined,
     ipAddress: meta.ipAddress,
     userAgent: meta.userAgent,
     reason: "Pre-handover factory reset for NFSU deployment",
@@ -864,6 +867,8 @@ export async function updateDocumentUploadPoliciesAction(
 
     await adminSupabase.from("audit_log").insert({
       actor_id: adminUser.id,
+      actor_email: adminUser.email ?? "unknown",
+      actor_name: (adminUser.user_metadata?.full_name as string) || null,
       action: "DOCUMENT_UPLOAD_POLICIES_UPDATED",
       resource: "document_upload_policies",
       filters_applied: { updates, updatedBy: adminUser.email || adminUser.id }
@@ -929,6 +934,8 @@ export async function updateSystemPreferencesAction(updates: {
     const adminSupabase = getAdminSupabase();
     await adminSupabase.from("audit_log").insert({
       actor_id: adminUser.id,
+      actor_email: adminUser.email ?? "unknown",
+      actor_name: (adminUser.user_metadata?.full_name as string) || null,
       action: "SYSTEM_PREFERENCES_UPDATED",
       resource: "system_config/preferences",
       filters_applied: {

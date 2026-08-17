@@ -17,6 +17,11 @@ interface StoredOtpRecord {
 const memoryOtpStore = new Map<string, StoredOtpRecord>();
 
 const whatsappService = new WhatsAppService();
+// SECURITY: SUPABASE_JWT_SECRET must be configured in production.
+// Falling back to a hardcoded default will make OTP tokens cryptographically weak.
+if (!process.env.SUPABASE_JWT_SECRET && process.env.NODE_ENV === "production") {
+  console.warn("[SECURITY_WARNING] SUPABASE_JWT_SECRET is not set. Student OTP HMAC is using an insecure default secret. Set SUPABASE_JWT_SECRET in the production environment.");
+}
 const OTP_SECRET = process.env.SUPABASE_JWT_SECRET || "nfsu-iscm-otp-secret-2026";
 
 export class StudentOtpService {

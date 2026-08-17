@@ -7,13 +7,17 @@
 
 export const FEATURE_FLAGS = {
   /**
-   * Temporary testing mode flag: Bypasses OTP authentication for Student Portal
+   * Development/testing mode flag: Bypasses OTP authentication for Student Portal
    * and loads a fully functional demo student session for testing.
-   * Default: true (Testing mode active until explicitly set to "false" in environment).
+   *
+   * PRODUCTION SAFETY: Defaults to FALSE (secure). Must be explicitly set to "true"
+   * in the environment for development/testing only. Never enable in production.
+   *
+   * To enable for local development: STUDENT_PORTAL_TEST_MODE=true
    */
-  STUDENT_PORTAL_TEST_MODE: 
-    process.env.NEXT_PUBLIC_STUDENT_PORTAL_TEST_MODE !== "false" && 
-    process.env.STUDENT_PORTAL_TEST_MODE !== "false",
+  STUDENT_PORTAL_TEST_MODE:
+    process.env.NEXT_PUBLIC_STUDENT_PORTAL_TEST_MODE === "true" ||
+    process.env.STUDENT_PORTAL_TEST_MODE === "true",
 
   /**
    * Enables or disables the Student Portal.

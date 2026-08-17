@@ -32,8 +32,11 @@ export default function StudentLoginPage() {
   const [maskedPhone, setMaskedPhone] = React.useState("");
   const [otpDigits, setOtpDigits] = React.useState<string[]>(["", "", "", "", "", ""]);
   
-  // Turnstile security check
-  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(null);
+  // Turnstile security check — skip if Turnstile is not configured
+  const isTurnstileConfigured = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim());
+  const [turnstileToken, setTurnstileToken] = React.useState<string | null>(
+    isTurnstileConfigured ? null : "no-turnstile-configured"
+  );
   
   // Status flags
   const [error, setError] = React.useState<string | null>(null);
@@ -73,7 +76,7 @@ export default function StudentLoginPage() {
       return;
     }
 
-    if (!turnstileToken) {
+    if (!turnstileToken && isTurnstileConfigured) {
       setError("Please complete the security check.");
       return;
     }
