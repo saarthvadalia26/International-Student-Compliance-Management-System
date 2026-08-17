@@ -7,6 +7,7 @@ import {
   StudentReminderHistoryRow
 } from "../types";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
+import { getCountryByCode } from "@/utils/countries";
 
 export interface IStudentPortalRepository {
   getStudentProfile(studentId: string): Promise<StudentPortalProfile | null>;
@@ -148,13 +149,16 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
     const visaDaysRemaining = visaExp ? Math.round((new Date(visaExp).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)) : null;
     const efrroDaysRemaining = efrroExp ? Math.round((new Date(efrroExp).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24)) : (snapshot?.days_until_efrro_expiry !== undefined ? snapshot.days_until_efrro_expiry : null);
 
+    const natCode = personal?.nationality_code || "";
+    const countryName = natCode ? (getCountryByCode(natCode)?.name || natCode) : "";
+
     return {
       studentId: student.id,
       fullName: personal?.full_name || "",
       registrationNumber: student.registration_number,
       programme: refMap[progCode] || progCode || "Postgraduate Studies",
       school: "School of Forensic Sciences",
-      nationality: personal?.nationality_code || "",
+      nationality: countryName,
       email: contact?.email || "",
       phoneHome: contact?.phone_home || "",
       phoneLocal: contact?.phone_local || "",

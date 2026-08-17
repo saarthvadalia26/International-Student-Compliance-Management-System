@@ -141,18 +141,18 @@ export function DocumentReminderSchedule({
       : "eFRRO / Residential Permit";
 
   return (
-    <Card className={`border border-border/70 shadow-sm overflow-hidden bg-card w-full max-w-full min-w-0 ${className}`}>
+    <Card className={`border border-border/70 shadow-xs overflow-hidden bg-card w-full max-w-full min-w-0 box-border @container ${className}`}>
       {/* 1. CARD HEADER */}
-      <CardHeader className="pb-3 border-b border-border/40 bg-muted/10 flex flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <CardHeader className="p-3 sm:p-4 pb-3 border-b border-border/40 bg-muted/10 flex flex-row items-center justify-between gap-2.5 w-full min-w-0 box-border">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
             <Bell className="h-3.5 w-3.5" />
           </div>
-          <div className="min-w-0">
-            <CardTitle className="text-xs font-bold text-foreground uppercase tracking-wider truncate">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-[11px] sm:text-xs font-bold text-foreground uppercase tracking-wider truncate">
               Document Reminder Schedule
             </CardTitle>
-            <CardDescription className="text-[10px] font-caption text-muted-foreground truncate">
+            <CardDescription className="text-[9px] sm:text-[10px] font-caption text-muted-foreground truncate">
               Automated expiry-driven WhatsApp notification timetable
             </CardDescription>
           </div>
@@ -173,12 +173,12 @@ export function DocumentReminderSchedule({
         )}
       </CardHeader>
 
-      <CardContent className="p-3.5 sm:p-4 space-y-4 text-xs w-full max-w-full min-w-0">
+      <CardContent className="p-3 sm:p-4 space-y-3.5 text-xs w-full max-w-full min-w-0 box-border overflow-hidden">
         {/* 2. DOCUMENT SELECTOR TABS (Responsive Segmented Control with EXACTLY ONE dot per tab) */}
         <div 
           role="tablist" 
           aria-label="Compliance Document Types" 
-          className="grid grid-cols-3 gap-1 p-1 bg-muted/50 dark:bg-muted/30 rounded-lg border border-border/60 text-xs w-full min-w-0"
+          className="grid grid-cols-3 gap-1 p-1 bg-muted/50 dark:bg-muted/30 rounded-lg border border-border/60 text-xs w-full min-w-0 box-border"
         >
           {DOCUMENT_TAB_CONFIG.map(({ type, label }) => {
             const isSelected = selectedDocType === type;
@@ -193,7 +193,7 @@ export function DocumentReminderSchedule({
                 aria-selected={isSelected}
                 aria-controls={`reminder-panel-${type}`}
                 onClick={() => onSelectDocType(type)}
-                className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-[11px] font-medium transition-all cursor-pointer min-w-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 px-1 sm:px-2 rounded-md text-[10px] sm:text-[11px] font-medium transition-all cursor-pointer min-w-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                   isSelected
                     ? "bg-background text-foreground font-semibold shadow-xs ring-1 ring-border/80"
                     : "text-muted-foreground hover:text-foreground hover:bg-background/40"
@@ -215,16 +215,16 @@ export function DocumentReminderSchedule({
           id={`reminder-panel-${selectedDocType}`}
           role="tabpanel"
           aria-labelledby={`reminder-tab-${selectedDocType}`}
-          className="space-y-3.5 w-full min-w-0"
+          className="space-y-3.5 w-full min-w-0 box-border"
         >
           {isLoading && !schedule ? (
-            <div className="py-8 text-center text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-center gap-2 rounded-lg border border-border/40 bg-muted/10">
+            <div className="py-8 text-center text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-center gap-2 rounded-lg border border-border/40 bg-muted/10 w-full min-w-0">
               <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
               <span>Loading reminder schedule...</span>
             </div>
           ) : !currentDoc?.expiryDate ? (
             /* Empty State: Expiry date not recorded */
-            <div className="py-6 sm:py-8 text-center space-y-2 rounded-lg border border-dashed border-border/70 p-4 bg-muted/5 w-full min-w-0">
+            <div className="py-6 sm:py-8 text-center space-y-2 rounded-lg border border-dashed border-border/70 p-4 bg-muted/5 w-full min-w-0 box-border">
               <CalendarDays className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground/60 mx-auto" />
               <p className="font-semibold text-xs text-foreground">
                 {docTitle} expiry date not available
@@ -234,10 +234,10 @@ export function DocumentReminderSchedule({
               </p>
             </div>
           ) : (
-            <div className="space-y-3.5 w-full min-w-0">
+            <div className="space-y-3.5 w-full min-w-0 box-border">
               {/* Active Source Expiry Date Banner */}
-              <div className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 w-full min-w-0 ${activeDocTheme.bannerClass}`}>
-                <div className="space-y-0.5 min-w-0">
+              <div className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 w-full min-w-0 box-border ${activeDocTheme.bannerClass}`}>
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <span className={`text-[10px] uppercase tracking-wider font-semibold font-caption block truncate ${activeDocTheme.bannerTitleClass}`}>
                     Active {docTitle} Expiry
                   </span>
@@ -247,35 +247,35 @@ export function DocumentReminderSchedule({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                   {/* Physical Document State Badge */}
                   {!currentDoc.isUploaded || currentDoc.verificationStatus === "not_uploaded" ? (
-                    <Badge variant="outline" className="text-[9px] h-5 font-medium text-muted-foreground border-border/60 bg-muted/20">
+                    <Badge variant="outline" className="text-[9px] h-5 font-medium text-muted-foreground border-border/60 bg-muted/20 whitespace-nowrap">
                       Document Not Uploaded
                     </Badge>
                   ) : currentDoc.verificationStatus === "pending" ? (
-                    <Badge variant="outline" className="text-[9px] h-5 font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30">
+                    <Badge variant="outline" className="text-[9px] h-5 font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30 whitespace-nowrap">
                       Document Pending Verification
                     </Badge>
                   ) : currentDoc.verificationStatus === "verified" ? (
-                    <Badge variant="outline" className="text-[9px] h-5 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30">
+                    <Badge variant="outline" className="text-[9px] h-5 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30 whitespace-nowrap">
                       Document Verified
                     </Badge>
                   ) : currentDoc.verificationStatus === "rejected" ? (
-                    <Badge variant="destructive" className="text-[9px] h-5 font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30">
+                    <Badge variant="destructive" className="text-[9px] h-5 font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 whitespace-nowrap">
                       Document Rejected
                     </Badge>
                   ) : null}
 
                   {currentDoc.isExpired ? (
-                    <Badge variant="destructive" className="text-[10px] h-5 font-semibold">Expired</Badge>
+                    <Badge variant="destructive" className="text-[10px] h-5 font-semibold whitespace-nowrap">Expired</Badge>
                   ) : (
-                    <Badge variant="outline" className={`text-[10px] h-5 font-mono font-medium ${activeDocTheme.badgeClass}`}>
+                    <Badge variant="outline" className={`text-[10px] h-5 font-mono font-medium whitespace-nowrap ${activeDocTheme.badgeClass}`}>
                       {currentDoc.daysRemaining} days left
                     </Badge>
                   )}
                   
-                  <Badge variant="outline" className="text-[9px] h-5 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 font-medium flex items-center gap-1">
+                  <Badge variant="outline" className="text-[9px] h-5 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 font-medium flex items-center gap-1 whitespace-nowrap">
                     <MessageSquare className="h-2.5 w-2.5" /> WhatsApp
                   </Badge>
                 </div>
@@ -283,7 +283,7 @@ export function DocumentReminderSchedule({
 
               {/* Expired State Warning Callout */}
               {currentDoc.isExpired && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2 rounded-md bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-700 dark:text-rose-300 w-full min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2 rounded-md bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-700 dark:text-rose-300 w-full min-w-0 box-border">
                   <div className="flex items-start sm:items-center gap-1.5 min-w-0 flex-1">
                     <XCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5 sm:mt-0" />
                     <span className="leading-snug break-words">
@@ -298,7 +298,7 @@ export function DocumentReminderSchedule({
 
               {/* Critical Alert Callout for Expiry within 15 Days */}
               {currentDoc.daysRemaining !== null && currentDoc.daysRemaining <= 15 && !currentDoc.isExpired && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200 w-full min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200 w-full min-w-0 box-border">
                   <div className="flex items-start sm:items-center gap-1.5 min-w-0 flex-1">
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
                     <span className="leading-snug break-words">
@@ -313,10 +313,10 @@ export function DocumentReminderSchedule({
 
               {/* Metadata Tracking Notice when physical document copy has not been uploaded */}
               {!currentDoc.isUploaded && (
-                <div className="flex items-start sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2 rounded-md bg-muted/30 border border-border/50 text-[11px] text-muted-foreground w-full min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2.5 rounded-md bg-muted/30 border border-border/50 text-[11px] text-muted-foreground w-full min-w-0 box-border">
                   <div className="flex items-start sm:items-center gap-1.5 min-w-0 flex-1">
                     <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 sm:mt-0" />
-                    <span className="leading-snug break-words">
+                    <span className="leading-relaxed break-words text-[11px]">
                       The system tracks when the {docTitle.toLowerCase()} expires, but the physical document has not yet been uploaded.
                     </span>
                   </div>
@@ -326,81 +326,83 @@ export function DocumentReminderSchedule({
                 </div>
               )}
 
-              {/* 4A. DESKTOP/TABLET TABLE VIEW (Visible on tablet & desktop >= md) */}
-              <div className="hidden md:block rounded-lg border border-border/60 overflow-hidden bg-card w-full max-w-full min-w-0">
-                <table className="w-full text-[11px] text-left">
-                  <thead className="bg-muted/40 text-[10px] text-muted-foreground uppercase border-b border-border/50">
-                    <tr>
-                      <th className="py-2.5 px-3 font-semibold">Reminder</th>
-                      <th className="py-2.5 px-2.5 font-semibold">Trigger</th>
-                      <th className="py-2.5 px-2.5 font-semibold">Scheduled Date</th>
-                      <th className="py-2.5 px-3 font-semibold text-right">Status & Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/30">
-                    {currentDoc.schedule.length === 0 ? (
+              {/* 4A. DESKTOP/TABLET TABLE VIEW (Visible when container has sufficient width >= 512px / @lg) */}
+              <div className="hidden @lg:block rounded-lg border border-border/60 overflow-hidden bg-card w-full max-w-full min-w-0 box-border">
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full text-[11px] text-left min-w-[440px]">
+                    <thead className="bg-muted/40 text-[10px] text-muted-foreground uppercase border-b border-border/50">
                       <tr>
-                        <td colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
-                          No reminder milestones configured for this document.
-                        </td>
+                        <th className="py-2.5 px-3 font-semibold">Reminder</th>
+                        <th className="py-2.5 px-2.5 font-semibold">Trigger</th>
+                        <th className="py-2.5 px-2.5 font-semibold">Scheduled Date</th>
+                        <th className="py-2.5 px-3 font-semibold text-right">Status & Action</th>
                       </tr>
-                    ) : (
-                      currentDoc.schedule.map((item: ReminderScheduleItem) => {
-                        const isDue = item.status === "DUE";
-                        const isCurrentDispatching = isDispatchingReminderId === item.ruleId;
+                    </thead>
+                    <tbody className="divide-y divide-border/30">
+                      {currentDoc.schedule.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
+                            No reminder milestones configured for this document.
+                          </td>
+                        </tr>
+                      ) : (
+                        currentDoc.schedule.map((item: ReminderScheduleItem) => {
+                          const isDue = item.status === "DUE";
+                          const isCurrentDispatching = isDispatchingReminderId === item.ruleId;
 
-                        return (
-                          <tr key={item.ruleId} className="hover:bg-muted/20 transition-colors">
-                            <td className="py-2.5 px-3 min-w-0">
-                              <span className="font-semibold text-foreground block leading-tight">
-                                {item.ruleName}
-                              </span>
-                              <span className="text-[9px] text-muted-foreground font-caption flex items-center gap-1 mt-0.5">
-                                <MessageSquare className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" /> via WhatsApp
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-2.5 text-muted-foreground whitespace-nowrap">
-                              {item.thresholdDays} days before expiry
-                            </td>
-                            <td className="py-2.5 px-2.5 font-medium text-foreground whitespace-nowrap font-mono">
-                              {item.scheduledDate || <span className="text-muted-foreground font-normal font-sans">N/A</span>}
-                            </td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {getReminderStatusBadge(item.status, item.statusLabel)}
-                                {isDue && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => onOpenDispatch(selectedDocType, item.thresholdDays, item.ruleId, item.ruleName)}
-                                    disabled={isCurrentDispatching}
-                                    className={`h-6 px-2 text-[10px] cursor-pointer font-medium ${activeDocTheme.buttonOutlineClass}`}
-                                    title="Dispatch WhatsApp notification now"
-                                    aria-label={`Dispatch ${item.ruleName} WhatsApp notification`}
-                                  >
-                                    {isCurrentDispatching ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <span className="flex items-center gap-1">
-                                        <Send className="h-2.5 w-2.5" />
-                                        <span>Dispatch</span>
-                                      </span>
-                                    )}
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                          return (
+                            <tr key={item.ruleId} className="hover:bg-muted/20 transition-colors">
+                              <td className="py-2.5 px-3 min-w-0">
+                                <span className="font-semibold text-foreground block leading-tight">
+                                  {item.ruleName}
+                                </span>
+                                <span className="text-[9px] text-muted-foreground font-caption flex items-center gap-1 mt-0.5">
+                                  <MessageSquare className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" /> via WhatsApp
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-2.5 text-muted-foreground whitespace-nowrap">
+                                {item.thresholdDays} days before expiry
+                              </td>
+                              <td className="py-2.5 px-2.5 font-medium text-foreground whitespace-nowrap font-mono">
+                                {item.scheduledDate || <span className="text-muted-foreground font-normal font-sans">N/A</span>}
+                              </td>
+                              <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {getReminderStatusBadge(item.status, item.statusLabel)}
+                                  {isDue && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => onOpenDispatch(selectedDocType, item.thresholdDays, item.ruleId, item.ruleName)}
+                                      disabled={isCurrentDispatching}
+                                      className={`h-6 px-2 text-[10px] cursor-pointer font-medium ${activeDocTheme.buttonOutlineClass}`}
+                                      title="Dispatch WhatsApp notification now"
+                                      aria-label={`Dispatch ${item.ruleName} WhatsApp notification`}
+                                    >
+                                      {isCurrentDispatching ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <span className="flex items-center gap-1">
+                                          <Send className="h-2.5 w-2.5" />
+                                          <span>Dispatch</span>
+                                        </span>
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              {/* 4B. MOBILE CARD PRESENTATION (Active on mobile viewports < md) */}
-              <div className="block md:hidden space-y-2.5 w-full min-w-0">
+              {/* 4B. MOBILE/COMPACT CARD PRESENTATION (Active on mobile viewports and narrow sidebar containers < @lg) */}
+              <div className="block @lg:hidden space-y-2.5 w-full min-w-0 max-w-full box-border">
                 {currentDoc.schedule.length === 0 ? (
                   <div className="p-4 text-center text-xs text-muted-foreground rounded-lg border border-border/50 bg-muted/10">
                     No reminder milestones configured for this document.
@@ -413,10 +415,10 @@ export function DocumentReminderSchedule({
                     return (
                       <div 
                         key={item.ruleId} 
-                        className="p-3.5 rounded-lg border border-border/60 bg-muted/15 space-y-3 w-full min-w-0 max-w-full"
+                        className="p-3 sm:p-3.5 rounded-lg border border-border/60 bg-muted/15 space-y-2.5 w-full min-w-0 max-w-full box-border shadow-2xs"
                       >
                         {/* 1. Reminder Name & Header */}
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start justify-between gap-2 min-w-0">
                           <div className="min-w-0 flex-1">
                             <h4 className="font-semibold text-foreground text-xs leading-snug break-words">
                               {item.ruleName}
@@ -428,42 +430,42 @@ export function DocumentReminderSchedule({
                         </div>
 
                         {/* 2 & 3. Trigger & Scheduled Date Grid */}
-                        <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-border/30">
+                        <div className="grid grid-cols-1 min-[340px]:grid-cols-2 gap-2 text-[11px] pt-1.5 border-t border-border/30">
                           <div className="space-y-0.5 min-w-0">
                             <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground block">
                               Trigger
                             </span>
-                            <span className="text-xs text-foreground font-medium block truncate">
+                            <span className="text-xs text-foreground font-medium block break-words">
                               {item.thresholdDays} days before expiry
                             </span>
                           </div>
 
                           <div className="space-y-0.5 min-w-0">
-                            <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground block">
-                              Scheduled
+                            <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-muted-foreground shrink-0" /> Scheduled
                             </span>
-                            <span className="text-xs font-mono font-semibold text-foreground block">
-                              {item.scheduledDate || "N/A"}
+                            <span className="text-xs font-mono font-semibold text-foreground block break-words">
+                              {item.scheduledDate || <span className="text-muted-foreground font-normal font-sans">N/A</span>}
                             </span>
                           </div>
                         </div>
 
                         {/* 4 & 5. Channel & Delivery Details */}
-                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-border/30">
-                          <div className="space-y-0.5">
+                        <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-border/30 min-w-0">
+                          <div className="space-y-0.5 min-w-0">
                             <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground block">
                               Channel
                             </span>
-                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                              <MessageSquare className="h-3 w-3" /> WhatsApp
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 truncate">
+                              <MessageSquare className="h-3 w-3 shrink-0" /> WhatsApp
                             </span>
                           </div>
 
-                          <div className="space-y-0.5 text-right">
+                          <div className="space-y-0.5 text-right min-w-0">
                             <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground block">
                               Status
                             </span>
-                            <span className="text-xs text-muted-foreground font-medium">
+                            <span className="text-xs text-muted-foreground font-medium block truncate">
                               {item.statusLabel || (isDue ? "Due Now" : "Scheduled")}
                             </span>
                           </div>
@@ -471,14 +473,14 @@ export function DocumentReminderSchedule({
 
                         {/* 6. Action Button (Touch friendly with full width) */}
                         {isDue && (
-                          <div className="pt-1.5 border-t border-border/30">
+                          <div className="pt-2 border-t border-border/30">
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
                               onClick={() => onOpenDispatch(selectedDocType, item.thresholdDays, item.ruleId, item.ruleName)}
                               disabled={isCurrentDispatching}
-                              className={`w-full h-8 text-xs font-semibold cursor-pointer justify-center ${activeDocTheme.buttonOutlineClass}`}
+                              className={`w-full h-8 text-xs font-semibold cursor-pointer justify-center shadow-2xs ${activeDocTheme.buttonOutlineClass}`}
                               title="Dispatch WhatsApp notification now"
                               aria-label={`Dispatch ${item.ruleName} WhatsApp notification`}
                             >

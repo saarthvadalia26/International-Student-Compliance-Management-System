@@ -16,6 +16,7 @@
  * 12. Batch Recovery & Controlled Rollback
  */
 
+import "./test-preload";
 import * as XLSX from "xlsx";
 import { BulkStudentImportService } from "../src/domain/import/services/bulk-student-import.service";
 import { ISCMS_FIELD_DEFINITIONS } from "../src/domain/import/types/bulk-import.types";

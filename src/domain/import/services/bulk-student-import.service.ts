@@ -20,6 +20,7 @@ import {
   ImportExecutionResult 
 } from "../types/bulk-import.types";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
+import { CountryService } from "@/domain/countries/country.service";
 
 export class BulkStudentImportService {
 
@@ -199,54 +200,12 @@ export class BulkStudentImportService {
   }
 
   /**
-   * Helper: Normalize country name to ISO 3-letter nationality code
+   * Helper: Normalize country name, ISO code, or demonym to canonical ISO 3-letter nationality code
    */
   static normalizeNationality(val: string): string | null {
-    const clean = val.trim();
-    if (!clean) return null;
-    if (clean.length === 3 && /^[A-Z]{3}$/i.test(clean)) {
-      return clean.toUpperCase();
-    }
-    const countryMap: Record<string, string> = {
-      "nepal": "NPL",
-      "bhutan": "BHT",
-      "bangladesh": "BGD",
-      "sri lanka": "LKA",
-      "maldives": "MDV",
-      "afghanistan": "AFG",
-      "united states": "USA",
-      "usa": "USA",
-      "united kingdom": "GBR",
-      "uk": "GBR",
-      "canada": "CAN",
-      "australia": "AUS",
-      "germany": "DEU",
-      "france": "FRA",
-      "kenya": "KEN",
-      "nigeria": "NGA",
-      "tanzania": "TZA",
-      "uganda": "UGA",
-      "mauritius": "MUS",
-      "zambia": "ZMB",
-      "zimbabwe": "ZWE",
-      "ethiopia": "ETH",
-      "ghana": "GHA",
-      "russia": "RUS",
-      "uzbekistan": "UZB",
-      "kazakhstan": "KAZ",
-      "kyrgyzstan": "KGZ",
-      "tajikistan": "TJK",
-      "turkmenistan": "TKM",
-      "indonesia": "IDN",
-      "malaysia": "MYS",
-      "thailand": "THA",
-      "vietnam": "VNM",
-      "myanmar": "MMR",
-      "fiji": "FJI"
-    };
-
-    const lower = clean.toLowerCase();
-    return countryMap[lower] || clean.substring(0, 3).toUpperCase();
+    if (!val || !val.trim()) return null;
+    const norm = CountryService.normalizeCountryInputSync(val);
+    return norm ? norm.isoAlpha3 : null;
   }
 
   /**
@@ -469,6 +428,26 @@ export class BulkStudentImportService {
           value: "Not Provided",
           warning: "Nationality not provided. Will be stored as NULL and can be updated later."
         });
+      } else {
+        const norm = CountryService.normalizeCountryInputSync(nationalityRaw);
+        if (!norm) {
+          warnings.push({
+            field: "nationality",
+            fieldLabel: "Nationality",
+            value: nationalityRaw,
+            warning: `Unrecognized country/nationality "${nationalityRaw}". Please check spelling (e.g. "Fiji", "India", "Nepal"). Stored as NULL.`
+          });
+        } else {
+          mappedData.nationality = norm.country.name;
+          if (norm.country.isActive === false) {
+            warnings.push({
+              field: "nationality",
+              fieldLabel: "Nationality",
+              value: `${norm.country.name} (${norm.isoAlpha3})`,
+              warning: `"${norm.country.name}" (${norm.isoAlpha3}) is an existing but currently inactive country in university settings.`
+            });
+          }
+        }
       }
 
       const dobRaw = mappedData.date_of_birth?.trim() || "";

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { UserManagementTab } from "@/components/settings/user-management-tab";
 import { AcademicProgramsTab } from "@/components/settings/academic-programs-tab";
+import { CountryManagementTab } from "@/components/settings/country-management-tab";
 import { PlatformInfrastructureTab } from "@/components/settings/platform-infrastructure-tab";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,14 +75,14 @@ function SettingsPageContent() {
   const [isEmergencyLogoutOpen, setIsEmergencyLogoutOpen] = React.useState(false);
 
   // Active Tab navigation state
-  const [activeTab, setActiveTab] = React.useState<"general" | "programs" | "notifications" | "retention" | "system" | "security" | "users">("general");
+  const [activeTab, setActiveTab] = React.useState<"general" | "programs" | "countries" | "notifications" | "retention" | "system" | "security" | "users">("general");
 
   const tabParam = searchParams ? searchParams.get("tab") : null;
 
   React.useEffect(() => {
-    if (tabParam && ["general", "programs", "notifications", "retention", "system", "security", "users"].includes(tabParam)) {
+    if (tabParam && ["general", "programs", "countries", "notifications", "retention", "system", "security", "users"].includes(tabParam)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setActiveTab(tabParam as "general" | "programs" | "notifications" | "retention" | "system" | "security" | "users");
+      setActiveTab(tabParam as "general" | "programs" | "countries" | "notifications" | "retention" | "system" | "security" | "users");
     }
   }, [tabParam]);
 
@@ -403,6 +404,7 @@ function SettingsPageContent() {
         {[
           { id: "general", label: "General", icon: Building },
           { id: "programs", label: "Academic Programs", icon: GraduationCap },
+          { id: "countries", label: "Country Management", icon: Globe2 },
           { id: "notifications", label: "Notifications", icon: Bell },
           { id: "users", label: "User Management", icon: Users },
           { id: "retention", label: "Retention Policies", icon: Clock },
@@ -414,7 +416,7 @@ function SettingsPageContent() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as "general" | "programs" | "notifications" | "retention" | "system" | "security" | "users")}
+              onClick={() => setActiveTab(tab.id as "general" | "programs" | "countries" | "notifications" | "retention" | "system" | "security" | "users")}
               className={`flex items-center gap-2 px-4 py-2 border-b-2 text-xs font-medium whitespace-nowrap transition-colors outline-none focus:text-primary ${
                 isActive 
                   ? "border-primary text-primary" 
@@ -433,6 +435,9 @@ function SettingsPageContent() {
         
         {/* Tab: Academic Programs */}
         {activeTab === "programs" && <AcademicProgramsTab />}
+
+        {/* Tab: Country Management */}
+        {activeTab === "countries" && <CountryManagementTab />}
 
         {/* Tab: User Management */}
         {activeTab === "users" && <UserManagementTab />}

@@ -1,19 +1,22 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, Check, Search, X } from "lucide-react";
+import { ChevronDown, Check, Search, X, AlertTriangle } from "lucide-react";
 import { Country, searchCountries, getCountryByCode } from "@/utils/countries";
+import { getActiveCountriesAction } from "@/app/(app)/settings/countries-actions";
 import { CountryFlag } from "./country-flag";
 import { Input } from "./input";
+import { Badge } from "./badge";
 import { cn } from "@/lib/utils";
 
 export interface NationalitySelectorProps {
-  value: string; // ISO 3166-1 Alpha-3 Code (e.g., "IND")
+  value: string; // ISO 3166-1 Alpha-3 Code (e.g., "IND", "FJI")
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
   allowClear?: boolean;
   disabled?: boolean;
+  onlyActive?: boolean;
 }
 
 export function NationalitySelector({
@@ -22,25 +25,78 @@ export function NationalitySelector({
   className,
   placeholder = "Select nationality or country...",
   allowClear = false,
-  disabled = false
+  disabled = false,
+  onlyActive = true
 }: NationalitySelectorProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [highlightedIndex, setHighlightedIndex] = React.useState(0);
+  const [dynamicCountries, setDynamicCountries] = React.useState<Country[]>([]);
   
   const containerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
 
-  // Selected country object lookup
+  // Fetch active countries from server action on mount
+  React.useEffect(() => {
+    let isMounted = true;
+    getActiveCountriesAction().then(res => {
+      if (isMounted && res.success && res.countries.length > 0) {
+        setDynamicCountries(res.countries.map(c => ({
+          code: c.isoAlpha3,
+          alpha2: c.isoAlpha2,
+          numeric: c.isoNumeric,
+          name: c.name,
+          officialName: c.officialName || c.name,
+          nationality: c.nationality || c.name,
+          flag: c.flag || "🌐",
+          region: c.region || "Global",
+          subregion: c.subregion || "Global",
+          isActive: c.isActive
+        })));
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Selected country object lookup (works even if country is inactive)
   const selectedCountry = React.useMemo(() => {
     if (!value) return null;
     return getCountryByCode(value) || null;
   }, [value]);
 
+  const isCurrentValueInactive = selectedCountry && selectedCountry.isActive === false;
+
   // Filter countries list
   const filteredCountries = React.useMemo(() => {
-    const list = searchCountries(search);
+    const baseSource = dynamicCountries.length > 0 ? dynamicCountries : searchCountries("", onlyActive);
+    
+    let list: Country[];
+    if (!search || !search.trim()) {
+      list = baseSource;
+    } else {
+      const s = search.trim().toLowerCase();
+      list = baseSource.filter(c =>
+        c.name.toLowerCase().includes(s) ||
+        c.officialName.toLowerCase().includes(s) ||
+        c.nationality.toLowerCase().includes(s) ||
+        c.code.toLowerCase().includes(s) ||
+        c.alpha2.toLowerCase().includes(s) ||
+        c.numeric.includes(s) ||
+        c.region.toLowerCase().includes(s)
+      );
+    }
+
+    // If currently selected country is inactive, ensure it's still available in list with (Inactive) indicator
+    if (selectedCountry && selectedCountry.isActive === false) {
+      const alreadyInList = list.some(c => c.code === selectedCountry.code);
+      if (!alreadyInList) {
+        list = [selectedCountry, ...list];
+      }
+    }
+
     if (allowClear) {
       const clearOption: Country = {
         code: "",
@@ -51,12 +107,14 @@ export function NationalitySelector({
         nationality: "All",
         flag: "🌍",
         region: "Global",
-        subregion: "Global"
+        subregion: "Global",
+        isActive: true
       };
       return [clearOption, ...list];
     }
+
     return list;
-  }, [search, allowClear]);
+  }, [search, dynamicCountries, onlyActive, allowClear, selectedCountry]);
 
   // Reset highlighted index on search change
   React.useEffect(() => {
@@ -164,7 +222,7 @@ export function NationalitySelector({
           aria-expanded={isOpen}
           aria-controls="nationality-options-list"
           aria-activedescendant={isOpen && filteredCountries[highlightedIndex] ? `country-opt-${filteredCountries[highlightedIndex].code}` : undefined}
-          value={isOpen ? search : selectedCountry ? `${selectedCountry.name} (${selectedCountry.code})` : ""}
+          value={isOpen ? search : selectedCountry ? `${selectedCountry.name} (${selectedCountry.code})${isCurrentValueInactive ? " [Inactive]" : ""}` : ""}
           onChange={(e) => {
             if (!isOpen) setIsOpen(true);
             setSearch(e.target.value);
@@ -176,10 +234,16 @@ export function NationalitySelector({
           placeholder={selectedCountry ? `${selectedCountry.flag} ${selectedCountry.name}` : placeholder}
           className={cn(
             "pr-10 h-10 text-sm cursor-text font-sans transition-all",
-            selectedCountry && !isOpen ? "pl-10" : "pl-3"
+            selectedCountry && !isOpen ? "pl-10" : "pl-3",
+            isCurrentValueInactive && !isOpen && "border-amber-500/50 bg-amber-500/5"
           )}
         />
         <div className="absolute inset-y-0 right-0 flex items-center pr-2.5 gap-1 pointer-events-none">
+          {isCurrentValueInactive && !isOpen && (
+            <Badge variant="outline" className="text-[9px] h-4 px-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+              Inactive
+            </Badge>
+          )}
           {allowClear && value && !isOpen && (
             <button
               type="button"
@@ -193,6 +257,14 @@ export function NationalitySelector({
           <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
         </div>
       </div>
+
+      {/* Inactive Country Notice when currently selected */}
+      {isCurrentValueInactive && !isOpen && (
+        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          <span>This country is currently inactive for new registrations, but preserved for this existing record.</span>
+        </p>
+      )}
 
       {/* Dropdown Options List */}
       {isOpen && (
@@ -211,12 +283,13 @@ export function NationalitySelector({
 
           {filteredCountries.length === 0 ? (
             <div className="py-3 px-3 text-xs text-muted-foreground font-sans text-center">
-              No matching ISO country found
+              No matching country found
             </div>
           ) : (
             filteredCountries.map((country, idx) => {
               const isSelected = country.code === value;
               const isHighlighted = idx === highlightedIndex;
+              const isInactive = country.isActive === false;
 
               return (
                 <div
@@ -230,19 +303,27 @@ export function NationalitySelector({
                   className={cn(
                     "flex items-center justify-between py-1.5 px-2.5 rounded-sm text-xs cursor-pointer select-none font-sans transition-colors mb-0.5",
                     isHighlighted && "bg-accent text-accent-foreground",
-                    isSelected && "font-semibold text-primary bg-primary/10"
+                    isSelected && "font-semibold text-primary bg-primary/10",
+                    isInactive && "opacity-80"
                   )}
                 >
-                  <div className="flex items-center gap-2 max-w-[85%]">
+                  <div className="flex items-center gap-2 max-w-[80%]">
                     {country.code ? (
                       <CountryFlag countryCode={country.alpha2 || country.code} fallbackEmoji={country.flag} size="md" />
                     ) : (
                       <span className="text-base leading-none">🌍</span>
                     )}
                     <div className="flex flex-col min-w-0">
-                      <span className="truncate leading-tight">
-                        {country.name}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate leading-tight">
+                          {country.name}
+                        </span>
+                        {isInactive && (
+                          <Badge variant="outline" className="text-[8px] h-3.5 px-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                            Inactive
+                          </Badge>
+                        )}
+                      </div>
                       {country.nationality && country.nationality !== country.name && (
                         <span className="text-[10px] text-muted-foreground/80 truncate">
                           {country.nationality}
