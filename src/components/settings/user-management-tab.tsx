@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Users, UserPlus, Shield, KeyRound, Ban, CheckCircle, Loader2, Trash2, AlertTriangle } from "lucide-react";
+import { Users, UserPlus, Shield, KeyRound, Ban, CheckCircle, Loader2, Trash2, AlertTriangle, Edit2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   toggleUserAccountStatusAction,
   resetUserPasswordAdminAction,
   deleteStaffAccountAction,
+  updateStaffAccountAction,
   UserAccountItem,
 } from "@/app/(app)/settings/actions";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
@@ -32,6 +33,11 @@ export function UserManagementTab() {
   const [newPassword, setNewPassword] = React.useState("");
   const [newFullName, setNewFullName] = React.useState("");
   const [isCreating, setIsCreating] = React.useState(false);
+
+  // Edit Name Modal state
+  const [editTargetUser, setEditTargetUser] = React.useState<UserAccountItem | null>(null);
+  const [editFullNameText, setEditFullNameText] = React.useState("");
+  const [isUpdatingName, setIsUpdatingName] = React.useState(false);
 
   // Reset Password Modal state
   const [resetTargetUser, setResetTargetUser] = React.useState<UserAccountItem | null>(null);
@@ -100,6 +106,33 @@ export function UserManagementTab() {
       toast.error(msg);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleUpdateStaffName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTargetUser) return;
+    const cleanName = editFullNameText.trim();
+    if (cleanName.length < 2) {
+      toast.error("Full name must be at least 2 characters long.");
+      return;
+    }
+
+    try {
+      setIsUpdatingName(true);
+      await updateStaffAccountAction({
+        targetUserId: editTargetUser.id,
+        fullName: cleanName,
+      });
+      toast.success(`Full name updated for ${editTargetUser.email}`);
+      setEditTargetUser(null);
+      setEditFullNameText("");
+      loadUsers();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed updating user name.";
+      toast.error(msg);
+    } finally {
+      setIsUpdatingName(false);
     }
   };
 
@@ -248,7 +281,14 @@ export function UserManagementTab() {
                     return (
                       <tr key={u.id} className="hover:bg-muted/30 transition-colors">
                         <td className="py-3 px-4">
-                          <div className="font-medium text-foreground">{u.fullName || "Unnamed User"}</div>
+                          {u.isProfileComplete ? (
+                            <div className="font-medium text-foreground">{u.fullName}</div>
+                          ) : (
+                            <div className="font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3 shrink-0" />
+                              <span>{u.fullName}</span>
+                            </div>
+                          )}
                           <div className="text-[11px] text-muted-foreground">{u.email}</div>
                         </td>
                         <td className="py-3 px-4">
@@ -280,6 +320,20 @@ export function UserManagementTab() {
                           <div className="flex items-center justify-end gap-1.5">
                             {isAdministrator && (
                               <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditTargetUser(u);
+                                    setEditFullNameText(u.isProfileComplete ? u.fullName : "");
+                                  }}
+                                  disabled={isProcessing}
+                                  title="Edit Full Name"
+                                  className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+
                                 {isAdmin ? (
                                   <Button
                                     variant="ghost"
@@ -554,6 +608,72 @@ export function UserManagementTab() {
                     <Trash2 className="h-3.5 w-3.5" /> Delete Account
                   </>
                 )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal 4: Edit Staff Full Name */}
+      <Dialog
+        open={!!editTargetUser}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditTargetUser(null);
+            setEditFullNameText("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-foreground flex items-center gap-2">
+              <Edit2 className="h-4 w-4 text-primary" /> Edit Full Name
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Update institutional real name for <span className="font-semibold text-foreground">{editTargetUser?.email}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateStaffName} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                <span>Full Name <span className="text-destructive">*</span></span>
+                <span className="text-[10px] text-muted-foreground font-normal">e.g. Dr. Skvadalia Shah, Rahul Kumar</span>
+              </label>
+              <Input
+                type="text"
+                placeholder="Dr. Staff Member"
+                value={editFullNameText}
+                onChange={(e) => setEditFullNameText(e.target.value)}
+                className="h-9 text-xs"
+                autoFocus
+                required
+                disabled={isUpdatingName}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                This name will be displayed in the application header, profile menu, and activity logs.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditTargetUser(null);
+                  setEditFullNameText("");
+                }}
+                disabled={isUpdatingName}
+                className="h-8 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isUpdatingName}
+                className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                {isUpdatingName ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : "Save Full Name"}
               </Button>
             </div>
           </form>

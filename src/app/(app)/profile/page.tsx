@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { User, Mail, Shield, Calendar, Clock, Edit2, CheckCircle2 } from "lucide-react";
+import { User, Mail, Shield, Calendar, Clock, Edit2, AlertCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { updateMyProfileNameAction } from "./actions";
+import { getInitials, isNameComplete } from "@/utils/name-utils";
 import { toast } from "sonner";
 
 export default function AdminProfilePage() {
@@ -16,6 +18,7 @@ export default function AdminProfilePage() {
     email: string;
     fullName: string;
     role: string;
+    isComplete: boolean;
     lastLogin: string | null;
     createdAt: string | null;
   } | null>(null);
@@ -38,17 +41,29 @@ export default function AdminProfilePage() {
         if (session?.user && mounted) {
           const email = session.user.email || "";
           const metadata = session.user.user_metadata || {};
-          const name = metadata.username || email.split("@")[0] || "Administrator";
-          const role = metadata.role || "administrator";
+          const rawName = (metadata.full_name as string | undefined)?.trim();
+          const hasCompleteName = isNameComplete(rawName);
+          const fullName = hasCompleteName ? (rawName as string) : "Profile Incomplete";
+          
+          const rawRole = (metadata.role as string | undefined)?.toLowerCase().trim();
+          const displayRole =
+            rawRole === "administrator" || rawRole === "admin"
+              ? "Administrator"
+              : rawRole === "staff"
+              ? "Staff"
+              : metadata.role
+              ? String(metadata.role).charAt(0).toUpperCase() + String(metadata.role).slice(1)
+              : "Staff Member";
           
           setProfile({
             email,
-            fullName: name.charAt(0).toUpperCase() + name.slice(1),
-            role: role.charAt(0).toUpperCase() + role.slice(1),
+            fullName,
+            role: displayRole,
+            isComplete: hasCompleteName,
             lastLogin: session.user.last_sign_in_at || null,
             createdAt: session.user.created_at || null,
           });
-          setEditName(name.charAt(0).toUpperCase() + name.slice(1));
+          setEditName(hasCompleteName ? (rawName as string) : "");
         }
       } catch (err) {
         console.error("Failed to load profile:", err);
@@ -66,8 +81,11 @@ export default function AdminProfilePage() {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editName.trim()) {
-      toast.error("Validation Error", { description: "Full name cannot be blank." });
+    const cleanName = editName.trim();
+    if (!isNameComplete(cleanName)) {
+      toast.error("Validation Error", {
+        description: "Full name must be at least 2 characters long.",
+      });
       return;
     }
 
@@ -76,22 +94,26 @@ export default function AdminProfilePage() {
     setSaveError(false);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: { username: editName.trim() }
-      });
+      await updateMyProfileNameAction(cleanName);
 
-      if (error) throw error;
-
-      setProfile(prev => prev ? { ...prev, fullName: editName.trim() } : null);
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              fullName: cleanName,
+              isComplete: true,
+            }
+          : null
+      );
       setSaveSuccess(true);
       
       // Delay closing editing state slightly to allow success state animation to show
       setTimeout(() => {
         setIsEditing(false);
-      }, 800);
+      }, 700);
 
       toast.success("Profile updated successfully", {
-        description: "Your administrative coordinates have been updated."
+        description: "Your institutional real name has been updated.",
       });
     } catch (err: unknown) {
       setSaveError(true);
@@ -121,7 +143,7 @@ export default function AdminProfilePage() {
     );
   }
 
-  const initials = profile.fullName.substring(0, 2).toUpperCase();
+  const initials = profile.isComplete ? getInitials(profile.fullName) : "--";
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto font-sans p-4">
@@ -129,7 +151,7 @@ export default function AdminProfilePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">My Profile</h1>
         <p className="text-xs text-muted-foreground mt-1">
-          Manage your administrative profile settings, credentials, and track session activity.
+          Manage your institutional identity, verified real name, credentials, and session coordinates.
         </p>
       </div>
 
@@ -137,15 +159,31 @@ export default function AdminProfilePage() {
         {/* User Card */}
         <Card className="border border-border/60 shadow-sm md:col-span-1">
           <CardContent className="pt-6 flex flex-col items-center text-center space-y-4">
-            <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-xl font-bold shadow-sm">
+            <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-xl font-bold shadow-sm font-mono">
               {initials}
             </div>
-            <div>
-              <h2 className="text-base font-bold text-foreground">{profile.fullName}</h2>
-              <span className="inline-flex items-center gap-1 mt-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/15 uppercase font-mono">
-                <Shield className="h-3 w-3" /> {profile.role}
-              </span>
+            <div className="space-y-1">
+              <h2 className="text-base font-bold text-foreground break-words">
+                {profile.fullName}
+              </h2>
+              <div>
+                <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary border border-primary/15 uppercase font-mono">
+                  <Shield className="h-3 w-3" /> {profile.role}
+                </span>
+              </div>
             </div>
+
+            {!profile.isComplete && (
+              <div className="w-full rounded-md bg-amber-500/10 border border-amber-500/20 p-2.5 text-left">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-amber-700 dark:text-amber-300">
+                    <p className="font-semibold">Profile Incomplete</p>
+                    <p className="mt-0.5 text-muted-foreground">Please click Edit Profile below to enter your real full name.</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -153,7 +191,7 @@ export default function AdminProfilePage() {
         <Card className="border border-border/60 shadow-sm md:col-span-2">
           <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
             <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-              <User className="h-4 w-4 text-muted-foreground" /> Account Details
+              <User className="h-4 w-4 text-muted-foreground" /> Account & Institutional Coordinates
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
@@ -161,13 +199,19 @@ export default function AdminProfilePage() {
               <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-0.5">
-                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Full Name</span>
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Full Legal Name</span>
                     <p className="text-sm font-semibold text-foreground">{profile.fullName}</p>
                   </div>
                   <div className="space-y-0.5">
-                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Email Address</span>
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Authentication Email</span>
+                    <p className="text-sm font-semibold text-foreground flex items-center gap-1.5 truncate">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> {profile.email}
+                    </p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Assigned Role</span>
                     <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 text-muted-foreground" /> {profile.email}
+                      <Shield className="h-3.5 w-3.5 text-muted-foreground" /> {profile.role}
                     </p>
                   </div>
                   <div className="space-y-0.5">
@@ -177,7 +221,7 @@ export default function AdminProfilePage() {
                       {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "N/A"}
                     </p>
                   </div>
-                  <div className="space-y-0.5">
+                  <div className="space-y-0.5 sm:col-span-2">
                     <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Last Session Login</span>
                     <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5 text-muted-foreground" />
@@ -192,31 +236,50 @@ export default function AdminProfilePage() {
                     onClick={() => setIsEditing(true)}
                     className="text-xs h-8 gap-1.5"
                   >
-                    <Edit2 className="h-3.5 w-3.5" /> Edit Profile
+                    <Edit2 className="h-3.5 w-3.5" /> Edit Full Name
                   </Button>
                 </div>
               </div>
             ) : (
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground" htmlFor="fullName">
-                    Full Name
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between" htmlFor="fullName">
+                    <span>Full Legal Name <span className="text-destructive">*</span></span>
+                    <span className="text-[10px] text-muted-foreground font-normal">e.g. Dr. Skvadalia Shah, Rahul Kumar</span>
                   </label>
                   <Input
                     id="fullName"
                     type="text"
+                    required
+                    autoFocus
+                    placeholder="Enter your real full name"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="h-9 text-sm"
+                    className="h-9 text-sm font-sans"
+                    disabled={isSaving}
                   />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    This real name is your canonical display identity across all ISCMS modules.
+                  </p>
                 </div>
+
                 <div className="space-y-1.5">
-                  <span className="text-xs font-semibold text-foreground">Email Address</span>
+                  <span className="text-xs font-semibold text-foreground">Authentication Email (Read-Only)</span>
                   <Input
                     type="email"
                     value={profile.email}
                     disabled
-                    className="h-9 text-sm bg-muted/40 cursor-not-allowed"
+                    className="h-9 text-sm bg-muted/40 cursor-not-allowed text-muted-foreground font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-foreground">Institutional Role (Read-Only)</span>
+                  <Input
+                    type="text"
+                    value={profile.role}
+                    disabled
+                    className="h-9 text-sm bg-muted/40 cursor-not-allowed text-muted-foreground"
                   />
                 </div>
 
@@ -226,9 +289,10 @@ export default function AdminProfilePage() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => {
-                      setEditName(profile.fullName);
+                      setEditName(profile.isComplete ? profile.fullName : "");
                       setIsEditing(false);
                     }}
+                    disabled={isSaving}
                     className="text-xs h-8"
                   >
                     Cancel
@@ -240,9 +304,9 @@ export default function AdminProfilePage() {
                     isLoading={isSaving}
                     isSuccess={saveSuccess}
                     isError={saveError}
-                    idleText="Save Changes"
-                    loadingText="Saving changes..."
-                    successText="Changes saved"
+                    idleText="Save Full Name"
+                    loadingText="Saving..."
+                    successText="Changes Saved"
                     errorText="Try Again"
                   />
                 </div>

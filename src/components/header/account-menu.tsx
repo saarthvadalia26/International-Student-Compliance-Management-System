@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { User, Settings, HelpCircle, LogOut } from "lucide-react";
+import { User, Settings, HelpCircle, LogOut, UserCheck, AlertCircle } from "lucide-react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { useUserRole } from "@/hooks/use-user-role";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,9 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ProfileCompletionDialog } from "@/components/profile/profile-completion-dialog";
+import { getInitials, isNameComplete } from "@/utils/name-utils";
 import { toast } from "sonner";
-
 
 export function AccountMenu() {
   const router = useRouter();
@@ -33,9 +34,15 @@ export function AccountMenu() {
   const supabase = getBrowserSupabase();
   const { isAdministrator } = useUserRole();
   
-  const [userProfile, setUserProfile] = React.useState<{ name: string; email: string; role: string } | null>(null);
+  const [userProfile, setUserProfile] = React.useState<{
+    name: string;
+    email: string;
+    role: string;
+    isComplete: boolean;
+  } | null>(null);
 
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [logoutSuccess, setLogoutSuccess] = React.useState(false);
   const [logoutError, setLogoutError] = React.useState(false);
@@ -50,9 +57,12 @@ export function AccountMenu() {
         if (session?.user && mounted) {
           const email = session.user.email || "";
           const metadata = session.user.user_metadata || {};
-          const emailPrefix = email.split("@")[0];
-          const name = metadata.username || emailPrefix || "User";
-          const rawRole = (metadata.role as string | undefined)?.toLowerCase();
+          
+          const rawName = (metadata.full_name as string | undefined)?.trim();
+          const hasCompleteName = isNameComplete(rawName);
+          const name = hasCompleteName ? (rawName as string) : "Profile Incomplete";
+
+          const rawRole = (metadata.role as string | undefined)?.toLowerCase().trim();
           const displayRole =
             rawRole === "administrator" || rawRole === "admin"
               ? "Administrator"
@@ -64,8 +74,9 @@ export function AccountMenu() {
 
           setUserProfile({
             email,
-            name: name.charAt(0).toUpperCase() + name.slice(1),
+            name,
             role: displayRole,
+            isComplete: hasCompleteName,
           });
         }
       } catch (err) {
@@ -79,9 +90,12 @@ export function AccountMenu() {
       if (session?.user && mounted) {
         const email = session.user.email || "";
         const metadata = session.user.user_metadata || {};
-        const emailPrefix = email.split("@")[0];
-        const name = metadata.username || emailPrefix || "User";
-        const rawRole = (metadata.role as string | undefined)?.toLowerCase();
+        
+        const rawName = (metadata.full_name as string | undefined)?.trim();
+        const hasCompleteName = isNameComplete(rawName);
+        const name = hasCompleteName ? (rawName as string) : "Profile Incomplete";
+
+        const rawRole = (metadata.role as string | undefined)?.toLowerCase().trim();
         const displayRole =
           rawRole === "administrator" || rawRole === "admin"
             ? "Administrator"
@@ -93,8 +107,9 @@ export function AccountMenu() {
 
         setUserProfile({
           email,
-          name: name.charAt(0).toUpperCase() + name.slice(1),
+          name,
           role: displayRole,
+          isComplete: hasCompleteName,
         });
       } else if (mounted) {
         setUserProfile(null);
@@ -117,24 +132,25 @@ export function AccountMenu() {
         throw error;
       }
       setLogoutSuccess(true);
-      toast.success("Profile updated successfully.", {
+      toast.success("Signed out successfully.", {
         description: "You have been securely signed out of your session.",
       });
       setTimeout(() => {
         setIsDialogOpen(false);
         router.push("/login");
-      }, 1500);
-    } catch (err: unknown) {
+      }, 1200);
+    } catch {
       setLogoutError(true);
-      toast.error("Unable to save changes. Please try again.");
+      toast.error("Unable to sign out. Please try again.");
     } finally {
       setIsLoggingOut(false);
     }
   };
 
-  const name = userProfile?.name || "Admin";
-  const role = userProfile?.role || "Administrator";
-  const initials = name.substring(0, 2).toUpperCase();
+  const name = userProfile?.name || "User";
+  const role = userProfile?.role || "Staff";
+  const isComplete = userProfile?.isComplete ?? false;
+  const initials = isComplete ? getInitials(name) : "--";
 
   return (
     <>
@@ -143,19 +159,48 @@ export function AccountMenu() {
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-9 w-9 rounded-full bg-accent text-accent-foreground border border-border/50 hover:bg-accent/80 transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 w-9 rounded-full bg-accent text-accent-foreground border border-border/60 hover:bg-accent/80 transition-colors focus-visible:ring-1 focus-visible:ring-ring shrink-0"
             aria-label="User Account Menu"
           >
-            <span className="text-xs font-semibold tracking-wider font-mono">{initials}</span>
+            {isComplete ? (
+              <span className="text-xs font-semibold tracking-wider font-mono">{initials}</span>
+            ) : (
+              <User className="h-4 w-4 text-amber-500" />
+            )}
           </Button>
         } />
-        <DropdownMenuContent align="end" className="w-56 font-sans">
-          {/* User Profile Header */}
-          <DropdownMenuLabel className="flex flex-col px-2.5 py-2">
-            <span className="text-sm font-semibold text-foreground truncate">{name}</span>
-            <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground mt-0.5">{role}</span>
+        <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-2rem)] font-sans p-1">
+          {/* User Profile Header with Clean Visual Hierarchy */}
+          <DropdownMenuLabel className="flex flex-col px-3 py-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <span className={cn(
+                "text-sm font-bold leading-tight break-words",
+                isComplete ? "text-foreground" : "text-amber-600 dark:text-amber-400"
+              )}>
+                {name}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-[10px] uppercase font-mono tracking-wider font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/15">
+                {role}
+              </span>
+            </div>
+
             {userProfile?.email && (
-              <span className="text-[11px] text-muted-foreground/80 truncate mt-0.5">{userProfile.email}</span>
+              <span className="text-[11px] text-muted-foreground truncate mt-1.5 font-normal">
+                {userProfile.email}
+              </span>
+            )}
+
+            {!isComplete && (
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(true)}
+                className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-medium cursor-pointer text-left"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" /> Complete your profile name
+              </button>
             )}
           </DropdownMenuLabel>
           
@@ -165,41 +210,42 @@ export function AccountMenu() {
           <DropdownMenuItem 
             onClick={() => router.push("/profile")}
             className={cn(
-              "text-xs cursor-pointer focus:bg-accent",
+              "text-xs cursor-pointer focus:bg-accent py-2",
               pathname === "/profile" && "text-primary font-semibold bg-accent/40"
             )}
           >
             <User className="mr-2 h-4 w-4 text-muted-foreground" /> My Profile
           </DropdownMenuItem>
+
           {/* Settings — Administrator only */}
           {isAdministrator && (
             <DropdownMenuItem 
               onClick={() => router.push("/settings")}
               className={cn(
-                "text-xs cursor-pointer focus:bg-accent",
+                "text-xs cursor-pointer focus:bg-accent py-2",
                 pathname === "/settings" && "text-primary font-semibold bg-accent/40"
               )}
             >
               <Settings className="mr-2 h-4 w-4 text-muted-foreground" /> Settings
             </DropdownMenuItem>
           )}
+
           <DropdownMenuItem 
             onClick={() => router.push("/help")}
             className={cn(
-              "text-xs cursor-pointer focus:bg-accent",
+              "text-xs cursor-pointer focus:bg-accent py-2",
               pathname === "/help" && "text-primary font-semibold bg-accent/40"
             )}
           >
-            <HelpCircle className="mr-2 h-4 w-4 text-muted-foreground" /> Help
+            <HelpCircle className="mr-2 h-4 w-4 text-muted-foreground" /> Help & Documentation
           </DropdownMenuItem>
-
           
           <DropdownMenuSeparator />
 
           {/* Destructive Sign Out */}
           <DropdownMenuItem 
             onClick={() => setIsDialogOpen(true)}
-            className="text-xs cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10 dark:focus:bg-destructive/20 font-medium"
+            className="text-xs cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10 dark:focus:bg-destructive/20 font-medium py-2"
           >
             <LogOut className="mr-2 h-4 w-4" /> Sign Out
           </DropdownMenuItem>
@@ -231,7 +277,7 @@ export function AccountMenu() {
               isSuccess={logoutSuccess}
               isError={logoutError}
               idleText="Sign Out"
-              loadingText="Processing..."
+              loadingText="Signing out..."
               successText="Signed out"
               errorText="Try Again"
               className="text-xs px-4"
@@ -239,6 +285,23 @@ export function AccountMenu() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Profile Completion Modal Trigger */}
+      <ProfileCompletionDialog
+        isOpen={isProfileModalOpen}
+        onOpenChange={setIsProfileModalOpen}
+        onCompleted={(newName) => {
+          setUserProfile((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  name: newName,
+                  isComplete: true,
+                }
+              : null
+          );
+        }}
+      />
     </>
   );
 }

@@ -13,6 +13,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 export interface GlobalSignOutAuditEntry {
   userId: string;
   userEmail: string;
+  userName?: string;
   ipAddress?: string;
   userAgent?: string;
   sessionsTerminated: number;
@@ -21,6 +22,7 @@ export interface GlobalSignOutAuditEntry {
 export interface EmergencyLogoutAuditEntry {
   adminId: string;
   adminEmail: string;
+  adminName?: string;
   reason: string;
   usersAffected: number;
   sessionsTerminated: number;
@@ -31,6 +33,7 @@ export interface EmergencyLogoutAuditEntry {
 export interface RoleChangeAuditEntry {
   changedById: string;
   changedByEmail: string;
+  changedByName?: string;
   targetUserId: string;
   targetUserEmail: string;
   action?: string;
@@ -42,12 +45,14 @@ export interface RoleChangeAuditEntry {
 export interface InitialAdminAuditEntry {
   adminId: string;
   adminEmail: string;
+  adminName?: string;
   ipAddress?: string;
 }
 
 export interface ConfigChangeAuditEntry {
   userId: string;
   userEmail: string;
+  userName?: string;
   setting: string;
   previousValue: string;
   newValue: string;
@@ -93,6 +98,7 @@ const auditService = {
     await admin.from("audit_log").insert({
       actor_id: entry.adminId,
       actor_email: entry.adminEmail,
+      actor_name: entry.adminName ?? null,
       action: "INITIALIZE_ADMIN",
       resource: "system_setup",
       category: "security",
@@ -113,6 +119,7 @@ const auditService = {
     await admin.from("audit_log").insert({
       actor_id: entry.userId,
       actor_email: entry.userEmail,
+      actor_name: entry.userName ?? null,
       action: "GLOBAL_SIGN_OUT",
       resource: "auth_session",
       category: "session",
@@ -134,6 +141,7 @@ const auditService = {
     await admin.from("audit_log").insert({
       actor_id: entry.adminId,
       actor_email: entry.adminEmail,
+      actor_name: entry.adminName ?? null,
       action: "EMERGENCY_FORCE_LOGOUT",
       resource: "auth_session",
       category: "security",
@@ -157,6 +165,7 @@ const auditService = {
     await admin.from("audit_log").insert({
       actor_id: entry.changedById,
       actor_email: entry.changedByEmail,
+      actor_name: entry.changedByName ?? null,
       action: entry.action ?? "ROLE_CHANGE",
       resource: "user_account",
       category: "role_change",
@@ -179,6 +188,7 @@ const auditService = {
     await admin.from("audit_log").insert({
       actor_id: entry.userId,
       actor_email: entry.userEmail,
+      actor_name: entry.userName ?? null,
       action: "CONFIG_CHANGE",
       resource: "system_config",
       category: "config_change",
@@ -199,6 +209,7 @@ const auditService = {
     await admin.from("audit_log").insert({
       actor_id: entry.adminId,
       actor_email: entry.adminEmail,
+      actor_name: entry.adminName ?? null,
       action: "DELETE_USER_ACCOUNT",
       resource: "user_account",
       category: "security",

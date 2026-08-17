@@ -38,7 +38,7 @@ export default async function AuthenticatedStudentLayout({ children }: Authentic
     redirect("/dashboard");
   }
 
-  const initialStudentName = session.user.user_metadata?.username || session.user.email?.split("@")[0] || "Student";
+  const initialStudentName = session.user.user_metadata?.full_name || session.user.user_metadata?.username || "Student";
   const initialEmail = session.user.email || "";
 
   return (

@@ -165,6 +165,7 @@ export interface UserAccountItem {
   fullName: string;
   role: "administrator" | "staff" | "student";
   isDisabled: boolean;
+  isProfileComplete?: boolean;
   createdAt: string;
   lastSignInAt?: string;
 }
@@ -175,6 +176,8 @@ export interface UserAccountItem {
 export async function fetchUserAccountsAction(): Promise<UserAccountItem[]> {
   await getAdminUser();
   const adminClient = getAdminSupabase();
+
+  // 1. Fetch user list from auth.admin
   const { data: { users }, error } = await adminClient.auth.admin.listUsers({
     page: 1,
     perPage: 1000,
@@ -184,6 +187,21 @@ export async function fetchUserAccountsAction(): Promise<UserAccountItem[]> {
     throw new Error(`Failed to list users: ${error.message}`);
   }
 
+  // 2. Fetch profiles from public.user_profiles
+  const { data: profiles } = await adminClient
+    .from("user_profiles")
+    .select("*");
+
+  const profileMap = new Map<string, { fullName: string | null; isComplete: boolean }>();
+  if (profiles) {
+    for (const p of profiles) {
+      profileMap.set(p.id, {
+        fullName: p.full_name,
+        isComplete: Boolean(p.is_profile_complete),
+      });
+    }
+  }
+
   return users.map((u) => {
     const rawRole = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
     let role: "administrator" | "staff" | "student" = "staff";
@@ -191,13 +209,18 @@ export async function fetchUserAccountsAction(): Promise<UserAccountItem[]> {
     else if (rawRole === "student") role = "student";
 
     const isDisabled = Boolean(u.banned_until && new Date(u.banned_until) > new Date());
+    const profile = profileMap.get(u.id);
+
+    const rawName = (profile?.fullName || (u.user_metadata?.full_name as string) || "").trim();
+    const isProfileComplete = Boolean(rawName && rawName.length >= 2);
 
     return {
       id: u.id,
       email: u.email ?? "no-email@nfsu.ac.in",
-      fullName: (u.user_metadata?.full_name as string) || (u.email?.split("@")[0] ?? "Staff User"),
+      fullName: isProfileComplete ? rawName : "Profile Incomplete",
       role,
       isDisabled,
+      isProfileComplete,
       createdAt: u.created_at,
       lastSignInAt: u.last_sign_in_at ?? undefined,
     };
@@ -219,9 +242,14 @@ export async function createStaffAccountAction(data: {
   if (!data.email || !data.password || !data.fullName) {
     throw new Error("Email, password, and full name are required.");
   }
+  if (data.fullName.trim().length < 2) {
+    throw new Error("Full name must be at least 2 characters long.");
+  }
   if (data.password.length < 8) {
     throw new Error("Password must be at least 8 characters long.");
   }
+
+  const cleanName = data.fullName.trim();
 
   const { data: { user }, error } = await adminClient.auth.admin.createUser({
     email: data.email,
@@ -229,12 +257,29 @@ export async function createStaffAccountAction(data: {
     email_confirm: true,
     user_metadata: {
       role: "staff",
-      full_name: data.fullName,
+      full_name: cleanName,
     },
   });
 
   if (error || !user) {
     throw new Error(error?.message ?? "Failed creating staff account.");
+  }
+
+  // Also upsert public.user_profiles if table exists
+  try {
+    await adminClient.from("user_profiles").upsert(
+      {
+        id: user.id,
+        email: data.email,
+        full_name: cleanName,
+        role: "staff",
+        is_profile_complete: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+  } catch (syncErr) {
+    console.warn("[SETTINGS_ACTIONS] user_profiles sync deferred:", syncErr);
   }
 
   await auditService.logRoleChange({
@@ -251,11 +296,72 @@ export async function createStaffAccountAction(data: {
   return {
     id: user.id,
     email: user.email ?? data.email,
-    fullName: data.fullName,
+    fullName: cleanName,
     role: "staff",
     isDisabled: false,
+    isProfileComplete: true,
     createdAt: user.created_at,
   };
+}
+
+/**
+ * Updates a user's full name (Administrator privilege).
+ */
+export async function updateStaffAccountAction(data: {
+  targetUserId: string;
+  fullName: string;
+}): Promise<void> {
+  const adminUser = await getAdminUser();
+  const meta = await getRequestMeta();
+  const adminClient = getAdminSupabase();
+
+  const cleanName = data.fullName.trim();
+  if (cleanName.length < 2) {
+    throw new Error("Full name must be at least 2 characters long.");
+  }
+
+  const { data: { user: targetUser }, error: getUserError } = await adminClient.auth.admin.getUserById(data.targetUserId);
+  if (getUserError || !targetUser) {
+    throw new Error("Target user not found.");
+  }
+
+  const prevName = (targetUser.user_metadata?.full_name as string) || "unset";
+
+  // 1. Update user_metadata in auth.users
+  const { error: updateError } = await adminClient.auth.admin.updateUserById(data.targetUserId, {
+    user_metadata: {
+      ...targetUser.user_metadata,
+      full_name: cleanName,
+    },
+  });
+
+  if (updateError) {
+    throw new Error(`Failed to update user name: ${updateError.message}`);
+  }
+
+  // 2. Update public.user_profiles
+  try {
+    await adminClient.from("user_profiles").upsert(
+      {
+        id: data.targetUserId,
+        email: targetUser.email ?? "no-email@nfsu.ac.in",
+        full_name: cleanName,
+        is_profile_complete: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+  } catch (syncErr) {
+    console.warn("[SETTINGS_ACTIONS] user_profiles sync deferred:", syncErr);
+  }
+
+  await auditService.logConfigChange({
+    userId: adminUser.id,
+    userEmail: adminUser.email ?? "unknown",
+    setting: `STAFF_FULL_NAME_UPDATED_${data.targetUserId}`,
+    previousValue: prevName,
+    newValue: cleanName,
+  });
 }
 
 /**

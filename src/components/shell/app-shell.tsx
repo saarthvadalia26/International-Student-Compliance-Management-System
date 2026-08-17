@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { MobileSidebar } from "@/components/sidebar/mobile-sidebar";
 import { Header } from "@/components/header/header";
+import { ProfileCompletionDialog } from "@/components/profile/profile-completion-dialog";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { RealtimeProvider } from "@/providers/realtime-provider";
 
@@ -72,6 +73,9 @@ export function AppShell({ children }: AppShellProps) {
             {children}
           </main>
         </div>
+
+        {/* Global Profile Completion Prompt for Legacy Accounts */}
+        <ProfileCompletionDialog />
       </div>
     </RealtimeProvider>
   );
