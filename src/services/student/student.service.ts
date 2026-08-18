@@ -93,10 +93,10 @@ export class StudentService implements IStudentService {
         localAddress: input.localAddress || null
       },
       academic: {
-        programCode: input.programCode,
-        admissionDate: admStr,
-        expectedGraduation: gradStr,
-        currentSemester: input.currentSemester || 1,
+        programCode: input.programCode || null,
+        admissionDate: admStr || null,
+        expectedGraduation: gradStr || null,
+        currentSemester: input.currentSemester || null,
         academicStatus: "good_standing"
       }
     });

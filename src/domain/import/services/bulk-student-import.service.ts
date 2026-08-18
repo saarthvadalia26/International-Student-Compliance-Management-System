@@ -321,18 +321,18 @@ export class BulkStudentImportService {
       }
 
       // =========================================================================
-      // 1. REQUIRED FIELD: University Registration / Enrollment Number
+      // 1. FIELD: University Registration / Enrollment Number (Optional on Import)
       // =========================================================================
       const regNo = mappedData.registration_number?.trim() || "";
       if (!regNo) {
-        // Strict requirement: ISCMS never auto-generates enrollment numbers
-        errors.push({
+        warnings.push({
           field: "registration_number",
           fieldLabel: "Registration / Enrollment Number",
           value: "",
-          problem: "Enrollment number is required and must be provided by the university.",
-          suggestion: "Enter the official university enrollment or registration number."
+          impact: "Enrollment number is not provided yet. Record will be created without enrollment number and can be assigned later.",
+          actionTaken: "Record will be saved with enrollment number marked as pending."
         });
+        warningsBreakdown.otherWarnings++;
       } else {
         const regLower = regNo.toLowerCase();
         // Intra-file duplicate check
@@ -361,7 +361,7 @@ export class BulkStudentImportService {
       }
 
       // =========================================================================
-      // 2. REQUIRED FIELD: Student Full Name
+      // 2. REQUIRED FIELD: Student Full Name (Mandatory Creation Identity)
       // =========================================================================
       const fullName = mappedData.full_name?.trim() || "";
       if (!fullName) {
@@ -375,19 +375,20 @@ export class BulkStudentImportService {
       }
 
       // =========================================================================
-      // 3. REQUIRED FIELD: Academic Program / Course & Academic Level Validation
+      // 3. FIELD: Academic Program / Course & Academic Level Validation (Progressive)
       // =========================================================================
       const programRaw = mappedData.academic_program?.trim() || "";
       let matchedProgram: { programName: string; programCode: string; totalSemesters: number; semesterDuration: number; semesterDurationUnit: string; academicLevel?: string | null } | null = null;
 
       if (!programRaw) {
-        errors.push({
+        warnings.push({
           field: "academic_program",
           fieldLabel: "Academic Program",
           value: "",
-          problem: "Academic program / course is required.",
-          suggestion: "Enter the enrolled course name or program code."
+          impact: "Academic program / course is not assigned yet.",
+          actionTaken: "Student record will be created with course marked as pending and can be assigned later."
         });
+        warningsBreakdown.otherWarnings++;
       } else {
         // Match against known programs
         if (programs.length > 0) {
@@ -950,11 +951,11 @@ export class BulkStudentImportService {
       let studentId: string | null = null;
 
       try {
-        // A. Insert core students table (mandatory university enrollment number)
+        // A. Insert core students table (university enrollment number or null)
         const { data: studentRecord, error: stErr } = await supabase
           .from("students")
           .insert({
-            registration_number: regNo,
+            registration_number: regNo || null,
             status: "active",
             import_batch_id: batchId,
             created_by: params.actorId,
@@ -1005,7 +1006,7 @@ export class BulkStudentImportService {
         // D. Insert student_academic (with progression calculation if admission date exists)
         const progName = data.academic_program?.trim() || "";
         const matchedP = programLookup.get(progName.toLowerCase());
-        const programCode = matchedP?.program_code || progName;
+        const programCode = matchedP?.program_code || progName || null;
 
         let currentSemester: number | null = null;
         let expectedGraduation: string | null = null;
@@ -1015,7 +1016,7 @@ export class BulkStudentImportService {
             admissionDate: data.admission_date,
             courseConfig: {
               programName: matchedP.program_name,
-              programCode: programCode,
+              programCode: matchedP.program_code || programCode || "",
               totalSemesters: matchedP.total_semesters || 8,
               semesterDuration: matchedP.semester_duration || 6,
               semesterDurationUnit: matchedP.semester_duration_unit || "months"

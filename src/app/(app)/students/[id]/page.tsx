@@ -70,6 +70,7 @@ import { DispatchReminderDialog } from "@/features/compliance/components/dispatc
 import { DOCUMENT_CONFIGS, getDocumentTheme } from "@/features/compliance/constants/constants";
 import { StudentDocumentCard } from "@/features/compliance/components/student-document-card";
 import { DocumentReminderSchedule } from "@/features/compliance/components/document-reminder-schedule";
+import { ProfileCompletionEngine, ProfileCompletionResult } from "@/domain/students/services/profile-completion.service";
 
 export interface StudentDocument {
   number: string;
@@ -512,11 +513,43 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [saveError, setSaveError] = React.useState(false);
 
+  // Compute profile completion score and missing fields
+  const profileCompletion = React.useMemo<ProfileCompletionResult | null>(() => {
+    if (!student) return null;
+    return ProfileCompletionEngine.evaluate({
+      fullName: student.fullName,
+      nationalityCode: student.nationalityCode,
+      dateOfBirth: null,
+      gender: null,
+      programCode: student.programCode,
+      admissionDate: student.admissionDate,
+      expectedGraduation: student.expectedGraduation,
+      email: student.email,
+      phoneHome: student.phoneHome,
+      permanentAddress: student.permanentAddress,
+      emergencyContactName: student.emergencyContact?.name,
+      emergencyContactPhone: student.emergencyContact?.phone,
+      passportNumber: student.passport?.number,
+      passportExpiry: student.passport?.expiryDate,
+      visaNumber: student.visa?.number,
+      visaExpiry: student.visa?.expiryDate,
+      efrroNumber: student.efrro?.number,
+      efrroExpiry: student.efrro?.expiryDate
+    });
+  }, [student]);
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editForm.fullName.trim() || !editForm.email.trim()) {
-      toast.error("Validation Error", { description: "Full Name and Email fields are required." });
+    if (!editForm.fullName.trim()) {
+      toast.error("Validation Error", { description: "Full Name is required." });
       return;
+    }
+    if (editForm.email && editForm.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editForm.email.trim())) {
+        toast.error("Validation Error", { description: "Please enter a valid email address format." });
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -526,13 +559,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
     try {
       const res = await updateStudentAction(studentId, {
         registrationNumber: editForm.registrationNumber?.trim() || null,
-        fullName: editForm.fullName,
-        email: editForm.email,
-        phoneHome: editForm.phoneHome,
-        phoneLocal: editForm.phoneLocal,
-        permanentAddress: editForm.permanentAddress,
-        localAddress: editForm.localAddress,
-        programCode: editForm.program,
+        fullName: editForm.fullName.trim(),
+        email: editForm.email?.trim() || undefined,
+        phoneHome: editForm.phoneHome?.trim() || undefined,
+        phoneLocal: editForm.phoneLocal?.trim() || undefined,
+        permanentAddress: editForm.permanentAddress?.trim() || undefined,
+        localAddress: editForm.localAddress?.trim() || undefined,
+        programCode: editForm.program?.trim() || undefined,
         currentSemester: Number(editForm.currentSemester) || 1,
         academicStatus: editForm.academicStatus,
         status: editForm.status,
@@ -1026,6 +1059,50 @@ export default function StudentDetailsPage({ params }: PageProps) {
           </Link>
         </div>
       </div>
+
+      {/* Profile Completion Progress Card */}
+      {profileCompletion && profileCompletion.percentage < 100 && (
+        <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-950/20 text-foreground shadow-xs animate-fade-in flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1.5 flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className="text-xs px-2.5 py-0.5 font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                {profileCompletion.statusLabel} ({profileCompletion.percentage}%)
+              </Badge>
+              <span className="text-xs font-medium text-foreground">
+                Progressive Registration Active
+              </span>
+            </div>
+            {/* Progress bar */}
+            <div className="w-full bg-muted/60 dark:bg-zinc-800 h-2 rounded-full overflow-hidden max-w-md">
+              <div 
+                className={`h-full transition-all duration-500 ${
+                  profileCompletion.percentage >= 80 
+                    ? "bg-emerald-500" 
+                    : profileCompletion.percentage >= 40 
+                      ? "bg-amber-500" 
+                      : "bg-rose-500"
+                }`}
+                style={{ width: `${profileCompletion.percentage}%` }}
+              />
+            </div>
+            {profileCompletion.missingItems.length > 0 && (
+              <p className="text-[11px] text-muted-foreground font-caption leading-relaxed">
+                <span className="font-semibold text-foreground/80">Pending Information:</span> {profileCompletion.missingItems.join(", ")}.
+              </p>
+            )}
+          </div>
+
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="text-xs border-amber-500/40 hover:bg-amber-500/10 shrink-0"
+            onClick={openEditDialog}
+          >
+            <Edit3 className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" />
+            Complete Profile
+          </Button>
+        </div>
+      )}
 
       {/* Main Grid View */}
       <div className="grid gap-6 lg:grid-cols-3 w-full max-w-full min-w-0">

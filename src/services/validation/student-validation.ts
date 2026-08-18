@@ -2,121 +2,147 @@ import { z } from "zod";
 
 export const RegisterStudentValidationSchema = z.object({
   registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
-  fullName: z.string().min(2, "Full name must be at least 2 characters").max(255),
-  nationalityCode: z.string().length(3, "Please select a valid nationality"),
+  fullName: z.string().trim().min(2, "Full name must be at least 2 characters").max(255),
+  nationalityCode: z.string().optional().nullable().refine(val => !val || val.trim().length === 3 || val.trim().length >= 2, { message: "Please select a valid nationality" }),
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"], {
-    message: "Please select a gender"
-  }).optional(),
-  dateOfBirth: z.string().min(1, "Date of birth is required").refine((dob) => {
+    message: "Please select a valid gender option"
+  }).optional().nullable(),
+  dateOfBirth: z.string().optional().nullable().refine((dob) => {
+    if (!dob || !dob.trim()) return true;
     const date = new Date(dob);
     return !isNaN(date.getTime()) && date < new Date();
   }, { message: "Date of birth must be a valid date in the past" }),
-  email: z.string().min(1, "Student institutional email is required").email("Please enter a valid email address format").max(255),
-  phoneHome: z.string().min(7, "Home country phone number must contain at least 7 digits").max(20, "Phone number cannot exceed 20 digits"),
-  phoneLocal: z.string().optional().refine(val => !val || val.length >= 7, { message: "Local phone must contain at least 7 digits" }),
-  permanentAddress: z.string().min(10, "Permanent address must be descriptive (at least 10 characters)"),
-  localAddress: z.string().optional(),
-  programCode: z.string().min(1, "Academic program is required").max(100),
-  admissionDate: z.string().min(1, "Admission date is required"),
-  expectedGraduation: z.string().min(1, "Expected graduation date is required"),
-  currentSemester: z.number().int().min(1).max(20).default(1),
-  relationshipType: z.enum(["parent", "guardian", "local_sponsor"], { message: "Please select a valid relationship type" }).optional(),
-  relationshipName: z.string().optional().refine(val => !val || val.trim().length >= 2, { message: "Emergency contact name must be at least 2 characters" }),
-  relationshipPhone: z.string().optional().refine(val => !val || val.trim().length >= 7, { message: "Emergency contact phone must contain at least 7 digits" }),
-  relationshipEmail: z.string().email("Invalid email address format").optional().or(z.literal("")),
-  relationshipAddress: z.string().optional(),
-  embassyName: z.string().optional(),
-  embassyAddress: z.string().optional(),
-  embassyPhone: z.string().optional(),
-  embassyEmail: z.string().optional().or(z.literal("")),
-  embassyContactPerson: z.string().optional(),
-  passportNumber: z.string().optional().refine(val => !val || val.length >= 5, { message: "Passport number must contain at least 5 characters" }),
-  passportIssueDate: z.string().optional(),
-  passportExpiry: z.string().optional(),
-  passportPlaceOfIssue: z.string().optional(),
-  visaNumber: z.string().optional().refine(val => !val || val.length >= 5, { message: "Visa number must contain at least 5 characters" }),
-  visaIssueDate: z.string().optional(),
-  visaExpiry: z.string().optional(),
-  visaType: z.string().optional(),
-  efrroNumber: z.string().optional().refine(val => !val || val.trim().length >= 3, { message: "eFRRO number must contain at least 3 characters" }),
-  efrroIssueDate: z.string().optional(),
-  efrroExpiry: z.string().optional()
+  email: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Please enter a valid email address format" }),
+  phoneHome: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return val.trim().length >= 7 && val.trim().length <= 20;
+  }, { message: "Home country phone number must contain at least 7 digits (max 20 digits)" }),
+  phoneLocal: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 7, { message: "Local phone must contain at least 7 digits" }),
+  permanentAddress: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 5, { message: "Permanent address must be descriptive (at least 5 characters)" }),
+  localAddress: z.string().optional().nullable(),
+  programCode: z.string().optional().nullable(),
+  admissionDate: z.string().optional().nullable(),
+  expectedGraduation: z.string().optional().nullable(),
+  currentSemester: z.number().int().min(1).max(20).optional().nullable(),
+  relationshipType: z.enum(["parent", "guardian", "local_sponsor"], { message: "Please select a valid relationship type" }).optional().nullable(),
+  relationshipName: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 2, { message: "Emergency contact name must be at least 2 characters" }),
+  relationshipPhone: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 7, { message: "Emergency contact phone must contain at least 7 digits" }),
+  relationshipEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid emergency contact email address format" }),
+  relationshipAddress: z.string().optional().nullable(),
+  embassyName: z.string().optional().nullable(),
+  embassyAddress: z.string().optional().nullable(),
+  embassyCity: z.string().optional().nullable(),
+  embassyCountry: z.string().optional().nullable(),
+  embassyPhone: z.string().optional().nullable(),
+  embassyEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid consular email address format" }),
+  embassyWebsite: z.string().optional().nullable(),
+  embassyContactPerson: z.string().optional().nullable(),
+  passportNumber: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 5, { message: "Passport number must contain at least 5 characters" }),
+  passportIssueDate: z.string().optional().nullable(),
+  passportExpiry: z.string().optional().nullable(),
+  passportPlaceOfIssue: z.string().optional().nullable(),
+  visaNumber: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 5, { message: "Visa number must contain at least 5 characters" }),
+  visaIssueDate: z.string().optional().nullable(),
+  visaExpiry: z.string().optional().nullable(),
+  visaType: z.string().optional().nullable(),
+  efrroNumber: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 3, { message: "eFRRO number must contain at least 3 characters" }),
+  efrroIssueDate: z.string().optional().nullable(),
+  efrroExpiry: z.string().optional().nullable()
 }).refine((data) => {
-  if (data.passportIssueDate && data.passportExpiry) {
+  if (data.passportIssueDate && data.passportExpiry && data.passportIssueDate.trim() && data.passportExpiry.trim()) {
     const pi = new Date(data.passportIssueDate);
     const pe = new Date(data.passportExpiry);
-    return pe > pi;
+    if (!isNaN(pi.getTime()) && !isNaN(pe.getTime())) {
+      return pe > pi;
+    }
   }
   return true;
 }, {
   message: "Passport expiration date must be strictly after the issue date",
   path: ["passportExpiry"]
 }).refine((data) => {
-  if (data.visaIssueDate && data.visaExpiry) {
+  if (data.visaIssueDate && data.visaExpiry && data.visaIssueDate.trim() && data.visaExpiry.trim()) {
     const vi = new Date(data.visaIssueDate);
     const ve = new Date(data.visaExpiry);
-    return ve > vi;
+    if (!isNaN(vi.getTime()) && !isNaN(ve.getTime())) {
+      return ve > vi;
+    }
   }
   return true;
 }, {
   message: "Visa expiration date must be strictly after the issue date",
   path: ["visaExpiry"]
 }).refine((data) => {
-  if (data.efrroIssueDate && data.efrroExpiry) {
+  if (data.efrroIssueDate && data.efrroExpiry && data.efrroIssueDate.trim() && data.efrroExpiry.trim()) {
     const ei = new Date(data.efrroIssueDate);
     const ee = new Date(data.efrroExpiry);
-    return ee > ei;
+    if (!isNaN(ei.getTime()) && !isNaN(ee.getTime())) {
+      return ee > ei;
+    }
   }
   return true;
 }, {
   message: "eFRRO expiration date must be strictly after the issue date",
   path: ["efrroExpiry"]
 }).refine((data) => {
-  if (data.admissionDate && data.expectedGraduation) {
+  if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
     const ad = new Date(data.admissionDate);
     const eg = new Date(data.expectedGraduation);
-    return eg > ad;
+    if (!isNaN(ad.getTime()) && !isNaN(eg.getTime())) {
+      return eg > ad;
+    }
   }
   return true;
 }, {
   message: "Expected graduation date must be after admission date",
   path: ["expectedGraduation"]
-}).refine((data) => {
-  if (data.visaExpiry) {
-    const ve = new Date(data.visaExpiry);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return ve >= today;
-  }
-  return true;
-}, {
-  message: "Visa expiration date must be today or in the future",
-  path: ["visaExpiry"]
-}).refine((data) => {
-  if (data.passportExpiry) {
-    const pe = new Date(data.passportExpiry);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return pe >= today;
-  }
-  return true;
-}, {
-  message: "Passport expiration date must be today or in the future",
-  path: ["passportExpiry"]
 });
 
 export const UpdateStudentValidationSchema = z.object({
   status: z.enum(["active", "suspended", "graduated", "withdrawn"]).optional(),
   registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
-  fullName: z.string().min(2).max(255).optional(),
-  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional(),
-  dateOfBirth: z.string().optional(),
-  email: z.string().email().max(255).optional(),
-  phoneHome: z.string().min(7).max(20).optional(),
-  phoneLocal: z.string().min(7).max(20).optional(),
-  permanentAddress: z.string().min(10).optional(),
-  localAddress: z.string().optional(),
-  programCode: z.string().max(100).optional(),
-  currentSemester: z.number().int().min(1).max(20).optional(),
-  academicStatus: z.enum(["good_standing", "probation", "suspended"]).optional()
+  fullName: z.string().min(2, "Full name must be at least 2 characters").max(255).optional(),
+  nationalityCode: z.string().optional().nullable(),
+  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional().nullable(),
+  dateOfBirth: z.string().optional().nullable().refine((dob) => {
+    if (!dob || !dob.trim()) return true;
+    const date = new Date(dob);
+    return !isNaN(date.getTime()) && date < new Date();
+  }, { message: "Date of birth must be a valid date in the past" }),
+  email: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid email address format" }),
+  phoneHome: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return val.trim().length >= 7 && val.trim().length <= 20;
+  }, { message: "Home phone must contain between 7 and 20 digits" }),
+  phoneLocal: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 7, { message: "Local phone must contain at least 7 digits" }),
+  permanentAddress: z.string().optional().nullable(),
+  localAddress: z.string().optional().nullable(),
+  programCode: z.string().optional().nullable(),
+  admissionDate: z.string().optional().nullable(),
+  expectedGraduation: z.string().optional().nullable(),
+  currentSemester: z.number().int().min(1).max(20).optional().nullable(),
+  academicStatus: z.enum(["good_standing", "probation", "suspended"]).optional(),
+  embassyName: z.string().optional().nullable(),
+  embassyAddress: z.string().optional().nullable(),
+  embassyCity: z.string().optional().nullable(),
+  embassyCountry: z.string().optional().nullable(),
+  embassyPhone: z.string().optional().nullable(),
+  embassyEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid consular email address format" }),
+  embassyWebsite: z.string().optional().nullable(),
+  embassyContactPerson: z.string().optional().nullable()
 });

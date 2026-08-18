@@ -391,8 +391,12 @@ export default function StudentListPage() {
                     {/* Nationality */}
                     <TableCell className="py-3.5 text-xs text-foreground">
                       <div className="flex items-center gap-1.5 font-small">
-                        <CountryFlag countryCode={student.nationalityCode} size="md" />
-                        <span>{student.nationalityName}</span>
+                        {student.nationalityCode ? (
+                          <CountryFlag countryCode={student.nationalityCode} size="md" />
+                        ) : (
+                          <div className="w-5 h-3.5 rounded bg-muted/60 border border-border/40 inline-block" />
+                        )}
+                        <span>{student.nationalityName || "Not specified"}</span>
                       </div>
                     </TableCell>
 

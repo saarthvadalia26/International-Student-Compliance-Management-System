@@ -284,22 +284,22 @@ export default function StudentRegistrationPage() {
     const sanitizedEfrroIssue = normalizeDateToISO(formData.efrroIssueDate);
     const sanitizedEfrroExp = normalizeDateToISO(formData.efrroExpiry);
 
-    // Zod payload assembly
+    // Zod payload assembly for progressive student registration
     const validationPayload: RegisterStudentInput = {
       registrationNumber: formData.enrollmentNumber?.trim() || undefined,
       fullName: formData.fullName.trim(),
-      nationalityCode: formData.nationality.trim().toUpperCase(),
+      nationalityCode: formData.nationality.trim().toUpperCase() || undefined,
       gender: (formData.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
-      dateOfBirth: sanitizedDob,
-      email: formData.email.trim().toLowerCase(),
-      phoneHome: formData.phoneHome.trim(),
+      dateOfBirth: sanitizedDob || undefined,
+      email: formData.email.trim().toLowerCase() || undefined,
+      phoneHome: formData.phoneHome.trim() || undefined,
       phoneLocal: formData.phoneLocal.trim() || undefined,
-      permanentAddress: formData.permanentAddress.trim(),
+      permanentAddress: formData.permanentAddress.trim() || undefined,
       localAddress: formData.localAddress.trim() || undefined,
-      programCode: formData.program.trim(),
-      admissionDate: sanitizedAdm,
-      expectedGraduation: sanitizedGrad,
-      currentSemester: 1,
+      programCode: formData.program.trim() || undefined,
+      admissionDate: sanitizedAdm || undefined,
+      expectedGraduation: sanitizedGrad || undefined,
+      currentSemester: formData.program.trim() ? 1 : undefined,
       relationshipType: formData.emergencyContactName.trim() ? (formData.emergencyContactRelation as "parent" | "guardian" | "local_sponsor") : undefined,
       relationshipName: formData.emergencyContactName.trim() || undefined,
       relationshipPhone: formData.emergencyContactPhone.trim() || undefined,
@@ -541,7 +541,7 @@ export default function StudentRegistrationPage() {
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <PhoneCall className="h-4 w-4 shrink-0" /> Emergency Contact
+              <PhoneCall className="h-4 w-4 shrink-0" /> Contact & Guardian
             </div>
             {tabErrorCounts.contact > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
@@ -560,7 +560,7 @@ export default function StudentRegistrationPage() {
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <FileCheck className="h-4 w-4 shrink-0" /> Document Checklist
+              <FileCheck className="h-4 w-4 shrink-0" /> Documents & Compliance
             </div>
             {tabErrorCounts.documents > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
@@ -571,10 +571,10 @@ export default function StudentRegistrationPage() {
 
           <div className="mt-8 p-3 rounded-lg border border-border/60 bg-muted/20 text-[11px] text-muted-foreground font-caption space-y-1">
             <div className="flex items-center gap-1 font-semibold text-foreground">
-              <AlertCircle className="h-3.5 w-3.5 text-primary shrink-0" /> Registration Guidance
+              <AlertCircle className="h-3.5 w-3.5 text-primary shrink-0" /> Progressive Registration
             </div>
             <p className="leading-relaxed">
-              Enter the information currently available. Additional contact details and physical compliance documents can be added later through the student profile.
+              Only <strong>Legal Full Name</strong> is required to create a student record. All other academic, passport, visa, and contact details can be added or updated anytime later.
             </p>
           </div>
         </div>
@@ -593,8 +593,8 @@ export default function StudentRegistrationPage() {
                 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="fullName">
-                      Full Name (as per Passport)
+                    <label className="text-xs font-medium text-foreground flex items-center gap-1" htmlFor="fullName">
+                      Full Name (as per Passport) <span className="text-rose-500 font-bold">*</span>
                     </label>
                     <Input
                       id="fullName"
@@ -613,7 +613,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="nationality">
-                      Nationality
+                      Nationality <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <NationalitySelector 
                       value={formData.nationality} 
@@ -628,14 +628,14 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="gender">
-                      Gender
+                      Gender <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <Select value={formData.gender} onValueChange={(v) => handleSelectChange("gender", v || "")}>
                       <SelectTrigger 
                         id="gender"
                         className={validationErrors.gender ? "border-rose-500 focus-visible:ring-rose-500" : ""}
                       >
-                        <SelectValue placeholder="Choose Gender" />
+                        <SelectValue placeholder="Choose Gender (Optional)" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="male">Male</SelectItem>
@@ -683,19 +683,19 @@ export default function StudentRegistrationPage() {
                 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium text-foreground" htmlFor="enrollmentNumber">
-                      Enrollment Number (optional)
+                    <label className="text-xs font-medium text-foreground flex items-center gap-1" htmlFor="enrollmentNumber">
+                      Enrollment Number <span className="text-muted-foreground text-[10px] font-normal">(Optional - Leave blank if not yet issued)</span>
                     </label>
                     <Input
                       id="enrollmentNumber"
-                      placeholder="e.g. NFSU/2026/CS/101"
+                      placeholder="e.g. NFSU/2026/CS/101 (Leave blank if not yet available)"
                       value={formData.enrollmentNumber}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
                       className={`h-10 text-sm font-mono ${(validationErrors.registrationNumber || validationErrors.enrollmentNumber) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
                     <p className="text-[11px] text-muted-foreground font-caption">
-                      Provided by the university. You can add it later if it is not available now.
+                      Official university enrollment number. If not available yet, you can leave it blank and add it later.
                     </p>
                     {(validationErrors.registrationNumber || validationErrors.enrollmentNumber) && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
@@ -705,8 +705,8 @@ export default function StudentRegistrationPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="program">
-                      Academic Program
+                    <label className="text-xs font-medium text-foreground flex items-center gap-1" htmlFor="program">
+                      Academic Program <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <Select 
                       value={formData.program} 
@@ -717,7 +717,7 @@ export default function StudentRegistrationPage() {
                         id="program"
                         className={`h-10 text-xs ${(validationErrors.programCode || validationErrors.program) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                       >
-                        <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select Academic Program"} />
+                        <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select Academic Program (Optional)"} />
                       </SelectTrigger>
                       <SelectContent>
                         {academicPrograms.map((prog) => (
@@ -741,7 +741,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="school">
-                      School / Department
+                      School / Department <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <Input
                       id="school"
@@ -755,7 +755,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="admissionDate">
-                      Admission Date
+                      Admission Date <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <DatePicker
                       id="admissionDate"
@@ -772,7 +772,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="expectedGraduation">
-                      Expected Graduation Date
+                      Expected Graduation Date <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <DatePicker
                       id="expectedGraduation"
@@ -834,14 +834,14 @@ export default function StudentRegistrationPage() {
               <CardContent className="p-6 space-y-4">
                 <div>
                   <h2 className="text-sm font-h2 font-semibold">Contact Details & Emergency Coordinators</h2>
-                  <p className="text-[11px] text-muted-foreground font-caption">Contact coordinates and immediate family/sponsor contacts.</p>
+                  <p className="text-[11px] text-muted-foreground font-caption">Contact coordinates and immediate family/sponsor contacts (Optional / Can be completed later).</p>
                 </div>
                 <Separator className="my-2" />
                 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">
-                      Home Country Phone Number
+                      Home Country Phone Number <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <Input
                       id="phoneHome"
@@ -860,7 +860,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="email">
-                      Student Institutional Email
+                      Student Institutional Email <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <Input
                       id="email"
@@ -880,7 +880,7 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="phoneLocal">
-                      Local Contact Number (India)
+                      Local Contact Number (India) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <Input
                       id="phoneLocal"
@@ -899,11 +899,11 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">
-                      Permanent Address (Home Country)
+                      Permanent Address (Home Country) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <Input
                       id="permanentAddress"
-                      placeholder="Full residential address in home country (at least 10 characters)"
+                      placeholder="Full residential address in home country (optional)"
                       value={formData.permanentAddress}
                       onChange={handleInputChange}
                       disabled={isSubmitting}
@@ -918,11 +918,11 @@ export default function StudentRegistrationPage() {
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground" htmlFor="localAddress">
-                      Local Address (India)
+                      Local Address (India) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
                     <Input
                       id="localAddress"
-                      placeholder="Hostel or local residential address"
+                      placeholder="Hostel or local residential address (optional)"
                       value={formData.localAddress}
                       onChange={handleInputChange}
                       disabled={isSubmitting}

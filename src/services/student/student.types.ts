@@ -16,9 +16,9 @@ export interface Student {
 export interface StudentPersonal {
   studentId: string;
   fullName: string;
-  nationalityCode: string;
-  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
-  dateOfBirth: Date;
+  nationalityCode: string | null;
+  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say" | null;
+  dateOfBirth: Date | null;
   bloodGroup: string | null;
   religion: string | null;
   createdAt: Date;
@@ -30,10 +30,10 @@ export interface StudentPersonal {
 
 export interface StudentContact {
   studentId: string;
-  email: string;
-  phoneHome: string;
+  email: string | null;
+  phoneHome: string | null;
   phoneLocal: string | null;
-  permanentAddress: string;
+  permanentAddress: string | null;
   localAddress: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -44,10 +44,10 @@ export interface StudentContact {
 
 export interface StudentAcademic {
   studentId: string;
-  programCode: string;
-  admissionDate: Date;
-  expectedGraduation: Date;
-  currentSemester: number;
+  programCode: string | null;
+  admissionDate: Date | null;
+  expectedGraduation: Date | null;
+  currentSemester: number | null;
   academicStatus: AcademicStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -100,69 +100,70 @@ export interface FullStudentProfile {
 export interface RegisterStudentInput {
   registrationNumber?: string | null;
   fullName: string;
-  nationalityCode: string;
-  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
-  dateOfBirth: Date | string;
-  email: string;
-  phoneHome: string;
-  phoneLocal?: string;
-  permanentAddress: string;
-  localAddress?: string;
-  programCode: string;
-  admissionDate: Date | string;
-  expectedGraduation: Date | string;
-  currentSemester?: number;
-  relationshipType?: RelationshipType;
-  relationshipName?: string;
-  relationshipPhone?: string;
-  relationshipEmail?: string;
-  relationshipAddress?: string;
-  embassyName?: string;
-  embassyAddress?: string;
-  embassyCity?: string;
-  embassyCountry?: string;
-  embassyPhone?: string;
-  embassyEmail?: string;
-  embassyWebsite?: string;
-  embassyContactPerson?: string;
-  passportNumber?: string;
-  passportIssueDate?: Date | string;
-  passportExpiry?: Date | string;
-  passportPlaceOfIssue?: string;
-  visaNumber?: string;
-  visaIssueDate?: Date | string;
-  visaExpiry?: Date | string;
-  visaType?: string;
-  efrroNumber?: string;
-  efrroIssueDate?: Date | string;
-  efrroExpiry?: Date | string;
+  nationalityCode?: string | null;
+  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say" | null;
+  dateOfBirth?: Date | string | null;
+  email?: string | null;
+  phoneHome?: string | null;
+  phoneLocal?: string | null;
+  permanentAddress?: string | null;
+  localAddress?: string | null;
+  programCode?: string | null;
+  admissionDate?: Date | string | null;
+  expectedGraduation?: Date | string | null;
+  currentSemester?: number | null;
+  relationshipType?: RelationshipType | null;
+  relationshipName?: string | null;
+  relationshipPhone?: string | null;
+  relationshipEmail?: string | null;
+  relationshipAddress?: string | null;
+  embassyName?: string | null;
+  embassyAddress?: string | null;
+  embassyCity?: string | null;
+  embassyCountry?: string | null;
+  embassyPhone?: string | null;
+  embassyEmail?: string | null;
+  embassyWebsite?: string | null;
+  embassyContactPerson?: string | null;
+  passportNumber?: string | null;
+  passportIssueDate?: Date | string | null;
+  passportExpiry?: Date | string | null;
+  passportPlaceOfIssue?: string | null;
+  visaNumber?: string | null;
+  visaIssueDate?: Date | string | null;
+  visaExpiry?: Date | string | null;
+  visaType?: string | null;
+  efrroNumber?: string | null;
+  efrroIssueDate?: Date | string | null;
+  efrroExpiry?: Date | string | null;
 }
 
 export interface UpdateStudentInput {
   status?: StudentStatus;
   registrationNumber?: string | null;
   fullName?: string;
-  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say";
-  dateOfBirth?: Date;
-  email?: string;
-  phoneHome?: string;
-  phoneLocal?: string;
-  permanentAddress?: string;
-  localAddress?: string;
-  programCode?: string;
-  admissionDate?: string | Date;
-  expectedGraduation?: string | Date;
-  currentSemester?: number;
+  nationalityCode?: string | null;
+  gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say" | null;
+  dateOfBirth?: Date | string | null;
+  email?: string | null;
+  phoneHome?: string | null;
+  phoneLocal?: string | null;
+  permanentAddress?: string | null;
+  localAddress?: string | null;
+  programCode?: string | null;
+  admissionDate?: string | Date | null;
+  expectedGraduation?: string | Date | null;
+  currentSemester?: number | null;
   academicStatus?: AcademicStatus;
   // Embassy / Consular updates
-  embassyName?: string;
-  embassyAddress?: string;
-  embassyCity?: string;
-  embassyCountry?: string;
-  embassyPhone?: string;
-  embassyEmail?: string;
-  embassyWebsite?: string;
-  embassyContactPerson?: string;
+  embassyName?: string | null;
+  embassyAddress?: string | null;
+  embassyCity?: string | null;
+  embassyCountry?: string | null;
+  embassyPhone?: string | null;
+  embassyEmail?: string | null;
+  embassyWebsite?: string | null;
+  embassyContactPerson?: string | null;
 }
 
 export interface StudentFilterOptions {

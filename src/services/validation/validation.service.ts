@@ -9,11 +9,12 @@ export const StudentSchema = z.object({
 // 2. Personal Info Schema
 export const StudentPersonalSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters").max(255),
-  nationalityCode: z.string().length(3, "Nationality must be a 3-letter ISO code"),
-  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional(),
-  dateOfBirth: z.string().refine((dob) => {
+  nationalityCode: z.string().optional().nullable().or(z.literal("")),
+  gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional().nullable(),
+  dateOfBirth: z.string().optional().nullable().refine((dob) => {
+    if (!dob || !dob.trim()) return true;
     const date = new Date(dob);
-    return date < new Date();
+    return !isNaN(date.getTime()) && date < new Date();
   }, { message: "Date of birth must be in the past" }),
   bloodGroup: z.string().max(5).optional().nullable(),
   religion: z.string().max(50).optional().nullable(),
@@ -21,24 +22,35 @@ export const StudentPersonalSchema = z.object({
 
 // 3. Contact Coordinates Schema
 export const StudentContactSchema = z.object({
-  email: z.string().email("Invalid email address format").max(255),
-  phoneHome: z.string().min(7).max(20),
-  phoneLocal: z.string().min(7).max(20).optional().nullable(),
-  permanentAddress: z.string().min(10, "Permanent address must be descriptive"),
+  email: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid email address format" }),
+  phoneHome: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return val.trim().length >= 7 && val.trim().length <= 20;
+  }, { message: "Home phone number must be between 7 and 20 digits" }),
+  phoneLocal: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 7, { message: "Local phone must contain at least 7 digits" }),
+  permanentAddress: z.string().optional().nullable(),
   localAddress: z.string().optional().nullable(),
 });
 
 // 4. Academic Details Schema
 export const StudentAcademicSchema = z.object({
-  programCode: z.string().min(1, "Academic program is required").max(100),
-  admissionDate: z.string(),
-  expectedGraduation: z.string(),
-  currentSemester: z.number().int().min(1).max(20),
+  programCode: z.string().optional().nullable().or(z.literal("")),
+  admissionDate: z.string().optional().nullable().or(z.literal("")),
+  expectedGraduation: z.string().optional().nullable().or(z.literal("")),
+  currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   academicStatus: z.enum(["good_standing", "probation", "suspended"]).default("good_standing"),
 }).refine((data) => {
-  const ad = new Date(data.admissionDate);
-  const eg = new Date(data.expectedGraduation);
-  return eg > ad;
+  if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
+    const ad = new Date(data.admissionDate);
+    const eg = new Date(data.expectedGraduation);
+    if (!isNaN(ad.getTime()) && !isNaN(eg.getTime())) {
+      return eg > ad;
+    }
+  }
+  return true;
 }, {
   message: "Expected graduation must be after admission date",
   path: ["expectedGraduation"]

@@ -110,13 +110,17 @@ export class SupabaseStudentRepository implements IStudentRepository {
     try {
       // 2. Insert into student_personal table
       const dobFormatted = this.formatDate(input.dateOfBirth);
+      const nationalityCode = input.nationalityCode && input.nationalityCode.trim() 
+        ? input.nationalityCode.trim().toUpperCase() 
+        : null;
+
       const { data: personalData, error: personalError } = await supabase
         .from("student_personal")
         .insert({
           student_id: studentId,
           full_name: input.fullName.trim(),
-          nationality_code: input.nationalityCode.trim().toUpperCase(),
-          gender: input.gender || "prefer_not_to_say",
+          nationality_code: nationalityCode,
+          gender: input.gender || null,
           date_of_birth: dobFormatted,
           created_by: actorId,
           updated_by: actorId
@@ -129,14 +133,18 @@ export class SupabaseStudentRepository implements IStudentRepository {
       }
 
       // 3. Insert into student_contact table
+      const emailVal = input.email && input.email.trim() ? input.email.trim().toLowerCase() : null;
+      const phoneHomeVal = input.phoneHome && input.phoneHome.trim() ? input.phoneHome.trim() : null;
+      const permAddressVal = input.permanentAddress && input.permanentAddress.trim() ? input.permanentAddress.trim() : null;
+
       const { data: contactData, error: contactError } = await supabase
         .from("student_contact")
         .insert({
           student_id: studentId,
-          email: input.email.trim().toLowerCase(),
-          phone_home: input.phoneHome.trim(),
+          email: emailVal,
+          phone_home: phoneHomeVal,
           phone_local: input.phoneLocal?.trim() || null,
-          permanent_address: input.permanentAddress.trim(),
+          permanent_address: permAddressVal,
           local_address: input.localAddress?.trim() || null,
           created_by: actorId,
           updated_by: actorId
@@ -151,31 +159,44 @@ export class SupabaseStudentRepository implements IStudentRepository {
         throw new Error(`Failed to create contact record: ${contactError?.message || "Unknown database error"}`);
       }
 
-      // 4. Insert into student_academic table (automatically calculated from course structure)
-      const admFormatted = this.formatDate(input.admissionDate) || "";
-      
-      const programService = new AcademicProgramService();
-      const progConfig = await programService.getProgramByCodeOrName(input.programCode);
+      // 4. Insert into student_academic table (automatically calculated from course structure if provided)
+      const admFormatted = this.formatDate(input.admissionDate);
+      let programCodeVal: string | null = null;
+      let expGradFormatted: string | null = null;
+      let calculatedSemester: number | null = null;
 
-      const progression = AcademicProgressionEngine.calculateProgression({
-        admissionDate: admFormatted,
-        courseConfig: {
-          programName: progConfig?.programName || input.programCode,
-          programCode: progConfig?.programCode || input.programCode,
-          totalSemesters: progConfig?.totalSemesters || 8,
-          semesterDuration: progConfig?.semesterDuration || 6,
-          semesterDurationUnit: progConfig?.semesterDurationUnit || "months"
+      if (input.programCode && input.programCode.trim()) {
+        const programService = new AcademicProgramService();
+        const progConfig = await programService.getProgramByCodeOrName(input.programCode.trim());
+        programCodeVal = progConfig?.programCode || input.programCode.trim();
+
+        if (admFormatted) {
+          const progression = AcademicProgressionEngine.calculateProgression({
+            admissionDate: admFormatted,
+            courseConfig: {
+              programName: progConfig?.programName || programCodeVal,
+              programCode: programCodeVal,
+              totalSemesters: progConfig?.totalSemesters || 8,
+              semesterDuration: progConfig?.semesterDuration || 6,
+              semesterDurationUnit: progConfig?.semesterDurationUnit || "months"
+            }
+          });
+          expGradFormatted = progression.expectedGraduationDateISO || this.formatDate(input.expectedGraduation);
+          calculatedSemester = progression.currentSemester;
+        } else {
+          expGradFormatted = this.formatDate(input.expectedGraduation);
+          calculatedSemester = input.currentSemester || null;
         }
-      });
-
-      const expGradFormatted = progression.expectedGraduationDateISO || this.formatDate(input.expectedGraduation) || "";
-      const calculatedSemester = progression.currentSemester;
+      } else {
+        expGradFormatted = this.formatDate(input.expectedGraduation);
+        calculatedSemester = input.currentSemester || null;
+      }
 
       const { data: academicData, error: academicError } = await supabase
         .from("student_academic")
         .insert({
           student_id: studentId,
-          program_code: progConfig?.programCode || input.programCode.trim(),
+          program_code: programCodeVal,
           admission_date: admFormatted,
           expected_graduation: expGradFormatted,
           current_semester: calculatedSemester,
@@ -284,9 +305,6 @@ export class SupabaseStudentRepository implements IStudentRepository {
         compliance_status: "MISSING"
       });
 
-      // Note: A document version is ONLY created when an actual document file is uploaded.
-      // Metadata registered during student creation is stored in student_snapshot without consuming version numbers.
-
       // 9. Record entry in audit_log
       await supabase.from("audit_log").insert({
         actor_id: actorId,
@@ -315,7 +333,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           fullName: personalData.full_name,
           nationalityCode: personalData.nationality_code,
           gender: personalData.gender,
-          dateOfBirth: new Date(personalData.date_of_birth),
+          dateOfBirth: personalData.date_of_birth ? new Date(personalData.date_of_birth) : null,
           bloodGroup: personalData.blood_group,
           religion: personalData.religion,
           createdAt: new Date(personalData.created_at),
@@ -340,8 +358,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         academic: {
           studentId: academicData.student_id,
           programCode: academicData.program_code,
-          admissionDate: new Date(academicData.admission_date),
-          expectedGraduation: new Date(academicData.expected_graduation),
+          admissionDate: academicData.admission_date ? new Date(academicData.admission_date) : null,
+          expectedGraduation: academicData.expected_graduation ? new Date(academicData.expected_graduation) : null,
           currentSemester: academicData.current_semester,
           academicStatus: academicData.academic_status,
           createdAt: new Date(academicData.created_at),
@@ -419,10 +437,6 @@ export class SupabaseStudentRepository implements IStudentRepository {
     const relationships: RelationshipRow[] = Array.isArray(student.student_relationships) ? student.student_relationships : [];
     const embassy = student.student_embassy?.[0] || student.student_embassy || null;
 
-    if (!personal || !contact || !academic) {
-      return null;
-    }
-
     return {
       student: {
         id: student.id,
@@ -435,44 +449,44 @@ export class SupabaseStudentRepository implements IStudentRepository {
         updatedBy: student.updated_by
       },
       personal: {
-        studentId: personal.student_id,
-        fullName: personal.full_name,
-        nationalityCode: personal.nationality_code,
-        gender: personal.gender,
-        dateOfBirth: new Date(personal.date_of_birth),
-        bloodGroup: personal.blood_group,
-        religion: personal.religion,
-        createdAt: new Date(personal.created_at),
-        updatedAt: new Date(personal.updated_at),
-        deletedAt: personal.deleted_at ? new Date(personal.deleted_at) : null,
-        createdBy: personal.created_by,
-        updatedBy: personal.updated_by
+        studentId: personal?.student_id || student.id,
+        fullName: personal?.full_name || "Unknown Student",
+        nationalityCode: personal?.nationality_code || null,
+        gender: personal?.gender || null,
+        dateOfBirth: personal?.date_of_birth ? new Date(personal.date_of_birth) : null,
+        bloodGroup: personal?.blood_group || null,
+        religion: personal?.religion || null,
+        createdAt: personal?.created_at ? new Date(personal.created_at) : new Date(student.created_at),
+        updatedAt: personal?.updated_at ? new Date(personal.updated_at) : new Date(student.updated_at),
+        deletedAt: personal?.deleted_at ? new Date(personal.deleted_at) : null,
+        createdBy: personal?.created_by || null,
+        updatedBy: personal?.updated_by || null
       },
       contact: {
-        studentId: contact.student_id,
-        email: contact.email,
-        phoneHome: contact.phone_home,
-        phoneLocal: contact.phone_local,
-        permanentAddress: contact.permanent_address,
-        localAddress: contact.local_address,
-        createdAt: new Date(contact.created_at),
-        updatedAt: new Date(contact.updated_at),
-        deletedAt: contact.deleted_at ? new Date(contact.deleted_at) : null,
-        createdBy: contact.created_by,
-        updatedBy: contact.updated_by
+        studentId: contact?.student_id || student.id,
+        email: contact?.email || null,
+        phoneHome: contact?.phone_home || null,
+        phoneLocal: contact?.phone_local || null,
+        permanentAddress: contact?.permanent_address || null,
+        localAddress: contact?.local_address || null,
+        createdAt: contact?.created_at ? new Date(contact.created_at) : new Date(student.created_at),
+        updatedAt: contact?.updated_at ? new Date(contact.updated_at) : new Date(student.updated_at),
+        deletedAt: contact?.deleted_at ? new Date(contact.deleted_at) : null,
+        createdBy: contact?.created_by || null,
+        updatedBy: contact?.updated_by || null
       },
       academic: {
-        studentId: academic.student_id,
-        programCode: academic.program_code,
-        admissionDate: new Date(academic.admission_date),
-        expectedGraduation: new Date(academic.expected_graduation),
-        currentSemester: academic.current_semester,
-        academicStatus: academic.academic_status,
-        createdAt: new Date(academic.created_at),
-        updatedAt: new Date(academic.updated_at),
-        deletedAt: academic.deleted_at ? new Date(academic.deleted_at) : null,
-        createdBy: academic.created_by,
-        updatedBy: academic.updated_by
+        studentId: academic?.student_id || student.id,
+        programCode: academic?.program_code || null,
+        admissionDate: academic?.admission_date ? new Date(academic.admission_date) : null,
+        expectedGraduation: academic?.expected_graduation ? new Date(academic.expected_graduation) : null,
+        currentSemester: academic?.current_semester ?? null,
+        academicStatus: academic?.academic_status || "good_standing",
+        createdAt: academic?.created_at ? new Date(academic.created_at) : new Date(student.created_at),
+        updatedAt: academic?.updated_at ? new Date(academic.updated_at) : new Date(student.updated_at),
+        deletedAt: academic?.deleted_at ? new Date(academic.deleted_at) : null,
+        createdBy: academic?.created_by || null,
+        updatedBy: academic?.updated_by || null
       },
       relationships: relationships.map((r: RelationshipRow) => ({
         id: r.id,
@@ -581,8 +595,13 @@ export class SupabaseStudentRepository implements IStudentRepository {
     // 2. Update student_personal table if personal fields provided
     const personalUpdates: Record<string, unknown> = {};
     if (input.fullName) personalUpdates.full_name = input.fullName.trim();
-    if (input.gender) personalUpdates.gender = input.gender;
-    if (input.dateOfBirth) personalUpdates.date_of_birth = this.formatDate(input.dateOfBirth);
+    if (input.nationalityCode !== undefined) {
+      personalUpdates.nationality_code = input.nationalityCode && input.nationalityCode.trim()
+        ? input.nationalityCode.trim().toUpperCase()
+        : null;
+    }
+    if (input.gender !== undefined) personalUpdates.gender = input.gender || null;
+    if (input.dateOfBirth !== undefined) personalUpdates.date_of_birth = this.formatDate(input.dateOfBirth);
     if (Object.keys(personalUpdates).length > 0) {
       personalUpdates.updated_at = new Date().toISOString();
       personalUpdates.updated_by = actorId;
@@ -591,10 +610,10 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
     // 3. Update student_contact table if contact fields provided
     const contactUpdates: Record<string, unknown> = {};
-    if (input.email) contactUpdates.email = input.email.trim().toLowerCase();
-    if (input.phoneHome) contactUpdates.phone_home = input.phoneHome.trim();
+    if (input.email !== undefined) contactUpdates.email = input.email && input.email.trim() ? input.email.trim().toLowerCase() : null;
+    if (input.phoneHome !== undefined) contactUpdates.phone_home = input.phoneHome && input.phoneHome.trim() ? input.phoneHome.trim() : null;
     if (input.phoneLocal !== undefined) contactUpdates.phone_local = input.phoneLocal ? input.phoneLocal.trim() : null;
-    if (input.permanentAddress) contactUpdates.permanent_address = input.permanentAddress.trim();
+    if (input.permanentAddress !== undefined) contactUpdates.permanent_address = input.permanentAddress && input.permanentAddress.trim() ? input.permanentAddress.trim() : null;
     if (input.localAddress !== undefined) contactUpdates.local_address = input.localAddress ? input.localAddress.trim() : null;
     if (Object.keys(contactUpdates).length > 0) {
       contactUpdates.updated_at = new Date().toISOString();
@@ -604,9 +623,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
     // 4. Update student_academic table if academic fields provided
     const academicUpdates: Record<string, unknown> = {};
-    if (input.programCode) academicUpdates.program_code = input.programCode.trim();
-    if (input.admissionDate) academicUpdates.admission_date = this.formatDate(input.admissionDate);
-    if (input.expectedGraduation) academicUpdates.expected_graduation = this.formatDate(input.expectedGraduation);
+    if (input.programCode !== undefined) academicUpdates.program_code = input.programCode && input.programCode.trim() ? input.programCode.trim() : null;
+    if (input.admissionDate !== undefined) academicUpdates.admission_date = this.formatDate(input.admissionDate);
+    if (input.expectedGraduation !== undefined) academicUpdates.expected_graduation = this.formatDate(input.expectedGraduation);
     if (input.academicStatus) academicUpdates.academic_status = input.academicStatus;
 
     if (input.programCode || input.admissionDate) {

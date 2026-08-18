@@ -1,164 +1,340 @@
-import assert from "node:assert";
-import { RegisterStudentValidationSchema, UpdateStudentValidationSchema } from "../src/services/validation/student-validation";
-import { RegisterStudentInput, UpdateStudentInput } from "../src/services/student/student.types";
+/**
+ * ISCMS Progressive / Incomplete Student Registration Test Suite
+ * Tests minimum registration creation, progressive partial updates, strict format validation,
+ * profile completion scoring, Excel bulk import progressive tolerance, and unassigned status handling.
+ */
 
-// =========================================================================
-// ISCMS PROGRESSIVE STUDENT REGISTRATION ACCEPTANCE TESTS
-// =========================================================================
+import { RegisterStudentValidationSchema, UpdateStudentValidationSchema } from "../src/services/validation/student-validation";
+import { ProfileCompletionEngine } from "../src/domain/students/services/profile-completion.service";
+import { BulkStudentImportService } from "../src/domain/import/services/bulk-student-import.service";
+
+let passedTests = 0;
+let failedTests = 0;
+
+function assert(condition: boolean, testName: string, errorDetail?: unknown) {
+  if (condition) {
+    console.log(`  ✓ ${testName}`);
+    passedTests++;
+  } else {
+    console.error(`  ✗ FAIL: ${testName}`, errorDetail || "");
+    failedTests++;
+  }
+}
 
 async function runTestSuite() {
-  console.log("=======================================================");
-  console.log("  ISCMS PROGRESSIVE STUDENT REGISTRATION TEST SUITE    ");
-  console.log("=======================================================\n");
+  console.log("\n============================================================");
+  console.log(" ISCMS PROGRESSIVE / INCOMPLETE REGISTRATION TEST SUITE");
+  console.log("============================================================\n");
 
-  // -------------------------------------------------------------
-  // Test A: Minimal Registration (Only Genuinely Required Fields)
-  // -------------------------------------------------------------
-  console.log("--- Test A: Minimal Registration (Genuinely Required Only) ---");
-  const minimalStudent: RegisterStudentInput = {
-    registrationNumber: "NFSU/2026/CYBER/001",
-    fullName: "Amina Al-Mansoor",
-    nationalityCode: "ARE",
-    dateOfBirth: "2003-04-12",
-    email: "amina.m@nfsu.ac.in",
-    phoneHome: "+971-50-1234567",
-    permanentAddress: "Al Barsha 1, Dubai, United Arab Emirates",
-    programCode: "B.Tech in Cyber Security & Forensic Science",
-    admissionDate: "2026-08-01",
-    expectedGraduation: "2030-06-30",
-    currentSemester: 1
-    // All optional fields omitted: gender, phoneLocal, localAddress, emergency contact, passport, visa, embassy
-  };
+  // --------------------------------------------------------------------------
+  // 1. MINIMUM REGISTRATION CREATION (Day 1 Scenario)
+  // --------------------------------------------------------------------------
+  console.log("[1] Minimum Registration Creation");
 
-  const minResult = RegisterStudentValidationSchema.safeParse(minimalStudent);
-  assert.strictEqual(minResult.success, true, "Minimal registration must succeed without optional fields");
-  console.log("✅ [PASS] Minimal registration succeeds with only required identity and academic fields");
+  const minNameResult = RegisterStudentValidationSchema.safeParse({
+    fullName: "Rahul Sharma"
+  });
+  assert(
+    minNameResult.success,
+    "Creating student with legal full name only succeeds without requiring other fields"
+  );
+  if (minNameResult.success) {
+    assert(
+      minNameResult.data.fullName === "Rahul Sharma",
+      "Full name preserved correctly"
+    );
+    assert(
+      minNameResult.data.registrationNumber === undefined,
+      "Enrollment number is undefined (no fake auto-generated ID)"
+    );
+    assert(
+      minNameResult.data.programCode === undefined,
+      "Program code is optional and undefined"
+    );
+    assert(
+      minNameResult.data.email === undefined,
+      "Student email is optional and undefined"
+    );
+  }
 
-  // -------------------------------------------------------------
-  // Test B: Partial Information (Some Optional Fields Provided)
-  // -------------------------------------------------------------
-  console.log("\n--- Test B: Partial Information (Documents / Contacts Omitted) ---");
-  const partialStudent: RegisterStudentInput = {
-    registrationNumber: "NFSU/2026/CYBER/002",
-    fullName: "Mateo Hernandez",
-    nationalityCode: "MEX",
-    gender: "male",
-    dateOfBirth: "2002-11-20",
-    email: "mateo.h@nfsu.ac.in",
-    phoneHome: "+52-55-12345678",
-    phoneLocal: "+91-9876543210",
-    permanentAddress: "Colonia Roma Norte, Ciudad de Mexico, Mexico",
-    programCode: "M.Tech in Digital Forensics",
+  const nameDobResult = RegisterStudentValidationSchema.safeParse({
+    fullName: "Rahul Sharma",
+    dateOfBirth: "2002-05-14"
+  });
+  assert(
+    nameDobResult.success,
+    "Creating student with name and date of birth only succeeds"
+  );
+
+  const nameNatResult = RegisterStudentValidationSchema.safeParse({
+    fullName: "Amina Yusuf",
+    nationalityCode: "NGA"
+  });
+  assert(
+    nameNatResult.success,
+    "Creating student with name and nationality only succeeds"
+  );
+
+  const shortNameResult = RegisterStudentValidationSchema.safeParse({
+    fullName: "R"
+  });
+  assert(
+    !shortNameResult.success,
+    "Creating student with name less than 2 characters is rejected"
+  );
+
+  const emptyNameResult = RegisterStudentValidationSchema.safeParse({
+    fullName: "   "
+  });
+  assert(
+    !emptyNameResult.success,
+    "Creating student with whitespace-only name is rejected"
+  );
+
+  // --------------------------------------------------------------------------
+  // 2. VALIDATION STRICTNESS (Allow Missing, Reject Invalid)
+  // --------------------------------------------------------------------------
+  console.log("\n[2] Validation Strictness: Allow Missing, Reject Invalid");
+
+  const invalidEmailResult = RegisterStudentValidationSchema.safeParse({
+    fullName: "Rahul Sharma",
+    email: "not-a-valid-email"
+  });
+  assert(
+    !invalidEmailResult.success,
+    "Supplying malformed email format is rejected"
+  );
+  if (!invalidEmailResult.success) {
+    const issue = invalidEmailResult.error.issues.find(i => i.path.includes("email"));
+    assert(
+      !!issue && issue.message.includes("valid email address format"),
+      "Error message explicitly identifies invalid email format"
+    );
+  }
+
+  const validEmailResult = RegisterStudentValidationSchema.safeParse({
+    fullName: "Rahul Sharma",
+    email: "rahul.sharma@university.ac.in"
+  });
+  assert(
+    validEmailResult.success,
+    "Supplying valid email format is accepted"
+  );
+
+  const futureDob = new Date();
+  futureDob.setFullYear(futureDob.getFullYear() + 2);
+  const futureDobResult = RegisterStudentValidationSchema.safeParse({
+    fullName: "Rahul Sharma",
+    dateOfBirth: futureDob.toISOString().split("T")[0]
+  });
+  assert(
+    !futureDobResult.success,
+    "Supplying future date of birth is rejected"
+  );
+
+  const invalidPassDates = RegisterStudentValidationSchema.safeParse({
+    fullName: "Elena Rostova",
+    passportNumber: "P12345678",
+    passportIssueDate: "2024-01-01",
+    passportExpiry: "2023-01-01"
+  });
+  assert(
+    !invalidPassDates.success,
+    "Passport expiry date before issue date is rejected"
+  );
+
+  const invalidShortPhone = RegisterStudentValidationSchema.safeParse({
+    fullName: "Elena Rostova",
+    phoneHome: "123"
+  });
+  assert(
+    !invalidShortPhone.success,
+    "Phone number shorter than 7 digits is rejected"
+  );
+
+  // --------------------------------------------------------------------------
+  // 3. PROGRESSIVE PARTIAL UPDATES
+  // --------------------------------------------------------------------------
+  console.log("\n[3] Progressive Partial Profile Updates");
+
+  const updateAcademicOnly = UpdateStudentValidationSchema.safeParse({
+    registrationNumber: "NFSU/2026/CS/101",
+    programCode: "MSC_CYBER_SEC",
+    admissionDate: "2026-08-01"
+  });
+  assert(
+    updateAcademicOnly.success,
+    "Updating academic fields succeeds without requiring contact or documents"
+  );
+
+  const updateContactOnly = UpdateStudentValidationSchema.safeParse({
+    phoneHome: "+91-9876543210",
+    email: "rahul.sharma@nfsu.ac.in"
+  });
+  assert(
+    updateContactOnly.success,
+    "Updating contact fields succeeds without requiring academic or personal fields"
+  );
+
+  const updateBadEmail = UpdateStudentValidationSchema.safeParse({
+    email: "bad-email"
+  });
+  assert(
+    !updateBadEmail.success,
+    "Updating with invalid email format is rejected"
+  );
+
+  // --------------------------------------------------------------------------
+  // 4. PROFILE COMPLETION ENGINE EVALUATION
+  // --------------------------------------------------------------------------
+  console.log("\n[4] Profile Completion Engine Evaluation");
+
+  const minEval = ProfileCompletionEngine.evaluate({
+    fullName: "Rahul Sharma"
+  });
+  assert(
+    minEval.percentage >= 20 && minEval.percentage <= 30,
+    `Minimal student has score ~25% (Actual: ${minEval.percentage}%)`
+  );
+  assert(
+    minEval.status === "minimal",
+    "Minimal student status is 'minimal'"
+  );
+  assert(
+    minEval.statusLabel === "Minimal Identity Profile",
+    "Minimal student label is 'Minimal Identity Profile'"
+  );
+  assert(
+    minEval.missingItems.includes("University Enrollment Number"),
+    "Missing items includes 'University Enrollment Number'"
+  );
+  assert(
+    minEval.missingItems.includes("Academic Program"),
+    "Missing items includes 'Academic Program'"
+  );
+  assert(
+    minEval.missingItems.includes("Student Email"),
+    "Missing items includes 'Student Email'"
+  );
+
+  const day5Eval = ProfileCompletionEngine.evaluate({
+    fullName: "Rahul Sharma",
+    nationalityCode: "IND",
+    dateOfBirth: "2002-05-14",
+    registrationNumber: "NFSU/2026/CS/101",
+    programCode: "MSC_CYBER",
+    admissionDate: "2026-08-01"
+  });
+  assert(
+    day5Eval.percentage >= 45 && day5Eval.percentage < 75,
+    `Day 5 student has partial score (Actual: ${day5Eval.percentage}%)`
+  );
+  assert(
+    day5Eval.status === "incomplete",
+    "Day 5 student status is 'incomplete'"
+  );
+  assert(
+    day5Eval.statusLabel === "Incomplete Profile",
+    "Day 5 student label is 'Incomplete Profile'"
+  );
+
+  const completeEval = ProfileCompletionEngine.evaluate({
+    fullName: "Elena Rostova",
+    nationalityCode: "RUS",
+    dateOfBirth: "2001-09-20",
+    gender: "female",
+    registrationNumber: "NFSU/2026/INT/088",
+    programCode: "MSC_FORENSIC",
     admissionDate: "2026-08-01",
     expectedGraduation: "2028-06-30",
-    currentSemester: 1,
-    // Only passport metadata provided (no visa, no emergency contact, no local address)
-    passportNumber: "MEX88776655",
-    passportIssueDate: "2024-01-10",
-    passportExpiry: "2034-01-09",
-    passportPlaceOfIssue: "Mexico City"
-  };
+    email: "elena.rostova@university.edu",
+    phoneHome: "+7-999-1234567",
+    permanentAddress: "Tverskaya St 12, Moscow, Russia",
+    emergencyContactName: "Dmitry Rostov",
+    emergencyContactPhone: "+7-999-7654321",
+    passportNumber: "75N1234567",
+    passportExpiry: "2030-01-01",
+    visaNumber: "V98765432",
+    visaExpiry: "2028-08-01",
+    efrroNumber: "FRRO998877",
+    efrroExpiry: "2027-08-01"
+  });
+  assert(
+    completeEval.percentage === 100,
+    "Fully populated student has 100% completion"
+  );
+  assert(
+    completeEval.status === "complete",
+    "Fully populated student status is 'complete'"
+  );
+  assert(
+    completeEval.missingItems.length === 0,
+    "No missing items for 100% completed profile"
+  );
 
-  const partialResult = RegisterStudentValidationSchema.safeParse(partialStudent);
-  assert.strictEqual(partialResult.success, true, "Partial registration with passport metadata must succeed");
-  console.log("✅ [PASS] Partial registration with document metadata but no emergency contacts succeeds");
+  // --------------------------------------------------------------------------
+  // 5. BULK IMPORT PROGRESSIVE COMPLIANCE
+  // --------------------------------------------------------------------------
+  console.log("\n[5] Bulk Import Progressive Compliance");
 
-  // -------------------------------------------------------------
-  // Test C: Invalid Optional Information
-  // -------------------------------------------------------------
-  console.log("\n--- Test C: Invalid Optional Information (Format Validation) ---");
-  const invalidOptionalStudent: RegisterStudentInput = {
-    registrationNumber: "NFSU/2026/CYBER/003",
-    fullName: "Lucas Dupont",
-    nationalityCode: "FRA",
-    dateOfBirth: "2001-09-15",
-    email: "lucas.d@nfsu.ac.in",
-    phoneHome: "+33-1-23456789",
-    permanentAddress: "15 Rue de Rivoli, Paris, France",
-    programCode: "B.Tech in Cyber Security & Forensic Science",
-    admissionDate: "2026-08-01",
-    expectedGraduation: "2030-06-30",
-    // Invalid optional values:
-    passportNumber: "AB", // Too short (< 5 chars)
-    passportIssueDate: "2025-01-01",
-    passportExpiry: "2024-01-01", // Expiry before issue date!
-    relationshipName: "P", // Too short (< 2 chars)
-    relationshipPhone: "123" // Too short (< 7 digits)
-  };
+  const importService = new BulkStudentImportService();
+  const mockRowsWithoutReg = [
+    ["Full Name", "Nationality", "Program", "Admission Date"],
+    ["Carlos Mendoza", "MEX", "MSc Forensic Science", "2026-08-01"]
+  ];
 
-  const invalidResult = RegisterStudentValidationSchema.safeParse(invalidOptionalStudent);
-  assert.strictEqual(invalidResult.success, false, "Invalid optional field formats must trigger validation errors");
-  
-  if (!invalidResult.success) {
-    const errorMap = invalidResult.error.issues.map(i => ({ path: i.path.join("."), message: i.message }));
-    assert(errorMap.some(e => e.path.includes("passportNumber")), "Flags invalid passport number length");
-    assert(errorMap.some(e => e.path.includes("passportExpiry")), "Flags passport expiry before issue date");
-    assert(errorMap.some(e => e.path.includes("relationshipName")), "Flags short emergency contact name");
-    assert(errorMap.some(e => e.path.includes("relationshipPhone")), "Flags short emergency contact phone");
+  const valNoReg = importService.validateSpreadsheetData(mockRowsWithoutReg, [
+    { programName: "MSc Forensic Science", programCode: "MSC_FORENSIC", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months" }
+  ]);
+
+  assert(
+    valNoReg.isValid === true,
+    "Spreadsheet with missing enrollment number is valid (produces warning, not fatal error)"
+  );
+  assert(
+    valNoReg.validRows === 1 && valNoReg.errorRows === 0,
+    "1 valid row and 0 error rows"
+  );
+  assert(
+    valNoReg.warningRows >= 1,
+    "Warning flag triggered for missing enrollment number"
+  );
+
+  const regWarning = valNoReg.rows[0].warnings.find(w => w.field === "registration_number");
+  assert(
+    !!regWarning && regWarning.impact.includes("Enrollment number is not provided yet"),
+    "Warning details correctly describe pending enrollment number"
+  );
+
+  const mockRowsWithoutProgram = [
+    ["Full Name", "Nationality", "Enrollment Number"],
+    ["Amina Bello", "NGA", "NFSU/2026/099"]
+  ];
+
+  const valNoProg = importService.validateSpreadsheetData(mockRowsWithoutProgram, []);
+  assert(
+    valNoProg.isValid === true,
+    "Spreadsheet with missing academic program is valid (produces warning, not fatal error)"
+  );
+  const progWarning = valNoProg.rows[0].warnings.find(w => w.field === "academic_program");
+  assert(
+    !!progWarning && progWarning.impact.includes("Academic program / course is not assigned yet"),
+    "Warning details correctly describe pending academic program"
+  );
+
+  // --------------------------------------------------------------------------
+  // SUMMARY
+  // --------------------------------------------------------------------------
+  console.log("\n============================================================");
+  console.log(` RESULTS: ${passedTests} passed, ${failedTests} failed`);
+  console.log("============================================================\n");
+
+  if (failedTests > 0) {
+    process.exit(1);
   }
-  console.log("✅ [PASS] Optional fields enforce format correctness when provided without accepting invalid data");
-
-  // -------------------------------------------------------------
-  // Test D: Complete Registration (All Fields Provided)
-  // -------------------------------------------------------------
-  console.log("\n--- Test D: Complete Registration (All Fields Provided) ---");
-  const completeStudent: RegisterStudentInput = {
-    registrationNumber: "NFSU/2026/CYBER/004",
-    fullName: "Sunita Sharma",
-    nationalityCode: "NPL",
-    gender: "female",
-    dateOfBirth: "2004-02-18",
-    email: "sunita.s@nfsu.ac.in",
-    phoneHome: "+977-1-4234567",
-    phoneLocal: "+91-9811223344",
-    permanentAddress: "Ward 4, Baluwatar, Kathmandu, Nepal",
-    localAddress: "NFSU International Students Hostel, Block B, Room 204",
-    programCode: "B.Tech in Cyber Security & Forensic Science",
-    admissionDate: "2026-08-01",
-    expectedGraduation: "2030-06-30",
-    currentSemester: 1,
-    relationshipType: "parent",
-    relationshipName: "Ram Sharma",
-    relationshipPhone: "+977-98-12345678",
-    relationshipEmail: "ram.sharma@example.com",
-    relationshipAddress: "Baluwatar, Kathmandu, Nepal",
-    passportNumber: "NPL9988776",
-    passportIssueDate: "2023-05-10",
-    passportExpiry: "2033-05-09",
-    passportPlaceOfIssue: "Kathmandu",
-    visaNumber: "IND77665544",
-    visaIssueDate: "2026-07-01",
-    visaExpiry: "2027-06-30",
-    visaType: "Student (S-1)",
-    embassyName: "Embassy of Nepal",
-    embassyAddress: "Barakhamba Road, New Delhi",
-    embassyPhone: "+91-11-23329969"
-  };
-
-  const completeResult = RegisterStudentValidationSchema.safeParse(completeStudent);
-  assert.strictEqual(completeResult.success, true, "Fully specified student registration must validate cleanly");
-  console.log("✅ [PASS] Complete registration with all fields and documents validates 100% cleanly");
-
-  // -------------------------------------------------------------
-  // Test E: Progressive Student Editing via Update Schema
-  // -------------------------------------------------------------
-  console.log("\n--- Test E: Progressive Profile Completion via Update Schema ---");
-  const updatePayload: UpdateStudentInput = {
-    phoneLocal: "+91-9988776655",
-    localAddress: "Hostel Block C, Room 102",
-    academicStatus: "good_standing"
-  };
-
-  const updateResult = UpdateStudentValidationSchema.safeParse(updatePayload);
-  assert.strictEqual(updateResult.success, true, "UpdateStudentValidationSchema accepts progressive additions");
-  console.log("✅ [PASS] Staff can progressively complete missing profile details through the student profile");
-
-  console.log("\n=======================================================");
-  console.log("  ALL 5 PROGRESSIVE REGISTRATION TESTS PASSED (100%)    ");
-  console.log("=======================================================\n");
 }
 
 runTestSuite().catch(err => {
-  console.error("❌ Test suite failed:", err);
+  console.error("Test execution failed:", err);
   process.exit(1);
 });

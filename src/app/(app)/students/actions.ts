@@ -278,9 +278,9 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         registration_number,
         status,
         created_at,
-        student_personal!inner(full_name, nationality_code),
-        student_contact!inner(email, phone_home),
-        student_academic!inner(program_code, academic_status),
+        student_personal(full_name, nationality_code),
+        student_contact(email, phone_home),
+        student_academic(program_code, academic_status),
         student_snapshot(compliance_status, passport_number, visa_number)
       `)
       .is("deleted_at", null)
@@ -328,14 +328,18 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       const academic = Array.isArray(r.student_academic) ? r.student_academic[0] : r.student_academic;
       const snapshot = Array.isArray(r.student_snapshot) ? r.student_snapshot[0] : r.student_snapshot;
 
-      const natCode = personal?.nationality_code || "IND";
-      const countryObj = getCountryByCode(natCode);
-      const nationalityName = countryObj?.name || natCode;
+      const natCode = personal?.nationality_code || "";
+      const countryObj = natCode ? getCountryByCode(natCode) : null;
+      const nationalityName = countryObj?.name || (natCode ? natCode : "Not specified");
 
       const progCode = academic?.program_code || "";
-      const progInfo = programMap.get(progCode) || {
-        name: progCode || "General Studies",
+      const progInfo = progCode ? (programMap.get(progCode) || {
+        name: progCode,
         school: "Academic Affairs",
+        academicLevel: null
+      }) : {
+        name: "Not assigned yet",
+        school: "Not assigned yet",
         academicLevel: null
       };
 
@@ -349,13 +353,13 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       return {
         id: r.id,
         fullName: personal?.full_name || "Unknown Student",
-        registrationNumber: r.registration_number,
+        registrationNumber: r.registration_number || "",
         nationalityCode: natCode,
         nationalityName,
         programName: progInfo.name,
         programCode: progCode,
         academicLevel: progInfo.academicLevel,
-        academicLevelLabel: getAcademicLevelLabel(progInfo.academicLevel),
+        academicLevelLabel: progInfo.academicLevel ? getAcademicLevelLabel(progInfo.academicLevel) : null,
         school: progInfo.school,
         passport: { number: snapshot?.passport_number || "Pending" },
         visa: { number: snapshot?.visa_number || "Pending" },
@@ -441,14 +445,27 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     const activeEfrro = (record.efrro_versions || []).find((e: VersionDatabaseRow) => e.is_active && !e.deleted_at);
     const isEfrroUploaded = hasValidFile(activeEfrro);
 
-    const countryObj = getCountryByCode(personal?.nationality_code || "IND");
+    const countryObj = personal?.nationality_code ? getCountryByCode(personal.nationality_code) : null;
 
-    // Retrieve academic program metadata & course structure
-    const { data: progData } = await adminSupabase
-      .from("academic_programs")
-      .select("program_name, program_code, school_name, total_semesters, semester_duration, semester_duration_unit, academic_level")
-      .or(`program_code.eq.${academic?.program_code},program_name.eq.${academic?.program_code}`)
-      .maybeSingle();
+    // Retrieve academic program metadata & course structure if program code is present
+    let progData: {
+      program_name: string;
+      program_code: string;
+      school_name: string | null;
+      total_semesters: number;
+      semester_duration: number;
+      semester_duration_unit: string;
+      academic_level: string | null;
+    } | null = null;
+
+    if (academic?.program_code && academic.program_code.trim()) {
+      const { data: foundProg } = await adminSupabase
+        .from("academic_programs")
+        .select("program_name, program_code, school_name, total_semesters, semester_duration, semester_duration_unit, academic_level")
+        .or(`program_code.eq.${academic.program_code.trim()},program_name.eq.${academic.program_code.trim()}`)
+        .maybeSingle();
+      progData = foundProg;
+    }
 
     // Retrieve academic adjustments for this student
     const { data: adjustmentsData } = await adminSupabase
@@ -490,7 +507,8 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     const semesterDuration = Number(progData?.semester_duration) || 6;
     const semesterDurationUnit = progData?.semester_duration_unit || "months";
 
-    const progression = AcademicProgressionEngine.calculateProgression({
+    const hasCourseConfig = Boolean(academic?.program_code && academic.program_code.trim());
+    const progression = hasCourseConfig ? AcademicProgressionEngine.calculateProgression({
       admissionDate: academic?.admission_date || "",
       courseConfig: {
         programName: progData?.program_name || academic?.program_code || "General Studies",
@@ -500,7 +518,16 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         semesterDurationUnit
       },
       adjustments
-    });
+    }) : {
+      currentSemester: academic?.current_semester || 1,
+      expectedGraduationDateISO: academic?.expected_graduation || "",
+      totalSemesters: 8,
+      details: { semesterDuration: 6, semesterDurationUnit: "months" },
+      stage: "NOT_STARTED",
+      stageLabel: "Course Pending",
+      isCompleted: false,
+      isFinalSemester: false
+    };
 
     const studentProfile: StudentDetailProfile = {
       id: record.id,
@@ -510,26 +537,26 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       phoneLocal: contact?.phone_local || "",
       permanentAddress: contact?.permanent_address || "",
       localAddress: contact?.local_address || "",
-      currentSemester: progression.currentSemester,
+      currentSemester: hasCourseConfig ? progression.currentSemester : (academic?.current_semester || 1),
       academicStatus: academic?.academic_status || "good_standing",
       status: record.status || "active",
       registrationNumber: record.registration_number,
-      nationalityCode: personal?.nationality_code || "IND",
-      nationalityName: countryObj?.name || personal?.nationality_code || "India",
-      programName: progData?.program_name || academic?.program_code || "General Studies",
+      nationalityCode: personal?.nationality_code || "",
+      nationalityName: countryObj?.name || (personal?.nationality_code ? personal.nationality_code : "Not specified"),
+      programName: progData?.program_name || (academic?.program_code ? academic.program_code : "Not assigned yet"),
       programCode: academic?.program_code || "",
       academicLevel: progData?.academic_level ? String(progData.academic_level) : null,
-      academicLevelLabel: getAcademicLevelLabel(progData?.academic_level),
-      school: progData?.school_name || "Academic Department",
+      academicLevelLabel: progData?.academic_level ? getAcademicLevelLabel(progData.academic_level) : null,
+      school: progData?.school_name || (academic?.program_code ? "Academic Affairs" : "Not assigned yet"),
       admissionDate: academic?.admission_date || "",
-      expectedGraduation: progression.expectedGraduationDateISO || academic?.expected_graduation || "",
-      totalSemesters: progression.totalSemesters,
-      semesterDuration: progression.details.semesterDuration,
-      semesterDurationUnit: progression.details.semesterDurationUnit,
-      academicStage: progression.stage,
-      academicStageLabel: progression.stageLabel,
-      isCompleted: progression.isCompleted,
-      isFinalSemester: progression.isFinalSemester,
+      expectedGraduation: hasCourseConfig ? (progression.expectedGraduationDateISO || academic?.expected_graduation || "") : (academic?.expected_graduation || ""),
+      totalSemesters: hasCourseConfig ? progression.totalSemesters : undefined,
+      semesterDuration: hasCourseConfig ? progression.details.semesterDuration : undefined,
+      semesterDurationUnit: hasCourseConfig ? progression.details.semesterDurationUnit : undefined,
+      academicStage: hasCourseConfig ? progression.stage : "PENDING_ASSIGNMENT",
+      academicStageLabel: hasCourseConfig ? progression.stageLabel : "Course Pending",
+      isCompleted: hasCourseConfig ? progression.isCompleted : false,
+      isFinalSemester: hasCourseConfig ? progression.isFinalSemester : false,
       academicAdjustments: adjustments,
       complianceStatus: (() => {
         const raw = (snapshot?.compliance_status || "").toUpperCase();
