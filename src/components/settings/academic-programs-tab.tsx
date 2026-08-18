@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { toast } from "sonner";
-import { AcademicProgram, AcademicProgramDurationUnit, SemesterDurationUnit } from "@/domain/academic-programs/types";
+import { AcademicProgram, AcademicProgramDurationUnit, SemesterDurationUnit, ACADEMIC_LEVEL_OPTIONS, getAcademicLevelLabel } from "@/domain/academic-programs/types";
 import { 
   getAllAcademicProgramsAction, 
   createAcademicProgramAction, 
@@ -320,8 +320,8 @@ export function AcademicProgramsTab() {
                     <td className="py-2.5 px-3 font-medium text-foreground">{prog.programName}</td>
                     <td className="py-2.5 px-3 font-mono text-muted-foreground">{prog.programCode || "—"}</td>
                     <td className="py-2.5 px-3">
-                      <Badge variant="outline" className="text-[10px] uppercase font-mono">
-                        {prog.academicLevel || "Degree"}
+                      <Badge variant="outline" className="text-[10px] font-medium">
+                        {getAcademicLevelLabel(prog.academicLevel)}
                       </Badge>
                     </td>
                     <td className="py-2.5 px-3">
@@ -404,10 +404,11 @@ export function AcademicProgramsTab() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UG">Undergraduate (UG)</SelectItem>
-                    <SelectItem value="PG">Postgraduate (PG)</SelectItem>
-                    <SelectItem value="PhD">Doctorate (PhD)</SelectItem>
-                    <SelectItem value="Diploma">Diploma / Cert</SelectItem>
+                    {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.code} value={opt.code}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -523,10 +524,11 @@ export function AcademicProgramsTab() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UG">Undergraduate (UG)</SelectItem>
-                    <SelectItem value="PG">Postgraduate (PG)</SelectItem>
-                    <SelectItem value="PhD">Doctorate (PhD)</SelectItem>
-                    <SelectItem value="Diploma">Diploma / Cert</SelectItem>
+                    {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.code} value={opt.code}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

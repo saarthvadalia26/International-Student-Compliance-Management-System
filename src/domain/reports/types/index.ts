@@ -19,6 +19,8 @@ export interface StudentReportRow {
   nationality: string;
   school: string;
   programme: string;
+  academicLevel?: string | null;
+  academicLevelLabel?: string | null;
   expectedGraduation: Date | null;
   status: string;
   complianceStatus: ComplianceStatus;

@@ -58,7 +58,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { RejectionDialog } from "@/components/ui/rejection-dialog";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
-import { AcademicProgram } from "@/domain/academic-programs/types";
+import { AcademicProgram, getAcademicLevelLabel } from "@/domain/academic-programs/types";
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
 import { ExpiryReminderEngine } from "@/domain/notifications/services/reminder-engine.service";
 import { 
@@ -133,6 +133,8 @@ export interface StudentProfile {
   nationalityName: string;
   programName: string;
   programCode: string;
+  academicLevel?: string | null;
+  academicLevelLabel?: string | null;
   school: string;
   admissionDate: string;
   expectedGraduation: string;
@@ -1211,7 +1213,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
                     <span className="text-muted-foreground block text-[11px] font-medium">Program Curriculum</span>
                     <span className="font-semibold text-foreground block">{student.programName}</span>
-                    <span className="text-[10px] font-mono text-muted-foreground block">Code: {student.programCode}</span>
+                    <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                      <span className="text-[10px] font-mono text-muted-foreground block">Code: {student.programCode}</span>
+                      {student.academicLevelLabel && (
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium">
+                          {student.academicLevelLabel}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">

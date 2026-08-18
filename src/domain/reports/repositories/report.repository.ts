@@ -238,6 +238,26 @@ export class SupabaseReportRepository implements IReportRepository {
       .select("code, display_name, category")
       .in("category", ["school", "course", "gender"]);
 
+    // Load academic programs mapping for canonical levels and schools
+    const { data: progData } = await supabase
+      .from("academic_programs")
+      .select("program_code, program_name, school_name, academic_level");
+
+    const progLevelMap: Record<string, string> = {};
+    const progSchoolMap: Record<string, string> = {};
+    if (progData) {
+      progData.forEach(p => {
+        if (p.program_code) {
+          if (p.academic_level) progLevelMap[p.program_code] = p.academic_level;
+          if (p.school_name) progSchoolMap[p.program_code] = p.school_name;
+        }
+        if (p.program_name) {
+          if (p.academic_level) progLevelMap[p.program_name] = p.academic_level;
+          if (p.school_name) progSchoolMap[p.program_name] = p.school_name;
+        }
+      });
+    }
+
     const refMap: Record<string, string> = {};
     const courseToSchoolMap: Record<string, string> = {};
     if (refData) {
@@ -259,8 +279,9 @@ export class SupabaseReportRepository implements IReportRepository {
         registration_number: row.registration_number,
         full_name: personal?.full_name,
         nationality: refMap[personal?.nationality_code] || personal?.nationality_code,
-        school: courseToSchoolMap[code] || "School of Forensic Sciences",
+        school: progSchoolMap[code] || courseToSchoolMap[code] || "School of Forensic Sciences",
         programme: refMap[code] || code,
+        academic_level: progLevelMap[code] || null,
         expected_graduation: academic?.expected_graduation,
         status: row.status,
         compliance_status: snapshot?.compliance_status

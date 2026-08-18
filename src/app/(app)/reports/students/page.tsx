@@ -256,6 +256,7 @@ export default function StudentReportPage() {
                 <th className="p-3 font-semibold text-muted-foreground">Nationality</th>
                 <th className="p-3 font-semibold text-muted-foreground">School</th>
                 <th className="p-3 font-semibold text-muted-foreground">Programme</th>
+                <th className="p-3 font-semibold text-muted-foreground">Academic Level</th>
                 <th className="p-3 font-semibold text-muted-foreground">Graduation Date</th>
                 <th className="p-3 font-semibold text-muted-foreground">Status</th>
                 <th className="p-3 font-semibold text-muted-foreground">
@@ -268,7 +269,7 @@ export default function StudentReportPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center">
+                  <td colSpan={9} className="p-8 text-center">
                     <div className="flex justify-center items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading registry records...
@@ -277,7 +278,7 @@ export default function StudentReportPage() {
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-8 text-center text-muted-foreground">
                     No registry rows matched filters.
                   </td>
                 </tr>
@@ -289,6 +290,9 @@ export default function StudentReportPage() {
                     <td className="p-3 text-muted-foreground">{row.nationality}</td>
                     <td className="p-3 text-muted-foreground">{row.school}</td>
                     <td className="p-3 text-muted-foreground">{row.programme}</td>
+                    <td className="p-3 text-muted-foreground">
+                      {row.academicLevelLabel || (row.academicLevel ? row.academicLevel : "Not Specified")}
+                    </td>
                     <td className="p-3 text-muted-foreground">
                       {row.expectedGraduation ? row.expectedGraduation.toLocaleDateString() : "N/A"}
                     </td>

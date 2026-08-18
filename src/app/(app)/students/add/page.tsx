@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
-import { AcademicProgram } from "@/domain/academic-programs/types";
+import { AcademicProgram, getAcademicLevelLabel } from "@/domain/academic-programs/types";
 import { RegisterStudentValidationSchema } from "@/services/validation/student-validation";
 import { registerStudentAction } from "@/app/(app)/students/actions";
 import { RegisterStudentInput } from "@/services/student/student.types";
@@ -788,31 +788,44 @@ export default function StudentRegistrationPage() {
                   </div>
                 </div>
 
-                {formData.program && (
-                  <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 space-y-1.5 mt-2">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <Sparkles className="h-3.5 w-3.5 text-primary" />
-                      Automatic Semester Progression Enabled
+                {formData.program && (() => {
+                  const selectedProgramObj = academicPrograms.find(p => p.programName === formData.program || p.programCode === formData.program);
+                  return (
+                    <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 space-y-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                          <Sparkles className="h-3.5 w-3.5 text-primary" />
+                          Automatic Progression & Academic Configuration
+                        </div>
+                        {selectedProgramObj?.academicLevel && (
+                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <span>Level:</span>
+                            <span className="font-semibold text-foreground bg-background px-2 py-0.5 rounded-md border border-border/60 text-[10px]">
+                              {getAcademicLevelLabel(selectedProgramObj.academicLevel)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <Layers className="h-3.5 w-3.5 text-primary" />
+                          <span className="font-medium text-foreground">
+                            {selectedProgramObj?.totalSemesters || 8} Semesters
+                          </span>
+                        </div>
+                        <div>
+                          Interval: <span className="font-medium text-foreground">{selectedProgramObj?.semesterDuration || 6} Months / Semester</span>
+                        </div>
+                        <div>
+                          Initial: <span className="font-semibold text-primary font-mono">Semester 1</span>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Course academic level and semester configuration determine automatic progression without manual staff selection.
+                      </p>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Layers className="h-3.5 w-3.5 text-primary" />
-                        <span className="font-medium text-foreground">
-                          {academicPrograms.find(p => p.programName === formData.program)?.totalSemesters || 8} Semesters
-                        </span>
-                      </div>
-                      <div>
-                        Interval: <span className="font-medium text-foreground">{academicPrograms.find(p => p.programName === formData.program)?.semesterDuration || 6} Months / Semester</span>
-                      </div>
-                      <div>
-                        Initial: <span className="font-semibold text-primary font-mono">Semester 1</span>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      ISCMS will automatically calculate and advance the student&apos;s current semester without manual staff intervention.
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
               </CardContent>
             )}
 

@@ -10,6 +10,7 @@ import { getCountryByCode } from "@/utils/countries";
 import { sanitizeError } from "@/lib/errors/error-sanitizer";
 import { StorageProviderFactory } from "@/domain/storage/factory";
 import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
+import { getAcademicLevelLabel } from "@/domain/academic-programs/academic-level";
 
 const studentService = new StudentService();
 
@@ -20,6 +21,9 @@ export interface StudentListItem {
   nationalityCode: string;
   nationalityName: string;
   programName: string;
+  programCode?: string;
+  academicLevel?: string | null;
+  academicLevelLabel?: string | null;
   school: string;
   passport: { number: string };
   visa: { number: string };
@@ -70,6 +74,8 @@ export interface StudentDetailProfile {
   nationalityName: string;
   programName: string;
   programCode: string;
+  academicLevel?: string | null;
+  academicLevelLabel?: string | null;
   school: string;
   admissionDate: string;
   expectedGraduation: string;
@@ -301,13 +307,18 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
     // Also fetch academic program lookup map for friendly display names
     const { data: programsData } = await adminSupabase
       .from("academic_programs")
-      .select("program_code, program_name, school_name");
+      .select("program_code, program_name, school_name, academic_level");
 
-    const programMap = new Map<string, { name: string; school: string }>();
+    const programMap = new Map<string, { name: string; school: string; academicLevel: string | null }>();
     if (programsData) {
       programsData.forEach(p => {
-        if (p.program_code) programMap.set(p.program_code, { name: p.program_name, school: p.school_name || "Academic Department" });
-        programMap.set(p.program_name, { name: p.program_name, school: p.school_name || "Academic Department" });
+        const item = { 
+          name: p.program_name, 
+          school: p.school_name || "Academic Department",
+          academicLevel: p.academic_level ? String(p.academic_level) : null
+        };
+        if (p.program_code) programMap.set(p.program_code, item);
+        programMap.set(p.program_name, item);
       });
     }
 
@@ -321,9 +332,11 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       const countryObj = getCountryByCode(natCode);
       const nationalityName = countryObj?.name || natCode;
 
-      const progInfo = programMap.get(academic?.program_code || "") || {
-        name: academic?.program_code || "General Studies",
-        school: "Academic Affairs"
+      const progCode = academic?.program_code || "";
+      const progInfo = programMap.get(progCode) || {
+        name: progCode || "General Studies",
+        school: "Academic Affairs",
+        academicLevel: null
       };
 
       // Map raw compliance status to UI badge enum
@@ -340,6 +353,9 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         nationalityCode: natCode,
         nationalityName,
         programName: progInfo.name,
+        programCode: progCode,
+        academicLevel: progInfo.academicLevel,
+        academicLevelLabel: getAcademicLevelLabel(progInfo.academicLevel),
         school: progInfo.school,
         passport: { number: snapshot?.passport_number || "Pending" },
         visa: { number: snapshot?.visa_number || "Pending" },
@@ -430,7 +446,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     // Retrieve academic program metadata & course structure
     const { data: progData } = await adminSupabase
       .from("academic_programs")
-      .select("program_name, program_code, school_name, total_semesters, semester_duration, semester_duration_unit")
+      .select("program_name, program_code, school_name, total_semesters, semester_duration, semester_duration_unit, academic_level")
       .or(`program_code.eq.${academic?.program_code},program_name.eq.${academic?.program_code}`)
       .maybeSingle();
 
@@ -502,6 +518,8 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       nationalityName: countryObj?.name || personal?.nationality_code || "India",
       programName: progData?.program_name || academic?.program_code || "General Studies",
       programCode: academic?.program_code || "",
+      academicLevel: progData?.academic_level ? String(progData.academic_level) : null,
+      academicLevelLabel: getAcademicLevelLabel(progData?.academic_level),
       school: progData?.school_name || "Academic Department",
       admissionDate: academic?.admission_date || "",
       expectedGraduation: progression.expectedGraduationDateISO || academic?.expected_graduation || "",

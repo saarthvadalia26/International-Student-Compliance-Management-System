@@ -5,6 +5,7 @@ import {
   AuditReportRow,
   ComplianceStatus
 } from "../types";
+import { getAcademicLevelLabel } from "@/domain/academic-programs/academic-level";
 
 export class ReportMapper {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,6 +18,8 @@ export class ReportMapper {
         nationality: "",
         school: "",
         programme: "",
+        academicLevel: null,
+        academicLevelLabel: "Not Specified",
         expectedGraduation: null,
         status: "",
         complianceStatus: "MISSING",
@@ -29,6 +32,8 @@ export class ReportMapper {
       nationality: row.nationality || "",
       school: row.school || "",
       programme: row.programme || "",
+      academicLevel: row.academic_level || null,
+      academicLevelLabel: getAcademicLevelLabel(row.academic_level),
       expectedGraduation: row.expected_graduation ? new Date(row.expected_graduation) : null,
       status: row.status || "",
       complianceStatus: (row.compliance_status || "MISSING") as ComplianceStatus,

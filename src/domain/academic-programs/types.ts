@@ -1,3 +1,5 @@
+export * from "./academic-level";
+
 export type AcademicProgramDurationUnit = 
   | "Years" 
   | "Semesters" 

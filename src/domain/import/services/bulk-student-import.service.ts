@@ -20,6 +20,7 @@ import {
   ImportExecutionResult 
 } from "../types/bulk-import.types";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
+import { normalizeAcademicLevel } from "@/domain/academic-programs/academic-level";
 import { CountryService } from "@/domain/countries/country.service";
 
 export class BulkStudentImportService {
@@ -226,6 +227,7 @@ export class BulkStudentImportService {
         totalSemesters: number;
         semesterDuration: number;
         semesterDurationUnit: string;
+        academicLevel?: string | null;
       }>;
     }
   ): Promise<ValidationReport> {
@@ -262,7 +264,7 @@ export class BulkStudentImportService {
         // 3. Academic programs
         const { data: progData } = await supabase
           .from("academic_programs")
-          .select("program_name, program_code, total_semesters, semester_duration, semester_duration_unit")
+          .select("program_name, program_code, total_semesters, semester_duration, semester_duration_unit, academic_level")
           .eq("is_active", true);
         if (progData) {
           programs = progData.map(p => ({
@@ -270,7 +272,8 @@ export class BulkStudentImportService {
             programCode: p.program_code || p.program_name,
             totalSemesters: p.total_semesters || 8,
             semesterDuration: p.semester_duration || 6,
-            semesterDurationUnit: p.semester_duration_unit || "months"
+            semesterDurationUnit: p.semester_duration_unit || "months",
+            academicLevel: p.academic_level || null
           }));
         }
       } catch (err) {
@@ -372,10 +375,10 @@ export class BulkStudentImportService {
       }
 
       // =========================================================================
-      // 3. REQUIRED FIELD: Academic Program / Course
+      // 3. REQUIRED FIELD: Academic Program / Course & Academic Level Validation
       // =========================================================================
       const programRaw = mappedData.academic_program?.trim() || "";
-      let matchedProgram: { programName: string; programCode: string; totalSemesters: number; semesterDuration: number; semesterDurationUnit: string } | null = null;
+      let matchedProgram: { programName: string; programCode: string; totalSemesters: number; semesterDuration: number; semesterDurationUnit: string; academicLevel?: string | null } | null = null;
 
       if (!programRaw) {
         errors.push({
@@ -415,6 +418,25 @@ export class BulkStudentImportService {
             semesterDurationUnit: "months"
           };
         }
+      }
+
+      // Validate Academic Level if provided in spreadsheet
+      const academicLevelRaw = mappedData.academic_level?.trim() || "";
+      if (academicLevelRaw) {
+        const normalizedLevel = normalizeAcademicLevel(academicLevelRaw);
+        if (!normalizedLevel) {
+          errors.push({
+            field: "academic_level",
+            fieldLabel: "Academic Level",
+            value: academicLevelRaw,
+            problem: `Unsupported academic level "${academicLevelRaw}". Valid options: Integrated (UG + PG), Undergraduate (UG), Postgraduate (PG), Doctorate (PhD), Diploma / Cert.`,
+            suggestion: "Enter a supported academic level such as 'Integrated (UG + PG)', 'Undergraduate (UG)', 'Postgraduate (PG)', 'Doctorate (PhD)', or 'Diploma / Cert'."
+          });
+        } else {
+          mappedData.academic_level = normalizedLevel;
+        }
+      } else if (matchedProgram?.academicLevel) {
+        mappedData.academic_level = matchedProgram.academicLevel;
       }
 
       // =========================================================================
@@ -911,7 +933,7 @@ export class BulkStudentImportService {
     // 2. Fetch academic programs for program code resolution
     const { data: progList } = await supabase
       .from("academic_programs")
-      .select("program_name, program_code, total_semesters, semester_duration, semester_duration_unit");
+      .select("program_name, program_code, total_semesters, semester_duration, semester_duration_unit, academic_level");
 
     const programLookup = new Map<string, any>();
     if (progList) {

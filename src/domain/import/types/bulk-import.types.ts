@@ -21,6 +21,7 @@ export type ISCMSImportField =
   | "local_address"
   // Academic
   | "academic_program"
+  | "academic_level"
   | "admission_date"
   | "current_semester"
   | "expected_graduation"
@@ -174,6 +175,24 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "Course name or program code (e.g. B.Tech CSE, BTECH_CSE).",
     sample: "B.Tech in Computer Science & Engineering",
     aliases: ["academic_program", "program", "program_name", "program name", "course", "course_name", "course name", "degree", "programme", "branch", "discipline"]
+  },
+  {
+    field: "academic_level",
+    label: "Academic Level",
+    category: "Academic",
+    required: false,
+    description: "Academic level classification: Integrated (UG + PG), Undergraduate (UG), Postgraduate (PG), Doctorate (PhD), Diploma / Cert.",
+    sample: "Integrated (UG + PG)",
+    aliases: [
+      "academic_level",
+      "academic level",
+      "degree_level",
+      "degree level",
+      "program_level",
+      "program level",
+      "level",
+      "course_level"
+    ]
   },
   {
     field: "admission_date",

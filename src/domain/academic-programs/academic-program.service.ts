@@ -1,5 +1,6 @@
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { AcademicProgram, CreateProgramDto, UpdateProgramDto, SemesterDurationUnit } from "./types";
+import { normalizeAcademicLevel } from "./academic-level";
 
 // In-memory fallback programs list if database table is empty or migrating
 const DEFAULT_FALLBACK_PROGRAMS: AcademicProgram[] = [
@@ -10,6 +11,7 @@ const DEFAULT_FALLBACK_PROGRAMS: AcademicProgram[] = [
   { id: "fallback-5", programName: "M.Tech in Cyber Security", programCode: "MTECH_CS", displayOrder: 5, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "fallback-6", programName: "Master of Business Administration (Cyber Security)", programCode: "MBA_CS", displayOrder: 6, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: "fallback-7", programName: "Doctor of Philosophy (Ph.D.)", programCode: "PHD", displayOrder: 7, isActive: true, durationValue: 6, durationUnit: "Years", totalSemesters: 6, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PhD", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "fallback-8", programName: "B.Tech + M.Tech in Computer Science & Engineering", programCode: "BTECH_MTECH_CSE", displayOrder: 8, isActive: true, durationValue: 5, durationUnit: "Years", totalSemesters: 10, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "INTEGRATED", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 export class AcademicProgramService {
@@ -123,6 +125,8 @@ export class AcademicProgramService {
       }
     }
 
+    const acadLevel = dto.academicLevel !== undefined ? (normalizeAcademicLevel(dto.academicLevel) || dto.academicLevel?.trim() || null) : null;
+
     const payload = {
       program_name: trimmedName,
       program_code: trimmedCode,
@@ -134,7 +138,7 @@ export class AcademicProgramService {
       semester_duration: semesterDuration,
       semester_duration_unit: semesterDurationUnit,
       school_name: dto.schoolName?.trim() || null,
-      academic_level: dto.academicLevel?.trim() || null,
+      academic_level: acadLevel,
       created_by: userId || null
     };
 
@@ -201,7 +205,9 @@ export class AcademicProgramService {
     if (dto.semesterDuration !== undefined) payload.semester_duration = Number(dto.semesterDuration);
     if (dto.semesterDurationUnit !== undefined) payload.semester_duration_unit = dto.semesterDurationUnit;
     if (dto.schoolName !== undefined) payload.school_name = dto.schoolName?.trim() || null;
-    if (dto.academicLevel !== undefined) payload.academic_level = dto.academicLevel?.trim() || null;
+    if (dto.academicLevel !== undefined) {
+      payload.academic_level = normalizeAcademicLevel(dto.academicLevel) || dto.academicLevel?.trim() || null;
+    }
 
     const { data, error } = await supabase
       .from("academic_programs")

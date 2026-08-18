@@ -124,6 +124,7 @@ export class ReportingService {
       "Nationality",
       "School",
       "Programme",
+      "Academic Level",
       "Expected Graduation",
       "Status",
       "Compliance Status"
@@ -135,6 +136,7 @@ export class ReportingService {
       row.nationality,
       row.school,
       row.programme,
+      row.academicLevelLabel || (row.academicLevel ? row.academicLevel : "Not Specified"),
       row.expectedGraduation ? row.expectedGraduation.toISOString().split("T")[0] : "N/A",
       row.status,
       row.complianceStatus

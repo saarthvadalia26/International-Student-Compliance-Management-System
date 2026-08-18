@@ -35,6 +35,7 @@ import {
   DropdownMenuLabel, 
   DropdownMenuSeparator 
 } from "@/components/ui/dropdown-menu";
+import { ACADEMIC_LEVEL_OPTIONS, normalizeAcademicLevel } from "@/domain/academic-programs/academic-level";
 
 export interface Student {
   id: string;
@@ -43,6 +44,8 @@ export interface Student {
   nationalityCode: string;
   nationalityName: string;
   programName: string;
+  academicLevel?: string | null;
+  academicLevelLabel?: string | null;
   school: string;
   passport: { number: string };
   visa: { number: string };
@@ -60,6 +63,7 @@ export default function StudentListPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [complianceFilter, setComplianceFilter] = React.useState<string>("all");
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
+  const [academicLevelFilter, setAcademicLevelFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
   const [students, setStudents] = React.useState<Student[]>([]);
@@ -124,6 +128,7 @@ export default function StudentListPage() {
         (student.registrationNumber || "").toLowerCase().includes(query) ||
         student.nationalityName.toLowerCase().includes(query) ||
         student.programName.toLowerCase().includes(query) ||
+        (student.academicLevelLabel || "").toLowerCase().includes(query) ||
         student.school.toLowerCase().includes(query) ||
         student.passport.number.toLowerCase().includes(query) ||
         student.visa.number.toLowerCase().includes(query) ||
@@ -140,15 +145,22 @@ export default function StudentListPage() {
         academicFilter === "all" || 
         student.academicStatus === academicFilter;
 
-      return matchesSearch && matchesCompliance && matchesAcademic;
+      // 4. Academic Level
+      const studentNormLevel = normalizeAcademicLevel(student.academicLevel);
+      const matchesLevel = 
+        academicLevelFilter === "all" ||
+        studentNormLevel === academicLevelFilter;
+
+      return matchesSearch && matchesCompliance && matchesAcademic && matchesLevel;
     });
-  }, [students, searchQuery, complianceFilter, academicFilter]);
+  }, [students, searchQuery, complianceFilter, academicFilter, academicLevelFilter]);
 
   // Reset all filters
   const resetFilters = () => {
     setSearchQuery("");
     setComplianceFilter("all");
     setAcademicFilter("all");
+    setAcademicLevelFilter("all");
     setCurrentPage(1);
   };
 
@@ -260,6 +272,29 @@ export default function StudentListPage() {
             </Select>
           </div>
 
+          {/* Academic Level filter */}
+          <div className="w-full md:w-[200px]">
+            <Select 
+              value={academicLevelFilter} 
+              onValueChange={(val) => {
+                setAcademicLevelFilter(val || "all");
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Academic Level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Academic Levels</SelectItem>
+                {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.code} value={opt.code}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Academic Status filter */}
           <div className="w-full md:w-[200px]">
             <Select 
@@ -282,7 +317,7 @@ export default function StudentListPage() {
           </div>
 
           {/* Clear filters trigger */}
-          {(searchQuery || complianceFilter !== "all" || academicFilter !== "all") && (
+          {(searchQuery || complianceFilter !== "all" || academicFilter !== "all" || academicLevelFilter !== "all") && (
             <Button 
               variant="ghost" 
               size="sm" 
@@ -363,9 +398,16 @@ export default function StudentListPage() {
 
                     {/* Academic Program */}
                     <TableCell className="py-3.5 text-xs">
-                      <div className="space-y-0.5">
+                      <div className="space-y-1">
                         <span className="font-medium text-foreground block">{student.programName}</span>
-                        <span className="text-[10px] text-muted-foreground block font-caption">{student.school}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] text-muted-foreground font-caption">{student.school}</span>
+                          {student.academicLevelLabel && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium">
+                              {student.academicLevelLabel}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
 
