@@ -36,7 +36,7 @@ export class ReminderEngine {
         status,
         student_personal(full_name, preferred_language),
         student_contact(email, phone_home, phone_local),
-        student_academic(program_code),
+        student_academic(program_code, expected_graduation),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry),
         passport_versions(version_number, is_active, expiry_date, verification_status, deleted_at),
         visa_versions(version_number, is_active, expiry_date, verification_status, deleted_at),
@@ -64,6 +64,7 @@ export class ReminderEngine {
       const programName = academic?.program_code || "Academic Program";
       const studentPhone = contact?.phone_local || contact?.phone_home || null;
       const studentEmail = contact?.email || null;
+      const cleanGrad = academic?.expected_graduation ? academic.expected_graduation.split("T")[0].trim() : null;
 
       // Resolve current verified active expiry dates for all 3 document types
       const activePassport = (student.passport_versions || []).find((v: { is_active: boolean; deleted_at: string | null }) => v.is_active && !v.deleted_at);
@@ -93,6 +94,12 @@ export class ReminderEngine {
         }
 
         const cleanExpiry = expiryDate.split("T")[0].trim();
+
+        // Enforce graduation date boundary: if document expires after graduation, skip
+        if (cleanGrad && cleanExpiry > cleanGrad) {
+          continue;
+        }
+
         const today = new Date().toISOString().split("T")[0];
         
         // Calculate offset difference
@@ -199,10 +206,69 @@ export class QueueProcessor {
           continue;
         }
 
-        // 2. Lock notification state to processing
+        // 2. Pre-Dispatch Final Safety Check: Enforce graduation date boundary
+        const { getAdminSupabase } = await import("@/lib/supabase/admin");
+        const adminSupabase = getAdminSupabase();
+        const { data: studentCheck } = await adminSupabase
+          .from("students")
+          .select(`
+            id,
+            student_academic(expected_graduation),
+            student_snapshot(passport_expiry, visa_expiry, efrro_expiry),
+            passport_versions(id, is_active, expiry_date, deleted_at),
+            visa_versions(id, is_active, expiry_date, deleted_at),
+            efrro_versions(id, is_active, expiry_date, deleted_at)
+          `)
+          .eq("id", alert.studentId)
+          .maybeSingle();
+
+        if (studentCheck) {
+          const academic = Array.isArray(studentCheck.student_academic) ? studentCheck.student_academic[0] : studentCheck.student_academic;
+          const snapshot = Array.isArray(studentCheck.student_snapshot) ? studentCheck.student_snapshot[0] : studentCheck.student_snapshot;
+          
+          const cleanGrad = academic?.expected_graduation ? academic.expected_graduation.split("T")[0].trim() : null;
+
+          const docType = alert.documentType as "passport" | "visa" | "efrro";
+          let currentExpiry: string | null = null;
+          if (docType === "passport") {
+            const pVer = (studentCheck.passport_versions || []).find((v: { is_active: boolean; deleted_at: string | null; expiry_date?: string | null }) => v.is_active && !v.deleted_at);
+            currentExpiry = pVer?.expiry_date || snapshot?.passport_expiry || null;
+          } else if (docType === "visa") {
+            const vVer = (studentCheck.visa_versions || []).find((v: { is_active: boolean; deleted_at: string | null; expiry_date?: string | null }) => v.is_active && !v.deleted_at);
+            currentExpiry = vVer?.expiry_date || snapshot?.visa_expiry || null;
+          } else if (docType === "efrro") {
+            const eVer = (studentCheck.efrro_versions || []).find((v: { is_active: boolean; deleted_at: string | null; expiry_date?: string | null }) => v.is_active && !v.deleted_at);
+            currentExpiry = eVer?.expiry_date || snapshot?.efrro_expiry || null;
+          }
+
+          const cleanExp = currentExpiry ? currentExpiry.split("T")[0].trim() : null;
+
+          if (cleanGrad && cleanExp && cleanExp > cleanGrad) {
+            console.log(`[QUEUE_PROCESSOR_SAFETY_CHECK] Cancelling stale notification ${alert.id}: document expiry (${cleanExp}) is after graduation date (${cleanGrad}).`);
+            await this.repository.updateNotificationStatus(alert.id, "cancelled");
+            await this.repository.logDeliveryAttempt({
+              notificationId: alert.id,
+              attemptNumber: alert.retryCount + 1,
+              status: "cancelled",
+              gatewayResponse: {
+                cancellation_reason: "DOCUMENT_EXPIRES_AFTER_GRADUATION",
+                graduation_date: cleanGrad,
+                document_expiry: cleanExp,
+                stage: "PRE_DISPATCH_SAFETY_CHECK"
+              },
+              errorMessage: "Pre-dispatch safety check cancelled reminder: Document expiry date is strictly after expected graduation date.",
+              latencyMs: 0,
+              providerName: "safety_check_guard",
+              correlationId
+            });
+            continue;
+          }
+        }
+
+        // 3. Lock notification state to processing
         await this.repository.updateNotificationStatus(alert.id, "processing");
 
-        // 3. Resolve active templates
+        // 4. Resolve active templates
         let body = alert.idempotencyKey;
         let subject = "ISCMS Compliance Reminder Alert";
         

@@ -3,15 +3,23 @@ import { AcademicProgram, CreateProgramDto, UpdateProgramDto, SemesterDurationUn
 import { normalizeAcademicLevel } from "./academic-level";
 
 // In-memory fallback programs list if database table is empty or migrating
-const DEFAULT_FALLBACK_PROGRAMS: AcademicProgram[] = [
-  { id: "fallback-1", programName: "B.Tech in Computer Science & Engineering", programCode: "BTECH_CSE", displayOrder: 1, isActive: true, durationValue: 4, durationUnit: "Years", totalSemesters: 8, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-2", programName: "B.Tech in AI & Data Science", programCode: "BTECH_AIDS", displayOrder: 2, isActive: true, durationValue: 4, durationUnit: "Years", totalSemesters: 8, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-3", programName: "B.Sc. in Forensic Science", programCode: "BSC_FS", displayOrder: 3, isActive: true, durationValue: 4, durationUnit: "Years", totalSemesters: 6, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-4", programName: "M.Sc. in Digital Forensics & Information Security", programCode: "MSC_DFIS", displayOrder: 4, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-5", programName: "M.Tech in Cyber Security", programCode: "MTECH_CS", displayOrder: 5, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-6", programName: "Master of Business Administration (Cyber Security)", programCode: "MBA_CS", displayOrder: 6, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-7", programName: "Doctor of Philosophy (Ph.D.)", programCode: "PHD", displayOrder: 7, isActive: true, durationValue: 6, durationUnit: "Years", totalSemesters: 6, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PhD", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: "fallback-8", programName: "B.Tech + M.Tech in Computer Science & Engineering", programCode: "BTECH_MTECH_CSE", displayOrder: 8, isActive: true, durationValue: 5, durationUnit: "Years", totalSemesters: 10, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "INTEGRATED", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+export const DEFAULT_FALLBACK_PROGRAMS: AcademicProgram[] = [
+  { id: "prog-msc-tox", programName: "M. Sc. Toxicology", programCode: "MSC-TOX", displayOrder: 1, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", schoolName: "School of Pharmacy & Emerging Sciences", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-msc-fs", programName: "M. Sc. Forensic Science", programCode: "MSC-FS", displayOrder: 2, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", schoolName: "School of Forensic Sciences", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-msc-cs", programName: "M. Sc. Cyber Security", programCode: "MSC-CS", displayOrder: 3, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", schoolName: "School of Cyber Security & Digital Forensics", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-msc-dfis", programName: "M.Sc. in Digital Forensics & Information Security", programCode: "MSC-DFIS", displayOrder: 4, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", schoolName: "School of Cyber Security & Digital Forensics", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-mtech-cs", programName: "M.Tech in Cyber Security", programCode: "MTECH-CS", displayOrder: 5, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", schoolName: "School of Cyber Security & Digital Forensics", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-ma-pss", programName: "M.A. Police & Security Studies", programCode: "MA-PSS", displayOrder: 6, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", schoolName: "School of Police Science & Security Studies", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-mba-cs", programName: "Master of Business Administration (Cyber Security)", programCode: "MBA-CS", displayOrder: 7, isActive: true, durationValue: 2, durationUnit: "Years", totalSemesters: 4, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PG", schoolName: "School of Management Studies", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-bsc-crim", programName: "B.Sc. Criminology", programCode: "BSC-CRIM", displayOrder: 8, isActive: true, durationValue: 3, durationUnit: "Years", totalSemesters: 6, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", schoolName: "School of Criminology & Behavioral Sciences", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-bsc-fs", programName: "B.Sc. in Forensic Science", programCode: "BSC-FS", displayOrder: 9, isActive: true, durationValue: 3, durationUnit: "Years", totalSemesters: 6, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", schoolName: "School of Forensic Sciences", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-btech-cse", programName: "B.Tech in Computer Science & Engineering", programCode: "BTECH-CSE", displayOrder: 10, isActive: true, durationValue: 4, durationUnit: "Years", totalSemesters: 8, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", schoolName: "School of Engineering & Technology", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-btech-aids", programName: "B.Tech in AI & Data Science", programCode: "BTECH-AIDS", displayOrder: 11, isActive: true, durationValue: 4, durationUnit: "Years", totalSemesters: 8, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "UG", schoolName: "School of Engineering & Technology", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-int-crim", programName: "Integrated B.A. + M.A. Criminology", programCode: "INT-BA-MA-CRIM", displayOrder: 12, isActive: true, durationValue: 5, durationUnit: "Years", totalSemesters: 10, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "INTEGRATED", schoolName: "School of Criminology & Behavioral Sciences", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-int-cse", programName: "B.Tech + M.Tech in Computer Science & Engineering", programCode: "BTECH-MTECH-CSE", displayOrder: 13, isActive: true, durationValue: 5, durationUnit: "Years", totalSemesters: 10, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "INTEGRATED", schoolName: "School of Engineering & Technology", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-phd", programName: "Doctor of Philosophy (Ph.D.)", programCode: "PHD", displayOrder: 14, isActive: true, durationValue: 3, durationUnit: "Years", totalSemesters: 6, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "PhD", schoolName: "Doctoral Research Programme", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-pgd-fps", programName: "Post Graduate Diploma in Fingerprint Science", programCode: "PGD-FPS", displayOrder: 15, isActive: true, durationValue: 1, durationUnit: "Years", totalSemesters: 2, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "Diploma", schoolName: "School of Forensic Sciences", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: "prog-pgd-fde", programName: "Post Graduate Diploma in Forensic Document Examination", programCode: "PGD-FDE", displayOrder: 16, isActive: true, durationValue: 1, durationUnit: "Years", totalSemesters: 2, semesterDuration: 6, semesterDurationUnit: "months", academicLevel: "Diploma", schoolName: "School of Forensic Sciences", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
 ];
 
 export class AcademicProgramService {
@@ -19,13 +27,34 @@ export class AcademicProgramService {
    * Get all active academic programs sorted alphabetically or by display order
    */
   public async getActivePrograms(): Promise<AcademicProgram[]> {
-    const supabase = getAdminSupabase();
-    
     try {
+      const supabase = getAdminSupabase();
       const { data, error } = await supabase
         .from("academic_programs")
         .select("*")
         .eq("is_active", true)
+        .order("display_order", { ascending: true })
+        .order("program_name", { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        return DEFAULT_FALLBACK_PROGRAMS.filter(p => p.isActive);
+      }
+
+      return data.map(this.mapToDomain);
+    } catch {
+      return DEFAULT_FALLBACK_PROGRAMS.filter(p => p.isActive);
+    }
+  }
+
+  /**
+   * Get all academic programs (including archived) for admin management
+   */
+  public async getAllPrograms(): Promise<AcademicProgram[]> {
+    try {
+      const supabase = getAdminSupabase();
+      const { data, error } = await supabase
+        .from("academic_programs")
+        .select("*")
         .order("display_order", { ascending: true })
         .order("program_name", { ascending: true });
 
@@ -40,51 +69,99 @@ export class AcademicProgramService {
   }
 
   /**
-   * Get all academic programs (including archived) for admin management
+   * Find program by stable UUID identifier
    */
-  public async getAllPrograms(): Promise<AcademicProgram[]> {
-    const supabase = getAdminSupabase();
+  public async getProgramById(id: string): Promise<AcademicProgram | null> {
+    const trimmedId = id?.trim();
+    if (!trimmedId) return null;
 
     try {
-      const { data, error } = await supabase
-        .from("academic_programs")
-        .select("*")
-        .order("display_order", { ascending: true })
-        .order("program_name", { ascending: true });
-
-      if (error || !data) {
-        return DEFAULT_FALLBACK_PROGRAMS;
-      }
-
-      return data.map(this.mapToDomain);
-    } catch {
-      return DEFAULT_FALLBACK_PROGRAMS;
-    }
-  }
-
-  /**
-   * Find program by code or name
-   */
-  public async getProgramByCodeOrName(codeOrName: string): Promise<AcademicProgram | null> {
-    const supabase = getAdminSupabase();
-    const query = codeOrName.trim();
-    if (!query) return null;
-
-    try {
+      const supabase = getAdminSupabase();
       const { data } = await supabase
         .from("academic_programs")
         .select("*")
-        .or(`program_code.eq.${query},program_name.eq.${query}`)
+        .eq("id", trimmedId)
         .maybeSingle();
 
       if (data) return this.mapToDomain(data);
 
+      const fallback = DEFAULT_FALLBACK_PROGRAMS.find(p => p.id === trimmedId);
+      return fallback || null;
+    } catch {
+      const fallback = DEFAULT_FALLBACK_PROGRAMS.find(p => p.id === trimmedId);
+      return fallback || null;
+    }
+  }
+
+  /**
+   * Find program by stable UUID, exact program code, or exact full program name
+   */
+  public async getProgramByIdCodeOrName(identifier: string): Promise<AcademicProgram | null> {
+    const query = identifier?.trim();
+    if (!query) return null;
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query);
+    if (isUuid) {
+      const byId = await this.getProgramById(query);
+      if (byId) return byId;
+    }
+
+    return this.getProgramByCodeOrName(query);
+  }
+
+  /**
+   * Find program by code or exact full name
+   */
+  public async getProgramByCodeOrName(codeOrName: string): Promise<AcademicProgram | null> {
+    const query = codeOrName?.trim();
+    if (!query) return null;
+
+    try {
+      const supabase = getAdminSupabase();
+      // Query 1: Exact program code match (case-insensitive)
+      const { data: byCode } = await supabase
+        .from("academic_programs")
+        .select("*")
+        .ilike("program_code", query)
+        .maybeSingle();
+
+      if (byCode) return this.mapToDomain(byCode);
+
+      // Query 2: Exact program name match (case-insensitive)
+      const { data: byName } = await supabase
+        .from("academic_programs")
+        .select("*")
+        .ilike("program_name", query)
+        .maybeSingle();
+
+      if (byName) return this.mapToDomain(byName);
+
+      // Query 3: Normalized hyphen/underscore code variation
+      const normalizedCode = query.replace(/_/g, "-");
+      const { data: byNormCode } = await supabase
+        .from("academic_programs")
+        .select("*")
+        .ilike("program_code", normalizedCode)
+        .maybeSingle();
+
+      if (byNormCode) return this.mapToDomain(byNormCode);
+
+      // Query 4: In-memory fallback dataset
+      const queryLower = query.toLowerCase();
       const fallback = DEFAULT_FALLBACK_PROGRAMS.find(
-        p => p.programCode?.toUpperCase() === query.toUpperCase() || p.programName.toLowerCase() === query.toLowerCase()
+        p => (p.programCode && p.programCode.toLowerCase() === queryLower) || 
+             p.programName.toLowerCase() === queryLower ||
+             (p.programCode && p.programCode.replace(/_/g, "-").toLowerCase() === queryLower.replace(/_/g, "-"))
       );
       return fallback || null;
     } catch {
-      return null;
+      const queryLower = query.toLowerCase();
+      const fallback = DEFAULT_FALLBACK_PROGRAMS.find(
+        p => (p.programCode && p.programCode.toLowerCase() === queryLower) || 
+             p.programName.toLowerCase() === queryLower ||
+             (p.programCode && p.programCode.replace(/_/g, "-").toLowerCase() === queryLower.replace(/_/g, "-"))
+      );
+      return fallback || null;
     }
   }
 

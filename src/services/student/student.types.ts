@@ -48,7 +48,12 @@ export interface StudentContact {
 
 export interface StudentAcademic {
   studentId: string;
+  programId?: string | null;
   programCode: string | null;
+  programName?: string | null;
+  academicLevel?: string | null;
+  academicLevelLabel?: string | null;
+  schoolName?: string | null;
   admissionDate: Date | null;
   expectedGraduation: Date | null;
   currentSemester: number | null;
@@ -116,6 +121,7 @@ export interface RegisterStudentInput {
   phoneHomeNumber?: string | null;
   permanentAddress?: string | null;
   localAddress?: string | null;
+  programId?: string | null;
   programCode?: string | null;
   admissionDate?: Date | string | null;
   expectedGraduation?: Date | string | null;
@@ -162,6 +168,7 @@ export interface UpdateStudentInput {
   phoneHomeNumber?: string | null;
   permanentAddress?: string | null;
   localAddress?: string | null;
+  programId?: string | null;
   programCode?: string | null;
   admissionDate?: string | Date | null;
   expectedGraduation?: string | Date | null;

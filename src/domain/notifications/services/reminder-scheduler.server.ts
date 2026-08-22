@@ -127,16 +127,13 @@ export class ReminderSchedulerServer {
       scheduleResponse.efrro
     ];
 
-    // 4. Iterate over each document type and queue DUE reminders
+    // 4. Run reconciliation to ensure any stale notifications for documents expiring after graduation are cancelled
+    const { ReminderReconciliationService } = await import("./reminder-reconciliation.service");
+    await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, "scheduler_server");
+
+    // 5. Iterate over each document type and queue DUE reminders
     for (const doc of docGroups) {
       if (doc.isAfterGraduation) {
-        // Re-evaluate: Cancel any previously queued notifications for documents expiring after graduation
-        await supabase
-          .from("notifications")
-          .update({ status: "cancelled", updated_at: new Date().toISOString() })
-          .eq("student_id", studentId)
-          .eq("document_type", doc.documentType)
-          .in("status", ["queued", "sending", "processing"]);
         continue;
       }
 

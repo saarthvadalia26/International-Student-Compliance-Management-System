@@ -11,6 +11,8 @@ import { sanitizeError } from "@/lib/errors/error-sanitizer";
 import { StorageProviderFactory } from "@/domain/storage/factory";
 import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
 import { getAcademicLevelLabel } from "@/domain/academic-programs/academic-level";
+import { AcademicProgramService } from "@/domain/academic-programs/academic-program.service";
+import { AcademicProgram } from "@/domain/academic-programs/types";
 
 const studentService = new StudentService();
 
@@ -22,6 +24,7 @@ export interface StudentListItem {
   nationalityName: string;
   programName: string;
   programCode?: string;
+  programId?: string | null;
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   school: string;
@@ -74,6 +77,7 @@ export interface StudentDetailProfile {
   nationalityName: string;
   programName: string;
   programCode: string;
+  programId?: string | null;
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   school: string;
@@ -188,6 +192,8 @@ export async function registerStudentAction(input: RegisterStudentInput): Promis
 
     // Evaluate and initialize automated reminder schedule for any provided document metadata
     try {
+      const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+      await ReminderReconciliationService.reconcileStudentReminderSchedule(created.student.id, user.id);
       const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
       await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(created.student.id);
     } catch (reminderErr) {
@@ -280,7 +286,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         created_at,
         student_personal(full_name, nationality_code),
         student_contact(email, phone_home),
-        student_academic(program_code, academic_status),
+        student_academic(program_id, program_code, academic_status),
         student_snapshot(compliance_status, passport_number, visa_number)
       `)
       .is("deleted_at", null)
@@ -304,23 +310,25 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       };
     }
 
-    // Also fetch academic program lookup map for friendly display names
-    const { data: programsData } = await adminSupabase
-      .from("academic_programs")
-      .select("program_code, program_name, school_name, academic_level");
+    // Also fetch all academic programs for authoritative display names and level mappings
+    const programService = new AcademicProgramService();
+    const allPrograms = await programService.getAllPrograms();
 
-    const programMap = new Map<string, { name: string; school: string; academicLevel: string | null }>();
-    if (programsData) {
-      programsData.forEach(p => {
-        const item = { 
-          name: p.program_name, 
-          school: p.school_name || "Academic Department",
-          academicLevel: p.academic_level ? String(p.academic_level) : null
-        };
-        if (p.program_code) programMap.set(p.program_code, item);
-        programMap.set(p.program_name, item);
-      });
-    }
+    const programMap = new Map<string, { id: string; name: string; school: string; academicLevel: string | null }>();
+    allPrograms.forEach(p => {
+      const item = { 
+        id: p.id,
+        name: p.programName, 
+        school: p.schoolName || "Academic Department",
+        academicLevel: p.academicLevel ? String(p.academicLevel) : null
+      };
+      if (p.id) programMap.set(p.id.toLowerCase(), item);
+      if (p.programCode) {
+        programMap.set(p.programCode.toLowerCase(), item);
+        programMap.set(p.programCode.replace(/_/g, "-").toLowerCase(), item);
+      }
+      programMap.set(p.programName.toLowerCase(), item);
+    });
 
     const students: StudentListItem[] = (records || []).map(r => {
       const personal = Array.isArray(r.student_personal) ? r.student_personal[0] : r.student_personal;
@@ -332,16 +340,26 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       const countryObj = natCode ? getCountryByCode(natCode) : null;
       const nationalityName = countryObj?.name || (natCode ? natCode : "Not specified");
 
+      const progId = academic?.program_id || "";
       const progCode = academic?.program_code || "";
-      const progInfo = progCode ? (programMap.get(progCode) || {
-        name: progCode,
-        school: "Academic Affairs",
-        academicLevel: null
-      }) : {
-        name: "Not assigned yet",
-        school: "Not assigned yet",
-        academicLevel: null
-      };
+      
+      const progInfo = progId && programMap.has(progId.toLowerCase())
+        ? programMap.get(progId.toLowerCase())!
+        : progCode && programMap.has(progCode.toLowerCase())
+        ? programMap.get(progCode.toLowerCase())!
+        : progCode
+        ? {
+            id: progId,
+            name: progCode,
+            school: "Not provided",
+            academicLevel: null
+          }
+        : {
+            id: "",
+            name: "Not assigned yet",
+            school: "Not assigned yet",
+            academicLevel: null
+          };
 
       // Map raw compliance status to UI badge enum
       let mappedCompliance: StudentListItem["complianceStatus"] = "compliant";
@@ -358,6 +376,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         nationalityName,
         programName: progInfo.name,
         programCode: progCode,
+        programId: progId || progInfo.id || null,
         academicLevel: progInfo.academicLevel,
         academicLevelLabel: progInfo.academicLevel ? getAcademicLevelLabel(progInfo.academicLevel) : null,
         school: progInfo.school,
@@ -447,24 +466,13 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
 
     const countryObj = personal?.nationality_code ? getCountryByCode(personal.nationality_code) : null;
 
-    // Retrieve academic program metadata & course structure if program code is present
-    let progData: {
-      program_name: string;
-      program_code: string;
-      school_name: string | null;
-      total_semesters: number;
-      semester_duration: number;
-      semester_duration_unit: string;
-      academic_level: string | null;
-    } | null = null;
+    // Retrieve academic program metadata & course structure via authoritative service
+    const programService = new AcademicProgramService();
+    const progIdent = academic?.program_id || academic?.program_code;
+    let progData: AcademicProgram | null = null;
 
-    if (academic?.program_code && academic.program_code.trim()) {
-      const { data: foundProg } = await adminSupabase
-        .from("academic_programs")
-        .select("program_name, program_code, school_name, total_semesters, semester_duration, semester_duration_unit, academic_level")
-        .or(`program_code.eq.${academic.program_code.trim()},program_name.eq.${academic.program_code.trim()}`)
-        .maybeSingle();
-      progData = foundProg;
+    if (progIdent && progIdent.trim()) {
+      progData = await programService.getProgramByIdCodeOrName(progIdent.trim());
     }
 
     // Retrieve academic adjustments for this student
@@ -503,16 +511,16 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     const activeVisaAuth = (authorizationsData || []).find(a => a.document_type === "visa");
     const activeEfrroAuth = (authorizationsData || []).find(a => a.document_type === "efrro");
 
-    const totalSemesters = Number(progData?.total_semesters) || 8;
-    const semesterDuration = Number(progData?.semester_duration) || 6;
-    const semesterDurationUnit = progData?.semester_duration_unit || "months";
+    const totalSemesters = Number(progData?.totalSemesters) || 8;
+    const semesterDuration = Number(progData?.semesterDuration) || 6;
+    const semesterDurationUnit = progData?.semesterDurationUnit || "months";
 
-    const hasCourseConfig = Boolean(academic?.program_code && academic.program_code.trim());
+    const hasCourseConfig = Boolean(progIdent && progIdent.trim());
     const progression = hasCourseConfig ? AcademicProgressionEngine.calculateProgression({
       admissionDate: academic?.admission_date || "",
       courseConfig: {
-        programName: progData?.program_name || academic?.program_code || "General Studies",
-        programCode: progData?.program_code || academic?.program_code || "",
+        programName: progData?.programName || academic?.program_code || "General Studies",
+        programCode: progData?.programCode || academic?.program_code || "",
         totalSemesters,
         semesterDuration,
         semesterDurationUnit
@@ -543,11 +551,12 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       registrationNumber: record.registration_number,
       nationalityCode: personal?.nationality_code || "",
       nationalityName: countryObj?.name || (personal?.nationality_code ? personal.nationality_code : "Not specified"),
-      programName: progData?.program_name || (academic?.program_code ? academic.program_code : "Not assigned yet"),
-      programCode: academic?.program_code || "",
-      academicLevel: progData?.academic_level ? String(progData.academic_level) : null,
-      academicLevelLabel: progData?.academic_level ? getAcademicLevelLabel(progData.academic_level) : null,
-      school: progData?.school_name || (academic?.program_code ? "Academic Affairs" : "Not assigned yet"),
+      programName: progData?.programName || (academic?.program_code ? academic.program_code : "Not assigned yet"),
+      programCode: progData?.programCode || academic?.program_code || "",
+      programId: progData?.id || academic?.program_id || null,
+      academicLevel: progData?.academicLevel ? String(progData.academicLevel) : null,
+      academicLevelLabel: progData?.academicLevel ? getAcademicLevelLabel(progData.academicLevel) : null,
+      school: progData?.schoolName || (academic?.program_code ? "Not provided" : "Not assigned yet"),
       admissionDate: academic?.admission_date || "",
       expectedGraduation: hasCourseConfig ? (progression.expectedGraduationDateISO || academic?.expected_graduation || "") : (academic?.expected_graduation || ""),
       totalSemesters: hasCourseConfig ? progression.totalSemesters : undefined,
@@ -686,6 +695,16 @@ export async function updateStudentAction(
     }
 
     await studentService.updateStudent(studentId, updates, user.id);
+
+    // Reconcile reminder schedules against updated profile dates (graduation, document expiries)
+    try {
+      const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+      await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, user.id);
+      const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
+      await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
+    } catch (reminderErr) {
+      console.warn("[UPDATE_STUDENT_REMINDER_RECONCILIATION_WARNING]", reminderErr);
+    }
 
     revalidatePath(`/students/${studentId}`);
     revalidatePath("/students");
@@ -1039,13 +1058,8 @@ export async function updateDocumentVerificationAction(
 
       // Invalidate obsolete reminders & recalculate for new active expiry
       if (docExpiry) {
-        await adminSupabase
-          .from("notifications")
-          .update({ status: "cancelled", updated_at: new Date().toISOString() })
-          .eq("student_id", studentId)
-          .eq("document_type", documentType)
-          .in("status", ["queued", "sending", "processing"]);
-
+        const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+        await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, user.id);
         const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
         await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
       }
@@ -1484,14 +1498,8 @@ export async function correctDocumentMetadataAction(
       .eq("student_id", studentId);
 
     // 4. Invalidate obsolete notifications & recalculate reminders if expiry changed
-    if (previousValues.expiryDate && previousValues.expiryDate !== cleanExpiry) {
-      await adminSupabase
-        .from("notifications")
-        .update({ status: "cancelled", updated_at: new Date().toISOString() })
-        .eq("student_id", studentId)
-        .eq("document_type", documentType)
-        .in("status", ["queued", "sending", "processing"]);
-    }
+    const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+    await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, user.id);
 
     const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
     await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
@@ -1654,6 +1662,10 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
       console.error("[REMINDER_SCHEDULE_STUDENT_NOT_FOUND]", { studentId, error: sErr?.message });
       return { success: false, error: "This reminder references a student record that could not be found." };
     }
+
+    // Reconcile outstanding reminders idempotently so stale notifications for documents expiring after graduation are cancelled
+    const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+    await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, "get_reminder_schedule");
 
     const [{ data: notifData }, { data: dbRules }] = await Promise.all([
       adminSupabase
@@ -2030,6 +2042,16 @@ export async function triggerReminderDispatchAction(
 
     // Enforce graduation date boundary
     if (expectedGraduation && cleanExpiry > expectedGraduation) {
+      await adminSupabase
+        .from("notifications")
+        .update({
+          status: "cancelled",
+          updated_at: new Date().toISOString()
+        })
+        .eq("student_id", studentId)
+        .eq("document_type", docType)
+        .in("status", ["queued", "sending", "processing"]);
+
       return {
         success: false,
         status: "BLOCKED",
@@ -2290,6 +2312,17 @@ export async function recordAcademicAdjustmentAction(
     }
 
     const res = await studentService.recordAcademicAdjustment(studentId, input, user.id);
+
+    // Reconcile reminder schedules against new academic progression/graduation boundary
+    try {
+      const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+      await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, user.id);
+      const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
+      await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
+    } catch (reconcileErr) {
+      console.warn("[ACADEMIC_ADJUSTMENT_RECONCILIATION_WARNING]", reconcileErr);
+    }
+
     revalidatePath(`/students/${studentId}`);
     revalidatePath(`/students`);
     return res;

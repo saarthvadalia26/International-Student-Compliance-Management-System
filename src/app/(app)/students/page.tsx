@@ -44,6 +44,8 @@ export interface Student {
   nationalityCode: string;
   nationalityName: string;
   programName: string;
+  programCode?: string | null;
+  programId?: string | null;
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   school: string;
@@ -128,7 +130,9 @@ export default function StudentListPage() {
         (student.registrationNumber || "").toLowerCase().includes(query) ||
         student.nationalityName.toLowerCase().includes(query) ||
         student.programName.toLowerCase().includes(query) ||
+        (student.programCode || "").toLowerCase().includes(query) ||
         (student.academicLevelLabel || "").toLowerCase().includes(query) ||
+        (student.academicLevel || "").toLowerCase().includes(query) ||
         student.school.toLowerCase().includes(query) ||
         student.passport.number.toLowerCase().includes(query) ||
         student.visa.number.toLowerCase().includes(query) ||

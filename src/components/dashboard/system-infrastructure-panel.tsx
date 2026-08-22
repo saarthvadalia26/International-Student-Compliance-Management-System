@@ -23,6 +23,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SystemInfrastructureDiagnostics, ServiceHealth } from "@/domain/system/types/diagnostics.types";
 import { fetchSystemDiagnosticsAction } from "@/app/(app)/dashboard/health/actions";
+import { getDisplayAppVersion } from "@/config/version";
 import { toast } from "sonner";
 
 interface SystemInfrastructurePanelProps {
@@ -230,7 +231,7 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
               <span className="text-muted-foreground font-medium flex items-center gap-2">
                 <Server className="h-3 w-3 text-muted-foreground/70" /> Application Version
               </span>
-              <span className="font-semibold font-mono text-foreground">v{runtime.appVersion}</span>
+              <span className="font-semibold font-mono text-foreground">{getDisplayAppVersion(runtime.appVersion)}</span>
             </div>
 
           </div>

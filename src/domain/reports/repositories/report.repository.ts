@@ -49,6 +49,7 @@ const PERSONAL_FIELDS = `
 
 const ACADEMIC_FIELDS = `
   student_academic(
+    program_id,
     program_code,
     expected_graduation
   )
@@ -238,20 +239,32 @@ export class SupabaseReportRepository implements IReportRepository {
       .select("code, display_name, category")
       .in("category", ["school", "course", "gender"]);
 
-    // Load academic programs mapping for canonical levels and schools
+    // Load academic programs mapping for canonical names, levels, and schools
     const { data: progData } = await supabase
       .from("academic_programs")
-      .select("program_code, program_name, school_name, academic_level");
+      .select("id, program_code, program_name, school_name, academic_level");
 
+    const progNameMap: Record<string, string> = {};
     const progLevelMap: Record<string, string> = {};
     const progSchoolMap: Record<string, string> = {};
+
     if (progData) {
       progData.forEach(p => {
+        if (p.id) {
+          progNameMap[p.id] = p.program_name;
+          if (p.academic_level) progLevelMap[p.id] = p.academic_level;
+          if (p.school_name) progSchoolMap[p.id] = p.school_name;
+        }
         if (p.program_code) {
+          progNameMap[p.program_code] = p.program_name;
+          progNameMap[p.program_code.toLowerCase()] = p.program_name;
+          progNameMap[p.program_code.replace(/_/g, "-")] = p.program_name;
           if (p.academic_level) progLevelMap[p.program_code] = p.academic_level;
           if (p.school_name) progSchoolMap[p.program_code] = p.school_name;
         }
         if (p.program_name) {
+          progNameMap[p.program_name] = p.program_name;
+          progNameMap[p.program_name.toLowerCase()] = p.program_name;
           if (p.academic_level) progLevelMap[p.program_name] = p.academic_level;
           if (p.school_name) progSchoolMap[p.program_name] = p.school_name;
         }
@@ -264,7 +277,7 @@ export class SupabaseReportRepository implements IReportRepository {
       refData.forEach(r => {
         refMap[r.code] = r.display_name;
         if (r.category === "course") {
-          courseToSchoolMap[r.code] = "School of Forensic Sciences"; // standard default school
+          courseToSchoolMap[r.code] = "Academic Department";
         }
       });
     }
@@ -273,15 +286,37 @@ export class SupabaseReportRepository implements IReportRepository {
       const snapshot = Array.isArray(row.student_snapshot) ? row.student_snapshot[0] : row.student_snapshot;
       const personal = Array.isArray(row.student_personal) ? row.student_personal[0] : row.student_personal;
       const academic = Array.isArray(row.student_academic) ? row.student_academic[0] : row.student_academic;
+      const progId = academic?.program_id || "";
       const code = academic?.program_code || "";
+      const resolvedProgramme = progId && progNameMap[progId] 
+        ? progNameMap[progId] 
+        : (code && progNameMap[code]) 
+        ? progNameMap[code] 
+        : (code && progNameMap[code.toLowerCase()]) 
+        ? progNameMap[code.toLowerCase()] 
+        : refMap[code] 
+        || code 
+        || "Not assigned yet";
+
+      const resolvedSchool = (progId && progSchoolMap[progId]) 
+        || (code && progSchoolMap[code]) 
+        || (resolvedProgramme && progSchoolMap[resolvedProgramme]) 
+        || courseToSchoolMap[code] 
+        || "Not provided";
+
+      const resolvedLevel = (progId && progLevelMap[progId]) 
+        || (code && progLevelMap[code]) 
+        || (resolvedProgramme && progLevelMap[resolvedProgramme]) 
+        || null;
+
       return ReportMapper.toStudentReportRow({
         student_id: row.id,
         registration_number: row.registration_number,
         full_name: personal?.full_name,
         nationality: refMap[personal?.nationality_code] || personal?.nationality_code,
-        school: progSchoolMap[code] || courseToSchoolMap[code] || "School of Forensic Sciences",
-        programme: refMap[code] || code,
-        academic_level: progLevelMap[code] || null,
+        school: resolvedSchool,
+        programme: resolvedProgramme,
+        academic_level: resolvedLevel,
         expected_graduation: academic?.expected_graduation,
         status: row.status,
         compliance_status: snapshot?.compliance_status

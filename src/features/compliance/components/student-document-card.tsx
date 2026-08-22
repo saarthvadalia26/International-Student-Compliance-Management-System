@@ -53,6 +53,8 @@ export interface StudentDocumentCardProps {
   notes?: string | null;
   filePath?: string | null;
   daysToExpiry?: number | null;
+  expectedGraduationDate?: string | null;
+  isAfterGraduation?: boolean;
   onUploadRenewalClick: () => void;
   onCorrectExpiryClick: () => void;
   onCorrectMetadataClick: () => void;
@@ -88,6 +90,8 @@ export function StudentDocumentCard({
   verifiedBy,
   rejectionReason,
   daysToExpiry,
+  expectedGraduationDate,
+  isAfterGraduation,
   onUploadRenewalClick,
   onCorrectExpiryClick,
   onCorrectMetadataClick,
@@ -111,6 +115,12 @@ export function StudentDocumentCard({
     cleanExpiry !== "Not Recorded" && 
     /^\d{4}-\d{2}-\d{2}$/.test(cleanExpiry)
   );
+
+  const cleanGraduation = expectedGraduationDate ? expectedGraduationDate.split("T")[0].trim() : "";
+  const hasValidGraduation = Boolean(cleanGraduation && /^\d{4}-\d{2}-\d{2}$/.test(cleanGraduation));
+  const docIsAfterGraduation = isAfterGraduation !== undefined 
+    ? isAfterGraduation 
+    : (hasValidExpiry && hasValidGraduation && cleanExpiry > cleanGraduation);
 
   const cleanIssue = issueDate ? issueDate.split("T")[0].trim() : "";
   const hasValidIssue = Boolean(
@@ -372,28 +382,45 @@ export function StudentDocumentCard({
                   {documentType === "efrro" ? "Expiration & Compliance" : "Expiration & Validity"}
                 </span>
                 {hasValidExpiry && (
-                  <Badge variant="outline" className={`text-[9px] h-4 font-medium ${theme.badgeClass}`}>
-                    Reminder schedule active
-                  </Badge>
+                  docIsAfterGraduation ? (
+                    <Badge variant="outline" className="text-[9px] h-4 font-medium text-muted-foreground border-border/60 bg-muted/20">
+                      Reminder schedule inactive
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className={`text-[9px] h-4 font-medium ${theme.badgeClass}`}>
+                      Reminder schedule active
+                    </Badge>
+                  )
                 )}
               </div>
 
               {hasValidExpiry ? (
-                <div className="flex flex-wrap items-baseline gap-2 pt-0.5">
-                  <span className="text-sm sm:text-base font-bold text-foreground font-mono">
-                    {CalendarDateEngine.formatDateDisplay(cleanExpiry)}
-                  </span>
-                  <span className={`text-xs font-semibold ${
-                    expiryHealth.isExpired 
-                      ? "text-rose-600 dark:text-rose-400" 
-                      : expiryHealth.isCritical 
-                      ? "text-rose-600 dark:text-rose-400"
-                      : expiryHealth.isWarning 
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-emerald-600 dark:text-emerald-400"
-                  }`}>
-                    ({expiryHealth.statusText})
-                  </span>
+                <div className="space-y-1 pt-0.5">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-sm sm:text-base font-bold text-foreground font-mono">
+                      {CalendarDateEngine.formatDateDisplay(cleanExpiry)}
+                    </span>
+                    <span className={`text-xs font-semibold ${
+                      expiryHealth.isExpired 
+                        ? "text-rose-600 dark:text-rose-400" 
+                        : expiryHealth.isCritical 
+                        ? "text-rose-600 dark:text-rose-400"
+                        : expiryHealth.isWarning 
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                    }`}>
+                      ({expiryHealth.statusText})
+                    </span>
+                  </div>
+
+                  {docIsAfterGraduation && (
+                    <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+                      <Info className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                      <span>
+                        {title} expires after the student&apos;s expected graduation date ({CalendarDateEngine.formatDateDisplay(cleanGraduation, true)}). Expiry reminders are not required.
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="pt-0.5">

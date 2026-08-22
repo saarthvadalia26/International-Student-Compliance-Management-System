@@ -37,6 +37,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
           nationality_code
         ),
         student_academic(
+          program_id,
           program_code
         ),
         student_contact(
@@ -63,7 +64,34 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       return null;
     }
 
-    // Load reference data mapping to resolve program and school
+    // Load academic programs mapping for authoritative course name and school
+    const { data: progData } = await supabase
+      .from("academic_programs")
+      .select("id, program_code, program_name, school_name");
+
+    const progNameMap: Record<string, string> = {};
+    const progSchoolMap: Record<string, string> = {};
+    if (progData) {
+      progData.forEach(p => {
+        if (p.id) {
+          progNameMap[p.id] = p.program_name;
+          if (p.school_name) progSchoolMap[p.id] = p.school_name;
+        }
+        if (p.program_code) {
+          progNameMap[p.program_code] = p.program_name;
+          progNameMap[p.program_code.toLowerCase()] = p.program_name;
+          progNameMap[p.program_code.replace(/_/g, "-")] = p.program_name;
+          if (p.school_name) progSchoolMap[p.program_code] = p.school_name;
+        }
+        if (p.program_name) {
+          progNameMap[p.program_name] = p.program_name;
+          progNameMap[p.program_name.toLowerCase()] = p.program_name;
+          if (p.school_name) progSchoolMap[p.program_name] = p.school_name;
+        }
+      });
+    }
+
+    // Load reference data mapping to resolve legacy categories
     const { data: refData } = await supabase
       .from("reference_data")
       .select("code, display_name, category")
@@ -111,6 +139,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
     const contact = Array.isArray(student.student_contact) ? student.student_contact[0] : student.student_contact;
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
 
+    const progId = academic?.program_id || "";
     const progCode = academic?.program_code || "";
 
     // Resolve Passport status
@@ -152,12 +181,25 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
     const natCode = personal?.nationality_code || "";
     const countryName = natCode ? (getCountryByCode(natCode)?.name || natCode) : "";
 
+    const resolvedProgramme = progId && progNameMap[progId]
+      ? progNameMap[progId]
+      : progCode && progNameMap[progCode]
+      ? progNameMap[progCode]
+      : progCode && progNameMap[progCode.toLowerCase()]
+      ? progNameMap[progCode.toLowerCase()]
+      : refMap[progCode] || progCode || "Not assigned yet";
+
+    const resolvedSchool = (progId && progSchoolMap[progId])
+      || (progCode && progSchoolMap[progCode])
+      || (resolvedProgramme && progSchoolMap[resolvedProgramme])
+      || "Not provided";
+
     return {
       studentId: student.id,
       fullName: personal?.full_name || "",
       registrationNumber: student.registration_number,
-      programme: refMap[progCode] || progCode || "Not assigned yet",
-      school: "School of Forensic Sciences",
+      programme: resolvedProgramme,
+      school: resolvedSchool,
       nationality: countryName || "Not specified",
       email: contact?.email || "",
       phoneHome: contact?.phone_home || "",

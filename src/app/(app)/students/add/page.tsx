@@ -20,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { NationalitySelector } from "@/components/ui/nationality-selector";
+import { SearchableProgramSelector } from "@/components/ui/searchable-program-selector";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
 import { AcademicProgram, getAcademicLevelLabel } from "@/domain/academic-programs/types";
@@ -151,6 +152,7 @@ export default function StudentRegistrationPage() {
     phoneLocalNumber: "",
     permanentAddress: "",
     localAddress: "",
+    programId: "",
     program: "",
     school: "",
     admissionDate: "",
@@ -189,9 +191,13 @@ export default function StudentRegistrationPage() {
   }, [validationErrors]);
 
   // Helper to calculate expected graduation date dynamically from program configuration
-  const calculateGraduationDate = (programName: string, admissionDateStr: string) => {
-    if (!admissionDateStr) return "";
-    const selectedProg = academicPrograms.find(p => p.programName === programName);
+  const calculateGraduationDate = (programIdent: string, admissionDateStr: string) => {
+    if (!admissionDateStr || !programIdent) return "";
+    const selectedProg = academicPrograms.find(p => 
+      p.id === programIdent || 
+      p.programName === programIdent || 
+      p.programCode === programIdent
+    );
     if (!selectedProg) return "";
 
     return AcademicProgressionEngine.calculateExpectedGraduationDate({
@@ -203,6 +209,28 @@ export default function StudentRegistrationPage() {
         semesterDuration: selectedProg.semesterDuration || 6,
         semesterDurationUnit: selectedProg.semesterDurationUnit || "months"
       }
+    });
+  };
+
+  const handleProgramChange = (prog: AcademicProgram | null) => {
+    setValidationErrors(prev => {
+      const next = { ...prev };
+      delete next.program;
+      delete next.programCode;
+      return next;
+    });
+
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        programId: prog?.id || "",
+        program: prog?.programName || "",
+        school: prog?.schoolName || prev.school || ""
+      };
+      if (prev.admissionDate && prog) {
+        next.expectedGraduation = calculateGraduationDate(prog.id, prev.admissionDate);
+      }
+      return next;
     });
   };
 
@@ -222,8 +250,8 @@ export default function StudentRegistrationPage() {
 
     setFormData(prev => {
       const next = { ...prev, [id]: value };
-      if (id === "admissionDate" && prev.program) {
-        next.expectedGraduation = calculateGraduationDate(prev.program, value);
+      if (id === "admissionDate" && (prev.programId || prev.program)) {
+        next.expectedGraduation = calculateGraduationDate(prev.programId || prev.program, value);
       }
       return next;
     });
@@ -245,19 +273,8 @@ export default function StudentRegistrationPage() {
 
     setFormData(prev => {
       const next = { ...prev, [field]: normalizedVal };
-      if (field === "program") {
-        const selectedProg = academicPrograms.find(p => p.programName === value);
-        if (selectedProg) {
-          if (!prev.school) {
-            next.school = selectedProg.schoolName || "";
-          }
-          if (prev.admissionDate) {
-            next.expectedGraduation = calculateGraduationDate(value, prev.admissionDate);
-          }
-        }
-      }
-      if (field === "admissionDate" && prev.program) {
-        next.expectedGraduation = calculateGraduationDate(prev.program, normalizedVal);
+      if (field === "admissionDate" && (prev.programId || prev.program)) {
+        next.expectedGraduation = calculateGraduationDate(prev.programId || prev.program, normalizedVal);
       }
       return next;
     });
@@ -305,6 +322,7 @@ export default function StudentRegistrationPage() {
       phoneLocalNumber: formData.phoneLocalNumber.trim() || undefined,
       permanentAddress: formData.permanentAddress.trim() || undefined,
       localAddress: formData.localAddress.trim() || undefined,
+      programId: formData.programId.trim() || undefined,
       programCode: formData.program.trim() || undefined,
       admissionDate: sanitizedAdm || undefined,
       expectedGraduation: sanitizedGrad || undefined,
@@ -717,33 +735,18 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground flex items-center gap-1" htmlFor="program">
                       Academic Program <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
-                    <Select 
-                      value={formData.program} 
-                      onValueChange={(v) => handleSelectChange("program", v || "")} 
-                      disabled={isLoadingPrograms || academicPrograms.length === 0}
-                    >
-                      <SelectTrigger 
-                        id="program"
-                        className={`h-10 text-xs ${(validationErrors.programCode || validationErrors.program) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                      >
-                        <SelectValue placeholder={isLoadingPrograms ? "Loading programs..." : "Select Academic Program (Optional)"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {academicPrograms.map((prog) => (
-                           <SelectItem key={prog.id} value={prog.programName}>
-                            {prog.programName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableProgramSelector
+                      id="program"
+                      programs={academicPrograms}
+                      value={formData.programId || formData.program}
+                      onChange={handleProgramChange}
+                      disabled={isSubmitting || isLoadingPrograms}
+                      placeholder={isLoadingPrograms ? "Loading academic programs..." : "Search and select academic program..."}
+                      error={validationErrors.programCode || validationErrors.program}
+                    />
                     {academicPrograms.length === 0 && !isLoadingPrograms && (
                       <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
                         No academic programs have been configured. Please contact the system administrator.
-                      </p>
-                    )}
-                    {(validationErrors.programCode || validationErrors.program) && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.programCode || validationErrors.program}
                       </p>
                     )}
                   </div>

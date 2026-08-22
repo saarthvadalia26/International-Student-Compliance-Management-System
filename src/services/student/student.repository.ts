@@ -7,6 +7,7 @@ import {
 } from "./student.types";
 import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
 import { AcademicProgramService } from "@/domain/academic-programs/academic-program.service";
+import { AcademicProgram } from "@/domain/academic-programs/types";
 
 export interface IStudentRepository {
   createStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile>;
@@ -165,14 +166,17 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
       // 4. Insert into student_academic table (automatically calculated from course structure if provided)
       const admFormatted = this.formatDate(input.admissionDate);
+      let programIdVal: string | null = null;
       let programCodeVal: string | null = null;
       let expGradFormatted: string | null = null;
       let calculatedSemester: number | null = null;
 
-      if (input.programCode && input.programCode.trim()) {
+      const progIdentifier = input.programId || input.programCode;
+      if (progIdentifier && progIdentifier.trim()) {
         const programService = new AcademicProgramService();
-        const progConfig = await programService.getProgramByCodeOrName(input.programCode.trim());
-        programCodeVal = progConfig?.programCode || input.programCode.trim();
+        const progConfig = await programService.getProgramByIdCodeOrName(progIdentifier.trim());
+        programIdVal = progConfig?.id || (input.programId?.trim() || null);
+        programCodeVal = progConfig?.programCode || (input.programCode?.trim() || progConfig?.programName || progIdentifier.trim());
 
         if (admFormatted) {
           const progression = AcademicProgressionEngine.calculateProgression({
@@ -200,6 +204,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         .from("student_academic")
         .insert({
           student_id: studentId,
+          program_id: programIdVal,
           program_code: programCodeVal,
           admission_date: admFormatted,
           expected_graduation: expGradFormatted,
@@ -485,6 +490,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
       },
       academic: {
         studentId: academic?.student_id || student.id,
+        programId: academic?.program_id || null,
         programCode: academic?.program_code || null,
         admissionDate: academic?.admission_date ? new Date(academic.admission_date) : null,
         expectedGraduation: academic?.expected_graduation ? new Date(academic.expected_graduation) : null,
@@ -635,25 +641,38 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
     // 4. Update student_academic table if academic fields provided
     const academicUpdates: Record<string, unknown> = {};
-    if (input.programCode !== undefined) academicUpdates.program_code = input.programCode && input.programCode.trim() ? input.programCode.trim() : null;
+    const progIdent = input.programId || input.programCode;
+    let resolvedProg: AcademicProgram | null = null;
+
+    if (progIdent && progIdent.trim()) {
+      const programService = new AcademicProgramService();
+      resolvedProg = await programService.getProgramByIdCodeOrName(progIdent.trim());
+      academicUpdates.program_id = resolvedProg?.id || (input.programId?.trim() || null);
+      academicUpdates.program_code = resolvedProg?.programCode || (input.programCode?.trim() || resolvedProg?.programName || progIdent.trim());
+    } else if (input.programCode === null || input.programId === null) {
+      academicUpdates.program_id = null;
+      academicUpdates.program_code = null;
+    }
+
     if (input.admissionDate !== undefined) academicUpdates.admission_date = this.formatDate(input.admissionDate);
     if (input.expectedGraduation !== undefined) academicUpdates.expected_graduation = this.formatDate(input.expectedGraduation);
     if (input.academicStatus) academicUpdates.academic_status = input.academicStatus;
 
-    if (input.programCode || input.admissionDate) {
+    if (progIdent || input.admissionDate) {
       // Re-calculate progression automatically based on updated course or admission date
       const { data: currentAcademic } = await supabase
         .from("student_academic")
-        .select("program_code, admission_date, expected_graduation")
+        .select("program_id, program_code, admission_date, expected_graduation")
         .eq("student_id", id)
         .maybeSingle();
 
-      const progCode = input.programCode?.trim() || currentAcademic?.program_code;
+      const effectiveProgCode = (academicUpdates.program_code as string) || currentAcademic?.program_code;
+      const effectiveProgId = (academicUpdates.program_id as string) || currentAcademic?.program_id;
       const admDate = input.admissionDate ? this.formatDate(input.admissionDate) : currentAcademic?.admission_date;
 
-      if (progCode && admDate) {
+      if ((effectiveProgId || effectiveProgCode) && admDate) {
         const programService = new AcademicProgramService();
-        const progConfig = await programService.getProgramByCodeOrName(progCode);
+        const progConfig = resolvedProg || await programService.getProgramByIdCodeOrName(effectiveProgId || effectiveProgCode);
 
         // Fetch existing adjustments
         const { data: adjustmentsData } = await supabase
@@ -678,8 +697,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         const progression = AcademicProgressionEngine.calculateProgression({
           admissionDate: admDate,
           courseConfig: {
-            programName: progConfig?.programName || progCode,
-            programCode: progConfig?.programCode || progCode,
+            programName: progConfig?.programName || effectiveProgCode,
+            programCode: progConfig?.programCode || effectiveProgCode,
             totalSemesters: progConfig?.totalSemesters || 8,
             semesterDuration: progConfig?.semesterDuration || 6,
             semesterDurationUnit: progConfig?.semesterDurationUnit || "months"

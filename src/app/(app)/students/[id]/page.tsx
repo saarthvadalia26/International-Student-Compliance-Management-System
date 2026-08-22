@@ -54,6 +54,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { SearchableProgramSelector } from "@/components/ui/searchable-program-selector";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { RejectionDialog } from "@/components/ui/rejection-dialog";
@@ -134,6 +135,7 @@ export interface StudentProfile {
   nationalityName: string;
   programName: string;
   programCode: string;
+  programId?: string | null;
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   school: string;
@@ -389,6 +391,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
     return ExpiryReminderEngine.calculateStudentReminders({
       studentId,
+      expectedGraduationDate: student.expectedGraduation,
       passport: student.passport ? {
         number: student.passport.number,
         expiryDate: student.passport.expiryDate,
@@ -451,6 +454,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     registrationNumber: "",
     fullName: "",
     email: "",
+    programId: "",
     program: "",
     phoneHome: "",
     phoneLocal: "",
@@ -475,6 +479,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         registrationNumber: student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "",
         fullName: student.fullName,
         email: student.email,
+        programId: student.programId || "",
         program: student.programName || student.programCode || "",
         phoneHome: student.phoneHome,
         phoneLocal: student.phoneLocal || "",
@@ -565,6 +570,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         phoneLocal: editForm.phoneLocal?.trim() || undefined,
         permanentAddress: editForm.permanentAddress?.trim() || undefined,
         localAddress: editForm.localAddress?.trim() || undefined,
+        programId: editForm.programId?.trim() || undefined,
         programCode: editForm.program?.trim() || undefined,
         currentSemester: Number(editForm.currentSemester) || 1,
         academicStatus: editForm.academicStatus,
@@ -1162,6 +1168,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 verifiedBy={student.passport.verifiedBy}
                 rejectionReason={student.passport.rejectionReason}
                 daysToExpiry={student.daysToPassportExpiry}
+                expectedGraduationDate={student.expectedGraduation}
                 activeEarlyAuthorization={student.passport.activeEarlyAuthorization}
                 onUploadRenewalClick={() => openRenewalDialog("passport")}
                 onCorrectExpiryClick={() => openExpiryDialog("passport")}
@@ -1193,6 +1200,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 verifiedBy={student.visa.verifiedBy}
                 rejectionReason={student.visa.rejectionReason}
                 daysToExpiry={student.daysToVisaExpiry}
+                expectedGraduationDate={student.expectedGraduation}
                 activeEarlyAuthorization={student.visa.activeEarlyAuthorization}
                 onUploadRenewalClick={() => openRenewalDialog("visa")}
                 onCorrectExpiryClick={() => openExpiryDialog("visa")}
@@ -1224,6 +1232,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   verifiedBy={student.efrro.verifiedBy}
                   rejectionReason={student.efrro.rejectionReason}
                   daysToExpiry={student.daysToEfrroExpiry}
+                  expectedGraduationDate={student.expectedGraduation}
                   activeEarlyAuthorization={student.efrro.activeEarlyAuthorization}
                   onUploadRenewalClick={() => openRenewalDialog("efrro")}
                   onCorrectExpiryClick={() => openExpiryDialog("efrro")}
@@ -1883,18 +1892,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground" htmlFor="program">Academic Program</label>
-              <Select value={editForm.program} onValueChange={(val) => handleFormSelectChange("program", val || "")}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Select Program" />
-                </SelectTrigger>
-                <SelectContent>
-                  {academicPrograms.map((p) => (
-                    <SelectItem key={p.id} value={p.programName}>
-                      {p.programName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableProgramSelector
+                id="program"
+                programs={academicPrograms}
+                value={editForm.programId || editForm.program}
+                onChange={(p) => {
+                  setEditForm(prev => ({
+                    ...prev,
+                    programId: p?.id || "",
+                    program: p?.programName || ""
+                  }));
+                  setIsDirty(true);
+                }}
+                placeholder="Search and select academic program..."
+              />
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2146,21 +2157,18 @@ export default function StudentDetailsPage({ params }: PageProps) {
             {adjustmentForm.adjustmentType === "course_transfer" && (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground">New Academic Program *</label>
-                <Select 
-                  value={adjustmentForm.newProgramCode} 
-                  onValueChange={(val) => setAdjustmentForm(prev => ({ ...prev, newProgramCode: val || "" }))}
-                >
-                  <SelectTrigger className="h-9 text-xs rounded-xl">
-                    <SelectValue placeholder="Select Destination Program" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {academicPrograms.map((p) => (
-                      <SelectItem key={p.id} value={p.programCode || p.programName}>
-                        {p.programName} ({p.totalSemesters || 8} Semesters)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableProgramSelector
+                  id="adjustmentNewProgram"
+                  programs={academicPrograms}
+                  value={adjustmentForm.newProgramCode}
+                  onChange={(p) => {
+                    setAdjustmentForm(prev => ({
+                      ...prev,
+                      newProgramCode: p?.programCode || p?.programName || ""
+                    }));
+                  }}
+                  placeholder="Select destination program..."
+                />
               </div>
             )}
 

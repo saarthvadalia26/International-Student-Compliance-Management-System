@@ -17,6 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SystemInfrastructureDiagnostics, ServiceHealth } from "@/domain/system/types/diagnostics.types";
 import { fetchSystemDiagnosticsAction } from "@/app/(app)/dashboard/health/actions";
+import { getDisplayAppVersion } from "@/config/version";
 import { toast } from "sonner";
 
 export function PlatformInfrastructureTab() {
@@ -231,7 +232,7 @@ export function PlatformInfrastructureTab() {
               <div><strong>Region:</strong> <span className="font-mono text-foreground">{runtime.region}</span></div>
               <div><strong>Node.js Version:</strong> <span className="font-mono text-foreground">{runtime.nodeVersion}</span></div>
               <div><strong>Next.js Version:</strong> <span className="font-mono text-foreground">{runtime.nextVersion}</span></div>
-              <div><strong>App Version:</strong> <span className="font-mono text-foreground">v{runtime.appVersion}</span></div>
+              <div><strong>App Version:</strong> <span className="font-mono text-foreground">{getDisplayAppVersion(runtime.appVersion)}</span></div>
               <div><strong>Commit:</strong> <span className="font-mono text-foreground">{deployment.shortCommitSha || "Local"}</span></div>
               <div><strong>Branch:</strong> <span className="font-mono text-foreground">{deployment.commitRef || "main"}</span></div>
               <div><strong>Deployment:</strong> <span className="font-mono text-foreground">{deployment.deploymentId || "Local / Development"}</span></div>

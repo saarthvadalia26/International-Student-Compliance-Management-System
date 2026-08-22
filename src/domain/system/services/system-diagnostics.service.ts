@@ -1,6 +1,3 @@
-import { getAdminSupabase } from "@/lib/supabase/admin";
-import { StorageProviderFactory } from "@/domain/storage/factory";
-import { WhatsAppIntegrationService } from "@/domain/notifications/services/whatsapp-integration.service";
 import { 
   SystemInfrastructureDiagnostics, 
   RuntimeDiagnostics, 
@@ -10,6 +7,7 @@ import {
   StorageServiceHealth,
   SystemHealthApiResponse
 } from "../types/diagnostics.types";
+import { APP_VERSION } from "@/config/version";
 import pkg from "../../../../package.json";
 
 /**
@@ -59,7 +57,7 @@ export class SystemDiagnosticsService {
     const region = process.env.VERCEL_REGION?.trim() || "Not available";
     const nodeVersion = process.version;
     const nextVersion = pkg.dependencies?.next?.replace(/[\^~]/g, "") || "16.2.10";
-    const appVersion = pkg.version || "1.0.0";
+    const appVersion = APP_VERSION;
 
     return {
       platform,
@@ -113,6 +111,7 @@ export class SystemDiagnosticsService {
 
     const start = Date.now();
     try {
+      const { getAdminSupabase } = await import("@/lib/supabase/admin");
       const supabase = getAdminSupabase();
       // Perform a minimal, safe query
       const queryPromise = supabase.from("students").select("id", { count: "exact", head: true }).limit(1);
@@ -165,6 +164,7 @@ export class SystemDiagnosticsService {
     let approximateStorageBytes = 0;
 
     try {
+      const { getAdminSupabase } = await import("@/lib/supabase/admin");
       const supabase = getAdminSupabase();
       const [passports, visas, efrros] = await Promise.all([
         supabase.from("passport_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
@@ -178,6 +178,7 @@ export class SystemDiagnosticsService {
     }
 
     try {
+      const { StorageProviderFactory } = await import("@/domain/storage/factory");
       const provider = StorageProviderFactory.getProvider();
       const res = await provider.healthCheck();
 
@@ -217,6 +218,7 @@ export class SystemDiagnosticsService {
    */
   static async checkWhatsAppHealth(): Promise<ServiceHealth> {
     const checkedAt = new Date().toISOString();
+    const { WhatsAppIntegrationService } = await import("@/domain/notifications/services/whatsapp-integration.service");
     const integration = WhatsAppIntegrationService.getIntegrationStatus();
 
     if (!integration.isConfigured || integration.status === "NOT_CONFIGURED") {

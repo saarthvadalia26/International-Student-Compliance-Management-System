@@ -1,9 +1,11 @@
+import { getDisplayAppVersion } from "./version";
+
 export const Branding = {
   universityName: "National Forensic Sciences University",
   shortName: "NFSU",
   appName: "International Student Compliance Management System",
   appShortName: "ISCMS",
-  appVersion: "v1.0.0",
+  appVersion: getDisplayAppVersion(),
   supportEmail: "support@nfsu.edu.in",
   supportPhone: "+91-79-23977102",
   officialWebsite: "https://www.nfsu.ac.in",

@@ -431,14 +431,15 @@ export class BulkStudentImportService {
         });
         warningsBreakdown.otherWarnings++;
       } else {
-        // Match against known programs
+        // Match against known programs with canonical priority
         if (programs.length > 0) {
           const progLower = programRaw.toLowerCase();
+          const progCodeNorm = progLower.replace(/_/g, "-");
+
           matchedProgram = programs.find(p => 
-            p.programCode.toLowerCase() === progLower ||
+            (p.programCode && p.programCode.toLowerCase() === progLower) ||
             p.programName.toLowerCase() === progLower ||
-            p.programName.toLowerCase().includes(progLower) ||
-            progLower.includes(p.programCode.toLowerCase())
+            (p.programCode && p.programCode.toLowerCase().replace(/_/g, "-") === progCodeNorm)
           ) || null;
 
           if (!matchedProgram) {
@@ -447,7 +448,7 @@ export class BulkStudentImportService {
               fieldLabel: "Academic Program",
               value: programRaw,
               problem: `Academic program "${programRaw}" not found in configured university courses.`,
-              suggestion: "Ensure the program is registered in Settings > Academic Programs."
+              suggestion: "Ensure the program is registered in Settings > Academic Programs with complete course name."
             });
           }
         } else {
@@ -1059,7 +1060,19 @@ export class BulkStudentImportService {
 
         // D. Insert student_academic (with progression calculation if admission date exists)
         const progName = data.academic_program?.trim() || "";
-        const matchedP = programLookup.get(progName.toLowerCase());
+        const progLower = progName.toLowerCase();
+        const progCodeNorm = progLower.replace(/_/g, "-");
+        const matchedP = progName ? (
+          programLookup.get(progLower) || 
+          programLookup.get(progCodeNorm) ||
+          (Array.from(programLookup.values()) as any[]).find((p: any) => 
+            p.program_name?.toLowerCase() === progLower || 
+            (p.program_code && p.program_code.toLowerCase() === progLower) ||
+            (p.program_code && p.program_code.toLowerCase().replace(/_/g, "-") === progCodeNorm)
+          )
+        ) : null;
+
+        const programId = matchedP?.id || null;
         const programCode = matchedP?.program_code || progName || null;
 
         let currentSemester: number | null = null;
@@ -1089,6 +1102,7 @@ export class BulkStudentImportService {
           .from("student_academic")
           .insert({
             student_id: studentId,
+            program_id: programId,
             program_code: programCode,
             admission_date: data.admission_date || null,
             expected_graduation: data.expected_graduation || expectedGraduation,
