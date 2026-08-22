@@ -30,7 +30,12 @@ export class StudentPortalService {
   /**
    * Verifies the token and creates a Supabase Auth magic link to authenticate the student portal session
    */
-  async verifyAndGenerateLoginLink(rawToken: string, baseUrl: string): Promise<string> {
+  async verifyAndGenerateLoginLink(rawToken: string, baseUrl: string): Promise<{
+    actionLink: string;
+    tokenHash?: string;
+    email?: string;
+    targetPath: string;
+  }> {
     const hash = crypto.createHash("sha256").update(rawToken).digest("hex");
     const token = await this.portalRepo.verifyUploadToken(hash);
 
@@ -44,29 +49,23 @@ export class StudentPortalService {
       throw new Error("This secure renewal link has expired.");
     }
 
-    // Load student contact to resolve their email
     const profile = await this.portalRepo.getStudentProfile(token.studentId);
     if (!profile || !profile.email) {
-      throw new Error("Student email coordinate not found.");
+      throw new Error("Target student contact record not found.");
     }
 
+    // Bootstrap or sync user in Supabase Auth if needed
     const supabase = getAdminSupabase();
+    const { data: userList } = await supabase.auth.admin.listUsers();
+    const existingUser = userList?.users?.find(u => u.email?.toLowerCase() === profile.email.toLowerCase());
 
-    // Self-healing: Check if the user exists in auth.users, and create them if missing
-    const { data: userList, error: listError } = await supabase.auth.admin.listUsers();
-    if (listError) {
-      console.error("[STUDENT_PORTAL_SERVICE_ERROR] Failed to list auth users:", listError.message);
-    }
-    const existingUser = userList?.users.find(u => u.email?.toLowerCase() === profile.email.toLowerCase());
-    
     if (!existingUser) {
-      console.log(`[STUDENT_PORTAL_SERVICE] Bootstrap student auth user: ${profile.email}`);
       const { error: createError } = await supabase.auth.admin.createUser({
         email: profile.email,
         email_confirm: true,
         user_metadata: {
           role: "student",
-          student_id: token.studentId,
+          studentId: token.studentId,
           username: profile.fullName
         }
       });
@@ -76,7 +75,8 @@ export class StudentPortalService {
     }
 
     // Generate standard passwordless magiclink using Supabase Auth admin API
-    const targetRedirect = token.purpose === "UPLOAD" ? `${baseUrl}/student/efrro` : `${baseUrl}/student/dashboard`;
+    const targetPath = token.purpose === "UPLOAD" ? "/student/efrro" : "/student/dashboard";
+    const targetRedirect = `${baseUrl}${targetPath}`;
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: "magiclink",
       email: profile.email,
@@ -85,7 +85,7 @@ export class StudentPortalService {
       }
     });
 
-    if (linkError || !linkData?.properties?.action_link) {
+    if (linkError || !linkData?.properties) {
       throw new Error(`[SUPABASE_LINK_GENERATION_FAILED] ${linkError?.message || "Link blank"}`);
     }
 
@@ -101,7 +101,12 @@ export class StudentPortalService {
       { tokenId: token.id }
     );
 
-    return linkData.properties.action_link;
+    return {
+      actionLink: linkData.properties.action_link,
+      tokenHash: linkData.properties.hashed_token,
+      email: profile.email,
+      targetPath
+    };
   }
 
   /**

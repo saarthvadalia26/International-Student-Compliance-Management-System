@@ -98,11 +98,42 @@ export default function StudentLoginPage() {
         baseUrl
       );
 
-      if (res.success && res.magicLink) {
+      if (res.success) {
         toast.success("Authentication successful!", {
           description: `Welcome ${res.studentName || "Student"}. Connecting to student portal...`
         });
-        window.location.replace(res.magicLink);
+
+        // 1. Preferred & Bulletproof: Direct token verification on client without external redirects
+        if (res.tokenHash) {
+          try {
+            const { getBrowserSupabase } = await import("@/lib/supabase/browser");
+            const supabase = getBrowserSupabase();
+            const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
+              token_hash: res.tokenHash,
+              type: "magiclink"
+            });
+
+            if (!verifyErr && verifyData?.session) {
+              // Direct internal navigation on current origin
+              window.location.replace("/student/dashboard");
+              return;
+            }
+            if (verifyErr) {
+              console.warn("[STUDENT_CLIENT_AUTH_WARN] Direct token_hash verify failed, falling back:", verifyErr.message);
+            }
+          } catch (clientAuthErr) {
+            console.warn("[STUDENT_CLIENT_AUTH_WARN] Client verify exception:", clientAuthErr);
+          }
+        }
+
+        // 2. Fallback: Action Link
+        if (res.magicLink) {
+          window.location.replace(res.magicLink);
+          return;
+        }
+
+        // 3. Fallback: Relative internal navigation
+        window.location.replace("/student/dashboard");
       } else {
         setError(res.error || "Unable to locate an active student record. Please verify your credentials.");
         toast.error(res.error || "Authentication Failed");
@@ -230,11 +261,41 @@ export default function StudentLoginPage() {
         baseUrl
       );
 
-      if (res.success && res.magicLink) {
+      if (res.success) {
         toast.success("OTP Verified Successfully!", {
           description: "Establishing secure student session..."
         });
-        window.location.replace(res.magicLink);
+
+        // 1. Preferred & Bulletproof: Direct token verification on client without external redirects
+        if (res.tokenHash) {
+          try {
+            const { getBrowserSupabase } = await import("@/lib/supabase/browser");
+            const supabase = getBrowserSupabase();
+            const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
+              token_hash: res.tokenHash,
+              type: "magiclink"
+            });
+
+            if (!verifyErr && verifyData?.session) {
+              window.location.replace("/student/dashboard");
+              return;
+            }
+            if (verifyErr) {
+              console.warn("[STUDENT_OTP_VERIFY_WARN] Direct token_hash verify failed, falling back:", verifyErr.message);
+            }
+          } catch (clientAuthErr) {
+            console.warn("[STUDENT_OTP_VERIFY_WARN] Client verify exception:", clientAuthErr);
+          }
+        }
+
+        // 2. Fallback: Action Link
+        if (res.magicLink) {
+          window.location.replace(res.magicLink);
+          return;
+        }
+
+        // 3. Fallback: Relative internal navigation
+        window.location.replace("/student/dashboard");
       } else {
         setError(res.error || "Incorrect verification code. Please try again.");
         toast.error("Verification Failed");

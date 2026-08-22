@@ -185,6 +185,10 @@ export async function loginStudentByIdentifierAction(
   success: boolean;
   studentId?: string;
   studentName?: string;
+  registrationNumber?: string;
+  email?: string;
+  tokenHash?: string;
+  emailOtp?: string;
   magicLink?: string;
   error?: string;
 }> {
@@ -253,6 +257,8 @@ export async function verifyStudentWhatsAppOtpByIdentifierAction(
 ): Promise<{
   success: boolean;
   studentId?: string;
+  tokenHash?: string;
+  emailOtp?: string;
   magicLink?: string;
   error?: string;
 }> {
@@ -284,13 +290,15 @@ export async function verifyStudentWhatsAppOtpByIdentifierAction(
       }
     });
 
-    if (linkError || !linkData?.properties?.action_link) {
+    if (linkError || !linkData?.properties) {
       throw new Error(`Failed to establish session: ${linkError?.message}`);
     }
 
     return {
       success: true,
       studentId: verification.studentId,
+      tokenHash: linkData.properties.hashed_token,
+      emailOtp: linkData.properties.email_otp,
       magicLink: linkData.properties.action_link
     };
   } catch (err: unknown) {

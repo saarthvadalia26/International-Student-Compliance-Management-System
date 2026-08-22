@@ -31,10 +31,40 @@ export default function UploadTokenLandingPage({ params }: { params: Promise<Tok
 
         if (!mounted) return;
 
-        if (res.success && res.link) {
+        if (res.success) {
           setStatus("success");
-          // Redirect the browser to the action magiclink. This logs them in via Supabase Auth
-          window.location.replace(res.link);
+
+          // 1. Direct client token verification to avoid external 302 redirects
+          if (res.tokenHash) {
+            try {
+              const { getBrowserSupabase } = await import("@/lib/supabase/browser");
+              const supabase = getBrowserSupabase();
+              const { data: verifyData, error: verifyErr } = await supabase.auth.verifyOtp({
+                token_hash: res.tokenHash,
+                type: "magiclink"
+              });
+
+              if (!verifyErr && verifyData?.session) {
+                const target = res.targetPath || "/student/efrro";
+                window.location.replace(target);
+                return;
+              }
+              if (verifyErr) {
+                console.warn("[UPLOAD_TOKEN_CLIENT_WARN] Direct verify failed, falling back:", verifyErr.message);
+              }
+            } catch (clientErr) {
+              console.warn("[UPLOAD_TOKEN_CLIENT_WARN] Exception in direct verify:", clientErr);
+            }
+          }
+
+          // 2. Fallback: Action Link
+          if (res.link) {
+            window.location.replace(res.link);
+            return;
+          }
+
+          // 3. Fallback: Relative navigation
+          window.location.replace(res.targetPath || "/student/efrro");
         } else {
           setStatus("error");
           setErrorMsg(res.error || "Token validation failed.");

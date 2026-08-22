@@ -7,6 +7,8 @@ export interface StudentAuthResult {
   studentName?: string;
   registrationNumber?: string;
   email?: string;
+  tokenHash?: string;
+  emailOtp?: string;
   magicLink?: string;
   error?: string;
 }
@@ -272,6 +274,8 @@ export class StudentPortalAuthService {
       studentName: targetStudent.fullName,
       registrationNumber: targetStudent.registrationNumber || undefined,
       email: studentEmail,
+      tokenHash: linkData.properties.hashed_token,
+      emailOtp: linkData.properties.email_otp,
       magicLink: linkData.properties.action_link
     };
   }
