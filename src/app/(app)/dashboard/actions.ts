@@ -77,56 +77,109 @@ async function _fetchAnalyticsChartsInternal() {
     });
   }
 
+  // Build ISO country map
+  const countryCodeMap: Record<string, string> = {};
+  const { ISO_MASTER_COUNTRIES } = await import("@/domain/countries/iso-countries.data");
+  ISO_MASTER_COUNTRIES.forEach(c => {
+    countryCodeMap[c.isoAlpha2.toUpperCase()] = c.name;
+    countryCodeMap[c.isoAlpha3.toUpperCase()] = c.name;
+  });
+
+  // Build academic programs and school map
+  const { DEFAULT_FALLBACK_PROGRAMS } = await import("@/domain/academic-programs/academic-program.service");
+  const programMap: Record<string, { name: string; code?: string; school?: string }> = {};
+  DEFAULT_FALLBACK_PROGRAMS.forEach(p => {
+    const code = p.programCode || "";
+    const name = p.programName || "";
+    const school = p.schoolName || "General Academic Faculty";
+    if (code) programMap[code.toUpperCase()] = { name, code, school };
+    if (p.id) programMap[p.id.toUpperCase()] = { name, code, school };
+    if (name) programMap[name.toUpperCase()] = { name, code, school };
+  });
+
   // 1. Students by Country
   const countryCounts: Record<string, number> = {};
   (countriesRes.data || []).forEach(row => {
-    const name = refMap[row.nationality_code] || row.nationality_code || "Unknown";
+    const rawCode = (row.nationality_code || "").trim().toUpperCase();
+    const name = refMap[row.nationality_code] || countryCodeMap[rawCode] || row.nationality_code || "Unspecified";
     countryCounts[name] = (countryCounts[name] || 0) + 1;
   });
-  const studentsByCountry = Object.entries(countryCounts).map(([name, value]) => ({ name, value }));
+  const studentsByCountry = Object.entries(countryCounts)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
 
   // 2 & 3. Students by Course & School
-  const courseCounts: Record<string, number> = {};
+  const courseCounts: Record<string, { value: number; code?: string }> = {};
   const schoolCounts: Record<string, number> = {};
   (academicRes.data || []).forEach(row => {
-    const courseName = refMap[row.program_code] || row.program_code || "Unknown";
-    courseCounts[courseName] = (courseCounts[courseName] || 0) + 1;
+    const rawProg = (row.program_code || "").trim().toUpperCase();
+    const progInfo = programMap[rawProg];
+    const courseName = progInfo?.name || refMap[row.program_code] || row.program_code || "General Studies";
+    const schoolName = progInfo?.school || "General Academic Faculty";
 
-    // School grouping — uses course name as proxy (school field is not in current data model)
-    schoolCounts[courseName] = (schoolCounts[courseName] || 0) + 1;
+    if (!courseCounts[courseName]) {
+      courseCounts[courseName] = { value: 0, code: progInfo?.code };
+    }
+    courseCounts[courseName].value += 1;
+    schoolCounts[schoolName] = (schoolCounts[schoolName] || 0) + 1;
   });
-  const studentsByCourse = Object.entries(courseCounts).map(([name, value]) => ({ name, value }));
-  const studentsBySchool = Object.entries(schoolCounts).map(([name, value]) => ({ name, value }));
 
+  const studentsByCourse = Object.entries(courseCounts)
+    .map(([name, data]) => ({ name, value: data.value, secondaryLabel: data.code }))
+    .sort((a, b) => b.value - a.value);
+
+  const studentsBySchool = Object.entries(schoolCounts)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
 
   // 4. Monthly Admissions
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const admissionCounts: Record<string, number> = {};
+  const admissionCounts: Record<string, { count: number; timestamp: number }> = {};
   (academicRes.data || []).forEach(row => {
     if (row.admission_date) {
       const date = new Date(row.admission_date);
       const label = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-      admissionCounts[label] = (admissionCounts[label] || 0) + 1;
+      if (!admissionCounts[label]) {
+        admissionCounts[label] = { count: 0, timestamp: new Date(date.getFullYear(), date.getMonth(), 1).getTime() };
+      }
+      admissionCounts[label].count += 1;
     }
   });
-  const monthlyAdmissions = Object.entries(admissionCounts).map(([name, value]) => ({ name, value }));
+  const monthlyAdmissions = Object.entries(admissionCounts)
+    .sort((a, b) => a[1].timestamp - b[1].timestamp)
+    .map(([name, data]) => ({ name, value: data.count }));
 
   // 5. eFRRO Expiry Timeline
-  const expiryCounts: Record<string, number> = {};
+  const expiryCounts: Record<string, { count: number; timestamp: number }> = {};
   (snapshotRes.data || []).forEach(row => {
     if (row.efrro_expiry && row.efrro_status !== "COMPLIANT") {
       const date = new Date(row.efrro_expiry);
       const label = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-      expiryCounts[label] = (expiryCounts[label] || 0) + 1;
+      if (!expiryCounts[label]) {
+        expiryCounts[label] = { count: 0, timestamp: new Date(date.getFullYear(), date.getMonth(), 1).getTime() };
+      }
+      expiryCounts[label].count += 1;
     }
   });
-  const efrroExpiryTimeline = Object.entries(expiryCounts).map(([name, value]) => ({ name, value }));
+  const efrroExpiryTimeline = Object.entries(expiryCounts)
+    .sort((a, b) => a[1].timestamp - b[1].timestamp)
+    .map(([name, data]) => ({ name, value: data.count }));
 
   // 6. Compliance Distribution
+  const complianceStatusLabels: Record<string, string> = {
+    COMPLIANT: "Fully Compliant",
+    WARNING: "Expiring Soon (30 Days)",
+    CRITICAL: "Critical Expiry (15 Days)",
+    EXPIRED: "Expired Documents",
+    PENDING_REVIEW: "Pending Verification",
+    INCOMPLETE: "Incomplete Profile",
+    MISSING: "Documents Missing"
+  };
   const complianceCounts: Record<string, number> = {};
   (snapshotRes.data || []).forEach(row => {
-    const status = row.compliance_status || "MISSING";
-    complianceCounts[status] = (complianceCounts[status] || 0) + 1;
+    const rawStatus = (row.compliance_status || "MISSING").toUpperCase();
+    const label = complianceStatusLabels[rawStatus] || rawStatus;
+    complianceCounts[label] = (complianceCounts[label] || 0) + 1;
   });
   const complianceDistribution = Object.entries(complianceCounts).map(([name, value]) => ({ name, value }));
 
@@ -134,12 +187,12 @@ async function _fetchAnalyticsChartsInternal() {
   let sent = 0;
   let failed = 0;
   (notifRows || []).forEach(row => {
-    if (row.status === "sent") sent++;
-    else if (row.status === "failed") failed++;
+    if (row.status === "sent" || row.status === "delivered") sent++;
+    else if (row.status === "failed" || row.status === "bounced") failed++;
   });
   const notificationSuccessRate = [
-    { name: "Sent (Success)", value: sent },
-    { name: "Failed", value: failed }
+    { name: "Delivered Successfully", value: sent },
+    { name: "Delivery Failed", value: failed }
   ];
 
   return {

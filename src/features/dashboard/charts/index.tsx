@@ -21,42 +21,42 @@ import {
 import { Loader2, Inbox } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Standard NFSU Dashboard Color Palette
+// Export the percentage-based visualization components
+export * from "./percentage-charts";
+
+// Neutral Institutional Palette (Accents only, no color-coded meaning)
 export const CHART_COLORS = {
   primary: "oklch(0.205 0 0)",       // Sleek dark dominant
   primaryLight: "oklch(0.4 0 0)",
-  success: "oklch(0.627 0.265 150)", // Compliant green
-  warning: "oklch(0.795 0.184 65)",  // Expiring yellow/orange
-  danger: "oklch(0.577 0.245 27)",   // Expired/Failed red
   muted: "oklch(0.92 0 0)",          // Border/Grid lines
   text: "oklch(0.45 0 0)",           // Axis labels
   background: "oklch(0.99 0 0)",     // Tooltip bg
   series: [
     "oklch(0.205 0 0)",              // primary dark
-    "oklch(0.4 0.1 240)",            // Blue
-    "oklch(0.6 0.15 320)",           // Purple
-    "oklch(0.55 0.2 15)",            // Orange
-    "oklch(0.627 0.265 150)",        // Success Green
-    "oklch(0.795 0.184 65)",         // Yellow
-    "oklch(0.577 0.245 27)"          // Danger Red
+    "oklch(0.4 0 0)",                // medium dark
+    "oklch(0.55 0 0)",               // medium gray
+    "oklch(0.7 0 0)",                // light gray
+    "oklch(0.85 0 0)"                // subtle gray
   ]
 };
 
 interface ChartWrapperProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
   description?: string;
+  populationBadge?: string;
   isLoading?: boolean;
   isEmpty?: boolean;
   children: React.ReactNode;
 }
 
 /**
- * Standard Recharts Container Wrapper.
+ * Standard Dashboard Card & Visualization Container.
  * Provides loading states, empty placeholders, borders, title blocks, and accessibility.
  */
 export function ChartWrapper({
   title,
   description,
+  populationBadge,
   isLoading = false,
   isEmpty = false,
   children,
@@ -66,31 +66,38 @@ export function ChartWrapper({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-lg border border-border/50 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md",
+        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md",
         className
       )}
       {...props}
     >
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
-        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        </div>
+        {populationBadge && (
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40 shrink-0">
+            {populationBadge}
+          </span>
+        )}
       </div>
 
-      <div className="relative flex-1 min-h-[300px] flex items-center justify-center">
+      <div className="relative flex-1 min-h-[220px] flex items-center justify-center">
         {isLoading ? (
           <div className="flex flex-col items-center gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
-            <span className="text-xs text-muted-foreground font-small">Loading statistics...</span>
+            <span className="text-xs text-muted-foreground">Loading statistics...</span>
           </div>
         ) : isEmpty ? (
-          <div className="flex flex-col items-center gap-2 text-muted-foreground/60">
-            <Inbox className="h-8 w-8 stroke-[1.5]" />
-            <span className="text-xs font-small">No analytics data available</span>
+          <div className="flex flex-col items-center gap-2 text-muted-foreground/60 py-8">
+            <Inbox className="h-7 w-7 stroke-[1.5]" />
+            <span className="text-xs">No analytics data available</span>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300} aria-label={title}>
-            {children as React.ReactElement}
-          </ResponsiveContainer>
+          <div className="w-full flex-1 flex flex-col justify-center">
+            {children}
+          </div>
         )}
       </div>
     </div>
@@ -137,7 +144,7 @@ export function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
   );
 }
 
-// 1. Standard Bar Chart component
+// Legacy chart components preserved for compatibility with clean styling
 interface DataItem {
   name: string;
   value: number;
@@ -145,114 +152,119 @@ interface DataItem {
 
 export function StandardBarChart({ data, dataKey = "value" }: { data: DataItem[], dataKey?: string }) {
   return (
-    <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-      <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.muted} vertical={false} />
-      <XAxis 
-        dataKey="name" 
-        stroke={CHART_COLORS.text} 
-        fontSize={10} 
-        tickLine={false}
-        axisLine={false}
-      />
-      <YAxis 
-        stroke={CHART_COLORS.text} 
-        fontSize={10} 
-        tickLine={false}
-        axisLine={false}
-      />
-      <Tooltip content={<ChartTooltip />} cursor={{ fill: "oklch(0.96 0 0)" }} />
-      <Bar dataKey={dataKey} fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} barSize={32} />
-    </BarChart>
+    <ResponsiveContainer width="100%" height={260}>
+      <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.muted} vertical={false} />
+        <XAxis 
+          dataKey="name" 
+          stroke={CHART_COLORS.text} 
+          fontSize={10} 
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis 
+          stroke={CHART_COLORS.text} 
+          fontSize={10} 
+          tickLine={false}
+          axisLine={false}
+        />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: "oklch(0.96 0 0)" }} />
+        <Bar dataKey={dataKey} fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} barSize={28} />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 
-// 2. Standard Line Chart component
 export function StandardLineChart({ data }: { data: DataItem[] }) {
   return (
-    <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-      <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.muted} vertical={false} />
-      <XAxis 
-        dataKey="name" 
-        stroke={CHART_COLORS.text} 
-        fontSize={10} 
-        tickLine={false}
-        axisLine={false}
-      />
-      <YAxis 
-        stroke={CHART_COLORS.text} 
-        fontSize={10} 
-        tickLine={false}
-        axisLine={false}
-      />
-      <Tooltip content={<ChartTooltip />} />
-      <Line 
-        type="monotone" 
-        dataKey="value" 
-        stroke={CHART_COLORS.primary} 
-        strokeWidth={2.5} 
-        activeDot={{ r: 6 }} 
-        dot={{ strokeWidth: 2, r: 3 }}
-      />
-    </LineChart>
+    <ResponsiveContainer width="100%" height={260}>
+      <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.muted} vertical={false} />
+        <XAxis 
+          dataKey="name" 
+          stroke={CHART_COLORS.text} 
+          fontSize={10} 
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis 
+          stroke={CHART_COLORS.text} 
+          fontSize={10} 
+          tickLine={false}
+          axisLine={false}
+        />
+        <Tooltip content={<ChartTooltip />} />
+        <Line 
+          type="monotone" 
+          dataKey="value" 
+          stroke={CHART_COLORS.primary} 
+          strokeWidth={2.5} 
+          activeDot={{ r: 5 }} 
+          dot={{ strokeWidth: 2, r: 3 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
 
-// 3. Standard Area Chart component
 export function StandardAreaChart({ data }: { data: DataItem[] }) {
   return (
-    <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-      <defs>
-        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.2}/>
-          <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0.01}/>
-        </linearGradient>
-      </defs>
-      <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.muted} vertical={false} />
-      <XAxis 
-        dataKey="name" 
-        stroke={CHART_COLORS.text} 
-        fontSize={10} 
-        tickLine={false}
-        axisLine={false}
-      />
-      <YAxis 
-        stroke={CHART_COLORS.text} 
-        fontSize={10} 
-        tickLine={false}
-        axisLine={false}
-      />
-      <Tooltip content={<ChartTooltip />} />
-      <Area 
-        type="monotone" 
-        dataKey="value" 
-        stroke={CHART_COLORS.primary} 
-        fillOpacity={1} 
-        fill="url(#areaGradient)" 
-        strokeWidth={2}
-      />
-    </AreaChart>
+    <ResponsiveContainer width="100%" height={260}>
+      <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <defs>
+          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.2}/>
+            <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0.01}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.muted} vertical={false} />
+        <XAxis 
+          dataKey="name" 
+          stroke={CHART_COLORS.text} 
+          fontSize={10} 
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis 
+          stroke={CHART_COLORS.text} 
+          fontSize={10} 
+          tickLine={false}
+          axisLine={false}
+        />
+        <Tooltip content={<ChartTooltip />} />
+        <Area 
+          type="monotone" 
+          dataKey="value" 
+          stroke={CHART_COLORS.primary} 
+          fillOpacity={1} 
+          fill="url(#areaGradient)" 
+          strokeWidth={2}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 
-// 4. Standard Pie/Donut Chart component
 export function StandardDonutChart({ data }: { data: DataItem[] }) {
   return (
-    <PieChart>
-      <Tooltip content={<ChartTooltip />} />
-      <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
-      <Pie
-        data={data}
-        cx="50%"
-        cy="45%"
-        innerRadius={60}
-        outerRadius={80}
-        paddingAngle={4}
-        dataKey="value"
-      >
-        {data.map((entry, index) => (
-          <Cell key={`cell-${index}`} fill={CHART_COLORS.series[index % CHART_COLORS.series.length]} />
-        ))}
-      </Pie>
-    </PieChart>
+    <ResponsiveContainer width="100%" height={260}>
+      <PieChart>
+        <Tooltip content={<ChartTooltip />} />
+        <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+        <Pie
+          data={data}
+          cx="50%"
+          cy="45%"
+          innerRadius={55}
+          outerRadius={75}
+          paddingAngle={4}
+          dataKey="value"
+        >
+          {data.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={CHART_COLORS.series[index % CHART_COLORS.series.length]} />
+          ))}
+        </Pie>
+      </PieChart>
+    </ResponsiveContainer>
   );
 }
