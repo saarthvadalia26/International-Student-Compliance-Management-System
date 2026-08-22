@@ -89,11 +89,13 @@ export default function StudentLoginPage() {
     setIsLoading(true);
 
     try {
+      const baseUrl = typeof window !== "undefined" ? window.location.origin : null;
       const res = await loginStudentByIdentifierAction(
         identifier,
         turnstileToken,
         null,
-        navigator.userAgent
+        navigator.userAgent,
+        baseUrl
       );
 
       if (res.success && res.magicLink) {
@@ -219,11 +221,13 @@ export default function StudentLoginPage() {
     setIsVerifying(true);
 
     try {
+      const baseUrl = typeof window !== "undefined" ? window.location.origin : null;
       const res = await verifyStudentWhatsAppOtpByIdentifierAction(
         identifierInput.trim(),
         fullOtp,
         null,
-        navigator.userAgent
+        navigator.userAgent,
+        baseUrl
       );
 
       if (res.success && res.magicLink) {

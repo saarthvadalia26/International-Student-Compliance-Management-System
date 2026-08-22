@@ -1,4 +1,5 @@
 import { getAdminSupabase } from "@/lib/supabase/admin";
+import { getRequestOrigin } from "@/config/app-url";
 
 export interface StudentAuthResult {
   success: boolean;
@@ -228,7 +229,7 @@ export class StudentPortalAuthService {
     }
 
     // 6. Generate Passwordless Magiclink Session
-    const baseUrl = metadata?.baseUrl || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = await getRequestOrigin(metadata?.baseUrl);
     const targetRedirect = `${baseUrl}/student/dashboard`;
 
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({

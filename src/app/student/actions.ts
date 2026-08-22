@@ -5,6 +5,7 @@ import { StudentPortalService } from "@/domain/student-portal/services/student-p
 import { SupabaseStudentPortalRepository } from "@/domain/student-portal/repositories/student-portal.repository";
 import { StudentOtpService } from "@/domain/student-portal/services/student-otp.service";
 import { isStudentPortalTestMode } from "@/config/feature-flags";
+import { getRequestOrigin } from "@/config/app-url";
 import { 
   StudentPortalProfile, 
   StudentHistoryRow, 
@@ -178,7 +179,8 @@ export async function loginStudentByIdentifierAction(
   rawIdentifier: string,
   turnstileToken: string | null,
   ipAddress?: string | null,
-  userAgent?: string | null
+  userAgent?: string | null,
+  baseUrl?: string | null
 ): Promise<{
   success: boolean;
   studentId?: string;
@@ -195,11 +197,12 @@ export async function loginStudentByIdentifierAction(
       return { success: false, error: "Please enter your Enrollment Number or Passport Number." };
     }
 
+    const resolvedBaseUrl = await getRequestOrigin(baseUrl);
     const { StudentPortalAuthService } = await import("@/domain/student-portal/services/student-portal-auth.service");
     return await StudentPortalAuthService.authenticateByIdentifier(rawIdentifier.trim(), {
       ipAddress,
       userAgent,
-      baseUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+      baseUrl: resolvedBaseUrl
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -245,7 +248,8 @@ export async function verifyStudentWhatsAppOtpByIdentifierAction(
   rawIdentifier: string,
   otpCode: string,
   ipAddress?: string | null,
-  userAgent?: string | null
+  userAgent?: string | null,
+  baseUrl?: string | null
 ): Promise<{
   success: boolean;
   studentId?: string;
@@ -268,10 +272,16 @@ export async function verifyStudentWhatsAppOtpByIdentifierAction(
       return { success: false, error: verification.error || "Invalid or expired verification code." };
     }
 
+    const resolvedBaseUrl = await getRequestOrigin(baseUrl);
+    const targetRedirect = `${resolvedBaseUrl}/student/dashboard`;
+
     const adminSupabase = (await import("@/lib/supabase/admin")).getAdminSupabase();
     const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
       type: "magiclink",
-      email: verification.studentEmail
+      email: verification.studentEmail,
+      options: {
+        redirectTo: targetRedirect
+      }
     });
 
     if (linkError || !linkData?.properties?.action_link) {
