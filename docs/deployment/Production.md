@@ -1,28 +1,35 @@
-# Production
+# Production Deployment & Verification Protocol
 
-- **Status**: Planned
-- **Owner**: System Compliance Team
-- **Purpose**: Define documentation structure and details for Production.
-- **Scope**: Guidelines, schemas, and configurations related to Production in the ISCMS.
-- **Dependencies**: None
-- **Related Documents**: [README.md](file:///d:/Saarth/Saarth/International Student Compliance Management System/docs/deployment/README.md)
+- **Status**: Approved
+- **Release Baseline**: v0.2.0
+- **Canonical Release Branch**: `main`
 
-## Table of Contents
-1. [Overview](#overview)
-2. [Details](#details)
-3. [Future Updates](#future-updates)
-4. [Revision History](#revision-history)
+---
 
-## Overview
-This document represents the planned architectural, business, or operational logic for Production.
+## 1. Production Release Checklist
 
-## Details
-Details are currently under review by stakeholders. Final implementation rules, specifications, and configurations will be updated systematically during development.
+Before releasing any version to Production:
+1. [x] **Lint & Types**: `npm run lint` (0 errors), `npx tsc --noEmit` (0 errors).
+2. [x] **Automated Tests**: All unit, integration, and domain test suites pass 100%.
+3. [x] **Build Verification**: `npm run build` succeeds generating all static and dynamic routes.
+4. [x] **Single Source of Truth Version**: Root `package.json` version matches target release (e.g. `0.2.0`).
+5. [x] **Zero Localhost Leakage**: No hardcoded localhost fallback used in production auth redirects.
+6. [x] **Git Merge to `main`**: Branch merged into `main` and tagged with `v0.X.X`.
 
-## Future Updates
-- Detailed logic to be defined in upcoming sprints.
+---
 
-## Revision History
-| Version | Date | Author | Description |
-|---|---|---|---|
-| 0.1 | 2026-07-07 | Antigravity | Initial Template Creation |
+## 2. Post-Deployment Production Verification Steps
+
+Once Vercel finishes the production deployment on `main`:
+1. **Public Landing / Staff Login**:
+   - Navigate to `/login`.
+   - Verify university branding, secure inputs, and successful authentication.
+2. **Student Portal Login**:
+   - Navigate to `/student/login`.
+   - Verify "Continue to Portal" button redirects without navigating to localhost.
+3. **Workspace Dashboard & Navigation**:
+   - Verify `/dashboard` metrics, student list, and quick actions.
+4. **System Health & Infrastructure Diagnostics**:
+   - Navigate to `/settings?tab=system` or `/dashboard/health`.
+   - Verify `App Version: v0.2.0`.
+   - Verify Supabase PostgreSQL latency, Cloudflare R2 bucket connection, and runtime environment.
