@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { UserCheck, MessageSquare, AlertCircle, Loader2, ArrowLeft, RefreshCw, CheckCircle2 } from "lucide-react";
+import { UserCheck, MessageSquare, AlertCircle, Loader2, ArrowLeft, RefreshCw, CheckCircle2, ArrowRight, ShieldCheck } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { TurnstileStub } from "@/components/ui/turnstile-stub";
 import { Branding } from "@/config/branding";
-import { isStudentPortalTestMode } from "@/config/feature-flags";
-import { requestStudentWhatsAppOtpByIdentifierAction, verifyStudentWhatsAppOtpByIdentifierAction } from "../../actions";
+import { isStudentPortalTestMode, isStudentPortalOtpEnabled } from "@/config/feature-flags";
+import { 
+  loginStudentByIdentifierAction, 
+  requestStudentWhatsAppOtpByIdentifierAction, 
+  verifyStudentWhatsAppOtpByIdentifierAction 
+} from "../../actions";
 
 export default function StudentLoginPage() {
   const router = useRouter();
+  const otpModeActive = isStudentPortalOtpEnabled();
 
   // Redirect immediately if test mode is active
   React.useEffect(() => {
@@ -23,11 +28,11 @@ export default function StudentLoginPage() {
     }
   }, [router]);
 
-  // Step 1 vs Step 2 state
+  // Step 1 vs Step 2 state (for OTP mode)
   const [step, setStep] = React.useState<"identifier_input" | "otp_verify">("identifier_input");
   
-  // Registration Number & OTP inputs
-  const [registrationNumber, setRegistrationNumber] = React.useState("");
+  // Registration / Passport Number & OTP inputs
+  const [identifierInput, setIdentifierInput] = React.useState("");
   const [confirmedRegNo, setConfirmedRegNo] = React.useState("");
   const [maskedPhone, setMaskedPhone] = React.useState("");
   const [otpDigits, setOtpDigits] = React.useState<string[]>(["", "", "", "", "", ""]);
@@ -63,15 +68,61 @@ export default function StudentLoginPage() {
     router.prefetch("/student/dashboard");
   }, [router]);
 
-  // Request WhatsApp OTP by Registration / Enrollment Number
+  // Direct Identifier Login (Enrollment Number OR Passport Number)
+  const handleDirectIdentifierLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isLoading) return;
+
+    setError(null);
+    const identifier = identifierInput.trim();
+
+    if (!identifier || identifier.length < 2) {
+      setError("Please enter your University Enrollment Number or Passport Number.");
+      return;
+    }
+
+    if (!turnstileToken && isTurnstileConfigured) {
+      setError("Please complete the security check.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const res = await loginStudentByIdentifierAction(
+        identifier,
+        turnstileToken,
+        null,
+        navigator.userAgent
+      );
+
+      if (res.success && res.magicLink) {
+        toast.success("Authentication successful!", {
+          description: `Welcome ${res.studentName || "Student"}. Connecting to student portal...`
+        });
+        window.location.replace(res.magicLink);
+      } else {
+        setError(res.error || "Unable to locate an active student record. Please verify your credentials.");
+        toast.error(res.error || "Authentication Failed");
+        setIsLoading(false);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg || "Failed to process student authentication.");
+      toast.error("Network request failed.");
+      setIsLoading(false);
+    }
+  };
+
+  // Request WhatsApp OTP by Registration / Enrollment Number (Active only when OTP is enabled)
   const handleRequestOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isLoading) return;
 
     setError(null);
-    const identifier = registrationNumber.trim();
+    const identifier = identifierInput.trim();
 
-    if (!identifier || identifier.length < 3) {
+    if (!identifier || identifier.length < 2) {
       setError("Please enter a valid Registration or Enrollment Number.");
       return;
     }
@@ -152,9 +203,9 @@ export default function StudentLoginPage() {
     }
   };
 
-  // Verify OTP
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  // Verify OTP submission
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (isVerifying) return;
 
     setError(null);
@@ -169,7 +220,7 @@ export default function StudentLoginPage() {
 
     try {
       const res = await verifyStudentWhatsAppOtpByIdentifierAction(
-        registrationNumber.trim(),
+        identifierInput.trim(),
         fullOtp,
         null,
         navigator.userAgent
@@ -179,8 +230,6 @@ export default function StudentLoginPage() {
         toast.success("OTP Verified Successfully!", {
           description: "Establishing secure student session..."
         });
-
-        // Execute session magiclink establishing browser session
         window.location.replace(res.magicLink);
       } else {
         setError(res.error || "Incorrect verification code. Please try again.");
@@ -207,15 +256,18 @@ export default function StudentLoginPage() {
       </div>
 
       <Card className="border border-border/80 bg-card/90 backdrop-blur-md shadow-xl rounded-2xl overflow-hidden">
-        {step === "identifier_input" ? (
+        {!otpModeActive ? (
+          /* =========================================================================
+             DIRECT IDENTIFIER LOGIN (v0.2.0 Active Mode: Enrollment No. or Passport No.)
+             ========================================================================= */
           <>
             <CardHeader className="space-y-1">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                Student Login
+                Student Portal Login
               </CardTitle>
               <CardDescription className="text-xs text-muted-foreground leading-relaxed">
-                Enter your NFSU Registration or Enrollment Number to receive a secure one-time verification code via WhatsApp.
+                Login with your University Enrollment Number or Passport Number.
               </CardDescription>
             </CardHeader>
 
@@ -228,24 +280,88 @@ export default function StudentLoginPage() {
                 </Alert>
               )}
 
+              <form onSubmit={handleDirectIdentifierLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="student-identifier" className="text-xs font-semibold text-foreground">
+                    Enrollment Number or Passport Number <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    id="student-identifier"
+                    type="text"
+                    placeholder="e.g. NFSU/2026/001 or UK78945612"
+                    value={identifierInput}
+                    onChange={(e) => setIdentifierInput(e.target.value)}
+                    disabled={isLoading}
+                    autoComplete="username"
+                    autoFocus
+                    className="h-10 text-xs rounded-xl font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Enter the enrollment number issued by the university or your active passport number.
+                  </p>
+                </div>
+
+                <div className="pt-1">
+                  <TurnstileStub onVerify={(token) => setTurnstileToken(token)} />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading || !identifierInput.trim() || !turnstileToken}
+                  className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                >
+                  {isLoading ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Verifying Credentials...</>
+                  ) : (
+                    <><ArrowRight className="h-4 w-4" /> Continue to Portal</>
+                  )}
+                </Button>
+              </form>
+
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/30 border border-border/40 text-[10px] text-muted-foreground">
+                <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>Secure university compliance portal with encrypted session authentication.</span>
+              </div>
+            </CardContent>
+          </>
+        ) : step === "identifier_input" ? (
+          /* =========================================================================
+             OTP MODE - STEP 1 (Identifier Entry for WhatsApp Code)
+             ========================================================================= */
+          <>
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                Student Login
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground leading-relaxed">
+                Enter your Registration or Enrollment Number to receive a verification code via WhatsApp.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive" className="py-2.5 px-3.5 text-xs rounded-xl">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle className="text-xs font-semibold">Verification Error</AlertTitle>
+                  <AlertDescription className="text-[11px] mt-0.5">{error}</AlertDescription>
+                </Alert>
+              )}
+
               <form onSubmit={handleRequestOtp} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="registration-input" className="text-xs font-medium text-foreground block">
-                    Registration / Enrollment Number
+                  <label htmlFor="otp-registration-number" className="text-xs font-semibold text-foreground">
+                    Enrollment / Registration Number <span className="text-rose-500">*</span>
                   </label>
-                  <div className="relative">
-                    <UserCheck className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="registration-input"
-                      type="text"
-                      placeholder="e.g. NFSU/2026/INT/1001"
-                      value={registrationNumber}
-                      onChange={(e) => setRegistrationNumber(e.target.value)}
-                      disabled={isLoading}
-                      className="pl-9 text-xs h-10 rounded-xl font-mono uppercase"
-                      autoFocus
-                    />
-                  </div>
+                  <Input
+                    id="otp-registration-number"
+                    type="text"
+                    placeholder="e.g. NFSU/2026/001"
+                    value={identifierInput}
+                    onChange={(e) => setIdentifierInput(e.target.value)}
+                    disabled={isLoading}
+                    className="h-10 text-xs rounded-xl font-mono uppercase"
+                  />
                   <p className="text-[11px] text-muted-foreground">
                     Your unique university identity assigned during admission
                   </p>
@@ -257,7 +373,7 @@ export default function StudentLoginPage() {
 
                 <Button
                   type="submit"
-                  disabled={isLoading || !registrationNumber.trim() || !turnstileToken}
+                  disabled={isLoading || !identifierInput.trim() || !turnstileToken}
                   className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
                   {isLoading ? (
@@ -270,6 +386,9 @@ export default function StudentLoginPage() {
             </CardContent>
           </>
         ) : (
+          /* =========================================================================
+             OTP MODE - STEP 2 (6-Digit OTP Verification)
+             ========================================================================= */
           <>
             <CardHeader className="space-y-1">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -297,7 +416,6 @@ export default function StudentLoginPage() {
               )}
 
               <form onSubmit={handleVerifyOtp} className="space-y-5">
-                {/* 6-Digit PIN Inputs */}
                 <div className="flex justify-center gap-2">
                   {otpDigits.map((digit, idx) => (
                     <input

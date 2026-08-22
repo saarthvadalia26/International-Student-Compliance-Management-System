@@ -1043,7 +1043,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         </div>
 
         {/* Global Action buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
           <Button 
             variant="outline" 
             size="sm" 
@@ -1274,56 +1274,56 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </CardHeader>
               <CardContent className="p-6 space-y-6">
                 {/* Academic Metrics Grid */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-xs">
-                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 text-xs w-full min-w-0">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Enrollment Number</span>
-                    <span className="font-semibold text-foreground block font-mono">
+                    <span className="font-semibold text-foreground block font-mono break-all">
                       {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "Not provided"}
                     </span>
                   </div>
 
-                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Registered School</span>
-                    <span className="font-semibold text-foreground block">{student.school}</span>
+                    <span className="font-semibold text-foreground block break-words">{student.school}</span>
                   </div>
 
-                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Program Curriculum</span>
-                    <span className="font-semibold text-foreground block">{student.programName}</span>
+                    <span className="font-semibold text-foreground block break-words">{student.programName}</span>
                     <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
                       <span className="text-[10px] font-mono text-muted-foreground block">Code: {student.programCode}</span>
                       {student.academicLevelLabel && (
-                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium">
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium shrink-0">
                           {student.academicLevelLabel}
                         </Badge>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Curriculum Structure</span>
-                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground flex-wrap">
                       <Layers className="h-3.5 w-3.5 text-primary shrink-0" />
                       <span>{student.totalSemesters || 8} Semesters</span>
                       <span className="text-muted-foreground text-[11px] font-normal">({student.semesterDuration || 6} {student.semesterDurationUnit || "mo"}/sem)</span>
                     </div>
                   </div>
 
-                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Admission Date</span>
-                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground flex-wrap">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       <span>{AcademicProgressionEngine.formatDisplayDate(student.admissionDate)}</span>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                  <div className="space-y-1.5 p-3 rounded-xl bg-primary/5 border border-primary/20 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Current Semester</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-foreground font-mono">
                         Semester {student.currentSemester} of {student.totalSemesters || 8}
                       </span>
-                      <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/30 flex items-center gap-1 px-1.5 py-0.5">
+                      <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/30 flex items-center gap-1 px-1.5 py-0.5 shrink-0">
                         <Sparkles className="h-2.5 w-2.5" />
                         Automatically calculated
                       </Badge>
@@ -1333,10 +1333,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     </p>
                   </div>
 
-                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Expected Graduation</span>
-                    <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground flex-wrap">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       <span>{AcademicProgressionEngine.formatDisplayDate(student.expectedGraduation)}</span>
                     </div>
                   </div>
@@ -1897,7 +1897,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </Select>
             </div>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground" htmlFor="status">Enrollment Status</label>
                 <Select value={editForm.status} onValueChange={(val) => handleFormSelectChange("status", val || "active")}>
@@ -1935,7 +1935,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
             <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-1.5">
               <span className="text-[11px] text-muted-foreground block font-medium">Current Semester Progression</span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-foreground font-mono">Semester {student?.currentSemester || 1} of {student?.totalSemesters || 8}</span>
                 <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/20 flex items-center gap-1">
                   <Sparkles className="h-2.5 w-2.5" />
@@ -1947,7 +1947,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">Home Phone</label>
                 <Input id="phoneHome" value={editForm.phoneHome} onChange={handleFormChange} className="h-9 text-sm" />
@@ -1997,7 +1997,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="embassyCity">City</label>
                   <Input 
@@ -2020,7 +2020,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="embassyPhone">Consular Phone Number</label>
                   <Input 
@@ -2032,13 +2032,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground" htmlFor="embassyEmail">Consular Email Address</label>
+                  <label className="text-xs font-medium text-foreground" htmlFor="embassyEmail">Consular Email</label>
                   <Input 
                     id="embassyEmail" 
                     type="email" 
                     value={editForm.embassyEmail} 
                     onChange={handleFormChange} 
-                    placeholder="e.g. visa@newd.diplo.de"
+                    placeholder="e.g. consular@embassy.de"
                     className="h-9 text-sm" 
                   />
                 </div>
@@ -2111,7 +2111,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground" htmlFor="adjustmentEffectiveDate">
                   Effective Date *

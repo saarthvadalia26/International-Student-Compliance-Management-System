@@ -171,6 +171,44 @@ async function verifyUserAndGetStudentId(jwt: string): Promise<string> {
 }
 
 /**
+ * Server action: Login student directly using University Enrollment Number or Passport Number
+ * Used for v0.2.0 when OTP verification is disabled.
+ */
+export async function loginStudentByIdentifierAction(
+  rawIdentifier: string,
+  turnstileToken: string | null,
+  ipAddress?: string | null,
+  userAgent?: string | null
+): Promise<{
+  success: boolean;
+  studentId?: string;
+  studentName?: string;
+  magicLink?: string;
+  error?: string;
+}> {
+  try {
+    if (!turnstileToken && !isStudentPortalTestMode() && Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim())) {
+      return { success: false, error: "Please complete the security check." };
+    }
+
+    if (!rawIdentifier || rawIdentifier.trim().length < 2) {
+      return { success: false, error: "Please enter your Enrollment Number or Passport Number." };
+    }
+
+    const { StudentPortalAuthService } = await import("@/domain/student-portal/services/student-portal-auth.service");
+    return await StudentPortalAuthService.authenticateByIdentifier(rawIdentifier.trim(), {
+      ipAddress,
+      userAgent,
+      baseUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[STUDENT_IDENTIFIER_LOGIN_ERROR]", msg);
+    return { success: false, error: "Unable to authenticate. Please check your credentials or try again later." };
+  }
+}
+
+/**
  * Server action: Request a 6-digit WhatsApp OTP by Registration / Enrollment Number
  */
 export async function requestStudentWhatsAppOtpByIdentifierAction(

@@ -114,13 +114,13 @@ export default function StudentDashboardPage() {
           </div>
 
           {/* CENTER SECTION: Name + Enrollment + 3 Info Cards */}
-          <div className="flex-1 space-y-4 text-center md:text-left w-full">
+          <div className="flex-1 space-y-4 text-center md:text-left w-full min-w-0">
             {/* Student Name & Enrollment */}
-            <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+            <div className="space-y-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground break-words">
                 {profile.fullName}
               </h1>
-              <p className="text-xs sm:text-sm font-mono text-muted-foreground font-medium">
+              <p className="text-xs sm:text-sm font-mono text-muted-foreground font-medium break-all">
                 Enrollment No: <span className="font-semibold text-foreground">{profile.registrationNumber}</span>
               </p>
             </div>

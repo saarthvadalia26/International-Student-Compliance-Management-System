@@ -455,7 +455,7 @@ export default function BulkStudentImportPage() {
       {activeTab === "wizard" && (
         <div className="space-y-6">
           {/* Stepper Header */}
-          <div className="grid grid-cols-5 gap-2 p-3 bg-muted/40 rounded-xl border border-border/50 text-xs font-medium text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 sm:gap-2 p-2.5 sm:p-3 bg-muted/40 rounded-xl border border-border/50 text-xs font-medium text-center">
             <div className={`p-2 rounded-lg transition-all ${step === 1 ? "bg-primary text-primary-foreground font-bold shadow-sm" : step > 1 ? "text-primary font-semibold" : "text-muted-foreground"}`}>
               1. Upload File
             </div>

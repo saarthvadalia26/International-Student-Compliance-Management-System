@@ -242,7 +242,7 @@ async function runTestSuite() {
   assert(report7.errorCount === 0, "Missing enrollment number does NOT trigger fatal error");
   assert(report7.rows[0].status === "valid", "Row status is 'valid'");
   assert(
-    report7.rows[0].warnings.some(w => w.field === "registration_number" && w.impact.includes("Enrollment number is not provided yet")),
+    report7.rows[0].warnings.some(w => w.field === "registration_number" && (w.impact?.includes("Enrollment number is not provided yet") || w.warning.includes("Enrollment number is not provided yet"))),
     "Clear warning: 'Enrollment number is not provided yet. Record will be created without enrollment number and can be assigned later.'"
   );
 

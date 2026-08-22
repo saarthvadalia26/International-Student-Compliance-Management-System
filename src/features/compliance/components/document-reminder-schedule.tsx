@@ -281,6 +281,33 @@ export function DocumentReminderSchedule({
                 </div>
               </div>
 
+              {/* Inactive Schedule Callout when Document Expires After Graduation */}
+              {currentDoc.isAfterGraduation && (
+                <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2.5 rounded-md border text-[11px] w-full min-w-0 box-border ${activeDocTheme.bannerClass}`}>
+                  <div className="flex items-start sm:items-center gap-1.5 min-w-0 flex-1">
+                    <Info className={`h-3.5 w-3.5 shrink-0 mt-0.5 sm:mt-0 ${activeDocTheme.bannerIconClass}`} />
+                    <span className="leading-snug break-words">
+                      <strong>Reminder schedule inactive:</strong> Document expires after expected graduation ({currentDoc.graduationDateFormatted || currentDoc.graduationDate}). No expiry reminders are required for this document.
+                    </span>
+                  </div>
+                  <Badge variant="outline" className={`text-[9px] font-semibold shrink-0 self-start sm:self-auto ${activeDocTheme.badgeClass}`}>
+                    Inactive
+                  </Badge>
+                </div>
+              )}
+
+              {/* Missing Graduation Date Notice */}
+              {currentDoc.graduationBoundaryStatus === "MISSING_GRADUATION_DATE" && !currentDoc.isExpired && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 sm:px-3 rounded-md bg-muted/20 border border-border/40 text-[10px] text-muted-foreground w-full min-w-0 box-border">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <Info className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <span className="leading-tight break-words">
+                      Student graduation date has not been recorded. Graduation-boundary rule cannot be evaluated; reminders are active on standard document expiry.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Expired State Warning Callout */}
               {currentDoc.isExpired && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2 rounded-md bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-700 dark:text-rose-300 w-full min-w-0 box-border">

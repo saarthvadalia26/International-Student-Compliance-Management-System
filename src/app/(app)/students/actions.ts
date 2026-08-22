@@ -1640,6 +1640,7 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
         status,
         student_personal(full_name, preferred_language),
         student_contact(email, phone_home, phone_local),
+        student_academic(program_code, expected_graduation),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
         passport_versions(id, is_active, document_number, expiry_date, verification_status, file_path, deleted_at),
         visa_versions(id, is_active, document_number, expiry_date, verification_status, file_path, deleted_at),
@@ -1692,6 +1693,7 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
     const hasValidFile = (fp?: string | null) => Boolean(fp && fp.trim() !== "" && fp !== "pending_upload" && fp !== "null");
 
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
+    const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
 
     const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
     const activeVisa = (student.visa_versions || []).find((v: { is_active?: boolean; deleted_at?: string | null }) => v.is_active && !v.deleted_at);
@@ -1705,11 +1707,13 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
     const passportExpiry = activePassport?.expiry_date || snapshot?.passport_expiry || null;
     const visaExpiry = activeVisa?.expiry_date || snapshot?.visa_expiry || null;
     const efrroExpiry = activeEfrro?.expiry_date || snapshot?.efrro_expiry || null;
+    const expectedGraduation = academic?.expected_graduation || null;
 
     const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
 
     const calculatedSchedule = ExpiryReminderEngine.calculateStudentReminders({
       studentId,
+      expectedGraduationDate: expectedGraduation,
       passport: {
         number: activePassport?.document_number || snapshot?.passport_number || "",
         expiryDate: passportExpiry,
@@ -1800,6 +1804,7 @@ export async function getReminderDispatchPreviewAction(
         status,
         student_personal(full_name, preferred_language),
         student_contact(email, phone_home, phone_local),
+        student_academic(program_code, expected_graduation),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
         passport_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
         visa_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
@@ -1817,6 +1822,7 @@ export async function getReminderDispatchPreviewAction(
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
     const contact = Array.isArray(student.student_contact) ? student.student_contact[0] : student.student_contact;
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
+    const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
 
     const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
     const activeVisa = (student.visa_versions || []).find((v: { is_active?: boolean; deleted_at?: string | null }) => v.is_active && !v.deleted_at);
@@ -1849,6 +1855,9 @@ export async function getReminderDispatchPreviewAction(
     const cleanPhone = (rawPhone || "").replace(/[^\d+]/g, "").trim();
     const hasValidPhone = Boolean(cleanPhone && cleanPhone.length >= 7);
 
+    const expectedGraduation = academic?.expected_graduation ? academic.expected_graduation.split("T")[0].trim() : null;
+    const isAfterGraduation = Boolean(expectedGraduation && cleanExpiry > expectedGraduation);
+
     const { WhatsAppIntegrationService } = await import("@/domain/notifications/services/whatsapp-integration.service");
     const integration = WhatsAppIntegrationService.getIntegrationStatus();
 
@@ -1876,6 +1885,10 @@ export async function getReminderDispatchPreviewAction(
       isDispatchable = false;
       blockedReason = "already_dispatched";
       blockedMessage = "This reminder has already been dispatched.";
+    } else if (isAfterGraduation) {
+      isDispatchable = false;
+      blockedReason = "after_graduation";
+      blockedMessage = `This ${docTitle} expires after the student's expected graduation date (${expectedGraduation}). No expiry reminders are eligible for dispatch.`;
     } else if (!hasValidPhone) {
       isDispatchable = false;
       blockedReason = "missing_phone";
@@ -1960,6 +1973,7 @@ export async function triggerReminderDispatchAction(
         status,
         student_personal(full_name, preferred_language),
         student_contact(email, phone_home, phone_local),
+        student_academic(program_code, expected_graduation),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
         passport_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
         visa_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
@@ -1982,6 +1996,7 @@ export async function triggerReminderDispatchAction(
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
     const contact = Array.isArray(student.student_contact) ? student.student_contact[0] : student.student_contact;
     const snapshot = Array.isArray(student.student_snapshot) ? student.student_snapshot[0] : student.student_snapshot;
+    const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
 
     const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
     const activeVisa = (student.visa_versions || []).find((v: { is_active?: boolean; deleted_at?: string | null }) => v.is_active && !v.deleted_at);
@@ -2011,6 +2026,17 @@ export async function triggerReminderDispatchAction(
     }
 
     const cleanExpiry = expiryDate.split("T")[0].trim();
+    const expectedGraduation = academic?.expected_graduation ? academic.expected_graduation.split("T")[0].trim() : null;
+
+    // Enforce graduation date boundary
+    if (expectedGraduation && cleanExpiry > expectedGraduation) {
+      return {
+        success: false,
+        status: "BLOCKED",
+        reason: "after_graduation",
+        error: `Cannot dispatch reminder: ${docTitle} expires after student expected graduation date (${expectedGraduation}).`
+      };
+    }
 
     // 2. Validate student contact information
     const rawPhone = contact?.phone_local || contact?.phone_home || null;

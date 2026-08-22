@@ -313,7 +313,7 @@ async function runTestSuite() {
 
   const regWarning = valNoReg.rows[0].warnings.find(w => w.field === "registration_number");
   assert(
-    !!regWarning && regWarning.impact.includes("Enrollment number is not provided yet"),
+    !!regWarning && (regWarning.impact?.includes("Enrollment number is not provided yet") || regWarning.warning.includes("Enrollment number is not provided yet")),
     "Warning details correctly describe pending enrollment number"
   );
 
@@ -340,7 +340,7 @@ async function runTestSuite() {
   );
   const progWarning = valNoProg.rows[0].warnings.find(w => w.field === "academic_program");
   assert(
-    !!progWarning && progWarning.impact.includes("Academic program / course is not assigned yet"),
+    !!progWarning && (progWarning.impact?.includes("Academic program / course is not assigned yet") || progWarning.warning.includes("Academic program / course is not assigned yet")),
     "Warning details correctly describe pending academic program"
   );
 

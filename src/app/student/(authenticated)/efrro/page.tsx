@@ -316,14 +316,14 @@ function DocumentCentreContent() {
       </div>
 
       {/* Document Type Selector Tabs */}
-      <div className="flex items-center gap-2 border-b border-border/60 pb-3">
+      <div className="flex items-center gap-2 border-b border-border/60 pb-3 overflow-x-auto scrollbar-none w-full min-w-0">
         {(["passport", "visa", "efrro"] as const).map((type) => (
           <Button
             key={type}
             variant={activeDocType === type ? "default" : "outline"}
             size="sm"
             onClick={() => { setActiveDocType(type); setSelectedFile(null); }}
-            className="text-xs font-semibold uppercase tracking-wider h-8 rounded-xl px-4 flex items-center gap-1.5"
+            className="text-xs font-semibold uppercase tracking-wider h-8 rounded-xl px-4 flex items-center gap-1.5 shrink-0"
           >
             {type === "passport" && <FileCheck2 className="h-3.5 w-3.5" />}
             {type === "visa" && <Globe2 className="h-3.5 w-3.5" />}

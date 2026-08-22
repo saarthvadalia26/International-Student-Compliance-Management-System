@@ -2,7 +2,7 @@
  * ISO 3166-1 Standard Country & Nationality Reference Dataset
  * 
  * Provides complete ISO country records with Alpha-2, Alpha-3, Numeric codes,
- * official names, common names, demonyms, Unicode flags, and regions.
+ * official names, common names, demonyms, Unicode flags, calling phone codes, and regions.
  */
 
 import { ISO_MASTER_COUNTRIES } from "@/domain/countries/iso-countries.data";
@@ -15,6 +15,7 @@ export interface Country {
   officialName: string; // Official country name (e.g. "Republic of India", "Republic of Fiji")
   nationality: string;  // Demonym (e.g. "Indian", "Fijian")
   flag: string;         // Unicode flag emoji (e.g. "🇮🇳", "🇫🇯")
+  phoneCode?: string;   // International calling dial code (e.g. "+91", "+679")
   region: string;       // Geographic region (e.g. "Asia", "Oceania")
   subregion: string;    // Geographic subregion (e.g. "Southern Asia", "Melanesia")
   isActive?: boolean;
@@ -28,13 +29,14 @@ export const countryList: Country[] = ISO_MASTER_COUNTRIES.map(c => ({
   officialName: c.officialName || c.name,
   nationality: c.nationality || c.name,
   flag: c.flag || "🌐",
+  phoneCode: c.phoneCode || "+91",
   region: c.region || "Global",
   subregion: c.subregion || "Global",
   isActive: c.isActive
 }));
 
 /**
- * Utility helper to retrieve country record by ISO code (Alpha-3, Alpha-2, or Numeric) or Name.
+ * Utility helper to retrieve country record by ISO code (Alpha-3, Alpha-2, or Numeric), Phone Code, or Name.
  */
 export function getCountryByCode(code: string): Country | undefined {
   if (!code) return undefined;
@@ -46,6 +48,7 @@ export function getCountryByCode(code: string): Country | undefined {
     c => c.code === upper || 
          c.alpha2 === upper || 
          c.numeric === clean ||
+         (c.phoneCode && (c.phoneCode === clean || c.phoneCode === `+${clean}`)) ||
          c.name.toLowerCase() === lower ||
          c.officialName.toLowerCase() === lower ||
          c.nationality.toLowerCase() === lower
@@ -53,7 +56,38 @@ export function getCountryByCode(code: string): Country | undefined {
 }
 
 /**
- * Filter countries by search query matching name, official name, demonym, ISO codes, or region.
+ * Utility helper to find country by calling phone dial code (e.g. "+91", "+679", "91")
+ */
+export function getCountryByPhoneCode(phoneCode: string): Country | undefined {
+  if (!phoneCode) return undefined;
+  const clean = phoneCode.trim();
+  const formatted = clean.startsWith("+") ? clean : `+${clean}`;
+
+  return countryList.find(c => c.phoneCode === formatted);
+}
+
+/**
+ * Normalizes phone components into standard E.164 compatible format (+[countryCode][number])
+ */
+export function formatE164Phone(countryCode?: string | null, number?: string | null): string {
+  if (!number || !number.trim()) return "";
+  const cleanNum = number.replace(/[^\d]/g, "");
+  if (!cleanNum) return "";
+
+  const cleanCode = countryCode ? countryCode.trim() : "+91";
+  const formattedCode = cleanCode.startsWith("+") ? cleanCode : `+${cleanCode}`;
+
+  // If number already contains the country code prefix, avoid double concatenation
+  const digitsOnlyCode = formattedCode.replace(/[^\d]/g, "");
+  if (cleanNum.startsWith(digitsOnlyCode) && cleanNum.length > digitsOnlyCode.length + 5) {
+    return `+${cleanNum}`;
+  }
+
+  return `${formattedCode}${cleanNum}`;
+}
+
+/**
+ * Filter countries by search query matching name, official name, demonym, ISO codes, phone codes, or region.
  */
 export function searchCountries(query: string, onlyActive: boolean = true): Country[] {
   const base = onlyActive ? countryList.filter(c => c.isActive !== false) : countryList;
@@ -66,6 +100,7 @@ export function searchCountries(query: string, onlyActive: boolean = true): Coun
     c.code.toLowerCase().includes(s) ||
     c.alpha2.toLowerCase().includes(s) ||
     c.numeric.includes(s) ||
+    (c.phoneCode && c.phoneCode.includes(s)) ||
     c.region.toLowerCase().includes(s)
   );
 }

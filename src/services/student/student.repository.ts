@@ -144,6 +144,10 @@ export class SupabaseStudentRepository implements IStudentRepository {
           email: emailVal,
           phone_home: phoneHomeVal,
           phone_local: input.phoneLocal?.trim() || null,
+          phone_local_country_code: input.phoneLocalCountryCode?.trim() || null,
+          phone_local_number: input.phoneLocalNumber?.trim() || null,
+          phone_home_country_code: input.phoneHomeCountryCode?.trim() || null,
+          phone_home_number: input.phoneHomeNumber?.trim() || null,
           permanent_address: permAddressVal,
           local_address: input.localAddress?.trim() || null,
           created_by: actorId,
@@ -467,6 +471,10 @@ export class SupabaseStudentRepository implements IStudentRepository {
         email: contact?.email || null,
         phoneHome: contact?.phone_home || null,
         phoneLocal: contact?.phone_local || null,
+        phoneLocalCountryCode: contact?.phone_local_country_code || null,
+        phoneLocalNumber: contact?.phone_local_number || null,
+        phoneHomeCountryCode: contact?.phone_home_country_code || null,
+        phoneHomeNumber: contact?.phone_home_number || null,
         permanentAddress: contact?.permanent_address || null,
         localAddress: contact?.local_address || null,
         createdAt: contact?.created_at ? new Date(contact.created_at) : new Date(student.created_at),
@@ -580,12 +588,12 @@ export class SupabaseStudentRepository implements IStudentRepository {
         if (previousRegNumber !== newReg) {
           await supabase.from("audit_log").insert({
             actor_id: actorId,
-            action: "UPDATE_ENROLLMENT_NUMBER",
+            action: "UPDATE_STUDENT_REGISTRATION_NUMBER",
             resource: `students/${id}`,
             filters_applied: {
-              student_id: id,
-              previous_enrollment_number: previousRegNumber,
-              new_enrollment_number: newReg
+              studentId: id,
+              previousRegistrationNumber: previousRegNumber,
+              newRegistrationNumber: newReg
             }
           });
         }
@@ -594,7 +602,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
     // 2. Update student_personal table if personal fields provided
     const personalUpdates: Record<string, unknown> = {};
-    if (input.fullName) personalUpdates.full_name = input.fullName.trim();
+    if (input.fullName !== undefined) personalUpdates.full_name = input.fullName.trim();
     if (input.nationalityCode !== undefined) {
       personalUpdates.nationality_code = input.nationalityCode && input.nationalityCode.trim()
         ? input.nationalityCode.trim().toUpperCase()
@@ -613,6 +621,10 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.email !== undefined) contactUpdates.email = input.email && input.email.trim() ? input.email.trim().toLowerCase() : null;
     if (input.phoneHome !== undefined) contactUpdates.phone_home = input.phoneHome && input.phoneHome.trim() ? input.phoneHome.trim() : null;
     if (input.phoneLocal !== undefined) contactUpdates.phone_local = input.phoneLocal ? input.phoneLocal.trim() : null;
+    if (input.phoneLocalCountryCode !== undefined) contactUpdates.phone_local_country_code = input.phoneLocalCountryCode ? input.phoneLocalCountryCode.trim() : null;
+    if (input.phoneLocalNumber !== undefined) contactUpdates.phone_local_number = input.phoneLocalNumber ? input.phoneLocalNumber.trim() : null;
+    if (input.phoneHomeCountryCode !== undefined) contactUpdates.phone_home_country_code = input.phoneHomeCountryCode ? input.phoneHomeCountryCode.trim() : null;
+    if (input.phoneHomeNumber !== undefined) contactUpdates.phone_home_number = input.phoneHomeNumber ? input.phoneHomeNumber.trim() : null;
     if (input.permanentAddress !== undefined) contactUpdates.permanent_address = input.permanentAddress && input.permanentAddress.trim() ? input.permanentAddress.trim() : null;
     if (input.localAddress !== undefined) contactUpdates.local_address = input.localAddress ? input.localAddress.trim() : null;
     if (Object.keys(contactUpdates).length > 0) {

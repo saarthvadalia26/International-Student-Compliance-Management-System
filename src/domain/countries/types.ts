@@ -12,6 +12,7 @@ export interface Country {
   officialName?: string | null;
   nationality?: string | null; // Demonym (e.g. "Indian", "Fijian", "American")
   flag?: string | null; // Unicode flag emoji (e.g. "🇮🇳", "🇫🇯")
+  phoneCode?: string | null; // International calling dial code (e.g. "+91", "+679")
   region?: string | null; // Geographic region (e.g. "Asia", "Oceania")
   subregion?: string | null; // Subregion (e.g. "Southern Asia", "Melanesia")
   displayOrder: number;
@@ -30,6 +31,7 @@ export interface CreateCountryDto {
   officialName?: string;
   nationality?: string;
   flag?: string;
+  phoneCode?: string;
   region?: string;
   subregion?: string;
   displayOrder?: number;
@@ -44,6 +46,7 @@ export interface UpdateCountryDto {
   officialName?: string;
   nationality?: string;
   flag?: string;
+  phoneCode?: string;
   region?: string;
   subregion?: string;
   displayOrder?: number;

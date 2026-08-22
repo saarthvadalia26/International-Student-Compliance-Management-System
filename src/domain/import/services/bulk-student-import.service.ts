@@ -210,6 +210,45 @@ export class BulkStudentImportService {
   }
 
   /**
+   * Helper: Parse structured phone components (country dial code + clean digits) and composite E.164
+   */
+  static parsePhoneComponents(
+    fullOrNumber?: string | null,
+    explicitCode?: string | null
+  ): { countryCode: string | null; number: string | null; formattedE164: string | null } {
+    if (!fullOrNumber && !explicitCode) {
+      return { countryCode: null, number: null, formattedE164: null };
+    }
+
+    const rawVal = (fullOrNumber || "").trim();
+    let code = (explicitCode || "").trim();
+    let num = rawVal;
+
+    if (rawVal.startsWith("+")) {
+      const digitsMatch = rawVal.match(/^\+(\d{1,4})\s*(.*)$/);
+      if (digitsMatch) {
+        code = `+${digitsMatch[1]}`;
+        num = digitsMatch[2];
+      }
+    }
+
+    const cleanNum = num.replace(/[^\d]/g, "");
+    const cleanCode = code ? (code.startsWith("+") ? code : `+${code}`) : null;
+
+    if (!cleanNum && !cleanCode) {
+      return { countryCode: null, number: null, formattedE164: null };
+    }
+
+    const formattedE164 = cleanNum ? (cleanCode ? `${cleanCode}${cleanNum}` : cleanNum) : null;
+
+    return {
+      countryCode: cleanCode,
+      number: cleanNum || null,
+      formattedE164
+    };
+  }
+
+  /**
    * 3. Validates spreadsheet data with production-grade row-level classification:
    *    - Required: Student Name, Enrollment Number, Academic Course
    *    - Optional: DOB, Gender, Nationality, Contact info, Emergency contact, Passport/Visa/eFRRO metadata
@@ -989,14 +1028,27 @@ export class BulkStudentImportService {
 
         if (persErr) throw new Error(`Personal details: ${persErr.message}`);
 
-        // C. Insert student_contact (optional fields stored as NULL)
+        // C. Insert student_contact (optional fields stored as NULL, structured phone stored)
+        const homePhoneParsed = BulkStudentImportService.parsePhoneComponents(
+          data.phone_home_number || data.phone_home,
+          data.phone_home_country_code
+        );
+        const localPhoneParsed = BulkStudentImportService.parsePhoneComponents(
+          data.phone_local_number || data.phone_local,
+          data.phone_local_country_code || "+91"
+        );
+
         const { error: contErr } = await supabase
           .from("student_contact")
           .insert({
             student_id: studentId,
             email: data.email ? data.email.trim().toLowerCase() : null,
-            phone_home: data.phone_home ? data.phone_home.trim() : null,
-            phone_local: data.phone_local ? data.phone_local.trim() : null,
+            phone_home: homePhoneParsed.formattedE164 || (data.phone_home ? data.phone_home.trim() : null),
+            phone_home_country_code: homePhoneParsed.countryCode,
+            phone_home_number: homePhoneParsed.number,
+            phone_local: localPhoneParsed.formattedE164 || (data.phone_local ? data.phone_local.trim() : null),
+            phone_local_country_code: localPhoneParsed.countryCode,
+            phone_local_number: localPhoneParsed.number,
             permanent_address: data.permanent_address ? data.permanent_address.trim() : null,
             local_address: data.local_address ? data.local_address.trim() : null,
             created_by: params.actorId,

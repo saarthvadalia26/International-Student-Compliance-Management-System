@@ -21,7 +21,7 @@ export class ReminderSchedulerServer {
         status,
         student_personal(full_name, preferred_language),
         student_contact(email, phone_home, phone_local),
-        student_academic(program_code),
+        student_academic(program_code, expected_graduation),
         student_snapshot(
           passport_expiry, passport_number,
           visa_expiry, visa_number,
@@ -51,6 +51,7 @@ export class ReminderSchedulerServer {
     const passportExpiry = activePassport?.expiry_date || snapshot?.passport_expiry || null;
     const visaExpiry = activeVisa?.expiry_date || snapshot?.visa_expiry || null;
     const efrroExpiry = activeEfrro?.expiry_date || snapshot?.efrro_expiry || null;
+    const expectedGraduation = academic?.expected_graduation || null;
 
     // 2. Fetch existing notification history for this student
     const { data: notifData } = await supabase
@@ -88,6 +89,7 @@ export class ReminderSchedulerServer {
 
     const scheduleResponse = ExpiryReminderEngine.calculateStudentReminders({
       studentId,
+      expectedGraduationDate: expectedGraduation,
       passport: {
         number: activePassport?.document_number || snapshot?.passport_number || "",
         expiryDate: passportExpiry,
@@ -127,6 +129,17 @@ export class ReminderSchedulerServer {
 
     // 4. Iterate over each document type and queue DUE reminders
     for (const doc of docGroups) {
+      if (doc.isAfterGraduation) {
+        // Re-evaluate: Cancel any previously queued notifications for documents expiring after graduation
+        await supabase
+          .from("notifications")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("student_id", studentId)
+          .eq("document_type", doc.documentType)
+          .in("status", ["queued", "sending", "processing"]);
+        continue;
+      }
+
       if (!doc.expiryDate || doc.isExpired) {
         continue;
       }

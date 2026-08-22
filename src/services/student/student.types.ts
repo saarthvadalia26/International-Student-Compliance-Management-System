@@ -33,6 +33,10 @@ export interface StudentContact {
   email: string | null;
   phoneHome: string | null;
   phoneLocal: string | null;
+  phoneLocalCountryCode?: string | null;
+  phoneLocalNumber?: string | null;
+  phoneHomeCountryCode?: string | null;
+  phoneHomeNumber?: string | null;
   permanentAddress: string | null;
   localAddress: string | null;
   createdAt: Date;
@@ -106,6 +110,10 @@ export interface RegisterStudentInput {
   email?: string | null;
   phoneHome?: string | null;
   phoneLocal?: string | null;
+  phoneLocalCountryCode?: string | null;
+  phoneLocalNumber?: string | null;
+  phoneHomeCountryCode?: string | null;
+  phoneHomeNumber?: string | null;
   permanentAddress?: string | null;
   localAddress?: string | null;
   programCode?: string | null;
@@ -148,6 +156,10 @@ export interface UpdateStudentInput {
   email?: string | null;
   phoneHome?: string | null;
   phoneLocal?: string | null;
+  phoneLocalCountryCode?: string | null;
+  phoneLocalNumber?: string | null;
+  phoneHomeCountryCode?: string | null;
+  phoneHomeNumber?: string | null;
   permanentAddress?: string | null;
   localAddress?: string | null;
   programCode?: string | null;

@@ -173,7 +173,7 @@ export function DispatchReminderDialog({
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-border/40">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-2 border-t border-border/40">
                   <div>
                     <span className="text-muted-foreground block text-[10px] font-caption">Expiry Date</span>
                     <span className="font-mono font-medium text-foreground flex items-center gap-1">
@@ -189,7 +189,7 @@ export function DispatchReminderDialog({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-border/40">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-2 border-t border-border/40">
                   <div>
                     <span className="text-muted-foreground block text-[10px] font-caption">Recipient Mobile / WhatsApp</span>
                     <span className={`font-mono font-medium flex items-center gap-1 ${preview.hasValidPhone ? "text-foreground" : "text-destructive font-sans font-semibold"}`}>

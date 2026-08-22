@@ -22,7 +22,19 @@ export const FEATURE_FLAGS = {
   /**
    * Enables or disables the Student Portal.
    */
-  STUDENT_PORTAL_ENABLED: true
+  STUDENT_PORTAL_ENABLED: true,
+
+  /**
+   * Student Portal Authentication Mode (v0.2.0):
+   * - "IDENTIFIER": Login with Enrollment Number or Passport Number without OTP (default for v0.2.0 until WhatsApp API is ready).
+   * - "OTP": Login with WhatsApp OTP verification code.
+   * 
+   * Reversible toggle: Can be enabled via STUDENT_PORTAL_OTP_ENABLED=true or STUDENT_PORTAL_AUTH_MODE=OTP.
+   */
+  STUDENT_PORTAL_OTP_ENABLED:
+    process.env.NEXT_PUBLIC_STUDENT_PORTAL_OTP_ENABLED === "true" ||
+    process.env.STUDENT_PORTAL_OTP_ENABLED === "true" ||
+    process.env.STUDENT_PORTAL_AUTH_MODE === "OTP"
 } as const;
 
 /**
@@ -37,4 +49,12 @@ export function isStudentPortalTestMode(): boolean {
  */
 export function isStudentPortalEnabled(): boolean {
   return FEATURE_FLAGS.STUDENT_PORTAL_ENABLED;
+}
+
+/**
+ * Returns whether WhatsApp OTP verification is active for Student Portal login.
+ * Defaults to false for v0.2.0 (direct identifier login).
+ */
+export function isStudentPortalOtpEnabled(): boolean {
+  return FEATURE_FLAGS.STUDENT_PORTAL_OTP_ENABLED;
 }

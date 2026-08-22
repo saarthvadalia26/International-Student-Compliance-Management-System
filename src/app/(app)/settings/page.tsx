@@ -390,7 +390,7 @@ function SettingsPageContent() {
 
   return (
     <>
-    <div className="space-y-6 max-w-5xl mx-auto font-sans p-4">
+    <div className="space-y-6 max-w-5xl mx-auto font-sans">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">System Administration</h1>

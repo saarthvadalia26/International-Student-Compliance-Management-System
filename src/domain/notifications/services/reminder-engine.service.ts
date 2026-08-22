@@ -68,12 +68,14 @@ export { CalendarDateEngine };
 export class ExpiryReminderEngine {
   /**
    * Calculate reminder schedule for a single document.
+   * Enforces graduation boundary: document_expiry_date <= student_graduation_date
    */
   static calculateDocumentReminders(params: {
     documentType: "passport" | "visa" | "efrro";
     documentTitle: string;
     documentNumber: string;
     expiryDate: string | null | undefined;
+    expectedGraduationDate?: string | null | undefined;
     isUploaded: boolean;
     verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
     existingNotifications: RawNotificationRecord[];
@@ -85,6 +87,7 @@ export class ExpiryReminderEngine {
       documentTitle,
       documentNumber,
       expiryDate,
+      expectedGraduationDate,
       isUploaded,
       verificationStatus,
       existingNotifications,
@@ -98,6 +101,12 @@ export class ExpiryReminderEngine {
 
     const cleanExpiry = expiryDate ? expiryDate.split("T")[0].trim() : "";
     const hasValidExpiry = Boolean(cleanExpiry && /^\d{4}-\d{2}-\d{2}$/.test(cleanExpiry));
+
+    const cleanGraduation = expectedGraduationDate ? expectedGraduationDate.split("T")[0].trim() : "";
+    const hasValidGraduation = Boolean(cleanGraduation && /^\d{4}-\d{2}-\d{2}$/.test(cleanGraduation));
+    const graduationDateFormatted = hasValidGraduation 
+      ? CalendarDateEngine.formatDateDisplay(cleanGraduation, true) 
+      : null;
 
     if (!hasValidExpiry) {
       const schedule: ReminderScheduleItem[] = rules.map(r => ({
@@ -122,12 +131,71 @@ export class ExpiryReminderEngine {
         verificationStatus,
         daysRemaining: null,
         isExpired: false,
+        isAfterGraduation: false,
+        graduationDate: hasValidGraduation ? cleanGraduation : null,
+        graduationDateFormatted,
+        graduationBoundaryStatus: hasValidGraduation ? "WITHIN_BOUNDARY" : "MISSING_GRADUATION_DATE",
+        graduationBoundaryReason: `${documentTitle} expiry date has not been recorded.`,
         schedule
       };
     }
 
     const daysRemaining = CalendarDateEngine.diffCalendarDays(cleanExpiry, todayISO);
     const isExpired = daysRemaining < 0;
+
+    // Evaluate Graduation Date Boundary:
+    // If document expires strictly after graduation date (cleanExpiry > cleanGraduation),
+    // the document is NOT REMINDER ELIGIBLE.
+    const isAfterGraduation = hasValidGraduation && cleanExpiry > cleanGraduation;
+
+    let graduationBoundaryStatus: "WITHIN_BOUNDARY" | "AFTER_GRADUATION" | "MISSING_GRADUATION_DATE" = "WITHIN_BOUNDARY";
+    let graduationBoundaryReason: string | null = null;
+
+    if (isAfterGraduation) {
+      graduationBoundaryStatus = "AFTER_GRADUATION";
+      graduationBoundaryReason = "Document expires after expected graduation. No expiry reminders are required for this document.";
+    } else if (!hasValidGraduation) {
+      graduationBoundaryStatus = "MISSING_GRADUATION_DATE";
+      graduationBoundaryReason = "Student graduation date has not been recorded. Boundary evaluation cannot be computed.";
+    }
+
+    // If document expires after graduation, mark all reminder schedule items as inactive / NOT_APPLICABLE
+    if (isAfterGraduation) {
+      const schedule: ReminderScheduleItem[] = rules.map(rule => {
+        const scheduledDateISO = CalendarDateEngine.subtractDays(cleanExpiry, rule.thresholdDays);
+        const scheduledDate = CalendarDateEngine.formatDateDisplay(scheduledDateISO);
+
+        return {
+          ruleId: rule.id,
+          ruleName: rule.ruleName,
+          thresholdDays: rule.thresholdDays,
+          channel: rule.channel,
+          scheduledDate,
+          scheduledDateISO,
+          status: "NOT_APPLICABLE",
+          statusLabel: "Inactive",
+          statusReason: "Document expires after expected graduation. No expiry reminders are required for this document."
+        };
+      });
+
+      return {
+        documentType,
+        documentTitle,
+        documentNumber: documentNumber || "Not Recorded",
+        expiryDate: cleanExpiry,
+        expiryDateFormatted: CalendarDateEngine.formatDateDisplay(cleanExpiry, true),
+        isUploaded,
+        verificationStatus,
+        daysRemaining,
+        isExpired,
+        isAfterGraduation: true,
+        graduationDate: cleanGraduation,
+        graduationDateFormatted,
+        graduationBoundaryStatus,
+        graduationBoundaryReason,
+        schedule
+      };
+    }
 
     // Identify the active due threshold among rules that have already reached their scheduled date
     const arrivedThresholds = rules
@@ -295,15 +363,22 @@ export class ExpiryReminderEngine {
       verificationStatus,
       daysRemaining,
       isExpired,
+      isAfterGraduation: false,
+      graduationDate: hasValidGraduation ? cleanGraduation : null,
+      graduationDateFormatted,
+      graduationBoundaryStatus,
+      graduationBoundaryReason,
       schedule
     };
   }
 
   /**
    * Calculate student automated reminder schedules for Passport, Visa, and eFRRO.
+   * Evaluates graduation boundary independently for each document.
    */
   static calculateStudentReminders(params: {
     studentId: string;
+    expectedGraduationDate?: string | null;
     passport?: DocumentInfoParam | null;
     visa?: DocumentInfoParam | null;
     efrro?: DocumentInfoParam | null;
@@ -312,12 +387,18 @@ export class ExpiryReminderEngine {
     todayISO?: string;
   }): StudentReminderScheduleResponse {
     const today = params.todayISO || CalendarDateEngine.getTodayISO();
+    const gradDate = params.expectedGraduationDate || null;
+    const cleanGrad = gradDate ? gradDate.split("T")[0].trim() : null;
+    const gradFormatted = cleanGrad && /^\d{4}-\d{2}-\d{2}$/.test(cleanGrad)
+      ? CalendarDateEngine.formatDateDisplay(cleanGrad, true)
+      : null;
 
     const passportGroup = this.calculateDocumentReminders({
       documentType: "passport",
       documentTitle: "International Passport",
       documentNumber: params.passport?.number || "",
       expiryDate: params.passport?.expiryDate,
+      expectedGraduationDate: gradDate,
       isUploaded: params.passport?.isUploaded || false,
       verificationStatus: params.passport?.verificationStatus || "not_uploaded",
       existingNotifications: params.notifications,
@@ -330,6 +411,7 @@ export class ExpiryReminderEngine {
       documentTitle: "Student Visa",
       documentNumber: params.visa?.number || "",
       expiryDate: params.visa?.expiryDate,
+      expectedGraduationDate: gradDate,
       isUploaded: params.visa?.isUploaded || false,
       verificationStatus: params.visa?.verificationStatus || "not_uploaded",
       existingNotifications: params.notifications,
@@ -342,6 +424,7 @@ export class ExpiryReminderEngine {
       documentTitle: "eFRRO / Residential Permit",
       documentNumber: params.efrro?.number || "",
       expiryDate: params.efrro?.expiryDate,
+      expectedGraduationDate: gradDate,
       isUploaded: params.efrro?.isUploaded || false,
       verificationStatus: params.efrro?.verificationStatus || "not_uploaded",
       existingNotifications: params.notifications,
@@ -381,6 +464,8 @@ export class ExpiryReminderEngine {
     return {
       studentId: params.studentId,
       evaluatedAt: new Date().toISOString(),
+      graduationDate: cleanGrad,
+      graduationDateFormatted: gradFormatted,
       passport: passportGroup,
       visa: visaGroup,
       efrro: efrroGroup,
@@ -393,4 +478,3 @@ export class ExpiryReminderEngine {
     };
   }
 }
-

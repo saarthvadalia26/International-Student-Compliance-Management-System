@@ -30,6 +30,7 @@ export class CountryService {
       officialName: row.official_name ? String(row.official_name) : null,
       nationality: row.nationality ? String(row.nationality) : null,
       flag: row.flag ? String(row.flag) : null,
+      phoneCode: row.phone_code ? String(row.phone_code) : null,
       region: row.region ? String(row.region) : null,
       subregion: row.subregion ? String(row.subregion) : null,
       displayOrder: Number(row.display_order ?? 0),
@@ -303,6 +304,7 @@ export class CountryService {
         official_name: dto.officialName?.trim() || null,
         nationality: dto.nationality?.trim() || null,
         flag: dto.flag?.trim() || "🌐",
+        phone_code: dto.phoneCode?.trim() || null,
         region: dto.region?.trim() || "Other",
         subregion: dto.subregion?.trim() || null,
         display_order: dto.displayOrder ?? 999,
@@ -350,6 +352,7 @@ export class CountryService {
     if (dto.officialName !== undefined) payload.official_name = dto.officialName.trim() || null;
     if (dto.nationality !== undefined) payload.nationality = dto.nationality.trim() || null;
     if (dto.flag !== undefined) payload.flag = dto.flag.trim() || null;
+    if (dto.phoneCode !== undefined) payload.phone_code = dto.phoneCode.trim() || null;
     if (dto.region !== undefined) payload.region = dto.region.trim() || null;
     if (dto.subregion !== undefined) payload.subregion = dto.subregion.trim() || null;
     if (dto.displayOrder !== undefined) payload.display_order = dto.displayOrder;

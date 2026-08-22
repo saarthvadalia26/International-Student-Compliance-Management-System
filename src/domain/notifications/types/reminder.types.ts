@@ -34,12 +34,19 @@ export interface DocumentReminderGroup {
   verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
   daysRemaining: number | null;
   isExpired: boolean;
+  isAfterGraduation: boolean;
+  graduationDate: string | null;
+  graduationDateFormatted?: string | null;
+  graduationBoundaryStatus: "WITHIN_BOUNDARY" | "AFTER_GRADUATION" | "MISSING_GRADUATION_DATE";
+  graduationBoundaryReason?: string | null;
   schedule: ReminderScheduleItem[];
 }
 
 export interface StudentReminderScheduleResponse {
   studentId: string;
   evaluatedAt: string;
+  graduationDate: string | null;
+  graduationDateFormatted?: string | null;
   passport: DocumentReminderGroup;
   visa: DocumentReminderGroup;
   efrro: DocumentReminderGroup;

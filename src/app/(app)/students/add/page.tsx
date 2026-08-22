@@ -27,6 +27,7 @@ import { RegisterStudentValidationSchema } from "@/services/validation/student-v
 import { registerStudentAction } from "@/app/(app)/students/actions";
 import { RegisterStudentInput } from "@/services/student/student.types";
 import { DatePicker } from "@/components/ui/date-picker";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { Layers, Sparkles } from "lucide-react";
 
@@ -143,7 +144,11 @@ export default function StudentRegistrationPage() {
     dateOfBirth: "",
     email: "",
     phoneHome: "",
+    phoneHomeCountryCode: "+91",
+    phoneHomeNumber: "",
     phoneLocal: "",
+    phoneLocalCountryCode: "+91",
+    phoneLocalNumber: "",
     permanentAddress: "",
     localAddress: "",
     program: "",
@@ -293,7 +298,11 @@ export default function StudentRegistrationPage() {
       dateOfBirth: sanitizedDob || undefined,
       email: formData.email.trim().toLowerCase() || undefined,
       phoneHome: formData.phoneHome.trim() || undefined,
+      phoneHomeCountryCode: formData.phoneHomeCountryCode.trim() || undefined,
+      phoneHomeNumber: formData.phoneHomeNumber.trim() || undefined,
       phoneLocal: formData.phoneLocal.trim() || undefined,
+      phoneLocalCountryCode: formData.phoneLocalCountryCode.trim() || undefined,
+      phoneLocalNumber: formData.phoneLocalNumber.trim() || undefined,
       permanentAddress: formData.permanentAddress.trim() || undefined,
       localAddress: formData.localAddress.trim() || undefined,
       programCode: formData.program.trim() || undefined,
@@ -492,11 +501,11 @@ export default function StudentRegistrationPage() {
 
       <div className="grid gap-6 md:grid-cols-4">
         {/* Sidebar Tabs navigation */}
-        <div className="md:col-span-1 space-y-1.5">
+        <div className="md:col-span-1 space-y-1.5 flex flex-row md:flex-col overflow-x-auto pb-2 md:pb-0 gap-1.5 md:gap-0 scrollbar-none min-w-0">
           <button
             type="button"
             onClick={() => setActiveTab("personal")}
-            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex-1 md:w-full shrink-0 flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === "personal" 
                 ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -506,7 +515,7 @@ export default function StudentRegistrationPage() {
               <User className="h-4 w-4 shrink-0" /> Personal Identity
             </div>
             {tabErrorCounts.personal > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
                 {tabErrorCounts.personal}
               </span>
             )}
@@ -515,7 +524,7 @@ export default function StudentRegistrationPage() {
           <button
             type="button"
             onClick={() => setActiveTab("academic")}
-            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex-1 md:w-full shrink-0 flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === "academic" 
                 ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -525,7 +534,7 @@ export default function StudentRegistrationPage() {
               <GraduationCap className="h-4 w-4 shrink-0" /> Academic Profile
             </div>
             {tabErrorCounts.academic > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
                 {tabErrorCounts.academic}
               </span>
             )}
@@ -534,7 +543,7 @@ export default function StudentRegistrationPage() {
           <button
             type="button"
             onClick={() => setActiveTab("contact")}
-            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex-1 md:w-full shrink-0 flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === "contact" 
                 ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -544,7 +553,7 @@ export default function StudentRegistrationPage() {
               <PhoneCall className="h-4 w-4 shrink-0" /> Contact & Guardian
             </div>
             {tabErrorCounts.contact > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
                 {tabErrorCounts.contact}
               </span>
             )}
@@ -553,7 +562,7 @@ export default function StudentRegistrationPage() {
           <button
             type="button"
             onClick={() => setActiveTab("documents")}
-            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+            className={`flex-1 md:w-full shrink-0 flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === "documents" 
                 ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -563,13 +572,13 @@ export default function StudentRegistrationPage() {
               <FileCheck className="h-4 w-4 shrink-0" /> Documents & Compliance
             </div>
             {tabErrorCounts.documents > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse">
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
                 {tabErrorCounts.documents}
               </span>
             )}
           </button>
 
-          <div className="mt-8 p-3 rounded-lg border border-border/60 bg-muted/20 text-[11px] text-muted-foreground font-caption space-y-1">
+          <div className="hidden md:block mt-8 p-3 rounded-lg border border-border/60 bg-muted/20 text-[11px] text-muted-foreground font-caption space-y-1">
             <div className="flex items-center gap-1 font-semibold text-foreground">
               <AlertCircle className="h-3.5 w-3.5 text-primary shrink-0" /> Progressive Registration
             </div>
@@ -841,15 +850,24 @@ export default function StudentRegistrationPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">
-                      Home Country Phone Number <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                      Home Country / Primary Phone <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
-                    <Input
+                    <PhoneInput
                       id="phoneHome"
-                      placeholder="+CountryCode-XXXXX-XXXXX"
-                      value={formData.phoneHome}
-                      onChange={handleInputChange}
+                      countryCode={formData.phoneHomeCountryCode}
+                      number={formData.phoneHomeNumber}
+                      onCountryCodeChange={(code) => setFormData(p => ({ ...p, phoneHomeCountryCode: code }))}
+                      onNumberChange={(num) => setFormData(p => ({ ...p, phoneHomeNumber: num }))}
+                      onChange={(composite, code, num) => {
+                        setFormData(p => ({ ...p, phoneHome: composite, phoneHomeCountryCode: code, phoneHomeNumber: num }));
+                        if (validationErrors.phoneHome) {
+                          setValidationErrors(prev => { const n = { ...prev }; delete n.phoneHome; return n; });
+                        }
+                      }}
                       disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.phoneHome ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      placeholder="e.g. 9812345678"
+                      defaultCountryCode="+91"
+                      className={validationErrors.phoneHome ? "border-rose-500 rounded-md" : ""}
                     />
                     {validationErrors.phoneHome && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
@@ -882,13 +900,22 @@ export default function StudentRegistrationPage() {
                     <label className="text-xs font-medium text-foreground" htmlFor="phoneLocal">
                       Local Contact Number (India) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
-                    <Input
+                    <PhoneInput
                       id="phoneLocal"
-                      placeholder="+91-XXXXX-XXXXX"
-                      value={formData.phoneLocal}
-                      onChange={handleInputChange}
+                      countryCode={formData.phoneLocalCountryCode}
+                      number={formData.phoneLocalNumber}
+                      onCountryCodeChange={(code) => setFormData(p => ({ ...p, phoneLocalCountryCode: code }))}
+                      onNumberChange={(num) => setFormData(p => ({ ...p, phoneLocalNumber: num }))}
+                      onChange={(composite, code, num) => {
+                        setFormData(p => ({ ...p, phoneLocal: composite, phoneLocalCountryCode: code, phoneLocalNumber: num }));
+                        if (validationErrors.phoneLocal) {
+                          setValidationErrors(prev => { const n = { ...prev }; delete n.phoneLocal; return n; });
+                        }
+                      }}
                       disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.phoneLocal ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      placeholder="e.g. 9876543210"
+                      defaultCountryCode="+91"
+                      className={validationErrors.phoneLocal ? "border-rose-500 rounded-md" : ""}
                     />
                     {validationErrors.phoneLocal && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">

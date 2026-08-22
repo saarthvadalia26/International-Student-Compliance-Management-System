@@ -211,7 +211,7 @@ export default function StudentListPage() {
           </p>
         </div>
         
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
           <Link href="/students/import" passHref>
             <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border hover:bg-muted/50">
               <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Bulk Import

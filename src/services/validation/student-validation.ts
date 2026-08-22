@@ -21,6 +21,10 @@ export const RegisterStudentValidationSchema = z.object({
     return val.trim().length >= 7 && val.trim().length <= 20;
   }, { message: "Home country phone number must contain at least 7 digits (max 20 digits)" }),
   phoneLocal: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 7, { message: "Local phone must contain at least 7 digits" }),
+  phoneLocalCountryCode: z.string().optional().nullable(),
+  phoneLocalNumber: z.string().optional().nullable(),
+  phoneHomeCountryCode: z.string().optional().nullable(),
+  phoneHomeNumber: z.string().optional().nullable(),
   permanentAddress: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 5, { message: "Permanent address must be descriptive (at least 5 characters)" }),
   localAddress: z.string().optional().nullable(),
   programCode: z.string().optional().nullable(),
@@ -127,6 +131,10 @@ export const UpdateStudentValidationSchema = z.object({
     return val.trim().length >= 7 && val.trim().length <= 20;
   }, { message: "Home phone must contain between 7 and 20 digits" }),
   phoneLocal: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 7, { message: "Local phone must contain at least 7 digits" }),
+  phoneLocalCountryCode: z.string().optional().nullable(),
+  phoneLocalNumber: z.string().optional().nullable(),
+  phoneHomeCountryCode: z.string().optional().nullable(),
+  phoneHomeNumber: z.string().optional().nullable(),
   permanentAddress: z.string().optional().nullable(),
   localAddress: z.string().optional().nullable(),
   programCode: z.string().optional().nullable(),

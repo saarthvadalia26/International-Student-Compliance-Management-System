@@ -16,7 +16,11 @@ export type ISCMSImportField =
   // Contact Info
   | "email"
   | "phone_home"
+  | "phone_home_country_code"
+  | "phone_home_number"
   | "phone_local"
+  | "phone_local_country_code"
+  | "phone_local_number"
   | "permanent_address"
   | "local_address"
   // Academic
@@ -134,9 +138,27 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "Home / Primary Phone",
     category: "Contact",
     required: false,
-    description: "Primary international phone number with country code. Defaults to NULL if omitted.",
+    description: "Primary international phone number with country code (e.g. +679 1234567, +91 9876543210). Defaults to NULL if omitted.",
     sample: "+977-9812345678",
     aliases: ["phone_home", "phone", "phone number", "mobile", "mobile number", "contact number", "primary phone", "home phone", "phone_number"]
+  },
+  {
+    field: "phone_home_country_code",
+    label: "Home Phone Country Code",
+    category: "Contact",
+    required: false,
+    description: "Calling country dial code for primary phone (e.g. +91, +679, 91, 679).",
+    sample: "+679",
+    aliases: ["phone_home_country_code", "home country code", "primary country code", "country dial code", "phone country code", "country code", "dial code"]
+  },
+  {
+    field: "phone_home_number",
+    label: "Home Phone Number",
+    category: "Contact",
+    required: false,
+    description: "Phone number digits excluding the country dial code.",
+    sample: "9812345678",
+    aliases: ["phone_home_number", "home phone number", "primary number", "phone digits"]
   },
   {
     field: "phone_local",
@@ -146,6 +168,24 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "Local Indian SIM contact number if available. Defaults to NULL if omitted.",
     sample: "+91-9876543210",
     aliases: ["phone_local", "local phone", "local mobile", "indian phone", "local_mobile"]
+  },
+  {
+    field: "phone_local_country_code",
+    label: "Local Phone Country Code",
+    category: "Contact",
+    required: false,
+    description: "Local phone dial code (defaults to +91).",
+    sample: "+91",
+    aliases: ["phone_local_country_code", "local phone country code", "local country code"]
+  },
+  {
+    field: "phone_local_number",
+    label: "Local Phone Number",
+    category: "Contact",
+    required: false,
+    description: "Local phone digits excluding country code.",
+    sample: "9876543210",
+    aliases: ["phone_local_number", "local phone number", "local number"]
   },
   {
     field: "permanent_address",

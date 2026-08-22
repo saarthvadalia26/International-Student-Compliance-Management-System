@@ -288,14 +288,14 @@ export function StudentDocumentCard({
   return (
     <Card className="border border-border/70 shadow-xs overflow-hidden bg-card transition-all">
       {/* 1. DOCUMENT HEADER */}
-      <CardHeader className="flex flex-row items-center justify-between pb-3 bg-muted/15 border-b border-border/40 gap-3">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 bg-muted/15 border-b border-border/40 gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${theme.iconContainerClass}`}>
             <DocumentIcon className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <div className={`h-2 w-2 rounded-full shrink-0 ${theme.dotClass}`} />
                 <CardTitle className="text-xs sm:text-sm font-bold tracking-tight uppercase text-foreground truncate">
                   {title}
@@ -313,7 +313,7 @@ export function StudentDocumentCard({
           </div>
         </div>
 
-        <div className="shrink-0">
+        <div className="shrink-0 self-start sm:self-auto">
           {renderVerificationBadge()}
         </div>
       </CardHeader>
@@ -323,7 +323,7 @@ export function StudentDocumentCard({
         {/* Responsive Information Grid */}
         <div className={`grid gap-3.5 ${
           fieldsToRender.length >= 4 
-            ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" 
+            ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" 
             : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
         }`}>
           {fieldsToRender.map((f, idx) => {
@@ -405,7 +405,7 @@ export function StudentDocumentCard({
             </div>
 
             {/* Action Buttons in Expiry Section */}
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="outline"
@@ -458,7 +458,7 @@ export function StudentDocumentCard({
         )}
 
         {/* 5. DOCUMENT CARD FOOTER ACTIONS */}
-        <div className="pt-2 border-t border-border/40 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="pt-2 border-t border-border/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <Link 
               href={`/students/${studentId}/${documentType}`} 
@@ -489,7 +489,7 @@ export function StudentDocumentCard({
           </div>
 
           {verificationStatus === "pending" && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               {onRejectClick && (
                 <Button 
                   variant="outline" 
