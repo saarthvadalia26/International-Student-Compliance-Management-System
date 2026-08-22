@@ -222,9 +222,9 @@ async function runTestSuite() {
   );
 
   // -------------------------------------------------------------------------
-  // Scenario 7: Missing Required Enrollment Number (Strict Rejection, No Auto-Gen)
+  // Scenario 7: Missing Enrollment Number (Progressive Acceptance with Warning)
   // -------------------------------------------------------------------------
-  console.log("\n--- Scenario 7: Missing Required Enrollment Number (Strict Rejection) ---");
+  console.log("\n--- Scenario 7: Missing Enrollment Number (Progressive Acceptance with Warning) ---");
   const missingRegData = [
     {
       "registration_number": "", // Missing enrollment number!
@@ -238,12 +238,12 @@ async function runTestSuite() {
     academicPrograms: mockPrograms
   });
 
-  assert(report7.validCount === 0, "Row without enrollment number is rejected");
-  assert(report7.errorCount === 1, "Missing enrollment number triggers validation error");
-  assert(report7.rows[0].status === "error", "Row status is 'error'");
+  assert(report7.validCount === 1, "Row without enrollment number is accepted for progressive registration");
+  assert(report7.errorCount === 0, "Missing enrollment number does NOT trigger fatal error");
+  assert(report7.rows[0].status === "valid", "Row status is 'valid'");
   assert(
-    report7.rows[0].errors.some(e => e.field === "registration_number" && e.problem.includes("must be provided by the university")),
-    "Clear error: 'Enrollment number is required and must be provided by the university.'"
+    report7.rows[0].warnings.some(w => w.field === "registration_number" && w.impact.includes("Enrollment number is not provided yet")),
+    "Clear warning: 'Enrollment number is not provided yet. Record will be created without enrollment number and can be assigned later.'"
   );
 
   // -------------------------------------------------------------------------
@@ -358,10 +358,10 @@ async function runTestSuite() {
   });
 
   assert(report10.totalRows === 4, "Total mixed rows is 4");
-  assert(report10.validCount === 2, "2 valid rows ready for import");
+  assert(report10.validCount === 3, "3 valid rows ready for import (including progressive rows with warnings)");
   assert(report10.cleanValidCount === 1, "1 clean valid row");
-  assert(report10.warningRowsCount === 1, "1 valid row with warnings");
-  assert(report10.errorCount === 2, "2 rows rejected due to validation errors");
+  assert(report10.warningRowsCount === 2, "2 valid rows with warnings");
+  assert(report10.errorCount === 1, "1 row rejected due to invalid date format");
 
   // Verify that error report can be generated from mixed report
   const errorReportResult = BulkStudentImportService.generateErrorReport(report10);
@@ -374,7 +374,7 @@ async function runTestSuite() {
 
   const rejectedSheet = errorWb.Sheets["Rejected Rows"];
   const rejectedSheetRows = XLSX.utils.sheet_to_json<string[]>(rejectedSheet, { header: 1 });
-  assert(rejectedSheetRows.length >= 3, "Rejected sheet contains header plus rejected rows");
+  assert(rejectedSheetRows.length >= 2, "Rejected sheet contains header plus rejected rows");
 
   // -------------------------------------------------------------------------
   // Scenario 11: Reminder Engine Metadata Queryable Without Physical PDF

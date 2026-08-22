@@ -710,8 +710,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         updated_at: new Date().toISOString(),
         updated_by: actorId
       };
-      if (input.embassyName !== undefined) embassyPayload.embassy_name = input.embassyName.trim();
-      if (input.embassyAddress !== undefined) embassyPayload.address = input.embassyAddress.trim();
+      if (input.embassyName !== undefined) embassyPayload.embassy_name = input.embassyName ? input.embassyName.trim() : null;
+      if (input.embassyAddress !== undefined) embassyPayload.address = input.embassyAddress ? input.embassyAddress.trim() : null;
       if (input.embassyCity !== undefined) embassyPayload.city = input.embassyCity ? input.embassyCity.trim() : null;
       if (input.embassyCountry !== undefined) embassyPayload.country = input.embassyCountry ? input.embassyCountry.trim() : null;
       if (input.embassyPhone !== undefined) embassyPayload.phone = input.embassyPhone ? input.embassyPhone.trim() : null;

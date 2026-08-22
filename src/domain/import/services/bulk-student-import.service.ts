@@ -328,7 +328,8 @@ export class BulkStudentImportService {
         warnings.push({
           field: "registration_number",
           fieldLabel: "Registration / Enrollment Number",
-          value: "",
+          value: "Not Provided",
+          warning: "Enrollment number is not provided yet. Record will be created without enrollment number and can be assigned later.",
           impact: "Enrollment number is not provided yet. Record will be created without enrollment number and can be assigned later.",
           actionTaken: "Record will be saved with enrollment number marked as pending."
         });
@@ -384,7 +385,8 @@ export class BulkStudentImportService {
         warnings.push({
           field: "academic_program",
           fieldLabel: "Academic Program",
-          value: "",
+          value: "Not Provided",
+          warning: "Academic program / course is not assigned yet.",
           impact: "Academic program / course is not assigned yet.",
           actionTaken: "Student record will be created with course marked as pending and can be assigned later."
         });

@@ -437,6 +437,8 @@ export interface ValidationWarningItem {
   fieldLabel: string;
   value: string;
   warning: string;
+  impact?: string;
+  actionTaken?: string;
 }
 
 export interface ValidationRowResult {

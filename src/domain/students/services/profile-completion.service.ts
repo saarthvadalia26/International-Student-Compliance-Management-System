@@ -30,6 +30,8 @@ export interface StudentProfileCompletionResult {
   isReadyForComplianceReview: boolean;
 }
 
+export type ProfileCompletionResult = StudentProfileCompletionResult;
+
 export interface StudentProfileEvaluationData {
   // Identity
   fullName?: string | null;
@@ -196,6 +198,14 @@ export class ProfileCompletionEngine {
       missingSummary.push(...immigrationMissing.map(f => `Immigration: ${f}`));
     }
 
+    const missingItems = [
+      ...identityMissing,
+      ...academicMissing,
+      ...contactMissing,
+      ...emergencyMissing,
+      ...immigrationMissing
+    ];
+
     // Compute weighted total
     const weightedScore = (
       (identityPct * 0.25) +
@@ -207,16 +217,16 @@ export class ProfileCompletionEngine {
     const overallPercentage = Math.round(weightedScore);
 
     let status: StudentProfileCompletionResult["status"] = "complete";
-    let statusLabel = "Profile Complete";
+    let statusLabel = "Complete Profile";
     let statusColor = "text-emerald-600 bg-emerald-500/10 border-emerald-500/30";
 
     if (overallPercentage < 35) {
       status = "minimal";
-      statusLabel = `Initial Record (${overallPercentage}%)`;
+      statusLabel = "Minimal Identity Profile";
       statusColor = "text-amber-600 bg-amber-500/10 border-amber-500/30";
     } else if (overallPercentage < 90) {
       status = "incomplete";
-      statusLabel = `Information Pending (${overallPercentage}%)`;
+      statusLabel = "Incomplete Profile";
       statusColor = "text-blue-600 bg-blue-500/10 border-blue-500/30";
     }
 
@@ -235,7 +245,7 @@ export class ProfileCompletionEngine {
       statusColor,
       sections,
       missingSummary,
-      missingItems: missingSummary,
+      missingItems,
       isReadyForComplianceReview
     };
   }
