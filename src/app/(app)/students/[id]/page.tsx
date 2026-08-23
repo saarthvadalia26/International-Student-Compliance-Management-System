@@ -47,6 +47,7 @@ import {
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
@@ -1226,48 +1227,40 @@ export default function StudentDetailsPage({ params }: PageProps) {
         {/* Left 2 Cols: Tabbed Content & Immigration Documents */}
         <div className="lg:col-span-2 space-y-6 w-full max-w-full min-w-0">
           {/* Sub-tabs for detailed drill-down */}
-          <div className="flex border-b border-border/60 overflow-x-auto w-full max-w-full min-w-0">
-            <button
+          <SectionNavGroup orientation="horizontal" variant="segmented" className="w-full max-w-full min-w-0">
+            <SectionNavCard
+              icon={FileText}
+              title="Legal & Immigration"
+              isActive={activeSubTab === "immigration"}
               onClick={() => setActiveSubTab("immigration")}
-              className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
-                activeSubTab === "immigration"
-                  ? "border-primary text-foreground font-semibold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Legal & Immigration Papers
-            </button>
-            <button
+              variant="segmented"
+              size="sm"
+            />
+            <SectionNavCard
+              icon={User}
+              title="Personal Identity"
+              isActive={activeSubTab === "personal"}
               onClick={() => setActiveSubTab("personal")}
-              className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
-                activeSubTab === "personal"
-                  ? "border-primary text-foreground font-semibold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Personal & Demographic Info
-            </button>
-            <button
+              variant="segmented"
+              size="sm"
+            />
+            <SectionNavCard
+              icon={GraduationCap}
+              title="Academic Profile"
+              isActive={activeSubTab === "academic"}
               onClick={() => setActiveSubTab("academic")}
-              className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
-                activeSubTab === "academic"
-                  ? "border-primary text-foreground font-semibold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Academic & Admission Profile
-            </button>
-            <button
+              variant="segmented"
+              size="sm"
+            />
+            <SectionNavCard
+              icon={Phone}
+              title="Contact & Guardian"
+              isActive={activeSubTab === "contact"}
               onClick={() => setActiveSubTab("contact")}
-              className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
-                activeSubTab === "contact"
-                  ? "border-primary text-foreground font-semibold"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Contact & Family Coordinates
-            </button>
-          </div>
+              variant="segmented"
+              size="sm"
+            />
+          </SectionNavGroup>
 
           {/* Tab 1: Immigration Documents */}
           {activeSubTab === "immigration" && (

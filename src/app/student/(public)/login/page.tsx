@@ -377,12 +377,12 @@ export default function StudentLoginPage() {
                 <Button
                   type="submit"
                   disabled={isLoading || !identifierInput.trim() || !turnstileToken}
-                  className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                  className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs transition-all duration-150 ease-out"
                 >
                   {isLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Verifying Credentials...</>
+                    <><Loader2 className="h-4 w-4 animate-spin shrink-0" /> <span>Verifying Credentials...</span></>
                   ) : (
-                    <><ArrowRight className="h-4 w-4" /> Continue to Portal</>
+                    <><ArrowRight className="h-4 w-4 shrink-0" /> <span>Continue to Portal</span></>
                   )}
                 </Button>
               </form>
@@ -443,12 +443,12 @@ export default function StudentLoginPage() {
                 <Button
                   type="submit"
                   disabled={isLoading || !identifierInput.trim() || !turnstileToken}
-                  className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs transition-all duration-150 ease-out"
                 >
                   {isLoading ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Locating & Sending Code...</>
+                    <><Loader2 className="h-4 w-4 animate-spin shrink-0" /> <span>Locating & Sending Code...</span></>
                   ) : (
-                    <><MessageSquare className="h-4 w-4" /> Send WhatsApp Code</>
+                    <><MessageSquare className="h-4 w-4 shrink-0" /> <span>Send WhatsApp Code</span></>
                   )}
                 </Button>
               </form>
@@ -497,7 +497,7 @@ export default function StudentLoginPage() {
                       onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                       disabled={isVerifying}
-                      className="w-10 h-12 text-center text-lg font-bold rounded-xl border border-border bg-background outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                      className="w-10 h-12 text-center text-lg font-bold rounded-xl border border-border bg-background outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-150 ease-out"
                     />
                   ))}
                 </div>
@@ -506,10 +506,10 @@ export default function StudentLoginPage() {
                   <Button
                     type="submit"
                     disabled={isVerifying || otpDigits.join("").length !== 6}
-                    className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="w-full text-xs font-semibold rounded-xl h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs transition-all duration-150 ease-out"
                   >
                     {isVerifying ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> Verifying Code...</>
+                      <><Loader2 className="h-4 w-4 animate-spin shrink-0" /> <span>Verifying Code...</span></>
                     ) : (
                       "Verify OTP"
                     )}

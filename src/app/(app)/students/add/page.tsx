@@ -17,6 +17,7 @@ import {
   Users
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -597,85 +598,44 @@ export default function StudentRegistrationPage() {
 
       <div className="grid gap-6 md:grid-cols-4">
         {/* Sidebar Tabs navigation */}
-        <div className="md:col-span-1 space-y-1.5 flex flex-row md:flex-col overflow-x-auto pb-2 md:pb-0 gap-1.5 md:gap-0 scrollbar-none min-w-0">
-          <button
-            type="button"
-            onClick={() => setActiveTab("personal")}
-            className={`flex-1 md:w-full shrink-0 flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === "personal" 
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <User className="h-4 w-4 shrink-0" /> Personal & Demographic
-            </div>
-            {tabErrorCounts.personal > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
-                {tabErrorCounts.personal}
-              </span>
-            )}
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => setActiveTab("academic")}
-            className={`flex-1 md:w-full shrink-0 flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === "academic" 
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <GraduationCap className="h-4 w-4 shrink-0" /> Academic & Admission
-            </div>
-            {tabErrorCounts.academic > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
-                {tabErrorCounts.academic}
-              </span>
-            )}
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => setActiveTab("contact")}
-            className={`flex-1 md:w-full shrink-0 flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === "contact" 
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <PhoneCall className="h-4 w-4 shrink-0" /> Family & Contact
-            </div>
-            {tabErrorCounts.contact > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
-                {tabErrorCounts.contact}
-              </span>
-            )}
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => setActiveTab("documents")}
-            className={`flex-1 md:w-full shrink-0 flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === "documents" 
-                ? "bg-primary text-primary-foreground shadow-sm font-semibold" 
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <FileCheck className="h-4 w-4 shrink-0" /> Documents & Legal
-            </div>
-            {tabErrorCounts.documents > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
-                {tabErrorCounts.documents}
-              </span>
-            )}
-          </button>
+        <div className="md:col-span-1 min-w-0">
+          <SectionNavGroup orientation="responsive" className="min-w-0">
+            <SectionNavCard
+              icon={User}
+              title="Personal & Demographic"
+              isActive={activeTab === "personal"}
+              onClick={() => setActiveTab("personal")}
+              badgeCount={tabErrorCounts.personal}
+              badgeVariant="destructive"
+            />
+            <SectionNavCard
+              icon={GraduationCap}
+              title="Academic & Admission"
+              isActive={activeTab === "academic"}
+              onClick={() => setActiveTab("academic")}
+              badgeCount={tabErrorCounts.academic}
+              badgeVariant="destructive"
+            />
+            <SectionNavCard
+              icon={PhoneCall}
+              title="Contact & Guardian"
+              isActive={activeTab === "contact"}
+              onClick={() => setActiveTab("contact")}
+              badgeCount={tabErrorCounts.contact}
+              badgeVariant="destructive"
+            />
+            <SectionNavCard
+              icon={FileCheck}
+              title="Documents & Legal"
+              isActive={activeTab === "documents"}
+              onClick={() => setActiveTab("documents")}
+              badgeCount={tabErrorCounts.documents}
+              badgeVariant="destructive"
+            />
+          </SectionNavGroup>
 
-          <div className="hidden md:block mt-8 p-3 rounded-lg border border-border/60 bg-muted/20 text-[11px] text-muted-foreground font-caption space-y-1">
-            <div className="flex items-center gap-1 font-semibold text-foreground">
+          <div className="hidden md:block mt-6 p-3 rounded-xl border border-border/60 bg-muted/20 text-[11px] text-muted-foreground font-caption space-y-1">
+            <div className="flex items-center gap-1.5 font-semibold text-foreground">
               <AlertCircle className="h-3.5 w-3.5 text-primary shrink-0" /> Progressive Registration
             </div>
             <p className="leading-relaxed">

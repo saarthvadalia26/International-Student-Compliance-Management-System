@@ -17,6 +17,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -118,29 +119,25 @@ export default function StudentHistoryPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-muted/40 p-1.5 rounded-xl border border-border/40 w-fit">
-        <button
-          onClick={() => setActiveTab("uploads")}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            activeTab === "uploads"
-              ? "bg-card text-foreground shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <History className="h-3.5 w-3.5" />
-          Document Upload History ({history.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("reminders")}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            activeTab === "reminders"
-              ? "bg-card text-foreground shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Bell className="h-3.5 w-3.5" />
-          Received Expiry Alerts ({reminders.length})
-        </button>
+      <div className="w-fit max-w-full">
+        <SectionNavGroup orientation="horizontal" variant="segmented" className="w-fit max-w-full">
+          <SectionNavCard
+            icon={History}
+            title={`Document Upload History (${history.length})`}
+            isActive={activeTab === "uploads"}
+            onClick={() => setActiveTab("uploads")}
+            variant="segmented"
+            size="sm"
+          />
+          <SectionNavCard
+            icon={Bell}
+            title={`Received Expiry Alerts (${reminders.length})`}
+            isActive={activeTab === "reminders"}
+            onClick={() => setActiveTab("reminders")}
+            variant="segmented"
+            size="sm"
+          />
+        </SectionNavGroup>
       </div>
 
       {activeTab === "uploads" && (

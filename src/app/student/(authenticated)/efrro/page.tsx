@@ -553,7 +553,7 @@ function DocumentCentreContent() {
 
               <CardContent className="p-0 pt-2 space-y-4">
                 <div 
-                  className="border-2 border-dashed border-primary/40 hover:border-primary rounded-2xl p-8 text-center bg-primary/5 transition-colors cursor-pointer"
+                  className="border-2 border-dashed border-primary/40 hover:border-primary rounded-2xl p-8 text-center bg-primary/5 transition-all duration-150 ease-out active:scale-[0.995] cursor-pointer"
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={(e) => {

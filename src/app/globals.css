@@ -66,6 +66,13 @@
   --animate-duration-fast: 150ms;
   --animate-duration-normal: 300ms;
   --animate-duration-slow: 500ms;
+
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-micro: 120ms;
+  --duration-fast: 180ms;
+  --duration-normal: 240ms;
 }
 
 :root {
@@ -158,6 +165,18 @@
   select option:disabled,
   select optgroup:disabled {
     color: #888888 !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+      transform: none !important;
+    }
   }
 }
 

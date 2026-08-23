@@ -167,7 +167,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                       onFocus={() => handlePrefetch(item.href)}
                       title={isCollapsed ? item.title : undefined}
                       className={cn(
-                        "flex min-h-[44px] w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        "flex min-h-[44px] w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ease-out cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground active:scale-[0.99] active:duration-75",
                         active && (isCollapsed ? "bg-primary/15 text-primary font-semibold" : "bg-accent/60 text-foreground"),
                         isCollapsed ? "justify-center px-0" : "justify-between"
                       )}
@@ -179,7 +179,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                       {!isCollapsed && (
                         <Icons.ChevronDown
                           className={cn(
-                            "h-4 w-4 shrink-0 transition-transform duration-200",
+                            "h-4 w-4 shrink-0 transition-transform duration-200 ease-out",
                             isOpen && "rotate-180"
                           )}
                         />
@@ -188,7 +188,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
 
                     {/* Sub-menu rendering */}
                     {!isCollapsed && isOpen && (
-                      <div className="mt-1 ml-8 space-y-1 border-l border-border pl-3">
+                      <div className="mt-1 ml-8 space-y-1 border-l border-border pl-3 animate-in fade-in-50 slide-in-from-top-1 duration-150">
                         {item.items?.map((subItem) => {
                           const subResolved = getResolvedHref(subItem.href);
                           const subActive = pathname === subResolved;
@@ -200,8 +200,8 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                               onMouseEnter={() => handlePrefetch(subItem.href)}
                               onFocus={() => handlePrefetch(subItem.href)}
                               className={cn(
-                                "block rounded-md px-3 py-2 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                                subActive && "text-primary font-semibold"
+                                "block rounded-md px-3 py-2 text-xs font-medium transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground active:scale-[0.99] active:duration-75",
+                                subActive && "text-primary font-semibold bg-accent/40"
                               )}
                             >
                               {subItem.title}
@@ -220,8 +220,8 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                     onFocus={() => handlePrefetch(item.href)}
                     title={isCollapsed ? item.title : undefined}
                     className={cn(
-                      "flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      active && "bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary/90 hover:text-primary-foreground",
+                      "flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-ring text-muted-foreground hover:bg-accent hover:text-accent-foreground active:scale-[0.99] active:duration-75",
+                      active && "bg-primary text-primary-foreground font-semibold shadow-xs hover:bg-primary/90 hover:text-primary-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
                   >

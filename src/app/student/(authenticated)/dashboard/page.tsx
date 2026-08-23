@@ -164,7 +164,7 @@ export default function StudentDashboardPage() {
             <Link href="/student/efrro" className="w-full md:w-auto">
               <Button 
                 size="lg" 
-                className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold gap-2.5 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 rounded-xl px-5 h-11"
+                className="w-full md:w-auto bg-primary hover:bg-primary/90 active:bg-primary/95 text-primary-foreground text-sm font-semibold gap-2.5 shadow-xs hover:shadow-sm active:scale-[0.98] transition-all duration-150 ease-out rounded-xl px-5 h-11"
               >
                 <Upload className="h-4 w-4" />
                 <span>Document Centre</span>
@@ -406,21 +406,21 @@ export default function StudentDashboardPage() {
               <CardTitle className="text-sm font-semibold">Quick Navigation</CardTitle>
             </CardHeader>
             <CardContent className="p-0 pt-2 space-y-2">
-              <Link href="/student/efrro" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-colors text-xs font-medium text-foreground">
+              <Link href="/student/efrro" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-all duration-150 ease-out active:scale-[0.99] active:duration-75 text-xs font-medium text-foreground">
                 <span className="flex items-center gap-2.5">
                   <Upload className="h-4 w-4 text-primary" />
                   Document Centre
                 </span>
                 <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
               </Link>
-              <Link href="/student/profile" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-colors text-xs font-medium text-foreground">
+              <Link href="/student/profile" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-all duration-150 ease-out active:scale-[0.99] active:duration-75 text-xs font-medium text-foreground">
                 <span className="flex items-center gap-2.5">
                   <User className="h-4 w-4 text-primary" />
                   View Full Profile
                 </span>
                 <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
               </Link>
-              <Link href="/student/history" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-colors text-xs font-medium text-foreground">
+              <Link href="/student/history" className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-accent hover:border-accent transition-all duration-150 ease-out active:scale-[0.99] active:duration-75 text-xs font-medium text-foreground">
                 <span className="flex items-center gap-2.5">
                   <History className="h-4 w-4 text-primary" />
                   Activity History Timeline

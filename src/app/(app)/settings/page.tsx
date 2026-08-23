@@ -30,6 +30,7 @@ import { AcademicProgramsTab } from "@/components/settings/academic-programs-tab
 import { CountryManagementTab } from "@/components/settings/country-management-tab";
 import { PlatformInfrastructureTab } from "@/components/settings/platform-infrastructure-tab";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
@@ -400,7 +401,7 @@ function SettingsPageContent() {
       </div>
 
       {/* Tabs Menu Navigation */}
-      <div className="flex border-b border-border overflow-x-auto gap-2 pb-px scrollbar-none">
+      <SectionNavGroup orientation="horizontal" variant="segmented" className="w-full overflow-x-auto">
         {[
           { id: "general", label: "General", icon: Building },
           { id: "programs", label: "Academic Programs", icon: GraduationCap },
@@ -410,25 +411,18 @@ function SettingsPageContent() {
           { id: "retention", label: "Retention Policies", icon: Clock },
           { id: "system", label: "System Health", icon: Database },
           { id: "security", label: "Security", icon: Lock }
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as "general" | "programs" | "countries" | "notifications" | "retention" | "system" | "security" | "users")}
-              className={`flex items-center gap-2 px-4 py-2 border-b-2 text-xs font-medium whitespace-nowrap transition-colors outline-none focus:text-primary ${
-                isActive 
-                  ? "border-primary text-primary" 
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+        ].map(tab => (
+          <SectionNavCard
+            key={tab.id}
+            icon={tab.icon}
+            title={tab.label}
+            isActive={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id as "general" | "programs" | "countries" | "notifications" | "retention" | "system" | "security" | "users")}
+            variant="segmented"
+            size="sm"
+          />
+        ))}
+      </SectionNavGroup>
 
       {/* Tab Workspaces Content */}
       <div className="space-y-6">

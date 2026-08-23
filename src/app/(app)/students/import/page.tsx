@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import {
   Select,
   SelectContent,
@@ -427,29 +428,25 @@ export default function BulkStudentImportPage() {
       </div>
 
       {/* Tabs: Wizard vs History */}
-      <div className="flex items-center gap-2 max-w-md bg-muted/40 p-1 rounded-xl border border-border/50">
-        <button
-          onClick={() => setActiveTab("wizard")}
-          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-            activeTab === "wizard"
-              ? "bg-background text-foreground shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Upload className="h-4 w-4" />
-          New Bulk Import
-        </button>
-        <button
-          onClick={() => setActiveTab("history")}
-          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-            activeTab === "history"
-              ? "bg-background text-foreground shadow-xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <History className="h-4 w-4" />
-          Import History & Batches
-        </button>
+      <div className="max-w-md">
+        <SectionNavGroup orientation="horizontal" variant="segmented" className="w-full">
+          <SectionNavCard
+            icon={Upload}
+            title="New Bulk Import"
+            isActive={activeTab === "wizard"}
+            onClick={() => setActiveTab("wizard")}
+            variant="segmented"
+            size="sm"
+          />
+          <SectionNavCard
+            icon={History}
+            title="Import History & Batches"
+            isActive={activeTab === "history"}
+            onClick={() => setActiveTab("history")}
+            variant="segmented"
+            size="sm"
+          />
+        </SectionNavGroup>
       </div>
 
       {activeTab === "wizard" && (

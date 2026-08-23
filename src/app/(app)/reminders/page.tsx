@@ -11,6 +11,7 @@ import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 import { fetchReminderSummary, ReminderSummaryMetrics } from "@/app/(app)/reminders/actions";
 import { Bell, Clock, FileText, Layers, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 
 export default function RemindersPage(): React.JSX.Element {
   const [activeTab, setActiveTab] = React.useState<"overview" | "rules" | "templates" | "logs">("overview");
@@ -74,48 +75,40 @@ export default function RemindersPage(): React.JSX.Element {
 
       <div className="w-full space-y-6">
         {/* Navigation Tabs */}
-        <div className="flex gap-1.5 bg-muted/40 border border-border/40 p-1.5 rounded-xl w-fit flex-wrap">
-          <button 
+        <SectionNavGroup orientation="horizontal" variant="segmented" className="w-fit max-w-full">
+          <SectionNavCard 
+            icon={Layers}
+            title="Overview & Summary"
+            isActive={activeTab === "overview"}
             onClick={() => setActiveTab("overview")}
-            className={`text-xs px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'overview' 
-                ? 'bg-background text-foreground shadow-sm' 
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Layers className="h-3.5 w-3.5" /> Overview & Summary
-          </button>
-          <button 
+            variant="segmented"
+            size="sm"
+          />
+          <SectionNavCard 
+            icon={Clock}
+            title="Trigger Rules"
+            isActive={activeTab === "rules"}
             onClick={() => setActiveTab("rules")}
-            className={`text-xs px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'rules' 
-                ? 'bg-background text-foreground shadow-sm' 
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Clock className="h-3.5 w-3.5" /> Trigger Rules
-          </button>
-          <button 
+            variant="segmented"
+            size="sm"
+          />
+          <SectionNavCard 
+            icon={FileText}
+            title="Templates Manager"
+            isActive={activeTab === "templates"}
             onClick={() => setActiveTab("templates")}
-            className={`text-xs px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'templates' 
-                ? 'bg-background text-foreground shadow-sm' 
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <FileText className="h-3.5 w-3.5" /> Templates Manager
-          </button>
-          <button 
+            variant="segmented"
+            size="sm"
+          />
+          <SectionNavCard 
+            icon={Bell}
+            title="Communication Logs"
+            isActive={activeTab === "logs"}
             onClick={() => setActiveTab("logs")}
-            className={`text-xs px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
-              activeTab === 'logs' 
-                ? 'bg-background text-foreground shadow-sm' 
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Bell className="h-3.5 w-3.5" /> Communication Logs
-          </button>
-        </div>
+            variant="segmented"
+            size="sm"
+          />
+        </SectionNavGroup>
 
         {/* Tab 1: Overview */}
         {activeTab === "overview" && (

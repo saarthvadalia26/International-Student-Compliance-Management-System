@@ -95,7 +95,7 @@ export default function StudentPortalShell({
                   href={link.href}
                   prefetch={true}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 ease-out outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98] active:duration-75",
                     isActive 
                       ? "bg-primary text-primary-foreground font-semibold shadow-xs" 
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -146,7 +146,7 @@ export default function StudentPortalShell({
 
       {/* Mobile Drawer Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-b border-border bg-card p-4 space-y-1.5 shadow-lg animate-in slide-in-from-top-2">
+        <div className="md:hidden border-b border-border bg-card p-4 space-y-1.5 shadow-lg animate-in slide-in-from-top-2 duration-150">
           {navLinks.map((link) => {
             const Icon = link.icon;
             const isActive = pathname === link.href;
@@ -157,7 +157,7 @@ export default function StudentPortalShell({
                 prefetch={true}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
-                  "flex min-h-[44px] items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "flex min-h-[44px] items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ease-out active:scale-[0.99] active:duration-75",
                   isActive
                     ? "bg-primary text-primary-foreground font-semibold"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"

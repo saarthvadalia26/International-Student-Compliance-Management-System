@@ -72,41 +72,40 @@ export const AsyncActionButton = React.forwardRef<HTMLButtonElement, AsyncAction
         aria-live="polite"
         aria-disabled={isDisabled}
         className={cn(
-          "transition-all duration-200 pointer-events-auto",
-          displayState === "success" && "bg-emerald-600 text-white hover:bg-emerald-600 focus:ring-emerald-500",
-          displayState === "error" && "bg-rose-600 text-white hover:bg-rose-600 focus:ring-rose-500",
-          isPending && "pointer-events-none select-none",
+          "transition-all duration-200 pointer-events-auto relative",
+          displayState === "success" && "bg-emerald-600 text-white hover:bg-emerald-600 focus-visible:ring-emerald-500 border-emerald-700/30",
+          displayState === "error" && "bg-rose-600 text-white hover:bg-rose-600 focus-visible:ring-rose-500 border-rose-700/30",
+          isPending && "pointer-events-none select-none active:scale-100",
           className
         )}
         style={{
-          // Extra assurance that pointer clicks are completely disabled during action execution
           pointerEvents: isPending ? "none" : undefined
         }}
         {...props}
       >
-        <span className="flex items-center justify-center gap-1.5">
+        <span className="flex items-center justify-center gap-1.5 transition-all duration-150">
           {/* 1. Loading Spinner */}
           {displayState === "loading" && (
-            <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-current" />
           )}
 
           {/* 2. Success Icon */}
           {displayState === "success" && (
-            <Check className="h-3.5 w-3.5 shrink-0 scale-110 transition-transform duration-200" />
+            <Check className="h-3.5 w-3.5 shrink-0 scale-105 transition-transform duration-150 ease-out text-current" />
           )}
 
           {/* 3. Error Icon */}
           {displayState === "error" && (
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 transition-transform duration-200" />
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 transition-transform duration-150 ease-out text-current" />
           )}
 
           {/* 4. Idle Icon */}
           {displayState === "idle" && Icon && (
-            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <Icon className="h-3.5 w-3.5 shrink-0 transition-transform duration-150" />
           )}
 
           {/* Text Labels Content */}
-          <span className="truncate">
+          <span className="truncate font-medium">
             {displayState === "loading" && loadingText}
             {displayState === "success" && successText}
             {displayState === "error" && errorText}
