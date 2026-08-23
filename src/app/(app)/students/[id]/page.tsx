@@ -30,7 +30,9 @@ import {
   Sparkles,
   Layers,
   GraduationCap,
-  Info
+  Info,
+  User,
+  Users
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
@@ -72,6 +74,19 @@ import { DOCUMENT_CONFIGS, getDocumentTheme } from "@/features/compliance/consta
 import { StudentDocumentCard } from "@/features/compliance/components/student-document-card";
 import { DocumentReminderSchedule } from "@/features/compliance/components/document-reminder-schedule";
 import { ProfileCompletionEngine, ProfileCompletionResult } from "@/domain/students/services/profile-completion.service";
+
+import { 
+  MARITAL_STATUS_OPTIONS, 
+  BLOOD_GROUP_OPTIONS, 
+  RELATIONSHIP_TYPE_OPTIONS, 
+  ADMISSION_CATEGORY_OPTIONS, 
+  formatAgeDisplay,
+  MaritalStatus,
+  BloodGroup,
+  RelationshipType,
+  AdmissionCategory
+} from "@/domain/students/types/registration-expansion.types";
+import { PhoneInput } from "@/components/ui/phone-input";
 
 export interface StudentDocument {
   number: string;
@@ -133,6 +148,17 @@ export interface StudentProfile {
   registrationNumber: string;
   nationalityCode: string;
   nationalityName: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  bloodGroup?: string | null;
+  maritalStatus?: string | null;
+  physicalDisability?: boolean | null;
+  fatherName?: string | null;
+  fatherMobile?: string | null;
+  fatherWhatsapp?: string | null;
+  motherName?: string | null;
+  motherMobile?: string | null;
+  motherWhatsapp?: string | null;
   programName: string;
   programCode: string;
   programId?: string | null;
@@ -141,6 +167,9 @@ export interface StudentProfile {
   school: string;
   admissionDate: string;
   expectedGraduation: string;
+  admissionCategory?: string | null;
+  admissionCategoryOther?: string | null;
+  siiApplicationNumber?: string | null;
   complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
   daysToPassportExpiry?: number;
   daysToVisaExpiry?: number;
@@ -176,7 +205,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
   
   const [student, setStudent] = React.useState<StudentProfile | undefined>(undefined);
   const [isLoadingStudent, setIsLoadingStudent] = React.useState(true);
-  const [activeSubTab, setActiveSubTab] = React.useState<"immigration" | "academic" | "contact">("immigration");
+  const [activeSubTab, setActiveSubTab] = React.useState<"immigration" | "personal" | "academic" | "contact">("immigration");
 
   // Academic Programs State
   const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
@@ -454,12 +483,32 @@ export default function StudentDetailsPage({ params }: PageProps) {
     registrationNumber: "",
     fullName: "",
     email: "",
+    dateOfBirth: "",
+    gender: "",
+    maritalStatus: "",
+    bloodGroup: "",
+    physicalDisability: "not_specified",
     programId: "",
     program: "",
+    admissionDate: "",
+    expectedGraduation: "",
+    admissionCategory: "",
+    admissionCategoryOther: "",
+    siiApplicationNumber: "",
     phoneHome: "",
     phoneLocal: "",
     permanentAddress: "",
     localAddress: "",
+    fatherName: "",
+    fatherMobile: "",
+    fatherWhatsapp: "",
+    motherName: "",
+    motherMobile: "",
+    motherWhatsapp: "",
+    emergencyContactName: "",
+    emergencyContactRelation: "parent",
+    emergencyContactPhone: "",
+    emergencyContactEmail: "",
     currentSemester: 1,
     academicStatus: "good_standing" as StudentProfile["academicStatus"],
     status: "active" as StudentProfile["status"],
@@ -479,12 +528,32 @@ export default function StudentDetailsPage({ params }: PageProps) {
         registrationNumber: student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "",
         fullName: student.fullName,
         email: student.email,
+        dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split("T")[0] : "",
+        gender: student.gender || "",
+        maritalStatus: student.maritalStatus || "",
+        bloodGroup: student.bloodGroup || "",
+        physicalDisability: student.physicalDisability === true ? "yes" : student.physicalDisability === false ? "no" : "not_specified",
         programId: student.programId || "",
         program: student.programName || student.programCode || "",
+        admissionDate: student.admissionDate ? student.admissionDate.split("T")[0] : "",
+        expectedGraduation: student.expectedGraduation ? student.expectedGraduation.split("T")[0] : "",
+        admissionCategory: student.admissionCategory || "",
+        admissionCategoryOther: student.admissionCategoryOther || "",
+        siiApplicationNumber: student.siiApplicationNumber || "",
         phoneHome: student.phoneHome,
         phoneLocal: student.phoneLocal || "",
         permanentAddress: student.permanentAddress,
         localAddress: student.localAddress || "",
+        fatherName: student.fatherName || "",
+        fatherMobile: student.fatherMobile || "",
+        fatherWhatsapp: student.fatherWhatsapp || "",
+        motherName: student.motherName || "",
+        motherMobile: student.motherMobile || "",
+        motherWhatsapp: student.motherWhatsapp || "",
+        emergencyContactName: student.emergencyContact?.name && student.emergencyContact.name !== "Not Specified" ? student.emergencyContact.name : "",
+        emergencyContactRelation: student.emergencyContact?.relationship || "parent",
+        emergencyContactPhone: student.emergencyContact?.phone && student.emergencyContact.phone !== "Not Specified" ? student.emergencyContact.phone : "",
+        emergencyContactEmail: student.emergencyContact?.email || "",
         currentSemester: student.currentSemester,
         academicStatus: student.academicStatus,
         status: student.status,
@@ -524,14 +593,22 @@ export default function StudentDetailsPage({ params }: PageProps) {
     return ProfileCompletionEngine.evaluate({
       fullName: student.fullName,
       nationalityCode: student.nationalityCode,
-      dateOfBirth: null,
-      gender: null,
+      dateOfBirth: student.dateOfBirth,
+      gender: student.gender,
+      maritalStatus: student.maritalStatus,
+      bloodGroup: student.bloodGroup,
+      physicalDisability: student.physicalDisability,
       programCode: student.programCode,
       admissionDate: student.admissionDate,
       expectedGraduation: student.expectedGraduation,
+      admissionCategory: student.admissionCategory,
+      admissionCategoryOther: student.admissionCategoryOther,
+      siiApplicationNumber: student.siiApplicationNumber,
       email: student.email,
       phoneHome: student.phoneHome,
       permanentAddress: student.permanentAddress,
+      fatherName: student.fatherName,
+      motherName: student.motherName,
       emergencyContactName: student.emergencyContact?.name,
       emergencyContactPhone: student.emergencyContact?.phone,
       passportNumber: student.passport?.number,
@@ -556,6 +633,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
         return;
       }
     }
+    if (editForm.admissionCategory === "iccr" && !editForm.siiApplicationNumber?.trim()) {
+      toast.error("Validation Error", { description: "SII Application Number is required for ICCR admission category." });
+      return;
+    }
+    if (editForm.admissionCategory === "other" && !editForm.admissionCategoryOther?.trim()) {
+      toast.error("Validation Error", { description: "Please specify the custom admission track." });
+      return;
+    }
+
+    // Parse disability 3-state value
+    let parsedDisability: boolean | null | undefined = undefined;
+    if (editForm.physicalDisability === "yes") parsedDisability = true;
+    else if (editForm.physicalDisability === "no") parsedDisability = false;
+    else if (editForm.physicalDisability === "not_specified") parsedDisability = null;
 
     setIsSaving(true);
     setSaveSuccess(false);
@@ -565,13 +656,33 @@ export default function StudentDetailsPage({ params }: PageProps) {
       const res = await updateStudentAction(studentId, {
         registrationNumber: editForm.registrationNumber?.trim() || null,
         fullName: editForm.fullName.trim(),
+        dateOfBirth: editForm.dateOfBirth?.trim() || undefined,
+        gender: (editForm.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
+        maritalStatus: (editForm.maritalStatus as MaritalStatus) || undefined,
+        bloodGroup: editForm.bloodGroup?.trim() || undefined,
+        physicalDisability: parsedDisability,
         email: editForm.email?.trim() || undefined,
         phoneHome: editForm.phoneHome?.trim() || undefined,
         phoneLocal: editForm.phoneLocal?.trim() || undefined,
         permanentAddress: editForm.permanentAddress?.trim() || undefined,
         localAddress: editForm.localAddress?.trim() || undefined,
+        fatherName: editForm.fatherName?.trim() || undefined,
+        fatherMobile: editForm.fatherMobile?.trim() || undefined,
+        fatherWhatsapp: editForm.fatherWhatsapp?.trim() || undefined,
+        motherName: editForm.motherName?.trim() || undefined,
+        motherMobile: editForm.motherMobile?.trim() || undefined,
+        motherWhatsapp: editForm.motherWhatsapp?.trim() || undefined,
+        relationshipName: editForm.emergencyContactName?.trim() || undefined,
+        relationshipType: (editForm.emergencyContactRelation as RelationshipType) || undefined,
+        relationshipPhone: editForm.emergencyContactPhone?.trim() || undefined,
+        relationshipEmail: editForm.emergencyContactEmail?.trim() || undefined,
         programId: editForm.programId?.trim() || undefined,
         programCode: editForm.program?.trim() || undefined,
+        admissionDate: editForm.admissionDate?.trim() || undefined,
+        expectedGraduation: editForm.expectedGraduation?.trim() || undefined,
+        admissionCategory: (editForm.admissionCategory as AdmissionCategory) || undefined,
+        admissionCategoryOther: editForm.admissionCategory === "other" ? (editForm.admissionCategoryOther?.trim() || undefined) : undefined,
+        siiApplicationNumber: editForm.siiApplicationNumber?.trim() || undefined,
         currentSemester: Number(editForm.currentSemester) || 1,
         academicStatus: editForm.academicStatus,
         status: editForm.status,
@@ -1127,6 +1238,16 @@ export default function StudentDetailsPage({ params }: PageProps) {
               Legal & Immigration Papers
             </button>
             <button
+              onClick={() => setActiveSubTab("personal")}
+              className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
+                activeSubTab === "personal"
+                  ? "border-primary text-foreground font-semibold"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Personal & Demographic Info
+            </button>
+            <button
               onClick={() => setActiveSubTab("academic")}
               className={`py-2 px-4 text-xs font-medium border-b-2 transition-colors ${
                 activeSubTab === "academic"
@@ -1134,7 +1255,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              Academic Profile
+              Academic & Admission Profile
             </button>
             <button
               onClick={() => setActiveSubTab("contact")}
@@ -1144,7 +1265,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              Contact & Addresses
+              Contact & Family Coordinates
             </button>
           </div>
 
@@ -1258,17 +1379,107 @@ export default function StudentDetailsPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* Academic Profile */}
+          {/* Tab 2: Personal & Demographic Info */}
+          {activeSubTab === "personal" && (
+            <Card className="border border-border/60 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="pb-4 border-b border-border/50">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  Personal & Demographic Identity
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                  Biographical coordinates, demographic background, and physical indicators.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6 space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2 text-xs w-full min-w-0">
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Full Name (Legal)</span>
+                    <span className="font-semibold text-foreground block text-sm break-words">{student.fullName}</span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Nationality</span>
+                    <div className="flex items-center gap-2 font-semibold text-foreground pt-0.5">
+                      <CountryFlag countryCode={student.nationalityCode} size="sm" />
+                      <span>{student.nationalityName}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 p-3 rounded-xl bg-primary/5 border border-primary/20 min-w-0 sm:col-span-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="text-muted-foreground block text-[11px] font-medium">Date of Birth & Age Calculation</span>
+                      {student.dateOfBirth && (() => {
+                        const ageInfo = formatAgeDisplay(student.dateOfBirth);
+                        return ageInfo ? (
+                          <Badge variant="outline" className="text-xs px-2.5 py-0.5 font-bold bg-primary/10 text-primary border-primary/30">
+                            {ageInfo.fullText}
+                          </Badge>
+                        ) : null;
+                      })()}
+                    </div>
+                    <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+                      <Calendar className="h-4 w-4 text-primary shrink-0" />
+                      <span>{student.dateOfBirth ? AcademicProgressionEngine.formatDisplayDate(student.dateOfBirth) : "Not provided"}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Calculated dynamically relative to the student&apos;s date of birth and elapsed chronological years.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Gender</span>
+                    <span className="font-semibold text-foreground block capitalize">
+                      {student.gender ? student.gender.replace(/_/g, " ") : "Not provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Marital Status</span>
+                    <span className="font-semibold text-foreground block capitalize">
+                      {student.maritalStatus ? student.maritalStatus.replace(/_/g, " ") : "Not provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Blood Group</span>
+                    <span className="font-semibold text-foreground block font-mono">
+                      {student.bloodGroup || "Not provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Physical Disability</span>
+                    <div>
+                      {student.physicalDisability === true ? (
+                        <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 text-xs px-2 py-0.5">
+                          Yes (Declared)
+                        </Badge>
+                      ) : student.physicalDisability === false ? (
+                        <Badge variant="outline" className="text-muted-foreground text-xs px-2 py-0.5">
+                          No
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground italic font-normal">Not provided</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tab 3: Academic & Admission Profile */}
           {activeSubTab === "academic" && (
             <Card className="border border-border/60 shadow-sm rounded-2xl overflow-hidden">
               <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-border/50">
                 <div>
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
                     <GraduationCap className="h-4 w-4 text-primary" />
-                    Academic Standing & Semester Progression
+                    Academic Standing, Admission & Progression
                   </CardTitle>
                   <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                    Automated curriculum progression, enrollment timeline, and adjustment history.
+                    Admission track, curriculum structure, enrollment timeline, and adjustment history.
                   </CardDescription>
                 </div>
                 <Button 
@@ -1290,6 +1501,27 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "Not provided"}
                     </span>
                   </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Admission Category</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.admissionCategory === "iccr" ? "ICCR (Indian Council for Cultural Relations)"
+                        : student.admissionCategory === "sii" ? "Study in India (SII)"
+                        : student.admissionCategory === "direct" ? "Direct Admission"
+                        : student.admissionCategory === "foreign_govt_sponsored" ? "Foreign Govt. Sponsored"
+                        : student.admissionCategory === "other" ? `Other (${student.admissionCategoryOther || "Custom Track"})`
+                        : "Not provided"}
+                    </span>
+                  </div>
+
+                  {(student.siiApplicationNumber || student.admissionCategory === "iccr") && (
+                    <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                      <span className="text-muted-foreground block text-[11px] font-medium">SII Application Number</span>
+                      <span className="font-semibold text-foreground block font-mono">
+                        {student.siiApplicationNumber || "Pending Entry"}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Registered School</span>
@@ -1410,64 +1642,111 @@ export default function StudentDetailsPage({ params }: PageProps) {
             </Card>
           )}
 
-          {/* Contact Details */}
+          {/* Tab 4: Contact & Family Details */}
           {activeSubTab === "contact" && (
-            <Card className="border border-border/60 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm font-semibold">Contact & Host Country Address</CardTitle>
-                <CardDescription className="text-[10px] font-caption">Home country addresses and temporary host coordinates.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4 text-xs">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Institutional Email</span>
-                    <span className="font-semibold text-foreground block">{student.email}</span>
+            <div className="space-y-6">
+              <Card className="border border-border/60 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-sm font-semibold">Contact & Host Country Coordinates</CardTitle>
+                  <CardDescription className="text-[10px] font-caption">Direct student email, home country phone, and residential addresses.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4 text-xs">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground block font-caption">Institutional Email</span>
+                      <span className="font-semibold text-foreground block">{student.email || "Not provided"}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground block font-caption">Home Country Phone</span>
+                      <span className="font-semibold text-foreground block">{student.phoneHome || "Not provided"}</span>
+                    </div>
+                    <div className="space-y-1 sm:col-span-2">
+                      <span className="text-muted-foreground block font-caption">Local Phone (Host / India)</span>
+                      <span className="font-semibold text-foreground block">{student.phoneLocal || "Not provided"}</span>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Home Country Phone</span>
-                    <span className="font-semibold text-foreground block">{student.phoneHome}</span>
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <span className="text-muted-foreground block font-caption">Local Phone (Host)</span>
-                    <span className="font-semibold text-foreground block">{student.phoneLocal || "Not provided"}</span>
-                  </div>
-                </div>
 
-                <Separator />
-                
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Permanent Home Address</span>
-                    <span className="font-medium text-foreground block leading-relaxed">{student.permanentAddress}</span>
+                  <Separator />
+                  
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground block font-caption">Permanent Home Address</span>
+                      <span className="font-medium text-foreground block leading-relaxed">{student.permanentAddress || "Not provided"}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-muted-foreground block font-caption">Local Address (Host Country Hostel/Rent)</span>
+                      <span className="font-medium text-foreground block leading-relaxed">{student.localAddress || "Not provided"}</span>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground block font-caption">Local Address (Host Country Hostel/Rent)</span>
-                    <span className="font-medium text-foreground block leading-relaxed">{student.localAddress || "Not provided"}</span>
-                  </div>
-                </div>
 
-                <Separator />
+                  <Separator />
 
-                {/* WhatsApp OTP Auth Control for Admin */}
-                <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5" />
-                      Registered WhatsApp OTP Number
-                    </span>
-                    <Badge variant={student.status === "active" ? "default" : "destructive"} className="text-[10px] h-5">
-                      {student.status === "active" ? "Login Enabled" : "Login Disabled"}
-                    </Badge>
+                  {/* WhatsApp OTP Auth Control for Admin */}
+                  <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" />
+                        Registered WhatsApp OTP Number
+                      </span>
+                      <Badge variant={student.status === "active" ? "default" : "destructive"} className="text-[10px] h-5">
+                        {student.status === "active" ? "Login Enabled" : "Login Disabled"}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-foreground font-mono font-medium">
+                      {student.phoneLocal || student.phoneHome || "No mobile number registered"}
+                    </p>
                   </div>
-                  <p className="text-[11px] text-foreground font-mono font-medium">
-                    {student.phoneLocal || student.phoneHome || "No mobile number registered"}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Administrators can update the mobile number or disable portal access via the Edit Profile action.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* Family Information Card */}
+              <Card className="border border-border/60 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    Family Information
+                  </CardTitle>
+                  <CardDescription className="text-[10px] font-caption">Parents&apos; contact coordinates and WhatsApp channels.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4 text-xs">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {/* Father Details */}
+                    <div className="p-3.5 rounded-xl border border-border/60 bg-muted/10 space-y-2">
+                      <span className="font-bold text-foreground block uppercase text-[10px] tracking-wider">Father Information</span>
+                      <div className="space-y-1">
+                        <span className="text-muted-foreground block font-caption">Full Name</span>
+                        <span className="font-semibold text-foreground block">{student.fatherName || "Not provided"}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-muted-foreground block font-caption">Mobile Number</span>
+                        <span className="font-medium text-foreground block">{student.fatherMobile || "Not provided"}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-muted-foreground block font-caption">WhatsApp Number</span>
+                        <span className="font-medium text-foreground block">{student.fatherWhatsapp || "Not provided"}</span>
+                      </div>
+                    </div>
+
+                    {/* Mother Details */}
+                    <div className="p-3.5 rounded-xl border border-border/60 bg-muted/10 space-y-2">
+                      <span className="font-bold text-foreground block uppercase text-[10px] tracking-wider">Mother Information</span>
+                      <div className="space-y-1">
+                        <span className="text-muted-foreground block font-caption">Full Name</span>
+                        <span className="font-semibold text-foreground block">{student.motherName || "Not provided"}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-muted-foreground block font-caption">Mobile Number</span>
+                        <span className="font-medium text-foreground block">{student.motherMobile || "Not provided"}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-muted-foreground block font-caption">WhatsApp Number</span>
+                        <span className="font-medium text-foreground block">{student.motherWhatsapp || "Not provided"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
 
@@ -1870,118 +2149,371 @@ export default function StudentDetailsPage({ params }: PageProps) {
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold">Edit Student Profile</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSaveEdit} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="registrationNumber">University Enrollment Number</label>
-              <Input 
-                id="registrationNumber" 
-                placeholder="e.g. NFSU/2026/CS/101 (leave empty if not yet assigned)" 
-                value={editForm.registrationNumber} 
-                onChange={handleFormChange} 
-                className="h-9 text-sm font-mono" 
-              />
-              <p className="text-[10px] text-muted-foreground font-caption">
-                Externally issued by the university academic registrar.
-              </p>
+          <form onSubmit={handleSaveEdit} className="space-y-5 py-2">
+            {/* Identity & Demographics Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+                <User className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Identity & Demographics</h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-foreground" htmlFor="fullName">Full Legal Name *</label>
+                  <Input id="fullName" value={editForm.fullName} onChange={handleFormChange} className="h-9 text-sm" required />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="registrationNumber">University Enrollment Number</label>
+                  <Input 
+                    id="registrationNumber" 
+                    placeholder="e.g. NFSU/2026/CS/101" 
+                    value={editForm.registrationNumber} 
+                    onChange={handleFormChange} 
+                    className="h-9 text-sm font-mono" 
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-foreground" htmlFor="dateOfBirth">Date of Birth</label>
+                    {editForm.dateOfBirth && (() => {
+                      const ageInfo = formatAgeDisplay(editForm.dateOfBirth);
+                      return ageInfo ? (
+                        <span className="text-[10px] font-semibold text-primary font-mono">
+                          {ageInfo.fullText}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+                  <DatePicker
+                    id="dateOfBirth"
+                    value={editForm.dateOfBirth}
+                    onChange={(e) => {
+                      setEditForm(prev => ({ ...prev, dateOfBirth: e.target.value }));
+                      setIsDirty(true);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="gender">Gender</label>
+                  <Select value={editForm.gender} onValueChange={(val) => handleFormSelectChange("gender", val || "")}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select gender..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="transgender">Transgender</SelectItem>
+                      <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="maritalStatus">Marital Status</label>
+                  <Select value={editForm.maritalStatus} onValueChange={(val) => handleFormSelectChange("maritalStatus", val || "")}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select marital status..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MARITAL_STATUS_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="bloodGroup">Blood Group</label>
+                  <Select value={editForm.bloodGroup} onValueChange={(val) => handleFormSelectChange("bloodGroup", val || "")}>
+                    <SelectTrigger className="h-9 text-xs font-mono">
+                      <SelectValue placeholder="Select blood group..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BLOOD_GROUP_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value} className="font-mono">{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="physicalDisability">Physical Disability</label>
+                  <Select value={editForm.physicalDisability} onValueChange={(val) => handleFormSelectChange("physicalDisability", val || "not_specified")}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not_specified">Not Specified / Not provided</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                      <SelectItem value="yes">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="fullName">Full Name</label>
-              <Input id="fullName" value={editForm.fullName} onChange={handleFormChange} className="h-9 text-sm" />
-            </div>
+            {/* Academic & Admission Details Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+                <GraduationCap className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Academic & Admission Profile</h4>
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="program">Academic Program</label>
-              <SearchableProgramSelector
-                id="program"
-                programs={academicPrograms}
-                value={editForm.programId || editForm.program}
-                onChange={(p) => {
-                  setEditForm(prev => ({
-                    ...prev,
-                    programId: p?.id || "",
-                    program: p?.programName || ""
-                  }));
-                  setIsDirty(true);
-                }}
-                placeholder="Search and select academic program..."
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="status">Enrollment Status</label>
-                <Select value={editForm.status} onValueChange={(val) => handleFormSelectChange("status", val || "active")}>
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                    <SelectItem value="graduated">Graduated</SelectItem>
-                    <SelectItem value="withdrawn">Withdrawn</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-xs font-medium text-foreground" htmlFor="program">Academic Program</label>
+                <SearchableProgramSelector
+                  id="program"
+                  programs={academicPrograms}
+                  value={editForm.programId || editForm.program}
+                  onChange={(p) => {
+                    setEditForm(prev => ({
+                      ...prev,
+                      programId: p?.id || "",
+                      program: p?.programName || ""
+                    }));
+                    setIsDirty(true);
+                  }}
+                  placeholder="Search and select academic program..."
+                />
               </div>
-              
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="admissionCategory">Admission Category</label>
+                  <Select value={editForm.admissionCategory} onValueChange={(val) => handleFormSelectChange("admissionCategory", val || "")}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select admission track..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ADMISSION_CATEGORY_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(editForm.admissionCategory === "iccr" || editForm.siiApplicationNumber) && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="siiApplicationNumber">
+                      SII Application Number {editForm.admissionCategory === "iccr" && <span className="text-destructive">*</span>}
+                    </label>
+                    <Input 
+                      id="siiApplicationNumber" 
+                      placeholder="e.g. SII-2026-98124" 
+                      value={editForm.siiApplicationNumber} 
+                      onChange={handleFormChange} 
+                      className="h-9 text-sm font-mono" 
+                    />
+                  </div>
+                )}
+
+                {editForm.admissionCategory === "other" && (
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="admissionCategoryOther">
+                      Please specify Custom Admission Category <span className="text-destructive">*</span>
+                    </label>
+                    <Input 
+                      id="admissionCategoryOther" 
+                      placeholder="e.g. Bilateral Government Scholarship" 
+                      value={editForm.admissionCategoryOther} 
+                      onChange={handleFormChange} 
+                      className="h-9 text-sm" 
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="admissionDate">Admission Date</label>
+                  <DatePicker
+                    id="admissionDate"
+                    value={editForm.admissionDate}
+                    onChange={(e) => {
+                      setEditForm(prev => ({ ...prev, admissionDate: e.target.value }));
+                      setIsDirty(true);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="expectedGraduation">Expected Graduation Date</label>
+                  <DatePicker
+                    id="expectedGraduation"
+                    value={editForm.expectedGraduation}
+                    onChange={(e) => {
+                      setEditForm(prev => ({ ...prev, expectedGraduation: e.target.value }));
+                      setIsDirty(true);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="status">Enrollment Status</label>
+                  <Select value={editForm.status} onValueChange={(val) => handleFormSelectChange("status", val || "active")}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="graduated">Graduated</SelectItem>
+                      <SelectItem value="withdrawn">Withdrawn</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="academicStatus">Academic Standing</label>
+                  <Select value={editForm.academicStatus} onValueChange={(val) => handleFormSelectChange("academicStatus", val || "good_standing")}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="good_standing">Good Standing</SelectItem>
+                      <SelectItem value="probation">Probation</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-1.5">
+                <span className="text-[11px] text-muted-foreground block font-medium">Current Semester Progression</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-foreground font-mono">Semester {student?.currentSemester || 1} of {student?.totalSemesters || 8}</span>
+                  <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/20 flex items-center gap-1">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    Automatically Managed
+                  </Badge>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Calculated automatically from admission date and course structure. To record exceptions, use the <strong>Academic Adjustment</strong> workflow.
+                </p>
+              </div>
+            </div>
+
+            {/* Contact Coordinates Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+                <Phone className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Contact & Residential Coordinates</h4>
+              </div>
+
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="academicStatus">Academic Standing</label>
-                <Select value={editForm.academicStatus} onValueChange={(val) => handleFormSelectChange("academicStatus", val || "good_standing")}>
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="good_standing">Good Standing</SelectItem>
-                    <SelectItem value="probation">Probation</SelectItem>
-                    <SelectItem value="suspended">Suspended</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-xs font-medium text-foreground" htmlFor="email">Institutional Email Address</label>
+                <Input id="email" type="email" value={editForm.email} onChange={handleFormChange} className="h-9 text-sm" />
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="email">Email Address</label>
-              <Input id="email" type="email" value={editForm.email} onChange={handleFormChange} className="h-9 text-sm" />
-            </div>
-
-            <div className="p-3 bg-muted/40 rounded-xl border border-border/50 space-y-1.5">
-              <span className="text-[11px] text-muted-foreground block font-medium">Current Semester Progression</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-foreground font-mono">Semester {student?.currentSemester || 1} of {student?.totalSemesters || 8}</span>
-                <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/20 flex items-center gap-1">
-                  <Sparkles className="h-2.5 w-2.5" />
-                  Automatically Managed
-                </Badge>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">Home Country Phone</label>
+                  <Input id="phoneHome" value={editForm.phoneHome} onChange={handleFormChange} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="phoneLocal">Local Host Phone</label>
+                  <Input id="phoneLocal" value={editForm.phoneLocal} onChange={handleFormChange} className="h-9 text-sm" />
+                </div>
               </div>
-              <p className="text-[10px] text-muted-foreground leading-tight">
-                Automatically calculated from admission date ({AcademicProgressionEngine.formatDisplayDate(student?.admissionDate)}) and course configuration. To record exceptions, use the <strong>Academic Adjustment</strong> workflow.
-              </p>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">Home Phone</label>
-                <Input id="phoneHome" value={editForm.phoneHome} onChange={handleFormChange} className="h-9 text-sm" />
+                <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">Permanent Home Address</label>
+                <Textarea id="permanentAddress" value={editForm.permanentAddress} onChange={handleFormChange} className="min-h-16 text-sm" />
               </div>
+
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="phoneLocal">Local Phone</label>
-                <Input id="phoneLocal" value={editForm.phoneLocal} onChange={handleFormChange} className="h-9 text-sm" />
+                <label className="text-xs font-medium text-foreground" htmlFor="localAddress">Local Host Address</label>
+                <Textarea id="localAddress" value={editForm.localAddress} onChange={handleFormChange} className="min-h-16 text-sm" />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">Permanent Address</label>
-              <Textarea id="permanentAddress" value={editForm.permanentAddress} onChange={handleFormChange} className="min-h-16 text-sm" />
+            {/* Family Details Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+                <Users className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Family Information</h4>
+              </div>
+
+              {/* Father Details */}
+              <div className="p-3 bg-muted/20 border border-border/50 rounded-xl space-y-3">
+                <span className="text-xs font-bold text-foreground block">Father Details</span>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="fatherName">Father Full Name</label>
+                  <Input id="fatherName" value={editForm.fatherName} onChange={handleFormChange} placeholder="e.g. Robert Smith" className="h-9 text-sm" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="fatherMobile">Father Mobile Number</label>
+                    <Input id="fatherMobile" value={editForm.fatherMobile} onChange={handleFormChange} placeholder="e.g. +44 7911 123456" className="h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="fatherWhatsapp">Father WhatsApp Number</label>
+                    <Input id="fatherWhatsapp" value={editForm.fatherWhatsapp} onChange={handleFormChange} placeholder="e.g. +44 7911 123456" className="h-9 text-sm" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Mother Details */}
+              <div className="p-3 bg-muted/20 border border-border/50 rounded-xl space-y-3">
+                <span className="text-xs font-bold text-foreground block">Mother Details</span>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="motherName">Mother Full Name</label>
+                  <Input id="motherName" value={editForm.motherName} onChange={handleFormChange} placeholder="e.g. Sarah Smith" className="h-9 text-sm" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="motherMobile">Mother Mobile Number</label>
+                    <Input id="motherMobile" value={editForm.motherMobile} onChange={handleFormChange} placeholder="e.g. +44 7911 654321" className="h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="motherWhatsapp">Mother WhatsApp Number</label>
+                    <Input id="motherWhatsapp" value={editForm.motherWhatsapp} onChange={handleFormChange} placeholder="e.g. +44 7911 654321" className="h-9 text-sm" />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="localAddress">Local Address</label>
-              <Textarea id="localAddress" value={editForm.localAddress} onChange={handleFormChange} className="min-h-16 text-sm" />
+            {/* Emergency Liaison Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Emergency Liaison Contact</h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactName">Contact Name</label>
+                  <Input id="emergencyContactName" value={editForm.emergencyContactName} onChange={handleFormChange} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactRelation">Relationship Type</label>
+                  <Select value={editForm.emergencyContactRelation} onValueChange={(val) => handleFormSelectChange("emergencyContactRelation", val || "parent")}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RELATIONSHIP_TYPE_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactPhone">Primary Phone</label>
+                  <Input id="emergencyContactPhone" value={editForm.emergencyContactPhone} onChange={handleFormChange} className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactEmail">Email Address</label>
+                  <Input id="emergencyContactEmail" type="email" value={editForm.emergencyContactEmail} onChange={handleFormChange} className="h-9 text-sm" />
+                </div>
+              </div>
             </div>
 
             {/* Consular & Embassy Information Section */}
-            <div className="pt-3 border-t border-border/60 space-y-3">
-              <div className="flex items-center gap-2">
+            <div className="pt-2 space-y-3">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/40">
                 <Building className="h-4 w-4 text-primary" />
                 <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Consular & Embassy Information</h4>
               </div>

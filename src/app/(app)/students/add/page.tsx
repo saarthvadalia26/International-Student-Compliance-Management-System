@@ -9,11 +9,14 @@ import {
   PhoneCall, 
   FileCheck, 
   ChevronLeft, 
-  AlertCircle,
-  XCircle,
-  ArrowRight
+  AlertCircle, 
+  XCircle, 
+  Layers, 
+  Sparkles, 
+  Info,
+  Users
 } from "lucide-react";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -30,7 +33,17 @@ import { RegisterStudentInput } from "@/services/student/student.types";
 import { DatePicker } from "@/components/ui/date-picker";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
-import { Layers, Sparkles } from "lucide-react";
+import { 
+  MARITAL_STATUS_OPTIONS, 
+  BLOOD_GROUP_OPTIONS, 
+  RELATIONSHIP_TYPE_OPTIONS, 
+  ADMISSION_CATEGORY_OPTIONS, 
+  formatAgeDisplay,
+  MaritalStatus,
+  BloodGroup,
+  RelationshipType,
+  AdmissionCategory
+} from "@/domain/students/types/registration-expansion.types";
 
 type TabKey = "personal" | "academic" | "contact" | "documents";
 
@@ -48,23 +61,41 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   nationality: { tab: "personal", elementId: "nationality", label: "Nationality" },
   gender: { tab: "personal", elementId: "gender", label: "Gender" },
   dateOfBirth: { tab: "personal", elementId: "dateOfBirth", label: "Date of Birth" },
+  maritalStatus: { tab: "personal", elementId: "maritalStatus", label: "Marital Status" },
+  bloodGroup: { tab: "personal", elementId: "bloodGroup", label: "Blood Group" },
+  physicalDisability: { tab: "personal", elementId: "physicalDisability", label: "Physical Disability" },
+  
   programCode: { tab: "academic", elementId: "program", label: "Academic Program" },
   program: { tab: "academic", elementId: "program", label: "Academic Program" },
   school: { tab: "academic", elementId: "school", label: "School / Department" },
   admissionDate: { tab: "academic", elementId: "admissionDate", label: "Admission Date" },
   expectedGraduation: { tab: "academic", elementId: "expectedGraduation", label: "Expected Graduation Date" },
   currentSemester: { tab: "academic", elementId: "currentSemester", label: "Current Semester" },
+  admissionCategory: { tab: "academic", elementId: "admissionCategory", label: "Admission Category" },
+  admissionCategoryOther: { tab: "academic", elementId: "admissionCategoryOther", label: "Custom Admission Track" },
+  siiApplicationNumber: { tab: "academic", elementId: "siiApplicationNumber", label: "SII Application Number" },
+  
   phoneHome: { tab: "contact", elementId: "phoneHome", label: "Home Country Phone" },
   email: { tab: "contact", elementId: "email", label: "Student Email" },
   phoneLocal: { tab: "contact", elementId: "phoneLocal", label: "Local Contact Phone" },
   permanentAddress: { tab: "contact", elementId: "permanentAddress", label: "Permanent Address" },
   localAddress: { tab: "contact", elementId: "localAddress", label: "Local Address" },
+  
+  fatherName: { tab: "contact", elementId: "fatherName", label: "Father Name" },
+  fatherMobile: { tab: "contact", elementId: "fatherMobile", label: "Father Mobile" },
+  fatherWhatsapp: { tab: "contact", elementId: "fatherWhatsapp", label: "Father WhatsApp" },
+  motherName: { tab: "contact", elementId: "motherName", label: "Mother Name" },
+  motherMobile: { tab: "contact", elementId: "motherMobile", label: "Mother Mobile" },
+  motherWhatsapp: { tab: "contact", elementId: "motherWhatsapp", label: "Mother WhatsApp" },
+
   relationshipName: { tab: "contact", elementId: "emergencyContactName", label: "Emergency Contact Name" },
   emergencyContactName: { tab: "contact", elementId: "emergencyContactName", label: "Emergency Contact Name" },
   relationshipType: { tab: "contact", elementId: "emergencyContactRelation", label: "Relationship Type" },
   emergencyContactRelation: { tab: "contact", elementId: "emergencyContactRelation", label: "Relationship Type" },
   relationshipPhone: { tab: "contact", elementId: "emergencyContactPhone", label: "Emergency Contact Phone" },
   emergencyContactPhone: { tab: "contact", elementId: "emergencyContactPhone", label: "Emergency Contact Phone" },
+  relationshipEmail: { tab: "contact", elementId: "emergencyContactEmail", label: "Emergency Contact Email" },
+  
   passportNumber: { tab: "documents", elementId: "passportNumber", label: "Passport Number" },
   passportIssueDate: { tab: "documents", elementId: "passportIssueDate", label: "Passport Issue Date" },
   passportExpiry: { tab: "documents", elementId: "passportExpiry", label: "Passport Expiry Date" },
@@ -138,11 +169,27 @@ export default function StudentRegistrationPage() {
 
   // Form State (persisted across all tab transitions)
   const [formData, setFormData] = React.useState({
-    enrollmentNumber: "",
+    // Personal Identity
     fullName: "",
     nationality: "",
     gender: "",
     dateOfBirth: "",
+    maritalStatus: "",
+    bloodGroup: "",
+    physicalDisability: "", // "" (not specified), "yes", "no"
+
+    // Academic Profile
+    enrollmentNumber: "",
+    programId: "",
+    program: "",
+    school: "",
+    admissionDate: "",
+    expectedGraduation: "",
+    admissionCategory: "",
+    admissionCategoryOther: "",
+    siiApplicationNumber: "",
+
+    // Contact Coordinates
     email: "",
     phoneHome: "",
     phoneHomeCountryCode: "+91",
@@ -152,14 +199,32 @@ export default function StudentRegistrationPage() {
     phoneLocalNumber: "",
     permanentAddress: "",
     localAddress: "",
-    programId: "",
-    program: "",
-    school: "",
-    admissionDate: "",
-    expectedGraduation: "",
+
+    // Family Information
+    fatherName: "",
+    fatherMobile: "",
+    fatherMobileCountryCode: "+91",
+    fatherMobileNumber: "",
+    fatherWhatsapp: "",
+    fatherWhatsappCountryCode: "+91",
+    fatherWhatsappNumber: "",
+    motherName: "",
+    motherMobile: "",
+    motherMobileCountryCode: "+91",
+    motherMobileNumber: "",
+    motherWhatsapp: "",
+    motherWhatsappCountryCode: "+91",
+    motherWhatsappNumber: "",
+
+    // Emergency Contact
     emergencyContactName: "",
     emergencyContactRelation: "parent",
     emergencyContactPhone: "",
+    emergencyContactCountryCode: "+91",
+    emergencyContactNumber: "",
+    emergencyContactEmail: "",
+
+    // Documents
     passportNumber: "",
     passportIssueDate: "",
     passportExpiry: "",
@@ -189,6 +254,11 @@ export default function StudentRegistrationPage() {
     });
     return counts;
   }, [validationErrors]);
+
+  // Derived age display
+  const calculatedAgeInfo = React.useMemo(() => {
+    return formatAgeDisplay(formData.dateOfBirth);
+  }, [formData.dateOfBirth]);
 
   // Helper to calculate expected graduation date dynamically from program configuration
   const calculateGraduationDate = (programIdent: string, admissionDateStr: string) => {
@@ -261,7 +331,11 @@ export default function StudentRegistrationPage() {
     const normalizedVal = normalizeDateToISO(value) || value;
 
     // Clear validation error on select/date change
-    const relatedKey = field === "nationality" ? "nationalityCode" : field === "program" ? "programCode" : field === "emergencyContactRelation" ? "relationshipType" : field;
+    const relatedKey = field === "nationality" ? "nationalityCode" 
+      : field === "program" ? "programCode" 
+      : field === "emergencyContactRelation" ? "relationshipType" 
+      : field;
+
     if (validationErrors[field] || validationErrors[relatedKey]) {
       setValidationErrors(prev => {
         const next = { ...prev };
@@ -306,6 +380,12 @@ export default function StudentRegistrationPage() {
     const sanitizedEfrroIssue = normalizeDateToISO(formData.efrroIssueDate);
     const sanitizedEfrroExp = normalizeDateToISO(formData.efrroExpiry);
 
+    // Disability 3-state parsing
+    let physicalDisabilityVal: boolean | null | undefined = undefined;
+    if (formData.physicalDisability === "yes") physicalDisabilityVal = true;
+    else if (formData.physicalDisability === "no") physicalDisabilityVal = false;
+    else if (formData.physicalDisability === "not_specified") physicalDisabilityVal = null;
+
     // Zod payload assembly for progressive student registration
     const validationPayload: RegisterStudentInput = {
       registrationNumber: formData.enrollmentNumber?.trim() || undefined,
@@ -313,6 +393,27 @@ export default function StudentRegistrationPage() {
       nationalityCode: formData.nationality.trim().toUpperCase() || undefined,
       gender: (formData.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
       dateOfBirth: sanitizedDob || undefined,
+      maritalStatus: (formData.maritalStatus as MaritalStatus) || undefined,
+      bloodGroup: formData.bloodGroup?.trim() || undefined,
+      physicalDisability: physicalDisabilityVal,
+
+      // Family info
+      fatherName: formData.fatherName?.trim() || undefined,
+      fatherMobile: formData.fatherMobile?.trim() || undefined,
+      fatherMobileCountryCode: formData.fatherMobileCountryCode?.trim() || undefined,
+      fatherMobileNumber: formData.fatherMobileNumber?.trim() || undefined,
+      fatherWhatsapp: formData.fatherWhatsapp?.trim() || undefined,
+      fatherWhatsappCountryCode: formData.fatherWhatsappCountryCode?.trim() || undefined,
+      fatherWhatsappNumber: formData.fatherWhatsappNumber?.trim() || undefined,
+      motherName: formData.motherName?.trim() || undefined,
+      motherMobile: formData.motherMobile?.trim() || undefined,
+      motherMobileCountryCode: formData.motherMobileCountryCode?.trim() || undefined,
+      motherMobileNumber: formData.motherMobileNumber?.trim() || undefined,
+      motherWhatsapp: formData.motherWhatsapp?.trim() || undefined,
+      motherWhatsappCountryCode: formData.motherWhatsappCountryCode?.trim() || undefined,
+      motherWhatsappNumber: formData.motherWhatsappNumber?.trim() || undefined,
+
+      // Contact coordinates
       email: formData.email.trim().toLowerCase() || undefined,
       phoneHome: formData.phoneHome.trim() || undefined,
       phoneHomeCountryCode: formData.phoneHomeCountryCode.trim() || undefined,
@@ -322,14 +423,24 @@ export default function StudentRegistrationPage() {
       phoneLocalNumber: formData.phoneLocalNumber.trim() || undefined,
       permanentAddress: formData.permanentAddress.trim() || undefined,
       localAddress: formData.localAddress.trim() || undefined,
+
+      // Academic profile
       programId: formData.programId.trim() || undefined,
       programCode: formData.program.trim() || undefined,
       admissionDate: sanitizedAdm || undefined,
       expectedGraduation: sanitizedGrad || undefined,
       currentSemester: formData.program.trim() ? 1 : undefined,
-      relationshipType: formData.emergencyContactName.trim() ? (formData.emergencyContactRelation as "parent" | "guardian" | "local_sponsor") : undefined,
+      admissionCategory: (formData.admissionCategory as AdmissionCategory) || undefined,
+      admissionCategoryOther: formData.admissionCategory === "other" ? (formData.admissionCategoryOther.trim() || undefined) : undefined,
+      siiApplicationNumber: formData.siiApplicationNumber?.trim() || undefined,
+
+      // Emergency relationship
+      relationshipType: formData.emergencyContactName.trim() ? (formData.emergencyContactRelation as RelationshipType) : undefined,
       relationshipName: formData.emergencyContactName.trim() || undefined,
       relationshipPhone: formData.emergencyContactPhone.trim() || undefined,
+      relationshipEmail: formData.emergencyContactEmail.trim() || undefined,
+
+      // Document details
       passportNumber: formData.passportNumber.trim() || undefined,
       passportIssueDate: sanitizedPassIssue || undefined,
       passportExpiry: sanitizedPassExp || undefined,
@@ -343,41 +454,11 @@ export default function StudentRegistrationPage() {
       efrroExpiry: sanitizedEfrroExp || undefined
     };
 
-    // Safe development diagnostics
-    if (process.env.NODE_ENV === "development" || typeof window !== "undefined") {
-      console.log("[STUDENT_REGISTRATION_SUBMIT_PAYLOAD]", {
-        registrationNumber: validationPayload.registrationNumber,
-        fullName: validationPayload.fullName,
-        nationalityCode: validationPayload.nationalityCode,
-        gender: validationPayload.gender,
-        dateOfBirth: validationPayload.dateOfBirth,
-        email: validationPayload.email,
-        phoneHome: validationPayload.phoneHome ? `${validationPayload.phoneHome.slice(0, 3)}***` : undefined,
-        programCode: validationPayload.programCode,
-        admissionDate: validationPayload.admissionDate,
-        expectedGraduation: validationPayload.expectedGraduation,
-        relationshipType: validationPayload.relationshipType,
-        relationshipName: validationPayload.relationshipName,
-        passportNumber: validationPayload.passportNumber ? `${validationPayload.passportNumber.slice(0, 2)}***` : undefined,
-        passportExpiry: validationPayload.passportExpiry,
-        visaNumber: validationPayload.visaNumber ? `${validationPayload.visaNumber.slice(0, 2)}***` : undefined,
-        visaExpiry: validationPayload.visaExpiry,
-        efrroNumber: validationPayload.efrroNumber ? `${validationPayload.efrroNumber.slice(0, 2)}***` : undefined,
-        efrroExpiry: validationPayload.efrroExpiry
-      });
-    }
-
     const result = RegisterStudentValidationSchema.safeParse(validationPayload);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       let firstErrorField = "";
 
-      console.warn("[STUDENT_REGISTRATION_VALIDATION_FAILED]", result.error.issues.map(iss => ({
-        field: iss.path.join("."),
-        code: iss.code,
-        message: iss.message
-      })));
-      
       result.error.issues.forEach((issue) => {
         const path = String(issue.path[0] || "");
         if (path && !fieldErrors[path]) {
@@ -387,10 +468,8 @@ export default function StudentRegistrationPage() {
       });
       
       setValidationErrors(fieldErrors);
-      
       const errorCount = Object.keys(fieldErrors).length;
       
-      // Auto-navigate and focus first invalid field
       if (firstErrorField) {
         focusField(firstErrorField);
       }
@@ -421,7 +500,6 @@ export default function StudentRegistrationPage() {
       } else {
         setSubmittingError(true);
         
-        // Handle server-side validation error map
         if (res.fieldErrors && Object.keys(res.fieldErrors).length > 0) {
           setValidationErrors(res.fieldErrors);
           const firstKey = Object.keys(res.fieldErrors)[0];
@@ -463,7 +541,7 @@ export default function StudentRegistrationPage() {
       <div>
         <h1 className="font-h1 tracking-tight text-foreground text-2xl font-bold">Register International Student</h1>
         <p className="font-caption text-muted-foreground text-xs mt-1">
-          Enter the information currently available. Additional information can be added later from the student profile.
+          Enter the demographic, academic, and family information available. Additional fields can be progressively updated later.
         </p>
       </div>
 
@@ -530,7 +608,7 @@ export default function StudentRegistrationPage() {
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <User className="h-4 w-4 shrink-0" /> Personal Identity
+              <User className="h-4 w-4 shrink-0" /> Personal & Demographic
             </div>
             {tabErrorCounts.personal > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
@@ -549,7 +627,7 @@ export default function StudentRegistrationPage() {
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <GraduationCap className="h-4 w-4 shrink-0" /> Academic Profile
+              <GraduationCap className="h-4 w-4 shrink-0" /> Academic & Admission
             </div>
             {tabErrorCounts.academic > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
@@ -568,7 +646,7 @@ export default function StudentRegistrationPage() {
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <PhoneCall className="h-4 w-4 shrink-0" /> Contact & Guardian
+              <PhoneCall className="h-4 w-4 shrink-0" /> Family & Contact
             </div>
             {tabErrorCounts.contact > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
@@ -587,7 +665,7 @@ export default function StudentRegistrationPage() {
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <FileCheck className="h-4 w-4 shrink-0" /> Documents & Compliance
+              <FileCheck className="h-4 w-4 shrink-0" /> Documents & Legal
             </div>
             {tabErrorCounts.documents > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-xs animate-pulse ml-2">
@@ -601,7 +679,7 @@ export default function StudentRegistrationPage() {
               <AlertCircle className="h-3.5 w-3.5 text-primary shrink-0" /> Progressive Registration
             </div>
             <p className="leading-relaxed">
-              Only <strong>Legal Full Name</strong> is required to create a student record. All other academic, passport, visa, and contact details can be added or updated anytime later.
+              Only <strong>Legal Full Name</strong> is mandatory for initial registration. All demographic, family, admission, and document details can be progressively enriched anytime.
             </p>
           </div>
         </div>
@@ -611,15 +689,15 @@ export default function StudentRegistrationPage() {
           <form onSubmit={handleSubmit} noValidate>
             {/* Personal Details Tab */}
             {activeTab === "personal" && (
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="p-6 space-y-5">
                 <div>
-                  <h2 className="text-sm font-h2 font-semibold">Personal Identification</h2>
-                  <p className="text-[11px] text-muted-foreground font-caption">Basic biographical information.</p>
+                  <h2 className="text-sm font-h2 font-semibold">Personal & Demographic Identity</h2>
+                  <p className="text-[11px] text-muted-foreground font-caption">Biographical coordinates, demographic background, and health indicators.</p>
                 </div>
                 <Separator className="my-2" />
                 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground flex items-center gap-1" htmlFor="fullName">
                       Full Name (as per Passport) <span className="text-rose-500 font-bold">*</span>
                     </label>
@@ -679,8 +757,13 @@ export default function StudentRegistrationPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="dateOfBirth">
-                      Date of Birth
+                    <label className="text-xs font-medium text-foreground flex items-center justify-between" htmlFor="dateOfBirth">
+                      <span>Date of Birth</span>
+                      {calculatedAgeInfo && (
+                        <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                          {calculatedAgeInfo.fullText}
+                        </span>
+                      )}
                     </label>
                     <DatePicker
                       id="dateOfBirth"
@@ -694,6 +777,81 @@ export default function StudentRegistrationPage() {
                       placeholder="Select date of birth..."
                       error={validationErrors.dateOfBirth}
                     />
+                    <p className="text-[11px] text-muted-foreground font-caption">
+                      Age is automatically calculated from the date of birth.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="maritalStatus">
+                      Marital Status <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Select value={formData.maritalStatus} onValueChange={(v) => handleSelectChange("maritalStatus", v || "")}>
+                      <SelectTrigger 
+                        id="maritalStatus"
+                        className={validationErrors.maritalStatus ? "border-rose-500 focus-visible:ring-rose-500" : ""}
+                      >
+                        <SelectValue placeholder="Select Marital Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MARITAL_STATUS_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.maritalStatus && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.maritalStatus}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="bloodGroup">
+                      Blood Group <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Select value={formData.bloodGroup} onValueChange={(v) => handleSelectChange("bloodGroup", v || "")}>
+                      <SelectTrigger 
+                        id="bloodGroup"
+                        className={validationErrors.bloodGroup ? "border-rose-500 focus-visible:ring-rose-500" : ""}
+                      >
+                        <SelectValue placeholder="Select Blood Group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BLOOD_GROUP_OPTIONS.map((bg) => (
+                          <SelectItem key={bg.value} value={bg.value} className="font-mono">{bg.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.bloodGroup && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.bloodGroup}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="physicalDisability">
+                      Physical Disability <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Select value={formData.physicalDisability} onValueChange={(v) => handleSelectChange("physicalDisability", v || "")}>
+                      <SelectTrigger 
+                        id="physicalDisability"
+                        className={validationErrors.physicalDisability ? "border-rose-500 focus-visible:ring-rose-500" : ""}
+                      >
+                        <SelectValue placeholder="Select Status (Not Specified)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_specified">Not Specified</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                        <SelectItem value="yes">Yes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.physicalDisability && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.physicalDisability}
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -701,10 +859,10 @@ export default function StudentRegistrationPage() {
 
             {/* Academic Details Tab */}
             {activeTab === "academic" && (
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="p-6 space-y-5">
                 <div>
-                  <h2 className="text-sm font-h2 font-semibold">Academic Enrollment Profile</h2>
-                  <p className="text-[11px] text-muted-foreground font-caption">University enrollment structure and program codes.</p>
+                  <h2 className="text-sm font-h2 font-semibold">Academic Profile & Admission Track</h2>
+                  <p className="text-[11px] text-muted-foreground font-caption">University enrollment structure, academic programs, and institutional admission channels.</p>
                 </div>
                 <Separator className="my-2" />
                 
@@ -721,15 +879,95 @@ export default function StudentRegistrationPage() {
                       disabled={isSubmitting}
                       className={`h-10 text-sm font-mono ${(validationErrors.registrationNumber || validationErrors.enrollmentNumber) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                     />
-                    <p className="text-[11px] text-muted-foreground font-caption">
-                      Official university enrollment number. If not available yet, you can leave it blank and add it later.
-                    </p>
                     {(validationErrors.registrationNumber || validationErrors.enrollmentNumber) && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                         {validationErrors.registrationNumber || validationErrors.enrollmentNumber}
                       </p>
                     )}
                   </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="admissionCategory">
+                      Admission Category <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Select 
+                      value={formData.admissionCategory} 
+                      onValueChange={(v) => handleSelectChange("admissionCategory", v || "")}
+                    >
+                      <SelectTrigger 
+                        id="admissionCategory"
+                        className={`h-10 text-xs ${validationErrors.admissionCategory ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      >
+                        <SelectValue placeholder="Select Admission Channel / Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ADMISSION_CATEGORY_OPTIONS.map((cat) => (
+                          <SelectItem key={cat.value} value={cat.value}>
+                            {cat.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.admissionCategory && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.admissionCategory}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Conditional: Please specify when category is Other */}
+                  {formData.admissionCategory === "other" && (
+                    <div className="space-y-1.5 sm:col-span-2 animate-in fade-in-0 slide-in-from-top-1">
+                      <label className="text-xs font-medium text-foreground flex items-center gap-1" htmlFor="admissionCategoryOther">
+                        Please Specify Admission Track <span className="text-rose-500 font-bold">*</span>
+                      </label>
+                      <Input
+                        id="admissionCategoryOther"
+                        placeholder="e.g. Bilateral Cultural Exchange or Special Scholarship"
+                        value={formData.admissionCategoryOther}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.admissionCategoryOther ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {validationErrors.admissionCategoryOther && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.admissionCategoryOther}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Conditional / Optional: SII Application Number */}
+                  {(formData.admissionCategory === "iccr" || formData.admissionCategory === "sii" || formData.admissionCategory) && (
+                    <div className="space-y-1.5 sm:col-span-2 animate-in fade-in-0 slide-in-from-top-1">
+                      <label className="text-xs font-medium text-foreground flex items-center justify-between" htmlFor="siiApplicationNumber">
+                        <span className="flex items-center gap-1">
+                          Study in India (SII) Application Number
+                          {formData.admissionCategory === "iccr" && (
+                            <span className="text-rose-500 font-bold">* (Required for ICCR)</span>
+                          )}
+                        </span>
+                      </label>
+                      <Input
+                        id="siiApplicationNumber"
+                        placeholder="e.g. SII-2026-IND-984210"
+                        value={formData.siiApplicationNumber}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm font-mono ${validationErrors.siiApplicationNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      <p className="text-[11px] text-muted-foreground font-caption">
+                        {formData.admissionCategory === "iccr" 
+                          ? "Mandatory for all students admitted through the Indian Council for Cultural Relations (ICCR) track."
+                          : "Optional Study in India application identifier."}
+                      </p>
+                      {validationErrors.siiApplicationNumber && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.siiApplicationNumber}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground flex items-center gap-1" htmlFor="program">
@@ -744,11 +982,6 @@ export default function StudentRegistrationPage() {
                       placeholder={isLoadingPrograms ? "Loading academic programs..." : "Search and select academic program..."}
                       error={validationErrors.programCode || validationErrors.program}
                     />
-                    {academicPrograms.length === 0 && !isLoadingPrograms && (
-                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
-                        No academic programs have been configured. Please contact the system administrator.
-                      </p>
-                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -832,204 +1065,334 @@ export default function StudentRegistrationPage() {
                           Initial: <span className="font-semibold text-primary font-mono">Semester 1</span>
                         </div>
                       </div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Course academic level and semester configuration determine automatic progression without manual staff selection.
-                      </p>
                     </div>
                   );
                 })()}
               </CardContent>
             )}
 
-            {/* Contact Details Tab */}
+            {/* Contact Details & Family Tab */}
             {activeTab === "contact" && (
-              <CardContent className="p-6 space-y-4">
+              <CardContent className="p-6 space-y-6">
                 <div>
-                  <h2 className="text-sm font-h2 font-semibold">Contact Details & Emergency Coordinators</h2>
-                  <p className="text-[11px] text-muted-foreground font-caption">Contact coordinates and immediate family/sponsor contacts (Optional / Can be completed later).</p>
+                  <h2 className="text-sm font-h2 font-semibold">Contact, Family & Emergency Coordinates</h2>
+                  <p className="text-[11px] text-muted-foreground font-caption">Direct contact coordinates, parents&apos; contact information, and emergency liaison.</p>
                 </div>
                 <Separator className="my-2" />
                 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">
-                      Home Country / Primary Phone <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
-                    </label>
-                    <PhoneInput
-                      id="phoneHome"
-                      countryCode={formData.phoneHomeCountryCode}
-                      number={formData.phoneHomeNumber}
-                      onCountryCodeChange={(code) => setFormData(p => ({ ...p, phoneHomeCountryCode: code }))}
-                      onNumberChange={(num) => setFormData(p => ({ ...p, phoneHomeNumber: num }))}
-                      onChange={(composite, code, num) => {
-                        setFormData(p => ({ ...p, phoneHome: composite, phoneHomeCountryCode: code, phoneHomeNumber: num }));
-                        if (validationErrors.phoneHome) {
-                          setValidationErrors(prev => { const n = { ...prev }; delete n.phoneHome; return n; });
-                        }
-                      }}
-                      disabled={isSubmitting}
-                      placeholder="e.g. 9812345678"
-                      defaultCountryCode="+91"
-                      className={validationErrors.phoneHome ? "border-rose-500 rounded-md" : ""}
-                    />
-                    {validationErrors.phoneHome && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.phoneHome}
-                      </p>
-                    )}
+                {/* 1. Student Coordinates */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Student Contact</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">
+                        Home Country / Primary Phone <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                      </label>
+                      <PhoneInput
+                        id="phoneHome"
+                        countryCode={formData.phoneHomeCountryCode}
+                        number={formData.phoneHomeNumber}
+                        onCountryCodeChange={(code) => setFormData(p => ({ ...p, phoneHomeCountryCode: code }))}
+                        onNumberChange={(num) => setFormData(p => ({ ...p, phoneHomeNumber: num }))}
+                        onChange={(composite, code, num) => {
+                          setFormData(p => ({ ...p, phoneHome: composite, phoneHomeCountryCode: code, phoneHomeNumber: num }));
+                          if (validationErrors.phoneHome) {
+                            setValidationErrors(prev => { const n = { ...prev }; delete n.phoneHome; return n; });
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        placeholder="e.g. 9812345678"
+                        defaultCountryCode="+91"
+                        className={validationErrors.phoneHome ? "border-rose-500 rounded-md" : ""}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="email">
+                        Student Institutional Email <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                      </label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="student@university.edu"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.email ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {validationErrors.email && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.email}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-medium text-foreground" htmlFor="phoneLocal">
+                        Local Contact Number (India) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                      </label>
+                      <PhoneInput
+                        id="phoneLocal"
+                        countryCode={formData.phoneLocalCountryCode}
+                        number={formData.phoneLocalNumber}
+                        onCountryCodeChange={(code) => setFormData(p => ({ ...p, phoneLocalCountryCode: code }))}
+                        onNumberChange={(num) => setFormData(p => ({ ...p, phoneLocalNumber: num }))}
+                        onChange={(composite, code, num) => {
+                          setFormData(p => ({ ...p, phoneLocal: composite, phoneLocalCountryCode: code, phoneLocalNumber: num }));
+                          if (validationErrors.phoneLocal) {
+                            setValidationErrors(prev => { const n = { ...prev }; delete n.phoneLocal; return n; });
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        placeholder="e.g. 9876543210"
+                        defaultCountryCode="+91"
+                        className={validationErrors.phoneLocal ? "border-rose-500 rounded-md" : ""}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">
+                        Permanent Address (Home Country) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                      </label>
+                      <Input
+                        id="permanentAddress"
+                        placeholder="Full residential address in home country"
+                        value={formData.permanentAddress}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.permanentAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {validationErrors.permanentAddress && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.permanentAddress}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* 2. Family Information */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Family Information</h3>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="email">
-                      Student Institutional Email <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
-                    </label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="student@university.edu"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.email ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
-                    {validationErrors.email && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.email}
-                      </p>
-                    )}
+                  {/* Father Details */}
+                  <div className="p-3.5 rounded-xl border border-border/60 bg-muted/10 space-y-3">
+                    <h4 className="text-xs font-semibold text-foreground">Father Details</h4>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="fatherName">
+                          Father Full Name
+                        </label>
+                        <Input
+                          id="fatherName"
+                          placeholder="e.g. Alexander Rostov"
+                          value={formData.fatherName}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className="h-10 text-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="fatherMobile">
+                          Father Mobile Number
+                        </label>
+                        <PhoneInput
+                          id="fatherMobile"
+                          countryCode={formData.fatherMobileCountryCode}
+                          number={formData.fatherMobileNumber}
+                          onCountryCodeChange={(code) => setFormData(p => ({ ...p, fatherMobileCountryCode: code }))}
+                          onNumberChange={(num) => setFormData(p => ({ ...p, fatherMobileNumber: num }))}
+                          onChange={(composite, code, num) => {
+                            setFormData(p => ({ ...p, fatherMobile: composite, fatherMobileCountryCode: code, fatherMobileNumber: num }));
+                          }}
+                          disabled={isSubmitting}
+                          placeholder="Mobile number"
+                          defaultCountryCode="+91"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="fatherWhatsapp">
+                          Father WhatsApp Number
+                        </label>
+                        <PhoneInput
+                          id="fatherWhatsapp"
+                          countryCode={formData.fatherWhatsappCountryCode}
+                          number={formData.fatherWhatsappNumber}
+                          onCountryCodeChange={(code) => setFormData(p => ({ ...p, fatherWhatsappCountryCode: code }))}
+                          onNumberChange={(num) => setFormData(p => ({ ...p, fatherWhatsappNumber: num }))}
+                          onChange={(composite, code, num) => {
+                            setFormData(p => ({ ...p, fatherWhatsapp: composite, fatherWhatsappCountryCode: code, fatherWhatsappNumber: num }));
+                          }}
+                          disabled={isSubmitting}
+                          placeholder="WhatsApp number"
+                          defaultCountryCode="+91"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="phoneLocal">
-                      Local Contact Number (India) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
-                    </label>
-                    <PhoneInput
-                      id="phoneLocal"
-                      countryCode={formData.phoneLocalCountryCode}
-                      number={formData.phoneLocalNumber}
-                      onCountryCodeChange={(code) => setFormData(p => ({ ...p, phoneLocalCountryCode: code }))}
-                      onNumberChange={(num) => setFormData(p => ({ ...p, phoneLocalNumber: num }))}
-                      onChange={(composite, code, num) => {
-                        setFormData(p => ({ ...p, phoneLocal: composite, phoneLocalCountryCode: code, phoneLocalNumber: num }));
-                        if (validationErrors.phoneLocal) {
-                          setValidationErrors(prev => { const n = { ...prev }; delete n.phoneLocal; return n; });
-                        }
-                      }}
-                      disabled={isSubmitting}
-                      placeholder="e.g. 9876543210"
-                      defaultCountryCode="+91"
-                      className={validationErrors.phoneLocal ? "border-rose-500 rounded-md" : ""}
-                    />
-                    {validationErrors.phoneLocal && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.phoneLocal}
-                      </p>
-                    )}
-                  </div>
+                  {/* Mother Details */}
+                  <div className="p-3.5 rounded-xl border border-border/60 bg-muted/10 space-y-3">
+                    <h4 className="text-xs font-semibold text-foreground">Mother Details</h4>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="motherName">
+                          Mother Full Name
+                        </label>
+                        <Input
+                          id="motherName"
+                          placeholder="e.g. Maria Rostova"
+                          value={formData.motherName}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className="h-10 text-sm"
+                        />
+                      </div>
 
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">
-                      Permanent Address (Home Country) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
-                    </label>
-                    <Input
-                      id="permanentAddress"
-                      placeholder="Full residential address in home country (optional)"
-                      value={formData.permanentAddress}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.permanentAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
-                    {validationErrors.permanentAddress && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.permanentAddress}
-                      </p>
-                    )}
-                  </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="motherMobile">
+                          Mother Mobile Number
+                        </label>
+                        <PhoneInput
+                          id="motherMobile"
+                          countryCode={formData.motherMobileCountryCode}
+                          number={formData.motherMobileNumber}
+                          onCountryCodeChange={(code) => setFormData(p => ({ ...p, motherMobileCountryCode: code }))}
+                          onNumberChange={(num) => setFormData(p => ({ ...p, motherMobileNumber: num }))}
+                          onChange={(composite, code, num) => {
+                            setFormData(p => ({ ...p, motherMobile: composite, motherMobileCountryCode: code, motherMobileNumber: num }));
+                          }}
+                          disabled={isSubmitting}
+                          placeholder="Mobile number"
+                          defaultCountryCode="+91"
+                        />
+                      </div>
 
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium text-foreground" htmlFor="localAddress">
-                      Local Address (India) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
-                    </label>
-                    <Input
-                      id="localAddress"
-                      placeholder="Hostel or local residential address (optional)"
-                      value={formData.localAddress}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.localAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
-                    {validationErrors.localAddress && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.localAddress}
-                      </p>
-                    )}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="motherWhatsapp">
+                          Mother WhatsApp Number
+                        </label>
+                        <PhoneInput
+                          id="motherWhatsapp"
+                          countryCode={formData.motherWhatsappCountryCode}
+                          number={formData.motherWhatsappNumber}
+                          onCountryCodeChange={(code) => setFormData(p => ({ ...p, motherWhatsappCountryCode: code }))}
+                          onNumberChange={(num) => setFormData(p => ({ ...p, motherWhatsappNumber: num }))}
+                          onChange={(composite, code, num) => {
+                            setFormData(p => ({ ...p, motherWhatsapp: composite, motherWhatsappCountryCode: code, motherWhatsappNumber: num }));
+                          }}
+                          disabled={isSubmitting}
+                          placeholder="WhatsApp number"
+                          defaultCountryCode="+91"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  
-                  <Separator className="my-2 sm:col-span-2" />
+                </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactName">
-                      Emergency Contact Name
-                    </label>
-                    <Input
-                      id="emergencyContactName"
-                      placeholder="e.g. Dmitry Rostov"
-                      value={formData.emergencyContactName}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${(validationErrors.relationshipName || validationErrors.emergencyContactName) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
-                    {(validationErrors.relationshipName || validationErrors.emergencyContactName) && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.relationshipName || validationErrors.emergencyContactName}
-                      </p>
-                    )}
-                  </div>
+                <Separator />
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactRelation">
-                      Relationship Type
-                    </label>
-                    <Select 
-                      value={formData.emergencyContactRelation} 
-                      onValueChange={(v) => handleSelectChange("emergencyContactRelation", v || "")}
-                    >
-                      <SelectTrigger 
-                        id="emergencyContactRelation"
-                        className={`h-10 text-xs ${(validationErrors.relationshipType || validationErrors.emergencyContactRelation) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                {/* 3. Emergency Contact */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Immediate Emergency Liaison</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactName">
+                        Emergency Contact Name
+                      </label>
+                      <Input
+                        id="emergencyContactName"
+                        placeholder="e.g. Dmitry Rostov"
+                        value={formData.emergencyContactName}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${(validationErrors.relationshipName || validationErrors.emergencyContactName) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {(validationErrors.relationshipName || validationErrors.emergencyContactName) && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.relationshipName || validationErrors.emergencyContactName}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactRelation">
+                        Relationship Type
+                      </label>
+                      <Select 
+                        value={formData.emergencyContactRelation} 
+                        onValueChange={(v) => handleSelectChange("emergencyContactRelation", v || "")}
                       >
-                        <SelectValue placeholder="Select Relationship" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="parent">Parent</SelectItem>
-                        <SelectItem value="guardian">Guardian</SelectItem>
-                        <SelectItem value="local_sponsor">Local Sponsor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {(validationErrors.relationshipType || validationErrors.emergencyContactRelation) && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.relationshipType || validationErrors.emergencyContactRelation}
-                      </p>
-                    )}
-                  </div>
+                        <SelectTrigger 
+                          id="emergencyContactRelation"
+                          className={`h-10 text-xs ${(validationErrors.relationshipType || validationErrors.emergencyContactRelation) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        >
+                          <SelectValue placeholder="Select Relationship" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {RELATIONSHIP_TYPE_OPTIONS.map((rel) => (
+                            <SelectItem key={rel.value} value={rel.value}>{rel.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {(validationErrors.relationshipType || validationErrors.emergencyContactRelation) && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.relationshipType || validationErrors.emergencyContactRelation}
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactPhone">
-                      Emergency Contact Phone Number
-                    </label>
-                    <Input
-                      id="emergencyContactPhone"
-                      placeholder="Country code prefixed phone number"
-                      value={formData.emergencyContactPhone}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${(validationErrors.relationshipPhone || validationErrors.emergencyContactPhone) ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
-                    {(validationErrors.relationshipPhone || validationErrors.emergencyContactPhone) && (
-                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                        {validationErrors.relationshipPhone || validationErrors.emergencyContactPhone}
-                      </p>
-                    )}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactPhone">
+                        Emergency Contact Phone Number
+                      </label>
+                      <PhoneInput
+                        id="emergencyContactPhone"
+                        countryCode={formData.emergencyContactCountryCode}
+                        number={formData.emergencyContactNumber}
+                        onCountryCodeChange={(code) => setFormData(p => ({ ...p, emergencyContactCountryCode: code }))}
+                        onNumberChange={(num) => setFormData(p => ({ ...p, emergencyContactNumber: num }))}
+                        onChange={(composite, code, num) => {
+                          setFormData(p => ({ ...p, emergencyContactPhone: composite, emergencyContactCountryCode: code, emergencyContactNumber: num }));
+                        }}
+                        disabled={isSubmitting}
+                        placeholder="Phone number"
+                        defaultCountryCode="+91"
+                        className={(validationErrors.relationshipPhone || validationErrors.emergencyContactPhone) ? "border-rose-500 rounded-md" : ""}
+                      />
+                      {(validationErrors.relationshipPhone || validationErrors.emergencyContactPhone) && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.relationshipPhone || validationErrors.emergencyContactPhone}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactEmail">
+                        Emergency Contact Email <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                      </label>
+                      <Input
+                        id="emergencyContactEmail"
+                        type="email"
+                        placeholder="contact@example.com"
+                        value={formData.emergencyContactEmail}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.relationshipEmail ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {validationErrors.relationshipEmail && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.relationshipEmail}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1044,7 +1407,7 @@ export default function StudentRegistrationPage() {
                 </div>
                 <Separator className="my-2" />
                 
-                {/* Passport Information Group */}
+                {/* Passport Details */}
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Passport Details</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -1120,7 +1483,7 @@ export default function StudentRegistrationPage() {
 
                 <Separator />
 
-                {/* Visa Information Group */}
+                {/* Visa Details */}
                 <div className="space-y-3">
                   <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Visa Details</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -1149,16 +1512,16 @@ export default function StudentRegistrationPage() {
                       </label>
                       <Select 
                         value={formData.visaType} 
-                        onValueChange={(v) => handleSelectChange("visaType", v || "Student (S-1)")}
+                        onValueChange={(v) => handleSelectChange("visaType", v || "")}
                       >
                         <SelectTrigger id="visaType" className="h-10 text-xs">
-                          <SelectValue />
+                          <SelectValue placeholder="Select Visa Type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Student (S-1)">Student (S-1)</SelectItem>
-                          <SelectItem value="Student (S-2)">Student (S-2)</SelectItem>
                           <SelectItem value="Research (R-1)">Research (R-1)</SelectItem>
                           <SelectItem value="Intern (I-1)">Intern (I-1)</SelectItem>
+                          <SelectItem value="Other">Other Category</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1202,39 +1565,27 @@ export default function StudentRegistrationPage() {
 
                 <Separator />
 
-                {/* eFRRO / Residential Permit Details */}
+                {/* eFRRO Details */}
                 <div className="space-y-3">
-                  <div>
-                    <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                      eFRRO / Residential Permit Details
-                    </h3>
-                    <p className="text-[11px] text-muted-foreground font-caption mt-0.5">
-                      Local registration details with Indian immigration authorities.
-                    </p>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5 sm:col-span-2">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">eFRRO / Residential Permit (Optional)</h3>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="space-y-1.5">
                       <label className="text-xs font-medium text-foreground" htmlFor="efrroNumber">
-                        eFRRO / Registration Number
+                        Registration / RC Number
                       </label>
                       <Input
                         id="efrroNumber"
-                        placeholder="e.g. FRRO123456789"
+                        placeholder="e.g. FRRO/AHM/2026/899"
                         value={formData.efrroNumber}
                         onChange={handleInputChange}
                         disabled={isSubmitting}
                         className={`h-10 text-sm ${validationErrors.efrroNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                       />
-                      {validationErrors.efrroNumber && (
-                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                          {validationErrors.efrroNumber}
-                        </p>
-                      )}
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-foreground" htmlFor="efrroIssueDate">
-                        eFRRO Issue Date
+                        Registration Issue Date
                       </label>
                       <DatePicker
                         id="efrroIssueDate"
@@ -1242,14 +1593,14 @@ export default function StudentRegistrationPage() {
                         onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
                         onValueChange={(v) => handleSelectChange("efrroIssueDate", v)}
                         disabled={isSubmitting}
-                        placeholder="Select eFRRO issue date..."
+                        placeholder="Select issue date..."
                         error={validationErrors.efrroIssueDate}
                       />
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-medium text-foreground" htmlFor="efrroExpiry">
-                        eFRRO Expiration Date
+                        Registration Valid Until
                       </label>
                       <DatePicker
                         id="efrroExpiry"
@@ -1257,63 +1608,56 @@ export default function StudentRegistrationPage() {
                         onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
                         onValueChange={(v) => handleSelectChange("efrroExpiry", v)}
                         disabled={isSubmitting}
-                        placeholder="Select eFRRO expiry date..."
+                        placeholder="Select expiry date..."
                         error={validationErrors.efrroExpiry}
                       />
-                      {validationErrors.efrroExpiry && (
-                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                          {validationErrors.efrroExpiry}
-                        </p>
-                      )}
                     </div>
                   </div>
-                </div>
-
-                <div className="p-3 bg-muted/30 border border-border rounded-md text-[10px] text-muted-foreground font-caption">
-                  Note: Uploading physical document scans (PDF/JPG) is disabled during architecture initialization. Once the profile is initialized, administrators can upload document files in the Student Profile Inspector.
                 </div>
               </CardContent>
             )}
 
-            {/* Footer action buttons */}
-            <CardFooter className="flex items-center justify-between border-t border-border/40 px-6 py-4 bg-muted/10">
-              <Link href="/students" passHref>
-                <Button variant="outline" type="button" size="sm" className="h-9 text-xs" disabled={isSubmitting}>
-                  Cancel
-                </Button>
-              </Link>
-              
-              <div className="flex items-center gap-2.5">
+            {/* Bottom Actions Footer */}
+            <div className="p-4 border-t border-border/60 bg-muted/10 flex items-center justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                disabled={isSubmitting}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+
+              <div className="flex items-center gap-2">
                 {activeTab !== "documents" && (
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    size="sm" 
-                    className="h-9 text-xs flex items-center gap-1.5"
+                  <Button
+                    type="button"
+                    variant="ghost"
                     onClick={() => {
                       if (activeTab === "personal") setActiveTab("academic");
                       else if (activeTab === "academic") setActiveTab("contact");
                       else if (activeTab === "contact") setActiveTab("documents");
                     }}
+                    className="text-xs font-medium"
                   >
-                    Next Section <ArrowRight className="h-3.5 w-3.5" />
+                    Next Section
                   </Button>
                 )}
 
                 <AsyncActionButton
                   type="submit"
-                  size="sm"
-                  className="h-9 text-xs px-4 font-semibold"
                   isLoading={isSubmitting}
                   isSuccess={submittingSuccess}
                   isError={submittingError}
-                  idleText="Save & Register"
-                  loadingText="Saving Student..."
-                  successText="Student Registered"
-                  errorText="Try Again"
+                  loadingText="Registering student..."
+                  successText="Student registered!"
+                  errorText="Registration failed"
+                  idleText="Register Student"
+                  className="min-w-[160px] text-xs font-semibold shadow-xs"
                 />
               </div>
-            </CardFooter>
+            </div>
           </form>
         </Card>
       </div>

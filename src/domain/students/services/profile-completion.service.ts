@@ -9,7 +9,7 @@
  */
 
 export interface ProfileSectionEvaluation {
-  id: "identity" | "academic" | "contact" | "emergency" | "immigration";
+  id: "identity" | "academic" | "contact" | "family" | "emergency" | "immigration";
   title: string;
   weight: number;
   completedFieldsCount: number;
@@ -38,12 +38,18 @@ export interface StudentProfileEvaluationData {
   dateOfBirth?: string | Date | null;
   gender?: string | null;
   nationalityCode?: string | null;
+  maritalStatus?: string | null;
+  bloodGroup?: string | null;
+  physicalDisability?: boolean | null;
 
   // Academic
   registrationNumber?: string | null;
   programCode?: string | null;
   admissionDate?: string | Date | null;
   expectedGraduation?: string | Date | null;
+  admissionCategory?: string | null;
+  admissionCategoryOther?: string | null;
+  siiApplicationNumber?: string | null;
 
   // Contact
   email?: string | null;
@@ -51,6 +57,10 @@ export interface StudentProfileEvaluationData {
   phoneLocal?: string | null;
   permanentAddress?: string | null;
   localAddress?: string | null;
+
+  // Family
+  fatherName?: string | null;
+  motherName?: string | null;
 
   // Emergency / Relationships
   emergencyContactName?: string | null;
@@ -69,6 +79,7 @@ export interface StudentProfileEvaluationData {
 export class ProfileCompletionEngine {
   private static isPresent(val: unknown): boolean {
     if (val === undefined || val === null) return false;
+    if (typeof val === "boolean") return true; // explicitly answered true or false
     if (typeof val === "string") {
       const trimmed = val.trim();
       return trimmed !== "" && trimmed !== "Not provided" && trimmed !== "Not assigned yet" && trimmed !== "Pending" && trimmed !== "undefined";
@@ -86,12 +97,14 @@ export class ProfileCompletionEngine {
     const sections: ProfileSectionEvaluation[] = [];
     const missingSummary: string[] = [];
 
-    // 1. Basic Identity (Weight: 25%)
+    // 1. Basic Identity (Weight: 20%)
     const identityFields = [
       { name: "Full Name", present: this.isPresent(data.fullName) },
       { name: "Date of Birth", present: this.isPresent(data.dateOfBirth) },
       { name: "Gender", present: this.isPresent(data.gender) },
-      { name: "Nationality", present: this.isPresent(data.nationalityCode) }
+      { name: "Nationality", present: this.isPresent(data.nationalityCode) },
+      { name: "Marital Status", present: this.isPresent(data.maritalStatus) },
+      { name: "Blood Group", present: this.isPresent(data.bloodGroup) }
     ];
     const identityMissing = identityFields.filter(f => !f.present).map(f => f.name);
     const identityCompleted = identityFields.filter(f => f.present).length;
@@ -99,7 +112,7 @@ export class ProfileCompletionEngine {
     sections.push({
       id: "identity",
       title: "Personal Identity",
-      weight: 25,
+      weight: 20,
       completedFieldsCount: identityCompleted,
       totalFieldsCount: identityFields.length,
       percentage: identityPct,
@@ -109,20 +122,38 @@ export class ProfileCompletionEngine {
       missingSummary.push(...identityMissing.map(f => `Personal: ${f}`));
     }
 
-    // 2. Academic Enrollment (Weight: 25%)
+    // 2. Academic Enrollment & Admission Track (Weight: 20%)
     const academicFields = [
       { name: "University Enrollment Number", present: this.isPresent(data.registrationNumber) },
       { name: "Academic Program", present: this.isPresent(data.programCode) },
       { name: "Admission Date", present: this.isPresent(data.admissionDate) },
-      { name: "Expected Graduation Date", present: this.isPresent(data.expectedGraduation) }
+      { name: "Expected Graduation Date", present: this.isPresent(data.expectedGraduation) },
+      { name: "Admission Category", present: this.isPresent(data.admissionCategory) }
     ];
+
+    // Conditional evaluation: If category is ICCR, require SII Application Number
+    if (data.admissionCategory === "iccr") {
+      academicFields.push({
+        name: "SII Application Number (Required for ICCR)",
+        present: this.isPresent(data.siiApplicationNumber)
+      });
+    }
+
+    // Conditional evaluation: If category is Other, require Please Specify
+    if (data.admissionCategory === "other") {
+      academicFields.push({
+        name: "Admission Track Specification",
+        present: this.isPresent(data.admissionCategoryOther)
+      });
+    }
+
     const academicMissing = academicFields.filter(f => !f.present).map(f => f.name);
     const academicCompleted = academicFields.filter(f => f.present).length;
     const academicPct = Math.round((academicCompleted / academicFields.length) * 100);
     sections.push({
       id: "academic",
-      title: "Academic Enrollment",
-      weight: 25,
+      title: "Academic & Admission",
+      weight: 20,
       completedFieldsCount: academicCompleted,
       totalFieldsCount: academicFields.length,
       percentage: academicPct,
@@ -154,7 +185,28 @@ export class ProfileCompletionEngine {
       missingSummary.push(...contactMissing.map(f => `Contact: ${f}`));
     }
 
-    // 4. Emergency / Guardian (Weight: 15%)
+    // 4. Family Information (Weight: 10%)
+    const familyFields = [
+      { name: "Father Name", present: this.isPresent(data.fatherName) },
+      { name: "Mother Name", present: this.isPresent(data.motherName) }
+    ];
+    const familyMissing = familyFields.filter(f => !f.present).map(f => f.name);
+    const familyCompleted = familyFields.filter(f => f.present).length;
+    const familyPct = Math.round((familyCompleted / familyFields.length) * 100);
+    sections.push({
+      id: "family",
+      title: "Family Coordinates",
+      weight: 10,
+      completedFieldsCount: familyCompleted,
+      totalFieldsCount: familyFields.length,
+      percentage: familyPct,
+      missingFields: familyMissing
+    });
+    if (familyMissing.length > 0) {
+      missingSummary.push(...familyMissing.map(f => `Family: ${f}`));
+    }
+
+    // 5. Emergency / Guardian (Weight: 15%)
     const emergencyFields = [
       { name: "Emergency Contact Name", present: this.isPresent(data.emergencyContactName) },
       { name: "Emergency Contact Phone", present: this.isPresent(data.emergencyContactPhone) }
@@ -164,7 +216,7 @@ export class ProfileCompletionEngine {
     const emergencyPct = Math.round((emergencyCompleted / emergencyFields.length) * 100);
     sections.push({
       id: "emergency",
-      title: "Emergency / Guardian",
+      title: "Emergency Contact",
       weight: 15,
       completedFieldsCount: emergencyCompleted,
       totalFieldsCount: emergencyFields.length,
@@ -175,7 +227,7 @@ export class ProfileCompletionEngine {
       missingSummary.push(...emergencyMissing.map(f => `Emergency: ${f}`));
     }
 
-    // 5. Immigration & Compliance Metadata (Weight: 15%)
+    // 6. Immigration & Compliance Metadata (Weight: 15%)
     const immigrationFields = [
       { name: "Passport Number", present: this.isPresent(data.passportNumber) },
       { name: "Passport Expiry Date", present: this.isPresent(data.passportExpiry) },
@@ -202,15 +254,17 @@ export class ProfileCompletionEngine {
       ...identityMissing,
       ...academicMissing,
       ...contactMissing,
+      ...familyMissing,
       ...emergencyMissing,
       ...immigrationMissing
     ];
 
     // Compute weighted total
     const weightedScore = (
-      (identityPct * 0.25) +
-      (academicPct * 0.25) +
+      (identityPct * 0.20) +
+      (academicPct * 0.20) +
       (contactPct * 0.20) +
+      (familyPct * 0.10) +
       (emergencyPct * 0.15) +
       (immigrationPct * 0.15)
     );

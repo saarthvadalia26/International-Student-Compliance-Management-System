@@ -75,6 +75,25 @@ export interface StudentDetailProfile {
   registrationNumber: string;
   nationalityCode: string;
   nationalityName: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  bloodGroup?: string | null;
+  maritalStatus?: string | null;
+  physicalDisability?: boolean | null;
+  fatherName?: string | null;
+  fatherMobile?: string | null;
+  fatherMobileCountryCode?: string | null;
+  fatherMobileNumber?: string | null;
+  fatherWhatsapp?: string | null;
+  fatherWhatsappCountryCode?: string | null;
+  fatherWhatsappNumber?: string | null;
+  motherName?: string | null;
+  motherMobile?: string | null;
+  motherMobileCountryCode?: string | null;
+  motherMobileNumber?: string | null;
+  motherWhatsapp?: string | null;
+  motherWhatsappCountryCode?: string | null;
+  motherWhatsappNumber?: string | null;
   programName: string;
   programCode: string;
   programId?: string | null;
@@ -83,6 +102,9 @@ export interface StudentDetailProfile {
   school: string;
   admissionDate: string;
   expectedGraduation: string;
+  admissionCategory?: string | null;
+  admissionCategoryOther?: string | null;
+  siiApplicationNumber?: string | null;
   totalSemesters?: number;
   semesterDuration?: number;
   semesterDurationUnit?: string;
@@ -551,6 +573,25 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       registrationNumber: record.registration_number,
       nationalityCode: personal?.nationality_code || "",
       nationalityName: countryObj?.name || (personal?.nationality_code ? personal.nationality_code : "Not specified"),
+      dateOfBirth: personal?.date_of_birth || null,
+      gender: personal?.gender || null,
+      bloodGroup: personal?.blood_group || null,
+      maritalStatus: personal?.marital_status || null,
+      physicalDisability: personal?.physical_disability !== undefined ? personal?.physical_disability : null,
+      fatherName: personal?.father_name || null,
+      fatherMobile: personal?.father_mobile || null,
+      fatherMobileCountryCode: personal?.father_mobile_country_code || null,
+      fatherMobileNumber: personal?.father_mobile_number || null,
+      fatherWhatsapp: personal?.father_whatsapp || null,
+      fatherWhatsappCountryCode: personal?.father_whatsapp_country_code || null,
+      fatherWhatsappNumber: personal?.father_whatsapp_number || null,
+      motherName: personal?.mother_name || null,
+      motherMobile: personal?.mother_mobile || null,
+      motherMobileCountryCode: personal?.mother_mobile_country_code || null,
+      motherMobileNumber: personal?.mother_mobile_number || null,
+      motherWhatsapp: personal?.mother_whatsapp || null,
+      motherWhatsappCountryCode: personal?.mother_whatsapp_country_code || null,
+      motherWhatsappNumber: personal?.mother_whatsapp_number || null,
       programName: progData?.programName || (academic?.program_code ? academic.program_code : "Not assigned yet"),
       programCode: progData?.programCode || academic?.program_code || "",
       programId: progData?.id || academic?.program_id || null,
@@ -559,6 +600,9 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       school: progData?.schoolName || (academic?.program_code ? "Not provided" : "Not assigned yet"),
       admissionDate: academic?.admission_date || "",
       expectedGraduation: hasCourseConfig ? (progression.expectedGraduationDateISO || academic?.expected_graduation || "") : (academic?.expected_graduation || ""),
+      admissionCategory: academic?.admission_category || null,
+      admissionCategoryOther: academic?.admission_category_other || null,
+      siiApplicationNumber: academic?.sii_application_number || null,
       totalSemesters: hasCourseConfig ? progression.totalSemesters : undefined,
       semesterDuration: hasCourseConfig ? progression.details.semesterDuration : undefined,
       semesterDurationUnit: hasCourseConfig ? progression.details.semesterDurationUnit : undefined,

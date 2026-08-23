@@ -12,6 +12,27 @@ export const RegisterStudentValidationSchema = z.object({
     const date = new Date(dob);
     return !isNaN(date.getTime()) && date < new Date();
   }, { message: "Date of birth must be a valid date in the past" }),
+  maritalStatus: z.enum(["single", "married", "divorced", "widowed", "separated", "other", "prefer_not_to_say"], {
+    message: "Please select a valid marital status"
+  }).optional().nullable(),
+  bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"], {
+    message: "Please select a valid standard blood group"
+  }).optional().nullable(),
+  physicalDisability: z.boolean().optional().nullable(),
+  fatherName: z.string().max(255).optional().nullable(),
+  fatherMobile: z.string().optional().nullable(),
+  fatherMobileCountryCode: z.string().optional().nullable(),
+  fatherMobileNumber: z.string().optional().nullable(),
+  fatherWhatsapp: z.string().optional().nullable(),
+  fatherWhatsappCountryCode: z.string().optional().nullable(),
+  fatherWhatsappNumber: z.string().optional().nullable(),
+  motherName: z.string().max(255).optional().nullable(),
+  motherMobile: z.string().optional().nullable(),
+  motherMobileCountryCode: z.string().optional().nullable(),
+  motherMobileNumber: z.string().optional().nullable(),
+  motherWhatsapp: z.string().optional().nullable(),
+  motherWhatsappCountryCode: z.string().optional().nullable(),
+  motherWhatsappNumber: z.string().optional().nullable(),
   email: z.string().optional().nullable().refine(val => {
     if (!val || !val.trim()) return true;
     return z.string().email().safeParse(val.trim()).success;
@@ -27,11 +48,29 @@ export const RegisterStudentValidationSchema = z.object({
   phoneHomeNumber: z.string().optional().nullable(),
   permanentAddress: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 5, { message: "Permanent address must be descriptive (at least 5 characters)" }),
   localAddress: z.string().optional().nullable(),
+  programId: z.string().optional().nullable(),
   programCode: z.string().optional().nullable(),
   admissionDate: z.string().optional().nullable(),
   expectedGraduation: z.string().optional().nullable(),
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
-  relationshipType: z.enum(["parent", "guardian", "local_sponsor"], { message: "Please select a valid relationship type" }).optional().nullable(),
+  admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"], {
+    message: "Please select a valid admission category"
+  }).optional().nullable(),
+  admissionCategoryOther: z.string().optional().nullable(),
+  siiApplicationNumber: z.string().optional().nullable(),
+  relationshipType: z.enum([
+    "father", 
+    "mother", 
+    "brother", 
+    "sister", 
+    "guardian", 
+    "husband", 
+    "wife", 
+    "spouse", 
+    "parent", 
+    "local_sponsor", 
+    "other"
+  ], { message: "Please select a valid relationship type" }).optional().nullable(),
   relationshipName: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 2, { message: "Emergency contact name must be at least 2 characters" }),
   relationshipPhone: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 7, { message: "Emergency contact phone must contain at least 7 digits" }),
   relationshipEmail: z.string().optional().nullable().refine(val => {
@@ -61,6 +100,24 @@ export const RegisterStudentValidationSchema = z.object({
   efrroNumber: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 3, { message: "eFRRO number must contain at least 3 characters" }),
   efrroIssueDate: z.string().optional().nullable(),
   efrroExpiry: z.string().optional().nullable()
+}).refine((data) => {
+  // Conditional rule: If admissionCategory is ICCR, siiApplicationNumber is mandatory
+  if (data.admissionCategory === "iccr") {
+    return Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
+  }
+  return true;
+}, {
+  message: "SII Application Number is required for ICCR admission category",
+  path: ["siiApplicationNumber"]
+}).refine((data) => {
+  // Conditional rule: If admissionCategory is Other, admissionCategoryOther (Please specify) is mandatory
+  if (data.admissionCategory === "other") {
+    return Boolean(data.admissionCategoryOther && data.admissionCategoryOther.trim().length > 0);
+  }
+  return true;
+}, {
+  message: "Please specify the custom admission category",
+  path: ["admissionCategoryOther"]
 }).refine((data) => {
   if (data.passportIssueDate && data.passportExpiry && data.passportIssueDate.trim() && data.passportExpiry.trim()) {
     const pi = new Date(data.passportIssueDate);
@@ -122,6 +179,23 @@ export const UpdateStudentValidationSchema = z.object({
     const date = new Date(dob);
     return !isNaN(date.getTime()) && date < new Date();
   }, { message: "Date of birth must be a valid date in the past" }),
+  maritalStatus: z.enum(["single", "married", "divorced", "widowed", "separated", "other", "prefer_not_to_say"]).optional().nullable(),
+  bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).optional().nullable(),
+  physicalDisability: z.boolean().optional().nullable(),
+  fatherName: z.string().max(255).optional().nullable(),
+  fatherMobile: z.string().optional().nullable(),
+  fatherMobileCountryCode: z.string().optional().nullable(),
+  fatherMobileNumber: z.string().optional().nullable(),
+  fatherWhatsapp: z.string().optional().nullable(),
+  fatherWhatsappCountryCode: z.string().optional().nullable(),
+  fatherWhatsappNumber: z.string().optional().nullable(),
+  motherName: z.string().max(255).optional().nullable(),
+  motherMobile: z.string().optional().nullable(),
+  motherMobileCountryCode: z.string().optional().nullable(),
+  motherMobileNumber: z.string().optional().nullable(),
+  motherWhatsapp: z.string().optional().nullable(),
+  motherWhatsappCountryCode: z.string().optional().nullable(),
+  motherWhatsappNumber: z.string().optional().nullable(),
   email: z.string().optional().nullable().refine(val => {
     if (!val || !val.trim()) return true;
     return z.string().email().safeParse(val.trim()).success;
@@ -137,11 +211,32 @@ export const UpdateStudentValidationSchema = z.object({
   phoneHomeNumber: z.string().optional().nullable(),
   permanentAddress: z.string().optional().nullable(),
   localAddress: z.string().optional().nullable(),
+  programId: z.string().optional().nullable(),
   programCode: z.string().optional().nullable(),
   admissionDate: z.string().optional().nullable(),
   expectedGraduation: z.string().optional().nullable(),
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   academicStatus: z.enum(["good_standing", "probation", "suspended"]).optional(),
+  admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"]).optional().nullable(),
+  admissionCategoryOther: z.string().optional().nullable(),
+  siiApplicationNumber: z.string().optional().nullable(),
+  relationshipType: z.enum([
+    "father", 
+    "mother", 
+    "brother", 
+    "sister", 
+    "guardian", 
+    "husband", 
+    "wife", 
+    "spouse", 
+    "parent", 
+    "local_sponsor", 
+    "other"
+  ]).optional().nullable(),
+  relationshipName: z.string().optional().nullable(),
+  relationshipPhone: z.string().optional().nullable(),
+  relationshipEmail: z.string().optional().nullable(),
+  relationshipAddress: z.string().optional().nullable(),
   embassyName: z.string().optional().nullable(),
   embassyAddress: z.string().optional().nullable(),
   embassyCity: z.string().optional().nullable(),
@@ -153,4 +248,20 @@ export const UpdateStudentValidationSchema = z.object({
   }, { message: "Invalid consular email address format" }),
   embassyWebsite: z.string().optional().nullable(),
   embassyContactPerson: z.string().optional().nullable()
+}).refine((data) => {
+  if (data.admissionCategory === "iccr") {
+    return Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
+  }
+  return true;
+}, {
+  message: "SII Application Number is required for ICCR admission category",
+  path: ["siiApplicationNumber"]
+}).refine((data) => {
+  if (data.admissionCategory === "other") {
+    return Boolean(data.admissionCategoryOther && data.admissionCategoryOther.trim().length > 0);
+  }
+  return true;
+}, {
+  message: "Please specify the custom admission category",
+  path: ["admissionCategoryOther"]
 });

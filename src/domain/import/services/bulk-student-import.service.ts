@@ -539,8 +539,70 @@ export class BulkStudentImportService {
         }
       }
 
+      // Age is dynamically computed from DOB in ISCMS
+      if (mappedData.age) {
+        warnings.push({
+          field: "age",
+          fieldLabel: "Age",
+          value: mappedData.age,
+          warning: `Age specified in spreadsheet (${mappedData.age}) is informational only; age is dynamically calculated from Date of Birth in ISCMS.`
+        });
+      }
+
+      // Blood Group validation
+      const bloodRaw = mappedData.blood_group?.trim() || "";
+      if (bloodRaw) {
+        const canonicalBloods = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+        const matchedBlood = canonicalBloods.find(b => b.toLowerCase() === bloodRaw.toLowerCase().replace(/\s+/g, ""));
+        if (matchedBlood) {
+          mappedData.blood_group = matchedBlood;
+        } else {
+          warnings.push({
+            field: "blood_group",
+            fieldLabel: "Blood Group",
+            value: bloodRaw,
+            warning: `Unrecognized blood group "${bloodRaw}". Expected standard format (e.g. A+, B+, O+, AB+).`
+          });
+        }
+      }
+
+      // Marital Status validation
+      const maritalRaw = mappedData.marital_status?.trim() || "";
+      if (maritalRaw) {
+        const canonicalMarital = ["single", "married", "divorced", "widowed", "separated", "other", "prefer_not_to_say"];
+        const normMarital = maritalRaw.toLowerCase().replace(/[\s-]+/g, "_");
+        if (canonicalMarital.includes(normMarital)) {
+          mappedData.marital_status = normMarital;
+        } else {
+          warnings.push({
+            field: "marital_status",
+            fieldLabel: "Marital Status",
+            value: maritalRaw,
+            warning: `Unrecognized marital status "${maritalRaw}". Expected Single, Married, Divorced, Widowed, Separated, Other, or Prefer not to say.`
+          });
+        }
+      }
+
+      // Physical Disability validation
+      const disabilityRaw = mappedData.physical_disability?.trim().toLowerCase() || "";
+      if (disabilityRaw) {
+        if (["yes", "true", "1", "y", "declared"].includes(disabilityRaw)) {
+          mappedData.physical_disability = "true";
+        } else if (["no", "false", "0", "n", "none"].includes(disabilityRaw)) {
+          mappedData.physical_disability = "false";
+        } else {
+          mappedData.physical_disability = "";
+          warnings.push({
+            field: "physical_disability",
+            fieldLabel: "Physical Disability",
+            value: mappedData.physical_disability || disabilityRaw,
+            warning: `Unrecognized disability declaration "${disabilityRaw}". Stored as Not Specified.`
+          });
+        }
+      }
+
       // =========================================================================
-      // 5. OPTIONAL CONTACT FIELDS (Email, Phone, Addresses)
+      // 5. OPTIONAL CONTACT FIELDS (Email, Phone, Addresses, Family)
       // =========================================================================
       const email = mappedData.email?.trim() || "";
       if (!email) {
@@ -612,7 +674,7 @@ export class BulkStudentImportService {
       }
 
       // =========================================================================
-      // 6. OPTIONAL EMERGENCY CONTACT
+      // 6. OPTIONAL EMERGENCY CONTACT & RELATIONSHIP
       // =========================================================================
       const emName = mappedData.emergency_contact_name?.trim() || "";
       const emPhone = mappedData.emergency_contact_phone?.trim() || "";
@@ -624,11 +686,59 @@ export class BulkStudentImportService {
           warning: "Emergency contact / guardian details not provided. Can be completed later."
         });
         warningsBreakdown.emergencyMissing++;
+      } else if (mappedData.emergency_contact_relationship) {
+        const canonicalRel = ["parent", "guardian", "local_sponsor", "brother", "sister", "husband", "wife", "spouse", "father", "mother", "other"];
+        const normRel = mappedData.emergency_contact_relationship.toLowerCase().replace(/[\s-]+/g, "_");
+        if (canonicalRel.includes(normRel)) {
+          mappedData.emergency_contact_relationship = normRel;
+        }
       }
 
       // =========================================================================
-      // 7. OPTIONAL ADMISSION DATE & ACADEMIC PROGRESSION
+      // 7. OPTIONAL ADMISSION DATE, CATEGORY & ACADEMIC PROGRESSION
       // =========================================================================
+      const admCategoryRaw = mappedData.admission_category?.trim() || "";
+      if (admCategoryRaw) {
+        const canonicalCats = ["iccr", "sii", "direct", "foreign_govt_sponsored", "other"];
+        const normCat = admCategoryRaw.toLowerCase().replace(/[\s-]+/g, "_");
+        if (normCat === "direct_admission") {
+          mappedData.admission_category = "direct";
+        } else if (normCat === "foreign_government_sponsored" || normCat === "foreign_govt") {
+          mappedData.admission_category = "foreign_govt_sponsored";
+        } else if (canonicalCats.includes(normCat)) {
+          mappedData.admission_category = normCat;
+        } else {
+          warnings.push({
+            field: "admission_category",
+            fieldLabel: "Admission Category",
+            value: admCategoryRaw,
+            warning: `Unrecognized admission category "${admCategoryRaw}". Allowed values: ICCR, SII, Direct admission, Foreign Govt. Sponsored, Other.`
+          });
+        }
+      }
+
+      // Conditional ICCR -> SII Application Number check
+      if (mappedData.admission_category === "iccr" && !mappedData.sii_application_number?.trim()) {
+        errors.push({
+          field: "sii_application_number",
+          fieldLabel: "SII Application Number",
+          value: "",
+          problem: "SII Application Number is mandatory when Admission Category is ICCR.",
+          suggestion: "Provide the Study in India (SII) reference application code (e.g. SII-2026-98124)."
+        });
+      }
+
+      // Conditional Other -> Admission Category Other check
+      if (mappedData.admission_category === "other" && !mappedData.admission_category_other?.trim()) {
+        errors.push({
+          field: "admission_category_other",
+          fieldLabel: "Custom Admission Category",
+          value: "",
+          problem: "Custom category specification is required when Admission Category is 'Other'.",
+          suggestion: "Specify the custom admission or scholarship track description."
+        });
+      }
+
       const admRaw = mappedData.admission_date?.trim() || "";
       let calculatedProg: any = null;
 
@@ -1014,6 +1124,15 @@ export class BulkStudentImportService {
 
         // B. Insert student_personal (optional fields stored as NULL)
         const nationalityCode = data.nationality ? this.normalizeNationality(data.nationality) : null;
+        let parsedDisability: boolean | null = null;
+        if (data.physical_disability === "true") parsedDisability = true;
+        else if (data.physical_disability === "false") parsedDisability = false;
+
+        const fatherPhoneParsed = data.father_mobile ? BulkStudentImportService.parsePhoneComponents(data.father_mobile) : null;
+        const fatherWhatsappParsed = data.father_whatsapp ? BulkStudentImportService.parsePhoneComponents(data.father_whatsapp) : null;
+        const motherPhoneParsed = data.mother_mobile ? BulkStudentImportService.parsePhoneComponents(data.mother_mobile) : null;
+        const motherWhatsappParsed = data.mother_whatsapp ? BulkStudentImportService.parsePhoneComponents(data.mother_whatsapp) : null;
+
         const { error: persErr } = await supabase
           .from("student_personal")
           .insert({
@@ -1023,6 +1142,22 @@ export class BulkStudentImportService {
             gender: data.gender ? data.gender.toLowerCase() : null,
             date_of_birth: data.date_of_birth || null,
             blood_group: data.blood_group?.trim() || null,
+            marital_status: data.marital_status ? data.marital_status.toLowerCase() : null,
+            physical_disability: parsedDisability,
+            father_name: data.father_name?.trim() || null,
+            father_mobile: fatherPhoneParsed?.formattedE164 || (data.father_mobile ? data.father_mobile.trim() : null),
+            father_mobile_country_code: fatherPhoneParsed?.countryCode || null,
+            father_mobile_number: fatherPhoneParsed?.number || null,
+            father_whatsapp: fatherWhatsappParsed?.formattedE164 || (data.father_whatsapp ? data.father_whatsapp.trim() : null),
+            father_whatsapp_country_code: fatherWhatsappParsed?.countryCode || null,
+            father_whatsapp_number: fatherWhatsappParsed?.number || null,
+            mother_name: data.mother_name?.trim() || null,
+            mother_mobile: motherPhoneParsed?.formattedE164 || (data.mother_mobile ? data.mother_mobile.trim() : null),
+            mother_mobile_country_code: motherPhoneParsed?.countryCode || null,
+            mother_mobile_number: motherPhoneParsed?.number || null,
+            mother_whatsapp: motherWhatsappParsed?.formattedE164 || (data.mother_whatsapp ? data.mother_whatsapp.trim() : null),
+            mother_whatsapp_country_code: motherWhatsappParsed?.countryCode || null,
+            mother_whatsapp_number: motherWhatsappParsed?.number || null,
             created_by: params.actorId,
             updated_by: params.actorId
           });
@@ -1107,6 +1242,9 @@ export class BulkStudentImportService {
             admission_date: data.admission_date || null,
             expected_graduation: data.expected_graduation || expectedGraduation,
             current_semester: currentSemester,
+            admission_category: data.admission_category ? data.admission_category.toLowerCase() : null,
+            admission_category_other: data.admission_category === "other" ? (data.admission_category_other?.trim() || null) : null,
+            sii_application_number: data.sii_application_number?.trim() || null,
             academic_status: "good_standing",
             created_by: params.actorId,
             updated_by: params.actorId

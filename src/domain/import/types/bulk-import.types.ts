@@ -12,7 +12,10 @@ export type ISCMSImportField =
   | "nationality"
   | "gender"
   | "date_of_birth"
+  | "age"
   | "blood_group"
+  | "marital_status"
+  | "physical_disability"
   // Contact Info
   | "email"
   | "phone_home"
@@ -23,10 +26,19 @@ export type ISCMSImportField =
   | "phone_local_number"
   | "permanent_address"
   | "local_address"
+  | "father_name"
+  | "father_mobile"
+  | "father_whatsapp"
+  | "mother_name"
+  | "mother_mobile"
+  | "mother_whatsapp"
   // Academic
   | "academic_program"
   | "academic_level"
   | "admission_date"
+  | "admission_category"
+  | "admission_category_other"
+  | "sii_application_number"
   | "current_semester"
   | "expected_graduation"
   // Emergency Contact
@@ -114,13 +126,40 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     aliases: ["date_of_birth", "date of birth", "dob", "birth date", "birth_date", "d.o.b"]
   },
   {
+    field: "age",
+    label: "Age (Informational / Auto-calculated from DOB)",
+    category: "Identity",
+    required: false,
+    description: "Informational column in spreadsheet; age is dynamically calculated from Date of Birth in ISCMS.",
+    sample: "23",
+    aliases: ["age", "student_age", "student age", "years"]
+  },
+  {
     field: "blood_group",
     label: "Blood Group",
     category: "Identity",
     required: false,
-    description: "A+, B+, O+, AB+, etc. Defaults to NULL if omitted.",
+    description: "A+, A-, B+, B-, AB+, AB-, O+, O-. Defaults to NULL if omitted.",
     sample: "O+",
     aliases: ["blood_group", "blood group", "blood type", "blood_type"]
+  },
+  {
+    field: "marital_status",
+    label: "Marital Status",
+    category: "Identity",
+    required: false,
+    description: "Single, Married, Divorced, Widowed, Separated, Other, or Prefer not to say. Defaults to NULL if omitted.",
+    sample: "Single",
+    aliases: ["marital_status", "marital status", "marital", "marriage status", "civil status"]
+  },
+  {
+    field: "physical_disability",
+    label: "Physical Disability",
+    category: "Identity",
+    required: false,
+    description: "Yes, No, or Not Specified. Defaults to NULL if omitted.",
+    sample: "No",
+    aliases: ["physical_disability", "physical disability", "disability", "handicap", "disabled", "is_disabled", "pwd"]
   },
 
   // Contact
@@ -205,6 +244,60 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     sample: "Hostel Block B, Room 302, NFSU Campus, Gandhinagar",
     aliases: ["local_address", "local address", "campus address", "hostel address", "hostel", "current address"]
   },
+  {
+    field: "father_name",
+    label: "Father Full Name",
+    category: "Contact",
+    required: false,
+    description: "Student's father full legal name. Defaults to NULL if omitted.",
+    sample: "Robert Doe",
+    aliases: ["father_name", "father name", "father's name", "fathers name", "father", "dad name"]
+  },
+  {
+    field: "father_mobile",
+    label: "Father Mobile Number",
+    category: "Contact",
+    required: false,
+    description: "Father's contact mobile number with country code. Defaults to NULL if omitted.",
+    sample: "+977-9811111111",
+    aliases: ["father_mobile", "father mobile", "father phone", "father's phone", "father_phone", "father contact"]
+  },
+  {
+    field: "father_whatsapp",
+    label: "Father WhatsApp Number",
+    category: "Contact",
+    required: false,
+    description: "Father's WhatsApp messaging number with country code. Defaults to NULL if omitted.",
+    sample: "+977-9811111111",
+    aliases: ["father_whatsapp", "father whatsapp", "father's whatsapp", "father wa", "father_wa"]
+  },
+  {
+    field: "mother_name",
+    label: "Mother Full Name",
+    category: "Contact",
+    required: false,
+    description: "Student's mother full legal name. Defaults to NULL if omitted.",
+    sample: "Mary Doe",
+    aliases: ["mother_name", "mother name", "mother's name", "mothers name", "mother", "mom name"]
+  },
+  {
+    field: "mother_mobile",
+    label: "Mother Mobile Number",
+    category: "Contact",
+    required: false,
+    description: "Mother's contact mobile number with country code. Defaults to NULL if omitted.",
+    sample: "+977-9822222222",
+    aliases: ["mother_mobile", "mother mobile", "mother phone", "mother's phone", "mother_phone", "mother contact"]
+  },
+  {
+    field: "mother_whatsapp",
+    label: "Mother WhatsApp Number",
+    category: "Contact",
+    required: false,
+    description: "Mother's WhatsApp messaging number with country code. Defaults to NULL if omitted.",
+    sample: "+977-9822222222",
+    aliases: ["mother_whatsapp", "mother whatsapp", "mother's whatsapp", "mother wa", "mother_wa"]
+  },
 
   // Academic
   {
@@ -215,6 +308,33 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "Course name or program code (e.g. B.Tech CSE, BTECH_CSE).",
     sample: "B.Tech in Computer Science & Engineering",
     aliases: ["academic_program", "program", "program_name", "program name", "course", "course_name", "course name", "degree", "programme", "branch", "discipline"]
+  },
+  {
+    field: "admission_category",
+    label: "Admission Category",
+    category: "Academic",
+    required: false,
+    description: "ICCR, SII, Direct admission, Foreign Govt. Sponsored, or Other.",
+    sample: "Direct admission",
+    aliases: ["admission_category", "admission category", "admission track", "category", "admission type", "quota", "sponsorship"]
+  },
+  {
+    field: "admission_category_other",
+    label: "Custom Admission Category (Other)",
+    category: "Academic",
+    required: false,
+    description: "Specification when Admission Category is Other.",
+    sample: "Bilateral Embassy Scholarship",
+    aliases: ["admission_category_other", "admission category other", "other admission category", "other category specify", "custom admission track"]
+  },
+  {
+    field: "sii_application_number",
+    label: "SII Application Number",
+    category: "Academic",
+    required: false,
+    description: "Study in India application number (Mandatory for ICCR admissions).",
+    sample: "SII-2026-98124",
+    aliases: ["sii_application_number", "sii application number", "sii app no", "sii_no", "sii id", "sii_id", "sii application id"]
   },
   {
     field: "academic_level",

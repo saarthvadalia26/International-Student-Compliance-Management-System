@@ -1,6 +1,19 @@
+import {
+  MaritalStatus,
+  BloodGroup,
+  RelationshipType,
+  AdmissionCategory
+} from "@/domain/students/types/registration-expansion.types";
+
+export type {
+  MaritalStatus,
+  BloodGroup,
+  RelationshipType,
+  AdmissionCategory
+};
+
 export type StudentStatus = "active" | "suspended" | "graduated" | "withdrawn";
 export type AcademicStatus = "good_standing" | "probation" | "suspended";
-export type RelationshipType = "parent" | "guardian" | "local_sponsor";
 
 export interface Student {
   id: string;
@@ -21,6 +34,22 @@ export interface StudentPersonal {
   dateOfBirth: Date | null;
   bloodGroup: string | null;
   religion: string | null;
+  maritalStatus?: MaritalStatus | null;
+  physicalDisability?: boolean | null;
+  fatherName?: string | null;
+  fatherMobile?: string | null;
+  fatherMobileCountryCode?: string | null;
+  fatherMobileNumber?: string | null;
+  fatherWhatsapp?: string | null;
+  fatherWhatsappCountryCode?: string | null;
+  fatherWhatsappNumber?: string | null;
+  motherName?: string | null;
+  motherMobile?: string | null;
+  motherMobileCountryCode?: string | null;
+  motherMobileNumber?: string | null;
+  motherWhatsapp?: string | null;
+  motherWhatsappCountryCode?: string | null;
+  motherWhatsappNumber?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -58,6 +87,9 @@ export interface StudentAcademic {
   expectedGraduation: Date | null;
   currentSemester: number | null;
   academicStatus: AcademicStatus;
+  admissionCategory?: AdmissionCategory | null;
+  admissionCategoryOther?: string | null;
+  siiApplicationNumber?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -112,6 +144,23 @@ export interface RegisterStudentInput {
   nationalityCode?: string | null;
   gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say" | null;
   dateOfBirth?: Date | string | null;
+  bloodGroup?: string | null;
+  maritalStatus?: MaritalStatus | null;
+  physicalDisability?: boolean | null;
+  fatherName?: string | null;
+  fatherMobile?: string | null;
+  fatherMobileCountryCode?: string | null;
+  fatherMobileNumber?: string | null;
+  fatherWhatsapp?: string | null;
+  fatherWhatsappCountryCode?: string | null;
+  fatherWhatsappNumber?: string | null;
+  motherName?: string | null;
+  motherMobile?: string | null;
+  motherMobileCountryCode?: string | null;
+  motherMobileNumber?: string | null;
+  motherWhatsapp?: string | null;
+  motherWhatsappCountryCode?: string | null;
+  motherWhatsappNumber?: string | null;
   email?: string | null;
   phoneHome?: string | null;
   phoneLocal?: string | null;
@@ -126,6 +175,9 @@ export interface RegisterStudentInput {
   admissionDate?: Date | string | null;
   expectedGraduation?: Date | string | null;
   currentSemester?: number | null;
+  admissionCategory?: AdmissionCategory | null;
+  admissionCategoryOther?: string | null;
+  siiApplicationNumber?: string | null;
   relationshipType?: RelationshipType | null;
   relationshipName?: string | null;
   relationshipPhone?: string | null;
@@ -159,6 +211,23 @@ export interface UpdateStudentInput {
   nationalityCode?: string | null;
   gender?: "male" | "female" | "other" | "transgender" | "prefer_not_to_say" | null;
   dateOfBirth?: Date | string | null;
+  bloodGroup?: string | null;
+  maritalStatus?: MaritalStatus | null;
+  physicalDisability?: boolean | null;
+  fatherName?: string | null;
+  fatherMobile?: string | null;
+  fatherMobileCountryCode?: string | null;
+  fatherMobileNumber?: string | null;
+  fatherWhatsapp?: string | null;
+  fatherWhatsappCountryCode?: string | null;
+  fatherWhatsappNumber?: string | null;
+  motherName?: string | null;
+  motherMobile?: string | null;
+  motherMobileCountryCode?: string | null;
+  motherMobileNumber?: string | null;
+  motherWhatsapp?: string | null;
+  motherWhatsappCountryCode?: string | null;
+  motherWhatsappNumber?: string | null;
   email?: string | null;
   phoneHome?: string | null;
   phoneLocal?: string | null;
@@ -174,6 +243,14 @@ export interface UpdateStudentInput {
   expectedGraduation?: string | Date | null;
   currentSemester?: number | null;
   academicStatus?: AcademicStatus;
+  admissionCategory?: AdmissionCategory | null;
+  admissionCategoryOther?: string | null;
+  siiApplicationNumber?: string | null;
+  relationshipType?: RelationshipType | null;
+  relationshipName?: string | null;
+  relationshipPhone?: string | null;
+  relationshipEmail?: string | null;
+  relationshipAddress?: string | null;
   // Embassy / Consular updates
   embassyName?: string | null;
   embassyAddress?: string | null;
@@ -191,6 +268,7 @@ export interface StudentFilterOptions {
   complianceStatus?: string | "all";
   nationalityCode?: string;
   programCode?: string;
+  admissionCategory?: AdmissionCategory | "all";
   limit?: number;
   offset?: number;
 }

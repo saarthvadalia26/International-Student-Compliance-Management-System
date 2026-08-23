@@ -3,7 +3,8 @@ import {
   FullStudentProfile, 
   RegisterStudentInput, 
   UpdateStudentInput, 
-  StudentFilterOptions
+  StudentFilterOptions,
+  RelationshipType
 } from "./student.types";
 import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
 import { AcademicProgramService } from "@/domain/academic-programs/academic-program.service";
@@ -36,7 +37,7 @@ export interface IStudentRepository {
 interface RelationshipRow {
   id: string;
   student_id: string;
-  relationship_type: "parent" | "guardian" | "local_sponsor";
+  relationship_type: RelationshipType;
   name: string;
   phone: string;
   email: string | null;
@@ -122,7 +123,25 @@ export class SupabaseStudentRepository implements IStudentRepository {
           full_name: input.fullName.trim(),
           nationality_code: nationalityCode,
           gender: input.gender || null,
+          dateOfBirth: dobFormatted,
           date_of_birth: dobFormatted,
+          blood_group: input.bloodGroup?.trim() || null,
+          marital_status: input.maritalStatus || null,
+          physical_disability: input.physicalDisability !== undefined ? input.physicalDisability : null,
+          father_name: input.fatherName?.trim() || null,
+          father_mobile: input.fatherMobile?.trim() || null,
+          father_mobile_country_code: input.fatherMobileCountryCode?.trim() || null,
+          father_mobile_number: input.fatherMobileNumber?.trim() || null,
+          father_whatsapp: input.fatherWhatsapp?.trim() || null,
+          father_whatsapp_country_code: input.fatherWhatsappCountryCode?.trim() || null,
+          father_whatsapp_number: input.fatherWhatsappNumber?.trim() || null,
+          mother_name: input.motherName?.trim() || null,
+          mother_mobile: input.motherMobile?.trim() || null,
+          mother_mobile_country_code: input.motherMobileCountryCode?.trim() || null,
+          mother_mobile_number: input.motherMobileNumber?.trim() || null,
+          mother_whatsapp: input.motherWhatsapp?.trim() || null,
+          mother_whatsapp_country_code: input.motherWhatsappCountryCode?.trim() || null,
+          mother_whatsapp_number: input.motherWhatsappNumber?.trim() || null,
           created_by: actorId,
           updated_by: actorId
         })
@@ -210,6 +229,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
           expected_graduation: expGradFormatted,
           current_semester: calculatedSemester,
           academic_status: "good_standing",
+          admission_category: input.admissionCategory || null,
+          admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
+          sii_application_number: input.siiApplicationNumber?.trim() || null,
           created_by: actorId,
           updated_by: actorId
         })
@@ -345,6 +367,22 @@ export class SupabaseStudentRepository implements IStudentRepository {
           dateOfBirth: personalData.date_of_birth ? new Date(personalData.date_of_birth) : null,
           bloodGroup: personalData.blood_group,
           religion: personalData.religion,
+          maritalStatus: personalData.marital_status || null,
+          physicalDisability: personalData.physical_disability !== undefined ? personalData.physical_disability : null,
+          fatherName: personalData.father_name || null,
+          fatherMobile: personalData.father_mobile || null,
+          fatherMobileCountryCode: personalData.father_mobile_country_code || null,
+          fatherMobileNumber: personalData.father_mobile_number || null,
+          fatherWhatsapp: personalData.father_whatsapp || null,
+          fatherWhatsappCountryCode: personalData.father_whatsapp_country_code || null,
+          fatherWhatsappNumber: personalData.father_whatsapp_number || null,
+          motherName: personalData.mother_name || null,
+          motherMobile: personalData.mother_mobile || null,
+          motherMobileCountryCode: personalData.mother_mobile_country_code || null,
+          motherMobileNumber: personalData.mother_mobile_number || null,
+          motherWhatsapp: personalData.mother_whatsapp || null,
+          motherWhatsappCountryCode: personalData.mother_whatsapp_country_code || null,
+          motherWhatsappNumber: personalData.mother_whatsapp_number || null,
           createdAt: new Date(personalData.created_at),
           updatedAt: new Date(personalData.updated_at),
           deletedAt: personalData.deleted_at ? new Date(personalData.deleted_at) : null,
@@ -371,6 +409,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
           expectedGraduation: academicData.expected_graduation ? new Date(academicData.expected_graduation) : null,
           currentSemester: academicData.current_semester,
           academicStatus: academicData.academic_status,
+          admissionCategory: academicData.admission_category || null,
+          admissionCategoryOther: academicData.admission_category_other || null,
+          siiApplicationNumber: academicData.sii_application_number || null,
           createdAt: new Date(academicData.created_at),
           updatedAt: new Date(academicData.updated_at),
           deletedAt: academicData.deleted_at ? new Date(academicData.deleted_at) : null,
@@ -465,6 +506,22 @@ export class SupabaseStudentRepository implements IStudentRepository {
         dateOfBirth: personal?.date_of_birth ? new Date(personal.date_of_birth) : null,
         bloodGroup: personal?.blood_group || null,
         religion: personal?.religion || null,
+        maritalStatus: personal?.marital_status || null,
+        physicalDisability: personal?.physical_disability !== undefined ? personal?.physical_disability : null,
+        fatherName: personal?.father_name || null,
+        fatherMobile: personal?.father_mobile || null,
+        fatherMobileCountryCode: personal?.father_mobile_country_code || null,
+        fatherMobileNumber: personal?.father_mobile_number || null,
+        fatherWhatsapp: personal?.father_whatsapp || null,
+        fatherWhatsappCountryCode: personal?.father_whatsapp_country_code || null,
+        fatherWhatsappNumber: personal?.father_whatsapp_number || null,
+        motherName: personal?.mother_name || null,
+        motherMobile: personal?.mother_mobile || null,
+        motherMobileCountryCode: personal?.mother_mobile_country_code || null,
+        motherMobileNumber: personal?.mother_mobile_number || null,
+        motherWhatsapp: personal?.mother_whatsapp || null,
+        motherWhatsappCountryCode: personal?.mother_whatsapp_country_code || null,
+        motherWhatsappNumber: personal?.mother_whatsapp_number || null,
         createdAt: personal?.created_at ? new Date(personal.created_at) : new Date(student.created_at),
         updatedAt: personal?.updated_at ? new Date(personal.updated_at) : new Date(student.updated_at),
         deletedAt: personal?.deleted_at ? new Date(personal.deleted_at) : null,
@@ -496,6 +553,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
         expectedGraduation: academic?.expected_graduation ? new Date(academic.expected_graduation) : null,
         currentSemester: academic?.current_semester ?? null,
         academicStatus: academic?.academic_status || "good_standing",
+        admissionCategory: academic?.admission_category || null,
+        admissionCategoryOther: academic?.admission_category_other || null,
+        siiApplicationNumber: academic?.sii_application_number || null,
         createdAt: academic?.created_at ? new Date(academic.created_at) : new Date(student.created_at),
         updatedAt: academic?.updated_at ? new Date(academic.updated_at) : new Date(student.updated_at),
         deletedAt: academic?.deleted_at ? new Date(academic.deleted_at) : null,
@@ -616,6 +676,24 @@ export class SupabaseStudentRepository implements IStudentRepository {
     }
     if (input.gender !== undefined) personalUpdates.gender = input.gender || null;
     if (input.dateOfBirth !== undefined) personalUpdates.date_of_birth = this.formatDate(input.dateOfBirth);
+    if (input.bloodGroup !== undefined) personalUpdates.blood_group = input.bloodGroup ? input.bloodGroup.trim() : null;
+    if (input.maritalStatus !== undefined) personalUpdates.marital_status = input.maritalStatus || null;
+    if (input.physicalDisability !== undefined) personalUpdates.physical_disability = input.physicalDisability;
+    if (input.fatherName !== undefined) personalUpdates.father_name = input.fatherName ? input.fatherName.trim() : null;
+    if (input.fatherMobile !== undefined) personalUpdates.father_mobile = input.fatherMobile ? input.fatherMobile.trim() : null;
+    if (input.fatherMobileCountryCode !== undefined) personalUpdates.father_mobile_country_code = input.fatherMobileCountryCode ? input.fatherMobileCountryCode.trim() : null;
+    if (input.fatherMobileNumber !== undefined) personalUpdates.father_mobile_number = input.fatherMobileNumber ? input.fatherMobileNumber.trim() : null;
+    if (input.fatherWhatsapp !== undefined) personalUpdates.father_whatsapp = input.fatherWhatsapp ? input.fatherWhatsapp.trim() : null;
+    if (input.fatherWhatsappCountryCode !== undefined) personalUpdates.father_whatsapp_country_code = input.fatherWhatsappCountryCode ? input.fatherWhatsappCountryCode.trim() : null;
+    if (input.fatherWhatsappNumber !== undefined) personalUpdates.father_whatsapp_number = input.fatherWhatsappNumber ? input.fatherWhatsappNumber.trim() : null;
+    if (input.motherName !== undefined) personalUpdates.mother_name = input.motherName ? input.motherName.trim() : null;
+    if (input.motherMobile !== undefined) personalUpdates.mother_mobile = input.motherMobile ? input.motherMobile.trim() : null;
+    if (input.motherMobileCountryCode !== undefined) personalUpdates.mother_mobile_country_code = input.motherMobileCountryCode ? input.motherMobileCountryCode.trim() : null;
+    if (input.motherMobileNumber !== undefined) personalUpdates.mother_mobile_number = input.motherMobileNumber ? input.motherMobileNumber.trim() : null;
+    if (input.motherWhatsapp !== undefined) personalUpdates.mother_whatsapp = input.motherWhatsapp ? input.motherWhatsapp.trim() : null;
+    if (input.motherWhatsappCountryCode !== undefined) personalUpdates.mother_whatsapp_country_code = input.motherWhatsappCountryCode ? input.motherWhatsappCountryCode.trim() : null;
+    if (input.motherWhatsappNumber !== undefined) personalUpdates.mother_whatsapp_number = input.motherWhatsappNumber ? input.motherWhatsappNumber.trim() : null;
+
     if (Object.keys(personalUpdates).length > 0) {
       personalUpdates.updated_at = new Date().toISOString();
       personalUpdates.updated_by = actorId;
@@ -657,6 +735,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.admissionDate !== undefined) academicUpdates.admission_date = this.formatDate(input.admissionDate);
     if (input.expectedGraduation !== undefined) academicUpdates.expected_graduation = this.formatDate(input.expectedGraduation);
     if (input.academicStatus) academicUpdates.academic_status = input.academicStatus;
+    if (input.admissionCategory !== undefined) academicUpdates.admission_category = input.admissionCategory || null;
+    if (input.admissionCategoryOther !== undefined) academicUpdates.admission_category_other = input.admissionCategoryOther ? input.admissionCategoryOther.trim() : null;
+    if (input.siiApplicationNumber !== undefined) academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
 
     if (progIdent || input.admissionDate) {
       // Re-calculate progression automatically based on updated course or admission date
@@ -717,6 +798,55 @@ export class SupabaseStudentRepository implements IStudentRepository {
       academicUpdates.updated_at = new Date().toISOString();
       academicUpdates.updated_by = actorId;
       await supabase.from("student_academic").update(academicUpdates).eq("student_id", id);
+    }
+
+    // 4.5. Update or insert primary emergency contact / relationship
+    const hasRelUpdates = 
+      input.relationshipName !== undefined || 
+      input.relationshipPhone !== undefined || 
+      input.relationshipType !== undefined || 
+      input.relationshipEmail !== undefined || 
+      input.relationshipAddress !== undefined;
+
+    if (hasRelUpdates) {
+      const { data: existingRel } = await supabase
+        .from("student_relationships")
+        .select("id")
+        .eq("student_id", id)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingRel) {
+        const relUpdatePayload: Record<string, unknown> = {
+          updated_at: new Date().toISOString(),
+          updated_by: actorId
+        };
+        if (input.relationshipType !== undefined) relUpdatePayload.relationship_type = input.relationshipType || "parent";
+        if (input.relationshipName !== undefined) relUpdatePayload.name = input.relationshipName ? input.relationshipName.trim() : "";
+        if (input.relationshipPhone !== undefined) relUpdatePayload.phone = input.relationshipPhone ? input.relationshipPhone.trim() : "";
+        if (input.relationshipEmail !== undefined) relUpdatePayload.email = input.relationshipEmail ? input.relationshipEmail.trim() : null;
+        if (input.relationshipAddress !== undefined) relUpdatePayload.address = input.relationshipAddress ? input.relationshipAddress.trim() : null;
+
+        await supabase
+          .from("student_relationships")
+          .update(relUpdatePayload)
+          .eq("id", existingRel.id);
+      } else if (input.relationshipName && input.relationshipName.trim() && input.relationshipPhone && input.relationshipPhone.trim()) {
+        await supabase
+          .from("student_relationships")
+          .insert({
+            student_id: id,
+            relationship_type: input.relationshipType || "parent",
+            name: input.relationshipName.trim(),
+            phone: input.relationshipPhone.trim(),
+            email: input.relationshipEmail?.trim() || null,
+            address: input.relationshipAddress?.trim() || null,
+            created_by: actorId,
+            updated_by: actorId
+          });
+      }
     }
 
     // 5. Update or Upsert student_embassy table

@@ -16,7 +16,23 @@ export const StudentPersonalSchema = z.object({
     const date = new Date(dob);
     return !isNaN(date.getTime()) && date < new Date();
   }, { message: "Date of birth must be in the past" }),
-  bloodGroup: z.string().max(5).optional().nullable(),
+  maritalStatus: z.enum(["single", "married", "divorced", "widowed", "separated", "other", "prefer_not_to_say"]).optional().nullable(),
+  bloodGroup: z.string().max(10).optional().nullable(),
+  physicalDisability: z.boolean().optional().nullable(),
+  fatherName: z.string().max(255).optional().nullable(),
+  fatherMobile: z.string().optional().nullable(),
+  fatherMobileCountryCode: z.string().optional().nullable(),
+  fatherMobileNumber: z.string().optional().nullable(),
+  fatherWhatsapp: z.string().optional().nullable(),
+  fatherWhatsappCountryCode: z.string().optional().nullable(),
+  fatherWhatsappNumber: z.string().optional().nullable(),
+  motherName: z.string().max(255).optional().nullable(),
+  motherMobile: z.string().optional().nullable(),
+  motherMobileCountryCode: z.string().optional().nullable(),
+  motherMobileNumber: z.string().optional().nullable(),
+  motherWhatsapp: z.string().optional().nullable(),
+  motherWhatsappCountryCode: z.string().optional().nullable(),
+  motherWhatsappNumber: z.string().optional().nullable(),
   religion: z.string().max(50).optional().nullable(),
 });
 
@@ -31,6 +47,10 @@ export const StudentContactSchema = z.object({
     return val.trim().length >= 7 && val.trim().length <= 20;
   }, { message: "Home phone number must be between 7 and 20 digits" }),
   phoneLocal: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 7, { message: "Local phone must contain at least 7 digits" }),
+  phoneLocalCountryCode: z.string().optional().nullable(),
+  phoneLocalNumber: z.string().optional().nullable(),
+  phoneHomeCountryCode: z.string().optional().nullable(),
+  phoneHomeNumber: z.string().optional().nullable(),
   permanentAddress: z.string().optional().nullable(),
   localAddress: z.string().optional().nullable(),
 });
@@ -42,6 +62,9 @@ export const StudentAcademicSchema = z.object({
   expectedGraduation: z.string().optional().nullable().or(z.literal("")),
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   academicStatus: z.enum(["good_standing", "probation", "suspended"]).default("good_standing"),
+  admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"]).optional().nullable(),
+  admissionCategoryOther: z.string().optional().nullable(),
+  siiApplicationNumber: z.string().optional().nullable(),
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
     const ad = new Date(data.admissionDate);
@@ -54,6 +77,22 @@ export const StudentAcademicSchema = z.object({
 }, {
   message: "Expected graduation must be after admission date",
   path: ["expectedGraduation"]
+}).refine((data) => {
+  if (data.admissionCategory === "iccr") {
+    return Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
+  }
+  return true;
+}, {
+  message: "SII Application Number is required for ICCR admission category",
+  path: ["siiApplicationNumber"]
+}).refine((data) => {
+  if (data.admissionCategory === "other") {
+    return Boolean(data.admissionCategoryOther && data.admissionCategoryOther.trim().length > 0);
+  }
+  return true;
+}, {
+  message: "Please specify the custom admission category",
+  path: ["admissionCategoryOther"]
 });
 
 // 5. Passport Document Schema (matching BR-003)
