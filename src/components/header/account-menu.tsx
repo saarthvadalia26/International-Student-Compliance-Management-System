@@ -169,7 +169,7 @@ export function AccountMenu() {
             )}
           </Button>
         } />
-        <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-2rem)] font-sans p-1">
+        <DropdownMenuContent align="end" side="bottom" sideOffset={8} className="w-64 max-w-[calc(100vw-2rem)] font-sans p-1">
           {/* User Profile Header with Clean Visual Hierarchy */}
           <DropdownMenuLabel className="flex flex-col px-3 py-2.5">
             <div className="flex items-start justify-between gap-2">
