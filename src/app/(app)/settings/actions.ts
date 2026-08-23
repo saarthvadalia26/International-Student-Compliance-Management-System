@@ -202,7 +202,14 @@ export async function fetchUserAccountsAction(): Promise<UserAccountItem[]> {
     }
   }
 
-  return users.map((u) => {
+  const filteredUsers = users.filter((u) => {
+    const rawRole = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+    const isStudentEmail = u.email?.toLowerCase().includes("@iscms.student.local");
+    const hasStudentId = Boolean(u.user_metadata?.student_id);
+    return rawRole !== "student" && !isStudentEmail && !hasStudentId;
+  });
+
+  return filteredUsers.map((u) => {
     const rawRole = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
     let role: "administrator" | "staff" | "student" = "staff";
     if (rawRole === "administrator" || rawRole === "admin") role = "administrator";

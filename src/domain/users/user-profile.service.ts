@@ -46,8 +46,15 @@ export class UserProfileService {
 
       const rawRole = (user.user_metadata?.role as string | undefined)?.toLowerCase().trim();
       let role: AppRole = "staff";
-      if (rawRole === "administrator" || rawRole === "admin") role = "administrator";
-      else if (rawRole === "student") role = "student";
+      if (rawRole === "administrator" || rawRole === "admin") {
+        role = "administrator";
+      } else if (
+        rawRole === "student" ||
+        Boolean(user.user_metadata?.student_id) ||
+        user.email?.toLowerCase().includes("@iscms.student.local")
+      ) {
+        role = "student";
+      }
 
       const rawName = (user.user_metadata?.full_name as string | undefined)?.trim() || null;
       const isComplete = isNameComplete(rawName);
@@ -124,8 +131,15 @@ export class UserProfileService {
     // 2. Update public.user_profiles (with graceful fallback if migration not yet applied in live DB)
     const rawRole = (existingMeta.role as string | undefined)?.toLowerCase().trim();
     let role: AppRole = "staff";
-    if (rawRole === "administrator" || rawRole === "admin") role = "administrator";
-    else if (rawRole === "student") role = "student";
+    if (rawRole === "administrator" || rawRole === "admin") {
+      role = "administrator";
+    } else if (
+      rawRole === "student" ||
+      Boolean(existingMeta.student_id) ||
+      user.email?.toLowerCase().includes("@iscms.student.local")
+    ) {
+      role = "student";
+    }
 
     try {
       const { error: profileError } = await supabase
@@ -162,6 +176,7 @@ export class UserProfileService {
 
   /**
    * Fetches all user profiles (for administrator user management).
+   * Excludes student profiles.
    */
   static async getAllUserProfiles(): Promise<UserProfile[]> {
     const supabase = getAdminSupabase();
@@ -169,6 +184,7 @@ export class UserProfileService {
     const { data, error } = await supabase
       .from("user_profiles")
       .select("*")
+      .neq("role", "student")
       .order("created_at", { ascending: false });
 
     if (error) {

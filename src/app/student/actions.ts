@@ -282,6 +282,61 @@ export async function verifyStudentWhatsAppOtpByIdentifierAction(
     const targetRedirect = `${resolvedBaseUrl}/student/dashboard`;
 
     const adminSupabase = (await import("@/lib/supabase/admin")).getAdminSupabase();
+
+    // Bootstrap or align student auth user metadata and user_profiles prior to link generation
+    try {
+      const { data: userList } = await adminSupabase.auth.admin.listUsers();
+      const existingUser = userList?.users?.find(
+        (u) => u.email?.toLowerCase() === verification.studentEmail!.toLowerCase()
+      );
+
+      if (!existingUser) {
+        const { data: newUser } = await adminSupabase.auth.admin.createUser({
+          email: verification.studentEmail,
+          email_confirm: true,
+          user_metadata: {
+            role: "student",
+            student_id: verification.studentId,
+          },
+        });
+        if (newUser?.user?.id) {
+          await adminSupabase.from("user_profiles").upsert(
+            {
+              id: newUser.user.id,
+              email: verification.studentEmail,
+              role: "student",
+              is_profile_complete: true,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" }
+          );
+        }
+      } else if (
+        existingUser.user_metadata?.student_id !== verification.studentId ||
+        existingUser.user_metadata?.role !== "student"
+      ) {
+        await adminSupabase.auth.admin.updateUserById(existingUser.id, {
+          user_metadata: {
+            ...existingUser.user_metadata,
+            role: "student",
+            student_id: verification.studentId,
+          },
+        });
+        await adminSupabase.from("user_profiles").upsert(
+          {
+            id: existingUser.id,
+            email: verification.studentEmail,
+            role: "student",
+            is_profile_complete: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
+      }
+    } catch (bootstrapErr) {
+      console.warn("[STUDENT_OTP_BOOTSTRAP_WARN]", bootstrapErr);
+    }
+
     const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
       type: "magiclink",
       email: verification.studentEmail,

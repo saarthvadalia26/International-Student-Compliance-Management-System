@@ -151,6 +151,11 @@ export async function middleware(request: NextRequest) {
   // ── Student Portal Routes (Production Mode) ─────────────────────────────────
   if (
     pathname.startsWith("/student/dashboard") ||
+    pathname.startsWith("/student/profile") ||
+    pathname.startsWith("/student/settings") ||
+    pathname.startsWith("/student/history") ||
+    pathname.startsWith("/student/notifications") ||
+    pathname.startsWith("/student/efrro") ||
     pathname.startsWith("/student/upload")
   ) {
     if (!user) {

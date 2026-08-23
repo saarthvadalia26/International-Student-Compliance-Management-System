@@ -214,9 +214,26 @@ export class StudentPortalAuthService {
 
         if (createErr) {
           console.error("[STUDENT_AUTH_ERROR] User creation error:", createErr.message);
+        } else {
+          // Explicitly register in user_profiles as student
+          try {
+            await supabase.from("user_profiles").upsert(
+              {
+                id: (await supabase.auth.admin.listUsers()).data.users.find(u => u.email?.toLowerCase() === studentEmail.toLowerCase())?.id,
+                email: studentEmail,
+                full_name: targetStudent.fullName,
+                role: "student",
+                is_profile_complete: true,
+                updated_at: new Date().toISOString()
+              },
+              { onConflict: "id" }
+            );
+          } catch {
+            // Non-blocking
+          }
         }
-      } else if (existingAuthUser.user_metadata?.student_id !== targetStudent.id) {
-        // Ensure student_id metadata is aligned
+      } else if (existingAuthUser.user_metadata?.student_id !== targetStudent.id || existingAuthUser.user_metadata?.role !== "student") {
+        // Ensure student_id metadata and role are aligned
         await supabase.auth.admin.updateUserById(existingAuthUser.id, {
           user_metadata: {
             ...existingAuthUser.user_metadata,
@@ -225,6 +242,23 @@ export class StudentPortalAuthService {
             full_name: targetStudent.fullName
           }
         });
+
+        // Also ensure user_profiles reflects student role
+        try {
+          await supabase.from("user_profiles").upsert(
+            {
+              id: existingAuthUser.id,
+              email: studentEmail,
+              full_name: targetStudent.fullName,
+              role: "student",
+              is_profile_complete: true,
+              updated_at: new Date().toISOString()
+            },
+            { onConflict: "id" }
+          );
+        } catch {
+          // Non-blocking
+        }
       }
     } catch (authErr) {
       console.warn("[STUDENT_AUTH] Auth check warning:", authErr);

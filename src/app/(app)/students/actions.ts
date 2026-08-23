@@ -210,6 +210,16 @@ export async function registerStudentAction(input: RegisterStudentInput): Promis
       };
     }
 
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return {
+        success: false,
+        errorCode: "AUTHORIZATION_ERROR",
+        errorTitle: "Access Restricted",
+        error: "Forbidden: Staff or Administrator privileges are required to register students."
+      };
+    }
+
     const created = await studentService.registerStudent(input, user.id);
 
     // Evaluate and initialize automated reminder schedule for any provided document metadata
@@ -738,6 +748,14 @@ export async function updateStudentAction(
       };
     }
 
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return {
+        success: false,
+        error: "Forbidden: Staff or Administrator privileges are required to update student profiles."
+      };
+    }
+
     await studentService.updateStudent(studentId, updates, user.id);
 
     // Reconcile reminder schedules against updated profile dates (graduation, document expiries)
@@ -776,6 +794,14 @@ export async function archiveStudentAction(studentId: string): Promise<{ success
       return {
         success: false,
         error: "Authentication required to archive student profile."
+      };
+    }
+
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return {
+        success: false,
+        error: "Forbidden: Staff or Administrator privileges are required to archive student profiles."
       };
     }
 
@@ -1846,6 +1872,11 @@ export async function getReminderDispatchPreviewAction(
       return { success: false, error: "Authentication required to preview reminder dispatch." };
     }
 
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: Staff or Administrator privileges required to preview reminder dispatch." };
+    }
+
     if (!studentId || typeof studentId !== "string" || studentId.trim() === "") {
       return { success: false, error: "Invalid student identifier provided for reminder dispatch." };
     }
@@ -2012,6 +2043,11 @@ export async function triggerReminderDispatchAction(
 
     if (authError || !user) {
       return { success: false, status: "BLOCKED", reason: "auth_required", error: "Authentication required to trigger reminder dispatch." };
+    }
+
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, status: "BLOCKED", reason: "forbidden", error: "Forbidden: Staff or Administrator privileges required to trigger reminders." };
     }
 
     if (!studentId || typeof studentId !== "string" || studentId.trim() === "") {
@@ -2351,6 +2387,11 @@ export async function recordAcademicAdjustmentAction(
       return { success: false, error: "Authentication required to record academic adjustments." };
     }
 
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: Staff or Administrator privileges are required to record academic adjustments." };
+    }
+
     if (!input.reason || !input.reason.trim()) {
       return { success: false, error: "A mandatory institutional reason is required to record an academic adjustment." };
     }
@@ -2387,6 +2428,11 @@ export async function getAcademicAdjustmentsAction(
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return { success: false, error: "Authentication required to view academic adjustments." };
+    }
+
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: Staff or Administrator privileges are required to view academic adjustments." };
     }
 
     const adjustments = await studentService.getAcademicAdjustments(studentId);
