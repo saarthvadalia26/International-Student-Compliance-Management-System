@@ -56,11 +56,12 @@ import {
   DocumentReplacementReason, 
   REASON_LABELS 
 } from "@/domain/compliance/types/replacement-request.types";
+import { DocumentCentreSkeleton } from "@/components/student/student-skeletons";
 import { cn } from "@/lib/utils";
 
 export default function DocumentCentrePage() {
   return (
-    <React.Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading Document Centre...</div>}>
+    <React.Suspense fallback={<DocumentCentreSkeleton />}>
       <DocumentCentreContent />
     </React.Suspense>
   );
@@ -109,14 +110,17 @@ function DocumentCentreContent() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const jwt = session?.access_token || "test_token";
-      const [profileData, elig, limitData] = await Promise.all([
+      const [profileData, limitData] = await Promise.all([
         fetchStudentProfile(jwt),
-        fetchDocumentUploadEligibilityAction(jwt, activeDocType),
         fetchDocumentUploadLimitAction()
       ]);
-      if (profileData) setProfile(profileData);
-      if (elig) {
-        setEligibilityData(prev => ({ ...prev, [activeDocType]: elig }));
+      if (profileData) {
+        setProfile(profileData);
+        setEligibilityData({
+          passport: profileData.passportEligibility,
+          visa: profileData.visaEligibility,
+          efrro: profileData.efrroEligibility
+        });
       }
       if (limitData?.maxUploadSizeBytes) {
         setMaxUploadSizeBytes(limitData.maxUploadSizeBytes);
@@ -125,7 +129,7 @@ function DocumentCentreContent() {
     } catch {
       // ignore
     }
-  }, [supabase, activeDocType]);
+  }, [supabase]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -133,15 +137,18 @@ function DocumentCentreContent() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const jwt = session?.access_token || "test_token";
-        const [profileData, elig, limitData] = await Promise.all([
+        const [profileData, limitData] = await Promise.all([
           fetchStudentProfile(jwt),
-          fetchDocumentUploadEligibilityAction(jwt, activeDocType),
           fetchDocumentUploadLimitAction()
         ]);
         if (mounted) {
-          if (profileData) setProfile(profileData);
-          if (elig) {
-            setEligibilityData(prev => ({ ...prev, [activeDocType]: elig }));
+          if (profileData) {
+            setProfile(profileData);
+            setEligibilityData({
+              passport: profileData.passportEligibility,
+              visa: profileData.visaEligibility,
+              efrro: profileData.efrroEligibility
+            });
           }
           if (limitData?.maxUploadSizeBytes) {
             setMaxUploadSizeBytes(limitData.maxUploadSizeBytes);
@@ -157,7 +164,7 @@ function DocumentCentreContent() {
     return () => {
       mounted = false;
     };
-  }, [supabase, activeDocType]);
+  }, [supabase]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isUploadAllowed) {
@@ -275,11 +282,7 @@ function DocumentCentreContent() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 w-full items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" />
-      </div>
-    );
+    return <DocumentCentreSkeleton />;
   }
 
   // Resolve current active doc eligibility

@@ -24,115 +24,90 @@ export interface IStudentPortalRepository {
 export class SupabaseStudentPortalRepository implements IStudentPortalRepository {
   async getStudentProfile(studentId: string): Promise<StudentPortalProfile | null> {
     const supabase = getAdminSupabase();
-    console.log(`[STUDENT_PORTAL_REPO] Loading profile for student: ${studentId}`);
+    const { StudentPortalReferenceCache } = await import("../services/reference-cache");
+    const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
 
-    // Query core student records using standard relationships
-    const { data: student, error } = await supabase
-      .from("students")
-      .select(`
-        id,
-        registration_number,
-        student_personal(
-          full_name,
-          nationality_code
-        ),
-        student_academic(
-          program_id,
-          program_code
-        ),
-        student_contact(
-          email,
-          phone_home,
-          phone_local
-        ),
-        student_snapshot(
-          passport_number,
-          passport_expiry,
-          visa_number,
-          visa_type,
-          visa_expiry,
-          efrro_status,
-          efrro_expiry,
-          days_until_efrro_expiry
-        )
-      `)
-      .eq("id", studentId)
-      .single();
+    // Execute core student record, document versions, reference caches, and batch eligibility concurrently
+    const [
+      studentRes,
+      passportVerRes,
+      visaVerRes,
+      efrroVerRes,
+      progMaps,
+      refMap,
+      eligibilityAll
+    ] = await Promise.all([
+      supabase
+        .from("students")
+        .select(`
+          id,
+          registration_number,
+          student_personal(
+            full_name,
+            nationality_code
+          ),
+          student_academic(
+            program_id,
+            program_code
+          ),
+          student_contact(
+            email,
+            phone_home,
+            phone_local
+          ),
+          student_snapshot(
+            passport_number,
+            passport_expiry,
+            visa_number,
+            visa_type,
+            visa_expiry,
+            efrro_status,
+            efrro_expiry,
+            days_until_efrro_expiry
+          )
+        `)
+        .eq("id", studentId)
+        .single(),
+      supabase
+        .from("passport_versions")
+        .select("id, document_number, expiry_date, verification_status, notes, rejection_reason, created_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("visa_versions")
+        .select("id, document_number, visa_type, expiry_date, verification_status, notes, rejection_reason, created_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("efrro_versions")
+        .select("id, created_at, verification_status, notes, rejection_reason")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      StudentPortalReferenceCache.getAcademicProgramMaps().catch(() => ({ nameMap: {}, schoolMap: {} })),
+      StudentPortalReferenceCache.getReferenceDataMap().catch(() => ({})),
+      DocumentUploadEligibilityEngine.evaluateAllEligibility(studentId).catch(() => null)
+    ]);
 
-    if (error || !student) {
-      console.error(`[STUDENT_PORTAL_REPO_ERROR] Student not found: ${studentId}`, error?.message);
+    const student = studentRes.data;
+    if (studentRes.error || !student) {
+      console.error(`[STUDENT_PORTAL_REPO_ERROR] Student not found: ${studentId}`, studentRes.error?.message);
       return null;
     }
 
-    // Load academic programs mapping for authoritative course name and school
-    const { data: progData } = await supabase
-      .from("academic_programs")
-      .select("id, program_code, program_name, school_name");
-
-    const progNameMap: Record<string, string> = {};
-    const progSchoolMap: Record<string, string> = {};
-    if (progData) {
-      progData.forEach(p => {
-        if (p.id) {
-          progNameMap[p.id] = p.program_name;
-          if (p.school_name) progSchoolMap[p.id] = p.school_name;
-        }
-        if (p.program_code) {
-          progNameMap[p.program_code] = p.program_name;
-          progNameMap[p.program_code.toLowerCase()] = p.program_name;
-          progNameMap[p.program_code.replace(/_/g, "-")] = p.program_name;
-          if (p.school_name) progSchoolMap[p.program_code] = p.school_name;
-        }
-        if (p.program_name) {
-          progNameMap[p.program_name] = p.program_name;
-          progNameMap[p.program_name.toLowerCase()] = p.program_name;
-          if (p.school_name) progSchoolMap[p.program_name] = p.school_name;
-        }
-      });
-    }
-
-    // Load reference data mapping to resolve legacy categories
-    const { data: refData } = await supabase
-      .from("reference_data")
-      .select("code, display_name, category")
-      .in("category", ["school", "course", "gender"]);
-
-    const refMap: Record<string, string> = {};
-    if (refData) {
-      refData.forEach(r => {
-        refMap[r.code] = r.display_name;
-      });
-    }
-
-    // Load latest Passport document version
-    const { data: passportVer } = await supabase
-      .from("passport_versions")
-      .select("id, document_number, expiry_date, verification_status, notes, rejection_reason, created_at")
-      .eq("student_id", studentId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    // Load latest Visa document version
-    const { data: visaVer } = await supabase
-      .from("visa_versions")
-      .select("id, document_number, visa_type, expiry_date, verification_status, notes, rejection_reason, created_at")
-      .eq("student_id", studentId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    // Load latest eFRRO document version
-    const { data: efrroVer } = await supabase
-      .from("efrro_versions")
-      .select("id, created_at, verification_status, notes, rejection_reason")
-      .eq("student_id", studentId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { nameMap: progNameMap, schoolMap: progSchoolMap } = progMaps as { nameMap: Record<string, string>; schoolMap: Record<string, string> };
+    const resolvedRefMap = (refMap || {}) as Record<string, string>;
+    const passportVer = passportVerRes.data;
+    const visaVer = visaVerRes.data;
+    const efrroVer = efrroVerRes.data;
 
     const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
     const academic = Array.isArray(student.student_academic) ? student.student_academic[0] : student.student_academic;
@@ -187,7 +162,7 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       ? progNameMap[progCode]
       : progCode && progNameMap[progCode.toLowerCase()]
       ? progNameMap[progCode.toLowerCase()]
-      : refMap[progCode] || progCode || "Not assigned yet";
+      : resolvedRefMap[progCode] || progCode || "Not assigned yet";
 
     const resolvedSchool = (progId && progSchoolMap[progId])
       || (progCode && progSchoolMap[progCode])
@@ -229,20 +204,9 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       daysRemaining: efrroDaysRemaining,
       efrroDaysRemaining,
 
-      passportEligibility: await (async () => {
-        const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
-        return DocumentUploadEligibilityEngine.evaluateEligibility(student.id, "passport");
-      })().catch(() => undefined),
-
-      visaEligibility: await (async () => {
-        const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
-        return DocumentUploadEligibilityEngine.evaluateEligibility(student.id, "visa");
-      })().catch(() => undefined),
-
-      efrroEligibility: await (async () => {
-        const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
-        return DocumentUploadEligibilityEngine.evaluateEligibility(student.id, "efrro");
-      })().catch(() => undefined),
+      passportEligibility: eligibilityAll?.passport,
+      visaEligibility: eligibilityAll?.visa,
+      efrroEligibility: eligibilityAll?.efrro,
 
       lastUploadDate: lastUpload
     };

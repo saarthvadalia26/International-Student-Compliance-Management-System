@@ -21,15 +21,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentDashboard } from "../../actions";
-import { StudentPortalProfile, StudentHistoryRow, StudentReminderHistoryRow } from "@/domain/student-portal/types";
+import { StudentPortalProfile } from "@/domain/student-portal/types";
+import { StudentDashboardSkeleton } from "@/components/student/student-skeletons";
 import { cn } from "@/lib/utils";
 
 export default function StudentDashboardPage() {
   const supabase = getBrowserSupabase();
   
   const [profile, setProfile] = React.useState<StudentPortalProfile | null>(null);
-  const [, setHistory] = React.useState<StudentHistoryRow[]>([]);
-  const [, setReminders] = React.useState<StudentReminderHistoryRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -44,8 +43,6 @@ export default function StudentDashboardPage() {
 
         if (mounted) {
           setProfile(data.profile);
-          setHistory(data.history);
-          setReminders(data.reminders);
           setIsLoading(false);
         }
       } catch (err: unknown) {
@@ -65,14 +62,7 @@ export default function StudentDashboardPage() {
   }, [supabase]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <span className="text-xs text-muted-foreground">Loading student dashboard...</span>
-        </div>
-      </div>
-    );
+    return <StudentDashboardSkeleton />;
   }
 
   if (error || !profile) {

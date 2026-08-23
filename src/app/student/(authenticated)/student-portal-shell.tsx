@@ -93,6 +93,7 @@ export default function StudentPortalShell({
                 <Link
                   key={link.href}
                   href={link.href}
+                  prefetch={true}
                   className={cn(
                     "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     isActive 
@@ -153,6 +154,7 @@ export default function StudentPortalShell({
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={true}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
                   "flex min-h-[44px] items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",

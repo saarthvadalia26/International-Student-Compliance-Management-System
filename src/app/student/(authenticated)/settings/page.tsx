@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { Bell, ShieldCheck, Phone, CheckCircle2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";

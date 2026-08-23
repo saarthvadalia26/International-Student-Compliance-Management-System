@@ -14,6 +14,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentProfile } from "../../actions";
 import { StudentPortalProfile } from "@/domain/student-portal/types";
+import { StudentProfileSkeleton } from "@/components/student/student-skeletons";
 import { cn } from "@/lib/utils";
 
 export default function StudentProfilePage() {
@@ -50,11 +51,7 @@ export default function StudentProfilePage() {
   }, [supabase]);
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 w-full items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" />
-      </div>
-    );
+    return <StudentProfileSkeleton />;
   }
 
   if (error || !profile) {

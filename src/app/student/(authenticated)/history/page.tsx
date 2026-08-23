@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { fetchStudentActivityHistory } from "../../actions";
 import { StudentHistoryRow, StudentReminderHistoryRow } from "@/domain/student-portal/types";
+import { StudentHistorySkeleton } from "@/components/student/student-skeletons";
 import { getDocumentBadgeClass } from "@/features/compliance/constants/constants";
 import { cn } from "@/lib/utils";
 
@@ -79,12 +80,7 @@ export default function StudentHistoryPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 w-full flex-col items-center justify-center gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground font-medium">Loading activity history timeline...</span>
-      </div>
-    );
+    return <StudentHistorySkeleton />;
   }
 
   if (error) {

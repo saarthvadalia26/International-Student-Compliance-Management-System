@@ -278,53 +278,54 @@ export class DocumentUploadEligibilityEngine {
     currentDate?: Date | string
   ): Promise<DocumentUploadEligibilityResult> {
     const { getAdminSupabase } = await import("@/lib/supabase/admin");
+    const { StudentPortalReferenceCache } = await import("@/domain/student-portal/services/reference-cache");
+    const { DocumentReplacementRequestService } = await import("./replacement-request.service");
     const supabase = getAdminSupabase();
 
-    // 1. Fetch policy for document type
-    const { data: policyData } = await supabase
-      .from("document_upload_policies")
-      .select("upload_window_days, is_active")
-      .eq("document_type", documentType)
-      .maybeSingle();
-
-    const policyWindowDays = (policyData?.is_active && policyData.upload_window_days > 0)
-      ? policyData.upload_window_days
-      : DocumentUploadEligibilityEngine.DEFAULT_UPLOAD_WINDOW_DAYS;
-
-    // 2. Fetch document versions for student
     const tableName = documentType === "passport" 
       ? "passport_versions" 
       : documentType === "visa" 
       ? "visa_versions" 
       : "efrro_versions";
 
-    const { data: versions } = await supabase
-      .from(tableName)
-      .select("version_number, file_path, verification_status, is_active, expiry_date, issue_date, deleted_at")
-      .eq("student_id", studentId)
-      .is("deleted_at", null)
-      .order("version_number", { ascending: false });
+    const nowIso = (currentDate ? new Date(currentDate) : new Date()).toISOString();
 
+    // Run policy lookup (cached), document versions, active authorizations, and replacement requests in parallel
+    const [policies, versionsRes, authRes, activeReplacementRequest] = await Promise.all([
+      StudentPortalReferenceCache.getUploadPolicies().catch(() => ({})),
+      supabase
+        .from(tableName)
+        .select("version_number, file_path, verification_status, is_active, expiry_date, issue_date, deleted_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("version_number", { ascending: false }),
+      supabase
+        .from("student_document_upload_authorizations")
+        .select("*")
+        .eq("student_id", studentId)
+        .eq("document_type", documentType)
+        .eq("status", "active")
+        .lte("valid_from", nowIso)
+        .gte("valid_until", nowIso)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      DocumentReplacementRequestService.getActiveRequest(studentId, documentType).catch(() => null)
+    ]);
+
+    const policyInfo = (policies as Record<string, { uploadWindowDays: number; isActive: boolean }>)[documentType];
+    const policyWindowDays = (policyInfo?.isActive && policyInfo.uploadWindowDays > 0)
+      ? policyInfo.uploadWindowDays
+      : DocumentUploadEligibilityEngine.DEFAULT_UPLOAD_WINDOW_DAYS;
+
+    const versions = versionsRes.data;
     const isVerified = (status?: string | null) => status?.toLowerCase() === "verified" || status?.toLowerCase() === "approved";
     const isPending = (status?: string | null) => status?.toLowerCase() === "pending" || status?.toLowerCase() === "pending_verification";
 
     const activeDoc = versions?.find(v => v.is_active === true && isVerified(v.verification_status)) || null;
     const pendingDoc = versions?.find(v => isPending(v.verification_status)) || null;
 
-    // 3. Fetch active early authorization if any
-    const nowIso = (currentDate ? new Date(currentDate) : new Date()).toISOString();
-    const { data: authData } = await supabase
-      .from("student_document_upload_authorizations")
-      .select("*")
-      .eq("student_id", studentId)
-      .eq("document_type", documentType)
-      .eq("status", "active")
-      .lte("valid_from", nowIso)
-      .gte("valid_until", nowIso)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
+    const authData = authRes.data;
     const activeAuth: StudentUploadAuthorization | null = authData ? {
       id: authData.id,
       studentId: authData.student_id,
@@ -339,10 +340,6 @@ export class DocumentUploadEligibilityEngine {
       consumedVersionId: authData.consumed_version_id,
       createdAt: authData.created_at
     } : null;
-
-    // 4. Fetch latest replacement request
-    const { DocumentReplacementRequestService } = await import("./replacement-request.service");
-    const activeReplacementRequest = await DocumentReplacementRequestService.getActiveRequest(studentId, documentType);
 
     // Resolve active document version info
     const resolvedActiveDoc = activeDoc ? {
@@ -370,6 +367,161 @@ export class DocumentUploadEligibilityEngine {
       activeReplacementRequest,
       currentDate
     });
+  }
+
+  /**
+   * Concurrently evaluates upload eligibility for ALL document types (passport, visa, efrro)
+   * in a single consolidated parallel batch.
+   */
+  public static async evaluateAllEligibility(
+    studentId: string,
+    currentDate?: Date | string
+  ): Promise<{
+    passport: DocumentUploadEligibilityResult;
+    visa: DocumentUploadEligibilityResult;
+    efrro: DocumentUploadEligibilityResult;
+  }> {
+    const { getAdminSupabase } = await import("@/lib/supabase/admin");
+    const { StudentPortalReferenceCache } = await import("@/domain/student-portal/services/reference-cache");
+    const supabase = getAdminSupabase();
+    const nowIso = (currentDate ? new Date(currentDate) : new Date()).toISOString();
+
+    const [
+      policies,
+      passportVersRes,
+      visaVersRes,
+      efrroVersRes,
+      authorizationsRes,
+      replacementRequestsRes
+    ] = await Promise.all([
+      StudentPortalReferenceCache.getUploadPolicies().catch(() => ({})),
+      supabase
+        .from("passport_versions")
+        .select("version_number, file_path, verification_status, is_active, expiry_date, issue_date, deleted_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("version_number", { ascending: false }),
+      supabase
+        .from("visa_versions")
+        .select("version_number, file_path, verification_status, is_active, expiry_date, issue_date, deleted_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("version_number", { ascending: false }),
+      supabase
+        .from("efrro_versions")
+        .select("version_number, file_path, verification_status, is_active, expiry_date, issue_date, deleted_at")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("version_number", { ascending: false }),
+      supabase
+        .from("student_document_upload_authorizations")
+        .select("*")
+        .eq("student_id", studentId)
+        .eq("status", "active")
+        .lte("valid_from", nowIso)
+        .gte("valid_until", nowIso)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("document_replacement_requests")
+        .select("*")
+        .eq("student_id", studentId)
+        .in("status", ["pending", "approved", "rejected"])
+        .order("submitted_at", { ascending: false })
+    ]);
+
+    const polMap = policies as Record<string, { uploadWindowDays: number; isActive: boolean }>;
+    const isVerified = (status?: string | null) => status?.toLowerCase() === "verified" || status?.toLowerCase() === "approved";
+    const isPending = (status?: string | null) => status?.toLowerCase() === "pending" || status?.toLowerCase() === "pending_verification";
+
+    const evaluateSingle = (
+      docType: ComplianceDocumentType,
+      versions: Array<{
+        version_number: number;
+        file_path: string;
+        verification_status: string;
+        is_active: boolean;
+        expiry_date?: string | null;
+        issue_date?: string | null;
+      }> | null
+    ): DocumentUploadEligibilityResult => {
+      const pInfo = polMap[docType];
+      const policyWindowDays = (pInfo?.isActive && pInfo.uploadWindowDays > 0)
+        ? pInfo.uploadWindowDays
+        : DocumentUploadEligibilityEngine.DEFAULT_UPLOAD_WINDOW_DAYS;
+
+      const activeDoc = versions?.find(v => v.is_active === true && isVerified(v.verification_status)) || null;
+      const pendingDoc = versions?.find(v => isPending(v.verification_status)) || null;
+
+      const authData = authorizationsRes.data?.find(a => a.document_type === docType) || null;
+      const activeAuth: StudentUploadAuthorization | null = authData ? {
+        id: authData.id,
+        studentId: authData.student_id,
+        documentType: authData.document_type,
+        reason: authData.reason,
+        reasonDetails: authData.reason_details,
+        validFrom: authData.valid_from,
+        validUntil: authData.valid_until,
+        status: authData.status,
+        authorizedBy: authData.authorized_by,
+        consumedAt: authData.consumed_at,
+        consumedVersionId: authData.consumed_version_id,
+        createdAt: authData.created_at
+      } : null;
+
+      const replData = replacementRequestsRes.data?.find(r => r.document_type === docType) || null;
+      const activeReplacementRequest = replData ? {
+        id: replData.id,
+        studentId: replData.student_id,
+        documentType: replData.document_type,
+        currentDocumentVersion: replData.current_document_version,
+        currentExpiryDate: replData.current_expiry_date,
+        reason: replData.reason,
+        reasonDetails: replData.reason_details,
+        status: replData.status,
+        submittedAt: replData.submitted_at,
+        reviewedBy: replData.reviewed_by,
+        reviewedAt: replData.reviewed_at,
+        rejectionReason: replData.rejection_reason,
+        authorizationId: replData.authorization_id,
+        authorizationExpiresAt: replData.authorization_expires_at,
+        completedAt: replData.completed_at,
+        completedVersionId: replData.completed_version_id,
+        createdAt: replData.created_at,
+        updatedAt: replData.updated_at
+      } : null;
+
+      const resolvedActiveDoc = activeDoc ? {
+        versionNumber: activeDoc.version_number,
+        filePath: activeDoc.file_path,
+        verificationStatus: isVerified(activeDoc.verification_status) ? "verified" as const : "pending" as const,
+        isActive: activeDoc.is_active,
+        expiryDate: activeDoc.expiry_date,
+        issueDate: activeDoc.issue_date
+      } : null;
+
+      return this.calculateEligibility({
+        documentType: docType,
+        activeDocument: resolvedActiveDoc,
+        pendingDocument: pendingDoc ? {
+          versionNumber: pendingDoc.version_number,
+          filePath: pendingDoc.file_path,
+          verificationStatus: "pending",
+          isActive: pendingDoc.is_active,
+          expiryDate: pendingDoc.expiry_date,
+          issueDate: pendingDoc.issue_date
+        } : null,
+        policyWindowDays,
+        activeAuthorization: activeAuth,
+        activeReplacementRequest,
+        currentDate
+      });
+    };
+
+    return {
+      passport: evaluateSingle("passport", passportVersRes.data),
+      visa: evaluateSingle("visa", visaVersRes.data),
+      efrro: evaluateSingle("efrro", efrroVersRes.data)
+    };
   }
 
   /**

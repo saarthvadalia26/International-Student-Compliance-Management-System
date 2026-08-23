@@ -114,8 +114,9 @@ export default function StudentLoginPage() {
             });
 
             if (!verifyErr && verifyData?.session) {
-              // Direct internal navigation on current origin
-              window.location.replace("/student/dashboard");
+              // Smooth Next.js client-side navigation
+              router.refresh();
+              router.replace("/student/dashboard");
               return;
             }
             if (verifyErr) {
@@ -133,7 +134,8 @@ export default function StudentLoginPage() {
         }
 
         // 3. Fallback: Relative internal navigation
-        window.location.replace("/student/dashboard");
+        router.refresh();
+        router.replace("/student/dashboard");
       } else {
         setError(res.error || "Unable to locate an active student record. Please verify your credentials.");
         toast.error(res.error || "Authentication Failed");
@@ -277,7 +279,8 @@ export default function StudentLoginPage() {
             });
 
             if (!verifyErr && verifyData?.session) {
-              window.location.replace("/student/dashboard");
+              router.refresh();
+              router.replace("/student/dashboard");
               return;
             }
             if (verifyErr) {
@@ -295,7 +298,8 @@ export default function StudentLoginPage() {
         }
 
         // 3. Fallback: Relative internal navigation
-        window.location.replace("/student/dashboard");
+        router.refresh();
+        router.replace("/student/dashboard");
       } else {
         setError(res.error || "Incorrect verification code. Please try again.");
         toast.error("Verification Failed");

@@ -315,18 +315,14 @@ export async function fetchStudentDashboard(jwt: string): Promise<{
 }> {
   try {
     const studentId = await verifyUserAndGetStudentId(jwt);
-    console.log(`[STUDENT_ACTION] Loading dashboard assets for student: ${studentId}`);
+    console.log(`[STUDENT_ACTION] Loading dashboard profile for student: ${studentId}`);
 
-    const [profile, history, reminders] = await Promise.all([
-      portalRepo.getStudentProfile(studentId).catch(() => null),
-      portalRepo.getStudentHistory(studentId).catch(() => []),
-      portalRepo.getStudentReminders(studentId).catch(() => [])
-    ]);
+    const profile = await portalRepo.getStudentProfile(studentId).catch(() => null);
 
     return { 
       profile: profile || (isStudentPortalTestMode() ? MOCK_DEMO_STUDENT_PROFILE : null), 
-      history: history.length > 0 ? history : (isStudentPortalTestMode() ? MOCK_DEMO_HISTORY : []), 
-      reminders: reminders.length > 0 ? reminders : (isStudentPortalTestMode() ? MOCK_DEMO_REMINDERS : []) 
+      history: isStudentPortalTestMode() ? MOCK_DEMO_HISTORY : [], 
+      reminders: isStudentPortalTestMode() ? MOCK_DEMO_REMINDERS : [] 
     };
   } catch (err: unknown) {
     if (isStudentPortalTestMode()) {
@@ -425,19 +421,17 @@ export async function fetchDocumentUploadLimitAction(): Promise<{
 export async function fetchAllDocumentUploadEligibilityAction(jwt: string) {
   try {
     const studentId = await verifyUserAndGetStudentId(jwt);
-    const { canStudentUploadDocument } = await import("@/domain/compliance/services/upload-eligibility.service");
+    const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
     const { systemConfigService } = await import("@/lib/system-config");
-    const [passport, visa, efrro, maxUploadSizeBytes] = await Promise.all([
-      canStudentUploadDocument(studentId, "passport"),
-      canStudentUploadDocument(studentId, "visa"),
-      canStudentUploadDocument(studentId, "efrro"),
+    const [eligibilityAll, maxUploadSizeBytes] = await Promise.all([
+      DocumentUploadEligibilityEngine.evaluateAllEligibility(studentId),
       systemConfigService.getMaxUploadSizeBytes()
     ]);
     const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
     return { 
-      passport, 
-      visa, 
-      efrro, 
+      passport: eligibilityAll.passport, 
+      visa: eligibilityAll.visa, 
+      efrro: eligibilityAll.efrro, 
       maxUploadSizeBytes, 
       maxUploadSizeMb, 
       maxUploadSizeLabel: `${maxUploadSizeMb} MB` 
