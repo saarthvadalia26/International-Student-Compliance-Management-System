@@ -364,7 +364,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         created_at,
         student_personal(full_name, nationality_code),
         student_contact(email, phone_home),
-        student_academic(program_id, program_code, academic_status, override_school_id, school_override_reason, admission_category, iccr_application_number, sii_application_number),
+        student_academic(*),
         student_snapshot(compliance_status, passport_number, visa_number)
       `)
       .is("deleted_at", null)
@@ -384,8 +384,10 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
     records = initialRes.data;
     error = initialRes.error;
 
-    if (error && error.message?.includes("override_school_id")) {
-      const fallbackQuery = adminSupabase
+    // Multi-tier schema resilience fallback: if any nested column/relation differs across environments
+    if (error) {
+      console.warn("[GET_STUDENTS_LIST] Primary query failed, attempting Tier 2 base join fallback:", error.message);
+      let fallbackQuery = adminSupabase
         .from("students")
         .select(`
           id,
@@ -394,19 +396,48 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
           created_at,
           student_personal(full_name, nationality_code),
           student_contact(email, phone_home),
-          student_academic(program_id, program_code, academic_status),
+          student_academic(program_id, program_code, academic_status, admission_category, sii_application_number),
           student_snapshot(compliance_status, passport_number, visa_number)
         `)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
+      if (filters.limit) fallbackQuery = fallbackQuery.limit(filters.limit);
+      if (filters.offset) fallbackQuery = fallbackQuery.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+
       const retryRes = await fallbackQuery;
       records = retryRes.data;
       error = retryRes.error;
+
+      // Tier 3: Core minimal fallback
+      if (error) {
+        console.warn("[GET_STUDENTS_LIST] Tier 2 fallback failed, attempting Tier 3 minimal join fallback:", error.message);
+        let minimalQuery = adminSupabase
+          .from("students")
+          .select(`
+            id,
+            registration_number,
+            status,
+            created_at,
+            student_personal(full_name, nationality_code),
+            student_contact(email),
+            student_academic(program_code),
+            student_snapshot(compliance_status)
+          `)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false });
+
+        if (filters.limit) minimalQuery = minimalQuery.limit(filters.limit);
+        if (filters.offset) minimalQuery = minimalQuery.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+
+        const minimalRes = await minimalQuery;
+        records = minimalRes.data;
+        error = minimalRes.error;
+      }
     }
 
     if (error) {
-      console.error("[GET_STUDENTS_LIST_ERROR]", error);
+      console.error("[GET_STUDENTS_LIST_FATAL_ERROR]", error);
       return {
         success: false,
         students: [],
@@ -532,7 +563,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing",
         admissionCategory: academic?.admission_category || null,
         iccrApplicationNumber: (academic?.admission_category === "iccr")
-          ? (academic?.iccr_application_number || null)
+          ? (academic?.iccr_application_number || academic?.sii_application_number || null)
           : null,
         siiApplicationNumber: (academic?.admission_category === "iccr" || academic?.admission_category === "sii")
           ? (academic?.sii_application_number || null)
