@@ -65,6 +65,7 @@ export class StudentPortalService {
         email_confirm: true,
         user_metadata: {
           role: "student",
+          student_id: token.studentId,
           studentId: token.studentId,
           username: profile.fullName
         }

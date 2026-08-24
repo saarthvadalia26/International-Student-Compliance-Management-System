@@ -158,7 +158,7 @@ async function verifyUserAndGetStudentId(jwt: string): Promise<string> {
     }
 
     const role = user.user_metadata?.role;
-    const studentId = user.user_metadata?.student_id;
+    const studentId = user.user_metadata?.student_id || user.user_metadata?.studentId;
 
     if (role !== "student" || !studentId) {
       if (isTestMode) return MOCK_DEMO_STUDENT_PROFILE.studentId;
