@@ -32,12 +32,20 @@ async function runTests() {
     "Message does not leak raw table names or SQL constraint identifiers"
   );
 
-  // 2. Test formatUserFacingError helper
-  console.log("\n--- 2. formatUserFacingError Helper Output ---");
-  const formattedMsg = formatUserFacingError(constraintErr);
+  // 2. Test formatUserFacingError helper for Visa and eFRRO
+  console.log("\n--- 2. Visa and eFRRO Constraint Sanitization ---");
+  const visaConstraintErr = new Error(`[DB_INSERT_FAILED] Failed to record visa version: new row for relation "visa_versions" violates check constraint "chk_visa_expiry_after_issue"`);
+  const sanitizedVisa = sanitizeError(visaConstraintErr, { action: "uploadStudentDocumentAction", route: "/student/efrro" });
   assert(
-    formattedMsg === "The document expiration date must be after the issue date. Please check the entered dates.",
-    `Formatted user facing message matches plain English text: "${formattedMsg}"`
+    sanitizedVisa.title === "Invalid Expiration Date" && sanitizedVisa.message.includes("The document expiration date must be after the issue date"),
+    "Visa check constraint is translated to user-friendly message without raw SQL"
+  );
+
+  const efrroConstraintErr = new Error(`[DB_INSERT_FAILED] Failed to record efrro version: new row for relation "efrro_versions" violates check constraint "chk_efrro_expiry_after_issue"`);
+  const sanitizedEfrro = sanitizeError(efrroConstraintErr, { action: "uploadStudentDocumentAction", route: "/student/efrro" });
+  assert(
+    sanitizedEfrro.title === "Invalid Expiration Date" && sanitizedEfrro.message.includes("The document expiration date must be after the issue date"),
+    "eFRRO check constraint is translated to user-friendly message without raw SQL"
   );
 
   // 3. Test generic check constraint
