@@ -36,7 +36,7 @@ export function SectionNavGroup({
             "flex flex-row md:flex-col overflow-x-auto pb-1.5 md:pb-0 gap-1.5 md:gap-1.5 scrollbar-none snap-x w-full",
           orientation === "vertical" && "flex flex-col gap-1.5 w-full",
           orientation === "horizontal" &&
-            "flex flex-row flex-wrap items-center gap-1.5 w-full",
+            "flex flex-row flex-nowrap items-center gap-1.5 w-full overflow-x-auto scrollbar-none",
           // Variant styling container
           variant === "segmented" &&
             "p-1 bg-muted/40 dark:bg-muted/20 border border-border/60 rounded-xl",
