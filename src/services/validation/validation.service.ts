@@ -65,6 +65,7 @@ export const StudentAcademicSchema = z.object({
   admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"]).optional().nullable(),
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
+  iccrApplicationNumber: z.string().optional().nullable(),
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
     const ad = new Date(data.admissionDate);
@@ -79,12 +80,14 @@ export const StudentAcademicSchema = z.object({
   path: ["expectedGraduation"]
 }).refine((data) => {
   if (data.admissionCategory === "iccr") {
-    return Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
+    const hasIccr = Boolean(data.iccrApplicationNumber && data.iccrApplicationNumber.trim().length > 0);
+    const hasLegacySii = Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
+    return hasIccr || hasLegacySii;
   }
   return true;
 }, {
-  message: "SII Application Number is required for ICCR admission category",
-  path: ["siiApplicationNumber"]
+  message: "ICCR Application Number is required when Category is ICCR",
+  path: ["iccrApplicationNumber"]
 }).refine((data) => {
   if (data.admissionCategory === "other") {
     return Boolean(data.admissionCategoryOther && data.admissionCategoryOther.trim().length > 0);

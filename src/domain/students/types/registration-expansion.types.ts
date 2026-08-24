@@ -87,35 +87,40 @@ export const RELATIONSHIP_TYPE_OPTIONS: Array<{ value: RelationshipType; label: 
   { value: "other", label: "Other" }
 ];
 
-export const ADMISSION_CATEGORY_OPTIONS: Array<{ value: AdmissionCategory; label: string; requiresSii: boolean; description?: string }> = [
+export const ADMISSION_CATEGORY_OPTIONS: Array<{ value: AdmissionCategory; label: string; requiresSii?: boolean; requiresIccrNumber?: boolean; description?: string }> = [
   { 
     value: "iccr", 
     label: "Indian Council for Cultural Relations (ICCR)", 
-    requiresSii: true,
-    description: "Requires mandatory Study in India (SII) Application Number."
+    requiresSii: false,
+    requiresIccrNumber: true,
+    description: "Requires mandatory ICCR Application Number."
   },
   { 
     value: "sii", 
     label: "Study in India (SII)", 
     requiresSii: false,
+    requiresIccrNumber: false,
     description: "Direct Study in India portal admission track."
   },
   { 
     value: "direct", 
     label: "Direct admission", 
     requiresSii: false,
+    requiresIccrNumber: false,
     description: "Self-financed or direct university admission."
   },
   { 
     value: "foreign_govt_sponsored", 
     label: "Foreign Govt. Sponsored", 
     requiresSii: false,
+    requiresIccrNumber: false,
     description: "Sponsored through international government or embassy scholarship."
   },
   { 
     value: "other", 
     label: "Other", 
     requiresSii: false,
+    requiresIccrNumber: false,
     description: "Custom institutional or bilateral program track."
   }
 ];

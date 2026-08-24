@@ -83,6 +83,8 @@ export interface StudentAcademic {
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   schoolName?: string | null;
+  overrideSchoolId?: string | null;
+  schoolOverrideReason?: string | null;
   admissionDate: Date | null;
   expectedGraduation: Date | null;
   currentSemester: number | null;
@@ -90,6 +92,7 @@ export interface StudentAcademic {
   admissionCategory?: AdmissionCategory | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
+  iccrApplicationNumber?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -172,12 +175,15 @@ export interface RegisterStudentInput {
   localAddress?: string | null;
   programId?: string | null;
   programCode?: string | null;
+  overrideSchoolId?: string | null;
+  schoolOverrideReason?: string | null;
   admissionDate?: Date | string | null;
   expectedGraduation?: Date | string | null;
   currentSemester?: number | null;
   admissionCategory?: AdmissionCategory | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
+  iccrApplicationNumber?: string | null;
   relationshipType?: RelationshipType | null;
   relationshipName?: string | null;
   relationshipPhone?: string | null;
@@ -239,6 +245,8 @@ export interface UpdateStudentInput {
   localAddress?: string | null;
   programId?: string | null;
   programCode?: string | null;
+  overrideSchoolId?: string | null;
+  schoolOverrideReason?: string | null;
   admissionDate?: string | Date | null;
   expectedGraduation?: string | Date | null;
   currentSemester?: number | null;
@@ -246,6 +254,7 @@ export interface UpdateStudentInput {
   admissionCategory?: AdmissionCategory | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
+  iccrApplicationNumber?: string | null;
   relationshipType?: RelationshipType | null;
   relationshipName?: string | null;
   relationshipPhone?: string | null;

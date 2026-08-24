@@ -219,24 +219,53 @@ export class SupabaseStudentRepository implements IStudentRepository {
         calculatedSemester = input.currentSemester || null;
       }
 
-      const { data: academicData, error: academicError } = await supabase
+      const isIccr = input.admissionCategory === "iccr";
+      const resolvedIccrNo = isIccr ? (input.iccrApplicationNumber?.trim() || input.siiApplicationNumber?.trim() || null) : null;
+
+      let { data: academicData, error: academicError } = await supabase
         .from("student_academic")
         .insert({
           student_id: studentId,
           program_id: programIdVal,
           program_code: programCodeVal,
+          override_school_id: input.overrideSchoolId?.trim() || null,
+          school_override_reason: input.overrideSchoolId ? (input.schoolOverrideReason?.trim() || null) : null,
           admission_date: admFormatted,
           expected_graduation: expGradFormatted,
           current_semester: calculatedSemester,
           academic_status: "good_standing",
           admission_category: input.admissionCategory || null,
           admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
-          sii_application_number: input.siiApplicationNumber?.trim() || null,
+          sii_application_number: isIccr ? resolvedIccrNo : (input.siiApplicationNumber?.trim() || null),
+          iccr_application_number: resolvedIccrNo,
           created_by: actorId,
           updated_by: actorId
         })
         .select()
         .single();
+
+      if (academicError && (academicError.message?.includes("override_school_id") || academicError.message?.includes("iccr_application_number"))) {
+        const retry = await supabase
+          .from("student_academic")
+          .insert({
+            student_id: studentId,
+            program_id: programIdVal,
+            program_code: programCodeVal,
+            admission_date: admFormatted,
+            expected_graduation: expGradFormatted,
+            current_semester: calculatedSemester,
+            academic_status: "good_standing",
+            admission_category: input.admissionCategory || null,
+            admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
+            sii_application_number: isIccr ? resolvedIccrNo : (input.siiApplicationNumber?.trim() || null),
+            created_by: actorId,
+            updated_by: actorId
+          })
+          .select()
+          .single();
+        academicData = retry.data;
+        academicError = retry.error;
+      }
 
       if (academicError || !academicData) {
         throw new Error(`Failed to create academic record: ${academicError?.message || "Unknown database error"}`);
@@ -412,6 +441,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           admissionCategory: academicData.admission_category || null,
           admissionCategoryOther: academicData.admission_category_other || null,
           siiApplicationNumber: academicData.sii_application_number || null,
+          iccrApplicationNumber: academicData.iccr_application_number || academicData.sii_application_number || null,
           createdAt: new Date(academicData.created_at),
           updatedAt: new Date(academicData.updated_at),
           deletedAt: academicData.deleted_at ? new Date(academicData.deleted_at) : null,
@@ -549,6 +579,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         studentId: academic?.student_id || student.id,
         programId: academic?.program_id || null,
         programCode: academic?.program_code || null,
+        overrideSchoolId: academic?.override_school_id || null,
+        schoolOverrideReason: academic?.school_override_reason || null,
         admissionDate: academic?.admission_date ? new Date(academic.admission_date) : null,
         expectedGraduation: academic?.expected_graduation ? new Date(academic.expected_graduation) : null,
         currentSemester: academic?.current_semester ?? null,
@@ -556,6 +588,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         admissionCategory: academic?.admission_category || null,
         admissionCategoryOther: academic?.admission_category_other || null,
         siiApplicationNumber: academic?.sii_application_number || null,
+        iccrApplicationNumber: academic?.iccr_application_number || academic?.sii_application_number || null,
         createdAt: academic?.created_at ? new Date(academic.created_at) : new Date(student.created_at),
         updatedAt: academic?.updated_at ? new Date(academic.updated_at) : new Date(student.updated_at),
         deletedAt: academic?.deleted_at ? new Date(academic.deleted_at) : null,
@@ -735,9 +768,30 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.admissionDate !== undefined) academicUpdates.admission_date = this.formatDate(input.admissionDate);
     if (input.expectedGraduation !== undefined) academicUpdates.expected_graduation = this.formatDate(input.expectedGraduation);
     if (input.academicStatus) academicUpdates.academic_status = input.academicStatus;
-    if (input.admissionCategory !== undefined) academicUpdates.admission_category = input.admissionCategory || null;
+    if (input.admissionCategory !== undefined) {
+      academicUpdates.admission_category = input.admissionCategory || null;
+      if (input.admissionCategory === "iccr") {
+        const iccrVal = input.iccrApplicationNumber !== undefined
+          ? (input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null)
+          : (input.siiApplicationNumber ? input.siiApplicationNumber.trim() : undefined);
+        if (iccrVal !== undefined) {
+          academicUpdates.iccr_application_number = iccrVal;
+          academicUpdates.sii_application_number = iccrVal;
+        }
+      } else {
+        // Data retention rule: non-ICCR category clears ICCR application number
+        academicUpdates.iccr_application_number = null;
+        academicUpdates.sii_application_number = null;
+      }
+    } else if (input.iccrApplicationNumber !== undefined) {
+      academicUpdates.iccr_application_number = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
+      academicUpdates.sii_application_number = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
+    } else if (input.siiApplicationNumber !== undefined) {
+      academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
+    }
     if (input.admissionCategoryOther !== undefined) academicUpdates.admission_category_other = input.admissionCategoryOther ? input.admissionCategoryOther.trim() : null;
-    if (input.siiApplicationNumber !== undefined) academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
+    if (input.overrideSchoolId !== undefined) academicUpdates.override_school_id = input.overrideSchoolId ? input.overrideSchoolId.trim() : null;
+    if (input.schoolOverrideReason !== undefined) academicUpdates.school_override_reason = input.schoolOverrideReason ? input.schoolOverrideReason.trim() : null;
 
     if (progIdent || input.admissionDate) {
       // Re-calculate progression automatically based on updated course or admission date
@@ -797,7 +851,17 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (Object.keys(academicUpdates).length > 0) {
       academicUpdates.updated_at = new Date().toISOString();
       academicUpdates.updated_by = actorId;
-      await supabase.from("student_academic").update(academicUpdates).eq("student_id", id);
+      const { error: updateErr } = await supabase.from("student_academic").update(academicUpdates).eq("student_id", id);
+      if (updateErr && (updateErr.message?.includes("override_school_id") || updateErr.message?.includes("iccr_application_number"))) {
+        if (updateErr.message.includes("iccr_application_number")) {
+          delete academicUpdates.iccr_application_number;
+        }
+        if (updateErr.message.includes("override_school_id")) {
+          delete academicUpdates.override_school_id;
+          delete academicUpdates.school_override_reason;
+        }
+        await supabase.from("student_academic").update(academicUpdates).eq("student_id", id);
+      }
     }
 
     // 4.5. Update or insert primary emergency contact / relationship

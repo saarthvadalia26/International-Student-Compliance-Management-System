@@ -35,10 +35,12 @@ export type ISCMSImportField =
   // Academic
   | "academic_program"
   | "academic_level"
+  | "school"
   | "admission_date"
   | "admission_category"
   | "admission_category_other"
   | "sii_application_number"
+  | "iccr_application_number"
   | "current_semester"
   | "expected_graduation"
   // Emergency Contact
@@ -328,11 +330,31 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     aliases: ["admission_category_other", "admission category other", "other admission category", "other category specify", "custom admission track"]
   },
   {
+    field: "iccr_application_number",
+    label: "ICCR Application Number",
+    category: "Academic",
+    required: false,
+    description: "Indian Council for Cultural Relations (ICCR) application number (Mandatory when Admission Category is ICCR).",
+    sample: "ICCR-2026-98124",
+    aliases: [
+      "iccr_application_number",
+      "iccr application number",
+      "iccr app no",
+      "iccr_no",
+      "iccr id",
+      "iccr_id",
+      "iccr application id",
+      "iccr number",
+      "iccr ref",
+      "iccr_ref"
+    ]
+  },
+  {
     field: "sii_application_number",
     label: "SII Application Number",
     category: "Academic",
     required: false,
-    description: "Study in India application number (Mandatory for ICCR admissions).",
+    description: "Study in India application number.",
     sample: "SII-2026-98124",
     aliases: ["sii_application_number", "sii application number", "sii app no", "sii_no", "sii id", "sii_id", "sii application id"]
   },
@@ -352,6 +374,25 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
       "program level",
       "level",
       "course_level"
+    ]
+  },
+  {
+    field: "school",
+    label: "School / Department (Derived from Program)",
+    category: "Academic",
+    required: false,
+    description: "School/department is canonically inherited from the Academic Program. If provided, it is verified against the canonical school.",
+    sample: "School of Pharmacy & Emerging Sciences",
+    aliases: [
+      "school",
+      "department",
+      "school_name",
+      "school name",
+      "dept",
+      "faculty",
+      "institution",
+      "school/department",
+      "school_department"
     ]
   },
   {

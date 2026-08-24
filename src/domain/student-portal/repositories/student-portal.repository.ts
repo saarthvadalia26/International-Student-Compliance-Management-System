@@ -48,7 +48,10 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
           ),
           student_academic(
             program_id,
-            program_code
+            program_code,
+            admission_category,
+            sii_application_number,
+            iccr_application_number
           ),
           student_contact(
             email,
@@ -179,6 +182,10 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       email: contact?.email || "",
       phoneHome: contact?.phone_home || "",
       phoneLocal: contact?.phone_local || "",
+      admissionCategory: academic?.admission_category || null,
+      iccrApplicationNumber: (academic?.admission_category === "iccr") 
+        ? (academic?.iccr_application_number || academic?.sii_application_number || null)
+        : null,
 
       overallCompliance,
 

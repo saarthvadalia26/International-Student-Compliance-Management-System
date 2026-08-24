@@ -58,6 +58,7 @@ export const RegisterStudentValidationSchema = z.object({
   }).optional().nullable(),
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
+  iccrApplicationNumber: z.string().optional().nullable(),
   relationshipType: z.enum([
     "father", 
     "mother", 
@@ -101,14 +102,16 @@ export const RegisterStudentValidationSchema = z.object({
   efrroIssueDate: z.string().optional().nullable(),
   efrroExpiry: z.string().optional().nullable()
 }).refine((data) => {
-  // Conditional rule: If admissionCategory is ICCR, siiApplicationNumber is mandatory
+  // Conditional rule: If admissionCategory is ICCR, iccrApplicationNumber is mandatory
   if (data.admissionCategory === "iccr") {
-    return Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
+    const hasIccr = Boolean(data.iccrApplicationNumber && data.iccrApplicationNumber.trim().length > 0);
+    const hasLegacySii = Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
+    return hasIccr || hasLegacySii;
   }
   return true;
 }, {
-  message: "SII Application Number is required for ICCR admission category",
-  path: ["siiApplicationNumber"]
+  message: "ICCR Application Number is required when Category is ICCR",
+  path: ["iccrApplicationNumber"]
 }).refine((data) => {
   // Conditional rule: If admissionCategory is Other, admissionCategoryOther (Please specify) is mandatory
   if (data.admissionCategory === "other") {

@@ -24,6 +24,8 @@ export interface StudentReportRow {
   expectedGraduation: Date | null;
   status: string;
   complianceStatus: ComplianceStatus;
+  admissionCategory?: string | null;
+  iccrApplicationNumber?: string | null;
 }
 
 export interface EfrroReportRow {

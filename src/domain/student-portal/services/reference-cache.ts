@@ -47,28 +47,60 @@ export class StudentPortalReferenceCache {
           .from("academic_programs")
           .select("id, program_code, program_name, school_name");
 
+        const { DEFAULT_FALLBACK_PROGRAMS, LEGACY_PROGRAM_ALIASES } = await import("@/domain/academic-programs/academic-program.service");
         const nameMap: Record<string, string> = {};
         const schoolMap: Record<string, string> = {};
 
-        if (!error && progData) {
-          progData.forEach((p) => {
-            if (p.id) {
-              nameMap[p.id] = p.program_name;
-              if (p.school_name) schoolMap[p.id] = p.school_name;
-            }
-            if (p.program_code) {
-              nameMap[p.program_code] = p.program_name;
-              nameMap[p.program_code.toLowerCase()] = p.program_name;
-              nameMap[p.program_code.replace(/_/g, "-")] = p.program_name;
-              if (p.school_name) schoolMap[p.program_code] = p.school_name;
-            }
-            if (p.program_name) {
-              nameMap[p.program_name] = p.program_name;
-              nameMap[p.program_name.toLowerCase()] = p.program_name;
-              if (p.school_name) schoolMap[p.program_name] = p.school_name;
-            }
-          });
-        }
+        const programList = (!error && progData && progData.length > 0)
+          ? progData.map(p => ({
+              id: p.id,
+              program_name: p.program_name,
+              program_code: p.program_code,
+              school_name: p.school_name
+            }))
+          : DEFAULT_FALLBACK_PROGRAMS.map(p => ({
+              id: p.id,
+              program_name: p.programName,
+              program_code: p.programCode,
+              school_name: p.schoolName
+            }));
+
+        programList.forEach((p) => {
+          const name = p.program_name || "";
+          const school = p.school_name || "Academic Faculty";
+          const normName = name.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+
+          if (p.id) {
+            nameMap[p.id] = name;
+            nameMap[p.id.toLowerCase()] = name;
+            if (school) schoolMap[p.id] = school;
+          }
+          if (p.program_code) {
+            nameMap[p.program_code] = name;
+            nameMap[p.program_code.toLowerCase()] = name;
+            nameMap[p.program_code.replace(/_/g, "-")] = name;
+            nameMap[p.program_code.replace(/_/g, "-").toLowerCase()] = name;
+            nameMap[p.program_code.replace(/-/g, "_")] = name;
+            nameMap[p.program_code.replace(/-/g, "_").toLowerCase()] = name;
+            if (school) schoolMap[p.program_code] = school;
+          }
+          if (name) {
+            nameMap[name] = name;
+            nameMap[name.toLowerCase()] = name;
+            nameMap[normName] = name;
+            if (school) schoolMap[name] = school;
+          }
+        });
+
+        // Add legacy aliases
+        Object.entries(LEGACY_PROGRAM_ALIASES).forEach(([alias, targetCode]) => {
+          const canonicalName = nameMap[targetCode.toLowerCase()];
+          if (canonicalName) {
+            nameMap[alias] = canonicalName;
+            nameMap[alias.toLowerCase()] = canonicalName;
+            nameMap[alias.replace(/_/g, "-").toLowerCase()] = canonicalName;
+          }
+        });
 
         const result: AcademicProgramMaps = { nameMap, schoolMap };
         this.academicProgramsCache = {

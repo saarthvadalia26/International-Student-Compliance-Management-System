@@ -49,6 +49,8 @@ export interface Student {
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   school: string;
+  admissionCategory?: string | null;
+  iccrApplicationNumber?: string | null;
   passport: { number: string };
   visa: { number: string };
   email: string;
@@ -134,6 +136,7 @@ export default function StudentListPage() {
         (student.academicLevelLabel || "").toLowerCase().includes(query) ||
         (student.academicLevel || "").toLowerCase().includes(query) ||
         student.school.toLowerCase().includes(query) ||
+        (student.iccrApplicationNumber || "").toLowerCase().includes(query) ||
         student.passport.number.toLowerCase().includes(query) ||
         student.visa.number.toLowerCase().includes(query) ||
         student.email.toLowerCase().includes(query);

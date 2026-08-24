@@ -11,6 +11,7 @@ import {
 } from "../types";
 import { ReportMapper } from "../mappers";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
+import { LEGACY_PROGRAM_ALIASES, DEFAULT_FALLBACK_PROGRAMS } from "@/domain/academic-programs/academic-program.service";
 
 // =========================================================================
 // Reusable Select Fragments (Canonical Table Hierarchy: students as Root)
@@ -51,6 +52,11 @@ const ACADEMIC_FIELDS = `
   student_academic(
     program_id,
     program_code,
+    override_school_id,
+    school_override_reason,
+    admission_category,
+    iccr_application_number,
+    sii_application_number,
     expected_graduation
   )
 `;
@@ -228,7 +234,45 @@ export class SupabaseReportRepository implements IReportRepository {
     const to = from + pagination.limit - 1;
     query = query.range(from, to);
 
-    const { data, error, count } = await query;
+    let data: any = null;
+    let error: any = null;
+    let count: number | null = null;
+
+    const initialRes = await query;
+    data = initialRes.data;
+    error = initialRes.error;
+    count = initialRes.count;
+
+    if (error && error.message?.includes("override_school_id")) {
+      const fallbackAcademicFields = `
+        student_academic(
+          program_id,
+          program_code,
+          expected_graduation
+        )
+      `;
+      let fallbackQuery = supabase
+        .from("students")
+        .select(`
+          ${STUDENT_FIELDS},
+          ${SNAPSHOT_FIELDS},
+          ${PERSONAL_FIELDS},
+          ${fallbackAcademicFields},
+          ${CONTACT_FIELDS}
+        `, { count: "exact" });
+
+      if (filters.complianceStatus) fallbackQuery = fallbackQuery.eq("student_snapshot.compliance_status", filters.complianceStatus);
+      if (filters.country) fallbackQuery = fallbackQuery.eq("student_personal.nationality_code", filters.country);
+      if (filters.gender) fallbackQuery = fallbackQuery.eq("student_personal.gender", filters.gender);
+      if (filters.course) fallbackQuery = fallbackQuery.eq("student_academic.program_code", filters.course);
+      fallbackQuery = fallbackQuery.range(from, to);
+
+      const retry = await fallbackQuery;
+      data = retry.data;
+      error = retry.error;
+      count = retry.count;
+    }
+
     if (error) {
       throw new Error(`[DB_QUERY_FAILED] ${error.message}`);
     }
@@ -244,32 +288,75 @@ export class SupabaseReportRepository implements IReportRepository {
       .from("academic_programs")
       .select("id, program_code, program_name, school_name, academic_level");
 
+    // Load canonical schools mapping
+    const { data: schoolsData } = await supabase
+      .from("schools")
+      .select("id, name, code");
+
+    const schoolsMap: Record<string, string> = {};
+    if (schoolsData) {
+      schoolsData.forEach(s => {
+        schoolsMap[s.id] = s.name;
+      });
+    }
+
     const progNameMap: Record<string, string> = {};
     const progLevelMap: Record<string, string> = {};
     const progSchoolMap: Record<string, string> = {};
 
-    if (progData) {
-      progData.forEach(p => {
-        if (p.id) {
-          progNameMap[p.id] = p.program_name;
-          if (p.academic_level) progLevelMap[p.id] = p.academic_level;
-          if (p.school_name) progSchoolMap[p.id] = p.school_name;
-        }
-        if (p.program_code) {
-          progNameMap[p.program_code] = p.program_name;
-          progNameMap[p.program_code.toLowerCase()] = p.program_name;
-          progNameMap[p.program_code.replace(/_/g, "-")] = p.program_name;
-          if (p.academic_level) progLevelMap[p.program_code] = p.academic_level;
-          if (p.school_name) progSchoolMap[p.program_code] = p.school_name;
-        }
-        if (p.program_name) {
-          progNameMap[p.program_name] = p.program_name;
-          progNameMap[p.program_name.toLowerCase()] = p.program_name;
-          if (p.academic_level) progLevelMap[p.program_name] = p.academic_level;
-          if (p.school_name) progSchoolMap[p.program_name] = p.school_name;
-        }
-      });
-    }
+    const allPrograms = (progData && progData.length > 0)
+      ? progData.map(p => ({
+          id: p.id,
+          programCode: p.program_code,
+          programName: p.program_name,
+          schoolName: p.school_name,
+          academicLevel: p.academic_level
+        }))
+      : DEFAULT_FALLBACK_PROGRAMS;
+
+    allPrograms.forEach(p => {
+      const code = p.programCode || "";
+      const name = p.programName || "";
+      const school = p.schoolName || "Academic Department";
+      const level = p.academicLevel ? String(p.academicLevel) : "";
+
+      if (p.id) {
+        progNameMap[p.id] = name;
+        progNameMap[p.id.toLowerCase()] = name;
+        if (level) progLevelMap[p.id] = level;
+        if (school) progSchoolMap[p.id] = school;
+      }
+      if (code) {
+        progNameMap[code] = name;
+        progNameMap[code.toLowerCase()] = name;
+        progNameMap[code.replace(/_/g, "-")] = name;
+        progNameMap[code.replace(/_/g, "-").toLowerCase()] = name;
+        progNameMap[code.replace(/-/g, "_")] = name;
+        progNameMap[code.replace(/-/g, "_").toLowerCase()] = name;
+        if (level) progLevelMap[code] = level;
+        if (level) progLevelMap[code.toLowerCase()] = level;
+        if (school) progSchoolMap[code] = school;
+        if (school) progSchoolMap[code.toLowerCase()] = school;
+      }
+      if (name) {
+        progNameMap[name] = name;
+        progNameMap[name.toLowerCase()] = name;
+        const norm = name.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+        progNameMap[norm] = name;
+        if (level) progLevelMap[name] = level;
+        if (school) progSchoolMap[name] = school;
+      }
+    });
+
+    // Populate aliases
+    Object.entries(LEGACY_PROGRAM_ALIASES).forEach(([alias, targetCode]) => {
+      const canonicalName = progNameMap[targetCode.toLowerCase()];
+      if (canonicalName) {
+        progNameMap[alias] = canonicalName;
+        progNameMap[alias.toLowerCase()] = canonicalName;
+        progNameMap[alias.replace(/_/g, "-").toLowerCase()] = canonicalName;
+      }
+    });
 
     const refMap: Record<string, string> = {};
     const courseToSchoolMap: Record<string, string> = {};
@@ -282,27 +369,32 @@ export class SupabaseReportRepository implements IReportRepository {
       });
     }
 
-    const mappedData = (data || []).map(row => {
+    const mappedData = ((data || []) as any[]).map((row: any) => {
       const snapshot = Array.isArray(row.student_snapshot) ? row.student_snapshot[0] : row.student_snapshot;
       const personal = Array.isArray(row.student_personal) ? row.student_personal[0] : row.student_personal;
       const academic = Array.isArray(row.student_academic) ? row.student_academic[0] : row.student_academic;
       const progId = academic?.program_id || "";
       const code = academic?.program_code || "";
-      const resolvedProgramme = progId && progNameMap[progId] 
-        ? progNameMap[progId] 
-        : (code && progNameMap[code]) 
-        ? progNameMap[code] 
-        : (code && progNameMap[code.toLowerCase()]) 
-        ? progNameMap[code.toLowerCase()] 
-        : refMap[code] 
+      const normalizedCode = code ? code.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase() : "";
+
+      const resolvedProgramme = (progId && progNameMap[progId]) 
+        || (progId && progNameMap[progId.toLowerCase()])
+        || (code && progNameMap[code]) 
+        || (code && progNameMap[code.toLowerCase()]) 
+        || (code && progNameMap[code.replace(/_/g, "-").toLowerCase()])
+        || (normalizedCode && progNameMap[normalizedCode])
+        || refMap[code] 
         || code 
         || "Not assigned yet";
 
-      const resolvedSchool = (progId && progSchoolMap[progId]) 
-        || (code && progSchoolMap[code]) 
-        || (resolvedProgramme && progSchoolMap[resolvedProgramme]) 
-        || courseToSchoolMap[code] 
-        || "Not provided";
+      const isOverridden = Boolean(academic?.override_school_id);
+      const resolvedSchool = (isOverridden && academic?.override_school_id && schoolsMap[academic.override_school_id])
+        ? schoolsMap[academic.override_school_id]
+        : ((progId && progSchoolMap[progId]) 
+          || (code && progSchoolMap[code]) 
+          || (resolvedProgramme && progSchoolMap[resolvedProgramme]) 
+          || courseToSchoolMap[code] 
+          || "Not provided");
 
       const resolvedLevel = (progId && progLevelMap[progId]) 
         || (code && progLevelMap[code]) 
@@ -319,7 +411,11 @@ export class SupabaseReportRepository implements IReportRepository {
         academic_level: resolvedLevel,
         expected_graduation: academic?.expected_graduation,
         status: row.status,
-        compliance_status: snapshot?.compliance_status
+        compliance_status: snapshot?.compliance_status,
+        admission_category: academic?.admission_category || null,
+        iccr_application_number: (academic?.admission_category === "iccr") 
+          ? (academic?.iccr_application_number || academic?.sii_application_number || null)
+          : null
       });
     });
 

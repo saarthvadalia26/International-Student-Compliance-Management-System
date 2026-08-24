@@ -4,6 +4,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { DashboardMetrics } from "@/domain/reports/types";
 import { SupabaseReportRepository } from "@/domain/reports/repositories/report.repository";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
+import { DEFAULT_FALLBACK_SCHOOLS } from "@/domain/schools/school.service";
 import { unstable_cache } from "next/cache";
 
 const reportRepo = new SupabaseReportRepository();
@@ -42,24 +43,40 @@ export async function fetchAnalyticsCharts() {
 async function _fetchAnalyticsChartsInternal() {
   const supabase = getAdminSupabase();
 
-  // Execute ALL queries in parallel (including reference_data which was previously sequential)
+  // Execute ALL queries in parallel (including reference_data and academic_programs)
   const [
     countriesRes,
     academicRes,
     snapshotRes,
     notificationsRes,
-    refDataRes
+    refDataRes,
+    academicProgramsRes,
+    schoolsRes
   ] = await Promise.all([
     // 1. Group by nationality
     supabase.from("student_personal").select("nationality_code"),
-    // 2. Group by program
-    supabase.from("student_academic").select("program_code, admission_date"),
+    // 2. Group by program (with graceful fallback if migration 056 is pending)
+    supabase.from("student_academic").select("program_id, program_code, admission_date, override_school_id").then(async (res) => {
+      if (res.error && res.error.message.includes("override_school_id")) {
+        return supabase.from("student_academic").select("program_id, program_code, admission_date");
+      }
+      return res;
+    }),
     // 3. Group by compliance and efrro expiry
     supabase.from("student_snapshot").select("compliance_status, efrro_expiry, efrro_status"),
     // 4. Group by notification statuses
     supabase.from(NOTIFICATION_TABLE_NAME).select("status"),
-    // 5. Reference data (moved into parallel batch — was previously sequential)
-    supabase.from("reference_data").select("code, display_name, category")
+    // 5. Reference data
+    supabase.from("reference_data").select("code, display_name, category"),
+    // 6. Canonical academic programs master data
+    supabase.from("academic_programs").select("id, program_name, program_code, school_name, academic_level"),
+    // 7. Canonical schools master data (fallback to default if pending migration)
+    supabase.from("schools").select("id, name, code").then((res) => {
+      if (res.error) {
+        return { data: DEFAULT_FALLBACK_SCHOOLS, error: null };
+      }
+      return res;
+    })
   ]);
 
   if (countriesRes.error) throw new Error(`[DB_QUERY_FAILED] ${countriesRes.error.message}`);
@@ -85,16 +102,65 @@ async function _fetchAnalyticsChartsInternal() {
     countryCodeMap[c.isoAlpha3.toUpperCase()] = c.name;
   });
 
-  // Build academic programs and school map
-  const { DEFAULT_FALLBACK_PROGRAMS } = await import("@/domain/academic-programs/academic-program.service");
-  const programMap: Record<string, { name: string; code?: string; school?: string }> = {};
-  DEFAULT_FALLBACK_PROGRAMS.forEach(p => {
-    const code = p.programCode || "";
-    const name = p.programName || "";
-    const school = p.schoolName || "General Academic Faculty";
-    if (code) programMap[code.toUpperCase()] = { name, code, school };
-    if (p.id) programMap[p.id.toUpperCase()] = { name, code, school };
-    if (name) programMap[name.toUpperCase()] = { name, code, school };
+  // Build canonical academic programs and school map
+  const { DEFAULT_FALLBACK_PROGRAMS, LEGACY_PROGRAM_ALIASES } = await import("@/domain/academic-programs/academic-program.service");
+  
+  interface ProgramMeta {
+    id: string;
+    name: string;
+    code?: string;
+    school?: string;
+  }
+
+  const programMap: Record<string, ProgramMeta> = {};
+  const normalizedNameMap: Record<string, ProgramMeta> = {};
+
+  function normalizeProgName(n: string): string {
+    return n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  const allProgramsSource = (academicProgramsRes.data && academicProgramsRes.data.length > 0)
+    ? academicProgramsRes.data.map(p => ({
+        id: p.id,
+        programName: p.program_name,
+        programCode: p.program_code,
+        schoolName: p.school_name,
+        academicLevel: p.academic_level
+      }))
+    : DEFAULT_FALLBACK_PROGRAMS;
+
+  allProgramsSource.forEach(p => {
+    const code = (p.programCode || "").trim();
+    const name = (p.programName || "").trim();
+    const school = (p.schoolName || "General Academic Faculty").trim();
+    const meta: ProgramMeta = { id: p.id, name, code: code || undefined, school };
+
+    if (p.id) {
+      programMap[p.id.toLowerCase()] = meta;
+      programMap[p.id.toUpperCase()] = meta;
+    }
+    if (code) {
+      programMap[code.toLowerCase()] = meta;
+      programMap[code.toUpperCase()] = meta;
+      programMap[code.replace(/_/g, "-").toLowerCase()] = meta;
+      programMap[code.replace(/_/g, "-").toUpperCase()] = meta;
+      programMap[code.replace(/-/g, "_").toLowerCase()] = meta;
+      programMap[code.replace(/-/g, "_").toUpperCase()] = meta;
+    }
+    if (name) {
+      programMap[name.toLowerCase()] = meta;
+      programMap[name.toUpperCase()] = meta;
+      normalizedNameMap[normalizeProgName(name)] = meta;
+    }
+  });
+
+  // Also index known legacy aliases into programMap
+  Object.entries(LEGACY_PROGRAM_ALIASES).forEach(([alias, targetCode]) => {
+    const targetMeta = programMap[targetCode.toUpperCase()];
+    if (targetMeta) {
+      programMap[alias.toLowerCase()] = targetMeta;
+      programMap[alias.toUpperCase()] = targetMeta;
+    }
   });
 
   // 1. Students by Country
@@ -108,24 +174,46 @@ async function _fetchAnalyticsChartsInternal() {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // 2 & 3. Students by Course & School
-  const courseCounts: Record<string, { value: number; code?: string }> = {};
-  const schoolCounts: Record<string, number> = {};
-  (academicRes.data || []).forEach(row => {
-    const rawProg = (row.program_code || "").trim().toUpperCase();
-    const progInfo = programMap[rawProg];
-    const courseName = progInfo?.name || refMap[row.program_code] || row.program_code || "General Studies";
-    const schoolName = progInfo?.school || "General Academic Faculty";
+  // 2 & 3. Students by Course & School (Grouped strictly by Canonical Program Identity & Override Resolution)
+  const schoolsMap: Record<string, string> = {};
+  if (schoolsRes.data) {
+    schoolsRes.data.forEach(s => {
+      schoolsMap[s.id] = s.name;
+    });
+  }
 
-    if (!courseCounts[courseName]) {
-      courseCounts[courseName] = { value: 0, code: progInfo?.code };
+  const courseCounts: Record<string, number> = {};
+  const schoolCounts: Record<string, number> = {};
+  
+  ((academicRes.data || []) as any[]).forEach((row: any) => {
+    const rawProgId = (row.program_id || "").trim();
+    const rawProgCode = (row.program_code || "").trim();
+
+    // Canonical resolution: ID first -> Code/Alias -> Normalized Name -> Fallback
+    let progInfo: ProgramMeta | undefined = undefined;
+    if (rawProgId && programMap[rawProgId.toLowerCase()]) {
+      progInfo = programMap[rawProgId.toLowerCase()];
+    } else if (rawProgCode) {
+      progInfo = programMap[rawProgCode.toLowerCase()] 
+        || programMap[rawProgCode.replace(/_/g, "-").toLowerCase()]
+        || normalizedNameMap[normalizeProgName(rawProgCode)];
     }
-    courseCounts[courseName].value += 1;
+
+    const courseName = progInfo?.name || refMap[row.program_code] || row.program_code || "General Studies";
+    
+    // Effective school resolution: override if present, else canonical program school
+    const isOverridden = Boolean(row.override_school_id);
+    const schoolName = (isOverridden && row.override_school_id && schoolsMap[row.override_school_id])
+      ? schoolsMap[row.override_school_id]
+      : (progInfo?.school || "General Academic Faculty");
+
+    courseCounts[courseName] = (courseCounts[courseName] || 0) + 1;
     schoolCounts[schoolName] = (schoolCounts[schoolName] || 0) + 1;
   });
 
+  // Return clean canonical program name and student count WITHOUT code badge
   const studentsByCourse = Object.entries(courseCounts)
-    .map(([name, data]) => ({ name, value: data.value, secondaryLabel: data.code }))
+    .map(([name, count]) => ({ name, value: count }))
     .sort((a, b) => b.value - a.value);
 
   const studentsBySchool = Object.entries(schoolCounts)
@@ -135,7 +223,7 @@ async function _fetchAnalyticsChartsInternal() {
   // 4. Monthly Admissions
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const admissionCounts: Record<string, { count: number; timestamp: number }> = {};
-  (academicRes.data || []).forEach(row => {
+  ((academicRes.data || []) as any[]).forEach((row: any) => {
     if (row.admission_date) {
       const date = new Date(row.admission_date);
       const label = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;

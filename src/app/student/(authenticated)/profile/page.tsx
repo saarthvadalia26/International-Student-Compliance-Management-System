@@ -104,6 +104,18 @@ export default function StudentProfilePage() {
               <span className="text-muted-foreground">School / Faculty</span>
               <span className="font-medium text-foreground">{profile.school}</span>
             </div>
+            {profile.admissionCategory === "iccr" && profile.iccrApplicationNumber && (
+              <>
+                <div className="flex justify-between py-1.5 border-b border-border/40">
+                  <span className="text-muted-foreground">Admission Category</span>
+                  <span className="font-medium text-foreground">ICCR</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-border/40">
+                  <span className="text-muted-foreground">ICCR Application Number</span>
+                  <span className="font-mono font-medium text-foreground">{profile.iccrApplicationNumber}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between py-1.5">
               <span className="text-muted-foreground">Nationality</span>
               <span className="font-medium text-foreground">{profile.nationality || "N/A"}</span>

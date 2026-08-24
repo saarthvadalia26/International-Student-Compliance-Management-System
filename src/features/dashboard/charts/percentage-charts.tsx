@@ -90,7 +90,7 @@ export function PercentageDistributionList({
                   <span className="text-[11px] font-mono font-medium text-muted-foreground/80 w-4 shrink-0">
                     {idx + 1}.
                   </span>
-                  <span className="font-medium text-foreground truncate" title={item.name}>
+                  <span className="font-medium text-foreground break-words sm:truncate leading-tight min-w-0" title={item.name}>
                     {item.name}
                   </span>
                   {item.secondaryLabel && (

@@ -11,8 +11,9 @@ import { sanitizeError } from "@/lib/errors/error-sanitizer";
 import { StorageProviderFactory } from "@/domain/storage/factory";
 import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
 import { getAcademicLevelLabel } from "@/domain/academic-programs/academic-level";
-import { AcademicProgramService } from "@/domain/academic-programs/academic-program.service";
+import { AcademicProgramService, LEGACY_PROGRAM_ALIASES } from "@/domain/academic-programs/academic-program.service";
 import { AcademicProgram } from "@/domain/academic-programs/types";
+import { SchoolService } from "@/domain/schools/school.service";
 
 const studentService = new StudentService();
 
@@ -28,6 +29,11 @@ export interface StudentListItem {
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   school: string;
+  isSchoolOverridden?: boolean;
+  overrideSchoolId?: string | null;
+  schoolOverrideReason?: string | null;
+  admissionCategory?: string | null;
+  iccrApplicationNumber?: string | null;
   passport: { number: string };
   visa: { number: string };
   email: string;
@@ -100,11 +106,15 @@ export interface StudentDetailProfile {
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   school: string;
+  isSchoolOverridden?: boolean;
+  overrideSchoolId?: string | null;
+  schoolOverrideReason?: string | null;
   admissionDate: string;
   expectedGraduation: string;
   admissionCategory?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
+  iccrApplicationNumber?: string | null;
   totalSemesters?: number;
   semesterDuration?: number;
   semesterDurationUnit?: string;
@@ -220,6 +230,20 @@ export async function registerStudentAction(input: RegisterStudentInput): Promis
       };
     }
 
+    if (input.admissionCategory === "iccr") {
+      const hasIccr = Boolean(input.iccrApplicationNumber?.trim() || input.siiApplicationNumber?.trim());
+      if (!hasIccr) {
+        return {
+          success: false,
+          errorCode: "VALIDATION_ERROR",
+          errorTitle: "Missing Required Field",
+          error: "ICCR Application Number is required when Admission Category is ICCR."
+        };
+      }
+    } else {
+      input.iccrApplicationNumber = null;
+    }
+
     const created = await studentService.registerStudent(input, user.id);
 
     // Evaluate and initialize automated reminder schedule for any provided document metadata
@@ -318,7 +342,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         created_at,
         student_personal(full_name, nationality_code),
         student_contact(email, phone_home),
-        student_academic(program_id, program_code, academic_status),
+        student_academic(program_id, program_code, academic_status, override_school_id, school_override_reason, admission_category, iccr_application_number, sii_application_number),
         student_snapshot(compliance_status, passport_number, visa_number)
       `)
       .is("deleted_at", null)
@@ -331,7 +355,33 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
     }
 
-    const { data: records, error } = await query;
+    let records: any = null;
+    let error: any = null;
+
+    const initialRes = await query;
+    records = initialRes.data;
+    error = initialRes.error;
+
+    if (error && error.message?.includes("override_school_id")) {
+      const fallbackQuery = adminSupabase
+        .from("students")
+        .select(`
+          id,
+          registration_number,
+          status,
+          created_at,
+          student_personal(full_name, nationality_code),
+          student_contact(email, phone_home),
+          student_academic(program_id, program_code, academic_status),
+          student_snapshot(compliance_status, passport_number, visa_number)
+        `)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false });
+
+      const retryRes = await fallbackQuery;
+      records = retryRes.data;
+      error = retryRes.error;
+    }
 
     if (error) {
       console.error("[GET_STUDENTS_LIST_ERROR]", error);
@@ -342,11 +392,27 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       };
     }
 
-    // Also fetch all academic programs for authoritative display names and level mappings
+    // Also fetch all academic programs and schools for authoritative display names, schools, and level mappings
     const programService = new AcademicProgramService();
-    const allPrograms = await programService.getAllPrograms();
+    const schoolService = new SchoolService();
+    const [allPrograms, allSchools] = await Promise.all([
+      programService.getAllPrograms(),
+      schoolService.getAllSchools()
+    ]);
+
+    const schoolsMap = new Map<string, string>();
+    allSchools.forEach(s => {
+      if (s.id) schoolsMap.set(s.id.toLowerCase(), s.name);
+      if (s.code) schoolsMap.set(s.code.toLowerCase(), s.name);
+    });
 
     const programMap = new Map<string, { id: string; name: string; school: string; academicLevel: string | null }>();
+    const normalizedNameMap = new Map<string, { id: string; name: string; school: string; academicLevel: string | null }>();
+
+    function normalizeName(n: string): string {
+      return n.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+    }
+
     allPrograms.forEach(p => {
       const item = { 
         id: p.id,
@@ -358,11 +424,24 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       if (p.programCode) {
         programMap.set(p.programCode.toLowerCase(), item);
         programMap.set(p.programCode.replace(/_/g, "-").toLowerCase(), item);
+        programMap.set(p.programCode.replace(/-/g, "_").toLowerCase(), item);
       }
-      programMap.set(p.programName.toLowerCase(), item);
+      if (p.programName) {
+        programMap.set(p.programName.toLowerCase(), item);
+        normalizedNameMap.set(normalizeName(p.programName), item);
+      }
     });
 
-    const students: StudentListItem[] = (records || []).map(r => {
+    // Map known legacy aliases
+    Object.entries(LEGACY_PROGRAM_ALIASES).forEach(([alias, targetCode]) => {
+      const targetMeta = programMap.get(targetCode.toLowerCase());
+      if (targetMeta) {
+        programMap.set(alias.toLowerCase(), targetMeta);
+        programMap.set(alias.replace(/_/g, "-").toLowerCase(), targetMeta);
+      }
+    });
+
+    const students: StudentListItem[] = (records || []).map((r: any) => {
       const personal = Array.isArray(r.student_personal) ? r.student_personal[0] : r.student_personal;
       const contact = Array.isArray(r.student_contact) ? r.student_contact[0] : r.student_contact;
       const academic = Array.isArray(r.student_academic) ? r.student_academic[0] : r.student_academic;
@@ -379,6 +458,10 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         ? programMap.get(progId.toLowerCase())!
         : progCode && programMap.has(progCode.toLowerCase())
         ? programMap.get(progCode.toLowerCase())!
+        : progCode && programMap.has(progCode.replace(/_/g, "-").toLowerCase())
+        ? programMap.get(progCode.replace(/_/g, "-").toLowerCase())!
+        : progCode && normalizedNameMap.has(normalizeName(progCode))
+        ? normalizedNameMap.get(normalizeName(progCode))!
         : progCode
         ? {
             id: progId,
@@ -392,6 +475,11 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
             school: "Not assigned yet",
             academicLevel: null
           };
+
+      const isOverridden = Boolean(academic?.override_school_id);
+      const resolvedSchool = (academic?.override_school_id && schoolsMap.get(academic.override_school_id.toLowerCase()))
+        ? schoolsMap.get(academic.override_school_id.toLowerCase())!
+        : progInfo.school;
 
       // Map raw compliance status to UI badge enum
       let mappedCompliance: StudentListItem["complianceStatus"] = "compliant";
@@ -411,12 +499,19 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         programId: progId || progInfo.id || null,
         academicLevel: progInfo.academicLevel,
         academicLevelLabel: progInfo.academicLevel ? getAcademicLevelLabel(progInfo.academicLevel) : null,
-        school: progInfo.school,
+        school: resolvedSchool,
+        isSchoolOverridden: isOverridden,
+        overrideSchoolId: academic?.override_school_id || null,
+        schoolOverrideReason: academic?.school_override_reason || null,
         passport: { number: snapshot?.passport_number || "Pending" },
         visa: { number: snapshot?.visa_number || "Pending" },
         email: contact?.email || "",
         complianceStatus: mappedCompliance,
-        academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing"
+        academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing",
+        admissionCategory: academic?.admission_category || null,
+        iccrApplicationNumber: (academic?.admission_category === "iccr")
+          ? (academic?.iccr_application_number || academic?.sii_application_number || null)
+          : null
       };
     });
 
@@ -500,11 +595,23 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
 
     // Retrieve academic program metadata & course structure via authoritative service
     const programService = new AcademicProgramService();
-    const progIdent = academic?.program_id || academic?.program_code;
+    const schoolService = new SchoolService();
     let progData: AcademicProgram | null = null;
 
-    if (progIdent && progIdent.trim()) {
-      progData = await programService.getProgramByIdCodeOrName(progIdent.trim());
+    if (academic?.program_id && academic.program_id.trim()) {
+      progData = await programService.getProgramById(academic.program_id.trim());
+    }
+    if (!progData && academic?.program_code && academic.program_code.trim()) {
+      progData = await programService.getProgramByIdCodeOrName(academic.program_code.trim());
+    }
+
+    let resolvedSchool = progData?.schoolName || (academic?.program_code ? "Not provided" : "Not assigned yet");
+    const isSchoolOverridden = Boolean(academic?.override_school_id);
+    if (academic?.override_school_id) {
+      const customSchool = await schoolService.getSchoolById(academic.override_school_id);
+      if (customSchool) {
+        resolvedSchool = customSchool.name;
+      }
     }
 
     // Retrieve academic adjustments for this student
@@ -547,7 +654,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     const semesterDuration = Number(progData?.semesterDuration) || 6;
     const semesterDurationUnit = progData?.semesterDurationUnit || "months";
 
-    const hasCourseConfig = Boolean(progIdent && progIdent.trim());
+    const hasCourseConfig = Boolean((academic?.program_id && academic.program_id.trim()) || (academic?.program_code && academic.program_code.trim()) || progData);
     const progression = hasCourseConfig ? AcademicProgressionEngine.calculateProgression({
       admissionDate: academic?.admission_date || "",
       courseConfig: {
@@ -606,13 +713,18 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       programCode: progData?.programCode || academic?.program_code || "",
       programId: progData?.id || academic?.program_id || null,
       academicLevel: progData?.academicLevel ? String(progData.academicLevel) : null,
-      academicLevelLabel: progData?.academicLevel ? getAcademicLevelLabel(progData.academicLevel) : null,
-      school: progData?.schoolName || (academic?.program_code ? "Not provided" : "Not assigned yet"),
+      school: resolvedSchool,
+      isSchoolOverridden,
+      overrideSchoolId: academic?.override_school_id || null,
+      schoolOverrideReason: academic?.school_override_reason || null,
       admissionDate: academic?.admission_date || "",
       expectedGraduation: hasCourseConfig ? (progression.expectedGraduationDateISO || academic?.expected_graduation || "") : (academic?.expected_graduation || ""),
       admissionCategory: academic?.admission_category || null,
       admissionCategoryOther: academic?.admission_category_other || null,
       siiApplicationNumber: academic?.sii_application_number || null,
+      iccrApplicationNumber: (academic?.admission_category === "iccr")
+        ? (academic?.iccr_application_number || academic?.sii_application_number || null)
+        : null,
       totalSemesters: hasCourseConfig ? progression.totalSemesters : undefined,
       semesterDuration: hasCourseConfig ? progression.details.semesterDuration : undefined,
       semesterDurationUnit: hasCourseConfig ? progression.details.semesterDurationUnit : undefined,
@@ -754,6 +866,19 @@ export async function updateStudentAction(
         success: false,
         error: "Forbidden: Staff or Administrator privileges are required to update student profiles."
       };
+    }
+
+    if (updates.admissionCategory === "iccr") {
+      const hasIccr = Boolean(updates.iccrApplicationNumber?.trim() || updates.siiApplicationNumber?.trim());
+      if (!hasIccr) {
+        return {
+          success: false,
+          error: "ICCR Application Number is required when Admission Category is ICCR."
+        };
+      }
+    } else if (updates.admissionCategory) {
+      updates.iccrApplicationNumber = null;
+      updates.siiApplicationNumber = null;
     }
 
     await studentService.updateStudent(studentId, updates, user.id);

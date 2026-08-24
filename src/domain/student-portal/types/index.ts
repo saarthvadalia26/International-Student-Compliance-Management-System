@@ -9,6 +9,8 @@ export interface StudentPortalProfile {
   phoneHome: string;
   phoneLocal: string;
   avatarUrl?: string | null;
+  admissionCategory?: string | null;
+  iccrApplicationNumber?: string | null;
   
   // Overall Status
   overallCompliance: "COMPLIANT" | "ATTENTION_REQUIRED";

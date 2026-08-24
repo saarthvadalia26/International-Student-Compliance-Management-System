@@ -21,6 +21,7 @@ import {
 } from "../types/bulk-import.types";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { normalizeAcademicLevel } from "@/domain/academic-programs/academic-level";
+import { DEFAULT_FALLBACK_PROGRAMS, LEGACY_PROGRAM_ALIASES } from "@/domain/academic-programs/academic-program.service";
 import { CountryService } from "@/domain/countries/country.service";
 
 export class BulkStudentImportService {
@@ -261,11 +262,12 @@ export class BulkStudentImportService {
       existingRegistrationNumbers?: Set<string>;
       existingEmails?: Set<string>;
       academicPrograms?: Array<{
+        id?: string;
         programName: string;
-        programCode: string;
-        totalSemesters: number;
-        semesterDuration: number;
-        semesterDurationUnit: string;
+        programCode?: string | null;
+        totalSemesters?: number;
+        semesterDuration?: number;
+        semesterDurationUnit?: string;
         academicLevel?: string | null;
       }>;
     }
@@ -303,10 +305,11 @@ export class BulkStudentImportService {
         // 3. Academic programs
         const { data: progData } = await supabase
           .from("academic_programs")
-          .select("program_name, program_code, total_semesters, semester_duration, semester_duration_unit, academic_level")
+          .select("id, program_name, program_code, total_semesters, semester_duration, semester_duration_unit, academic_level")
           .eq("is_active", true);
-        if (progData) {
+        if (progData && progData.length > 0) {
           programs = progData.map(p => ({
+            id: p.id,
             programName: p.program_name,
             programCode: p.program_code || p.program_name,
             totalSemesters: p.total_semesters || 8,
@@ -314,9 +317,28 @@ export class BulkStudentImportService {
             semesterDurationUnit: p.semester_duration_unit || "months",
             academicLevel: p.academic_level || null
           }));
+        } else {
+          programs = DEFAULT_FALLBACK_PROGRAMS.filter(p => p.isActive).map(p => ({
+            id: p.id,
+            programName: p.programName,
+            programCode: p.programCode || p.programName,
+            totalSemesters: p.totalSemesters || 8,
+            semesterDuration: p.semesterDuration || 6,
+            semesterDurationUnit: p.semesterDurationUnit || "months",
+            academicLevel: p.academicLevel || null
+          }));
         }
       } catch (err) {
         console.warn("[BULK_IMPORT] Notice: Could not connect to DB for live duplicate validation, proceeding with local checks.", err);
+        programs = DEFAULT_FALLBACK_PROGRAMS.filter(p => p.isActive).map(p => ({
+          id: p.id,
+          programName: p.programName,
+          programCode: p.programCode || p.programName,
+          totalSemesters: p.totalSemesters || 8,
+          semesterDuration: p.semesterDuration || 6,
+          semesterDurationUnit: p.semesterDurationUnit || "months",
+          academicLevel: p.academicLevel || null
+        }));
       }
     }
 
@@ -418,7 +440,7 @@ export class BulkStudentImportService {
       // 3. FIELD: Academic Program / Course & Academic Level Validation (Progressive)
       // =========================================================================
       const programRaw = mappedData.academic_program?.trim() || "";
-      let matchedProgram: { programName: string; programCode: string; totalSemesters: number; semesterDuration: number; semesterDurationUnit: string; academicLevel?: string | null } | null = null;
+      let matchedProgram: { id?: string; programName: string; programCode?: string | null; totalSemesters?: number; semesterDuration?: number; semesterDurationUnit?: string; academicLevel?: string | null } | null = null;
 
       if (!programRaw) {
         warnings.push({
@@ -431,35 +453,32 @@ export class BulkStudentImportService {
         });
         warningsBreakdown.otherWarnings++;
       } else {
-        // Match against known programs with canonical priority
-        if (programs.length > 0) {
-          const progLower = programRaw.toLowerCase();
-          const progCodeNorm = progLower.replace(/_/g, "-");
+        const progLower = programRaw.toLowerCase();
+        const progUpper = programRaw.toUpperCase();
+        const progCodeNorm = progLower.replace(/_/g, "-");
+        const aliasedCode = LEGACY_PROGRAM_ALIASES[progUpper] || LEGACY_PROGRAM_ALIASES[progUpper.replace(/_/g, "-")];
+        const normalizedTarget = programRaw.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
 
-          matchedProgram = programs.find(p => 
-            (p.programCode && p.programCode.toLowerCase() === progLower) ||
-            p.programName.toLowerCase() === progLower ||
-            (p.programCode && p.programCode.toLowerCase().replace(/_/g, "-") === progCodeNorm)
-          ) || null;
+        // 1. Check in loaded programs list (or fallback list)
+        const activeProgramsList: any[] = programs.length > 0 ? programs : DEFAULT_FALLBACK_PROGRAMS;
+        
+        matchedProgram = activeProgramsList.find(p => 
+          (p.id && p.id.toLowerCase() === progLower) ||
+          (p.programCode && p.programCode.toLowerCase() === progLower) ||
+          (p.programName && p.programName.toLowerCase() === progLower) ||
+          (p.programCode && p.programCode.toLowerCase().replace(/_/g, "-") === progCodeNorm) ||
+          (p.programName && p.programName.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase() === normalizedTarget) ||
+          (aliasedCode && p.programCode && p.programCode.toUpperCase() === aliasedCode.toUpperCase())
+        ) || null;
 
-          if (!matchedProgram) {
-            errors.push({
-              field: "academic_program",
-              fieldLabel: "Academic Program",
-              value: programRaw,
-              problem: `Academic program "${programRaw}" not found in configured university courses.`,
-              suggestion: "Ensure the program is registered in Settings > Academic Programs with complete course name."
-            });
-          }
-        } else {
-          // If no programs pre-loaded, default fallback configuration
-          matchedProgram = {
-            programName: programRaw,
-            programCode: programRaw.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase(),
-            totalSemesters: 8,
-            semesterDuration: 6,
-            semesterDurationUnit: "months"
-          };
+        if (!matchedProgram) {
+          errors.push({
+            field: "academic_program",
+            fieldLabel: "Academic Program",
+            value: programRaw,
+            problem: `Academic program "${programRaw}" not found in configured university courses.`,
+            suggestion: "Ensure the program is registered in Settings > Academic Programs with complete course name."
+          });
         }
       }
 
@@ -480,6 +499,22 @@ export class BulkStudentImportService {
         }
       } else if (matchedProgram?.academicLevel) {
         mappedData.academic_level = matchedProgram.academicLevel;
+      }
+
+      // Validate / Verify School / Department if provided in spreadsheet
+      const schoolRaw = mappedData.school?.trim() || "";
+      if (schoolRaw && (matchedProgram as any)?.schoolName) {
+        if (schoolRaw.toLowerCase() !== (matchedProgram as any).schoolName.toLowerCase()) {
+          warnings.push({
+            field: "school",
+            fieldLabel: "School / Department",
+            value: schoolRaw,
+            warning: `School "${schoolRaw}" specified in spreadsheet will be canonically mapped as "${(matchedProgram as any).schoolName}" from academic program "${matchedProgram?.programName}".`
+          });
+        }
+        mappedData.school = (matchedProgram as any).schoolName;
+      } else if ((matchedProgram as any)?.schoolName) {
+        mappedData.school = (matchedProgram as any).schoolName;
       }
 
       // =========================================================================
@@ -717,15 +752,25 @@ export class BulkStudentImportService {
         }
       }
 
-      // Conditional ICCR -> SII Application Number check
-      if (mappedData.admission_category === "iccr" && !mappedData.sii_application_number?.trim()) {
-        errors.push({
-          field: "sii_application_number",
-          fieldLabel: "SII Application Number",
-          value: "",
-          problem: "SII Application Number is mandatory when Admission Category is ICCR.",
-          suggestion: "Provide the Study in India (SII) reference application code (e.g. SII-2026-98124)."
-        });
+      // Conditional ICCR -> ICCR Application Number check
+      const isIccr = mappedData.admission_category === "iccr";
+      const iccrAppNo = (mappedData.iccr_application_number || mappedData.sii_application_number)?.trim() || "";
+
+      if (isIccr) {
+        if (!iccrAppNo) {
+          errors.push({
+            field: "iccr_application_number",
+            fieldLabel: "ICCR Application Number",
+            value: "",
+            problem: "ICCR Application Number is mandatory when Admission Category is ICCR.",
+            suggestion: "Provide the official ICCR application identifier (e.g. ICCR-2026-98124)."
+          });
+        } else {
+          mappedData.iccr_application_number = iccrAppNo;
+        }
+      } else {
+        // Data retention rule: non-ICCR rows normalize ICCR application number to empty/null
+        mappedData.iccr_application_number = "";
       }
 
       // Conditional Other -> Admission Category Other check
@@ -765,7 +810,13 @@ export class BulkStudentImportService {
           if (matchedProgram) {
             calculatedProg = AcademicProgressionEngine.calculateProgression({
               admissionDate: parsedAdm.isoDate,
-              courseConfig: matchedProgram
+              courseConfig: {
+                programName: matchedProgram.programName,
+                programCode: matchedProgram.programCode || "",
+                totalSemesters: matchedProgram.totalSemesters || 8,
+                semesterDuration: matchedProgram.semesterDuration || 6,
+                semesterDurationUnit: (matchedProgram.semesterDurationUnit as any) || "months"
+              }
             });
 
             // Check if Excel provided a conflicting Current Semester
@@ -1086,15 +1137,19 @@ export class BulkStudentImportService {
     // 2. Fetch academic programs for program code resolution
     const { data: progList } = await supabase
       .from("academic_programs")
-      .select("program_name, program_code, total_semesters, semester_duration, semester_duration_unit, academic_level");
+      .select("id, program_name, program_code, total_semesters, semester_duration, semester_duration_unit, academic_level");
 
-    const programLookup = new Map<string, any>();
-    if (progList) {
-      for (const p of progList) {
-        programLookup.set(p.program_name.toLowerCase(), p);
-        if (p.program_code) programLookup.set(p.program_code.toLowerCase(), p);
-      }
-    }
+    const allLoadedPrograms: any[] = (progList && progList.length > 0)
+      ? progList
+      : DEFAULT_FALLBACK_PROGRAMS.map(p => ({
+          id: p.id,
+          program_name: p.programName,
+          program_code: p.programCode,
+          total_semesters: p.totalSemesters,
+          semester_duration: p.semesterDuration,
+          semester_duration_unit: p.semesterDurationUnit,
+          academic_level: p.academicLevel
+        }));
 
     // 3. Process records sequentially with per-row atomic transaction boundaries
     for (const row of validRowsToImport) {
@@ -1196,19 +1251,22 @@ export class BulkStudentImportService {
         // D. Insert student_academic (with progression calculation if admission date exists)
         const progName = data.academic_program?.trim() || "";
         const progLower = progName.toLowerCase();
+        const progUpper = progName.toUpperCase();
         const progCodeNorm = progLower.replace(/_/g, "-");
-        const matchedP = progName ? (
-          programLookup.get(progLower) || 
-          programLookup.get(progCodeNorm) ||
-          (Array.from(programLookup.values()) as any[]).find((p: any) => 
-            p.program_name?.toLowerCase() === progLower || 
-            (p.program_code && p.program_code.toLowerCase() === progLower) ||
-            (p.program_code && p.program_code.toLowerCase().replace(/_/g, "-") === progCodeNorm)
-          )
+        const aliasedCode = LEGACY_PROGRAM_ALIASES[progUpper] || LEGACY_PROGRAM_ALIASES[progUpper.replace(/_/g, "-")];
+        const normalizedTarget = progName.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase();
+
+        const matchedP = progName ? allLoadedPrograms.find((p: any) => 
+          (p.id && p.id.toLowerCase() === progLower) ||
+          (p.program_code && p.program_code.toLowerCase() === progLower) ||
+          (p.program_name && p.program_name.toLowerCase() === progLower) ||
+          (p.program_code && p.program_code.toLowerCase().replace(/_/g, "-") === progCodeNorm) ||
+          (p.program_name && p.program_name.replace(/\./g, "").replace(/\s+/g, " ").trim().toLowerCase() === normalizedTarget) ||
+          (aliasedCode && p.program_code && p.program_code.toUpperCase() === aliasedCode.toUpperCase())
         ) : null;
 
         const programId = matchedP?.id || null;
-        const programCode = matchedP?.program_code || progName || null;
+        const programCode = matchedP?.program_code || (progName || null);
 
         let currentSemester: number | null = null;
         let expectedGraduation: string | null = null;
@@ -1233,7 +1291,10 @@ export class BulkStudentImportService {
           }
         }
 
-        const { error: acadErr } = await supabase
+        const isIccrRow = data.admission_category === "iccr";
+        const resolvedIccrAppNo = isIccrRow ? (data.iccr_application_number?.trim() || data.sii_application_number?.trim() || null) : null;
+
+        let { error: acadErr } = await supabase
           .from("student_academic")
           .insert({
             student_id: studentId,
@@ -1244,11 +1305,32 @@ export class BulkStudentImportService {
             current_semester: currentSemester,
             admission_category: data.admission_category ? data.admission_category.toLowerCase() : null,
             admission_category_other: data.admission_category === "other" ? (data.admission_category_other?.trim() || null) : null,
-            sii_application_number: data.sii_application_number?.trim() || null,
+            sii_application_number: isIccrRow ? resolvedIccrAppNo : (data.sii_application_number?.trim() || null),
+            iccr_application_number: resolvedIccrAppNo,
             academic_status: "good_standing",
             created_by: params.actorId,
             updated_by: params.actorId
           });
+
+        if (acadErr && acadErr.message?.includes("iccr_application_number")) {
+          const retry = await supabase
+            .from("student_academic")
+            .insert({
+              student_id: studentId,
+              program_id: programId,
+              program_code: programCode,
+              admission_date: data.admission_date || null,
+              expected_graduation: data.expected_graduation || expectedGraduation,
+              current_semester: currentSemester,
+              admission_category: data.admission_category ? data.admission_category.toLowerCase() : null,
+              admission_category_other: data.admission_category === "other" ? (data.admission_category_other?.trim() || null) : null,
+              sii_application_number: isIccrRow ? resolvedIccrAppNo : (data.sii_application_number?.trim() || null),
+              academic_status: "good_standing",
+              created_by: params.actorId,
+              updated_by: params.actorId
+            });
+          acadErr = retry.error;
+        }
 
         if (acadErr) throw new Error(`Academic details: ${acadErr.message}`);
 

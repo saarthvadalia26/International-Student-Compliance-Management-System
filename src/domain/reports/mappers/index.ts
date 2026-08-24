@@ -37,6 +37,8 @@ export class ReportMapper {
       expectedGraduation: row.expected_graduation ? new Date(row.expected_graduation) : null,
       status: row.status || "",
       complianceStatus: (row.compliance_status || "MISSING") as ComplianceStatus,
+      admissionCategory: row.admission_category || null,
+      iccrApplicationNumber: row.iccr_application_number || row.sii_application_number || null,
     };
   }
 

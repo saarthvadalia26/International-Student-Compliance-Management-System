@@ -21,6 +21,7 @@ export interface AcademicProgram {
   totalSemesters: number;
   semesterDuration: number;
   semesterDurationUnit: SemesterDurationUnit;
+  schoolId?: string | null;
   schoolName?: string | null;
   academicLevel?: string | null;
   createdAt: string;
@@ -38,6 +39,7 @@ export interface CreateProgramDto {
   totalSemesters?: number;
   semesterDuration?: number;
   semesterDurationUnit?: SemesterDurationUnit;
+  schoolId?: string | null;
   schoolName?: string | null;
   academicLevel?: string | null;
 }
@@ -52,6 +54,7 @@ export interface UpdateProgramDto {
   totalSemesters?: number;
   semesterDuration?: number;
   semesterDurationUnit?: SemesterDurationUnit;
+  schoolId?: string | null;
   schoolName?: string | null;
   academicLevel?: string | null;
 }

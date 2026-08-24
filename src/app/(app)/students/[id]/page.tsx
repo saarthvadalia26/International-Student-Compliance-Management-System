@@ -44,6 +44,8 @@ import {
   triggerReminderDispatchAction,
   recordAcademicAdjustmentAction
 } from "@/app/(app)/students/actions";
+import { getActiveSchoolsAction } from "@/app/(app)/settings/schools-actions";
+import { School } from "@/domain/schools/types";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -166,11 +168,15 @@ export interface StudentProfile {
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
   school: string;
+  isSchoolOverridden?: boolean;
+  overrideSchoolId?: string | null;
+  schoolOverrideReason?: string | null;
   admissionDate: string;
   expectedGraduation: string;
   admissionCategory?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
+  iccrApplicationNumber?: string | null;
   complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
   daysToPassportExpiry?: number;
   daysToVisaExpiry?: number;
@@ -208,8 +214,9 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [isLoadingStudent, setIsLoadingStudent] = React.useState(true);
   const [activeSubTab, setActiveSubTab] = React.useState<"immigration" | "personal" | "academic" | "contact">("immigration");
 
-  // Academic Programs State
+  // Academic Programs & Schools Reference State
   const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
+  const [schools, setSchools] = React.useState<School[]>([]);
 
   // Expiry-Driven Reminder Schedule State
   const [reminderSchedule, setReminderSchedule] = React.useState<StudentReminderScheduleResponse | null>(null);
@@ -468,13 +475,19 @@ export default function StudentDetailsPage({ params }: PageProps) {
   }, [loadStudentData, loadReminderSchedule]);
 
   React.useEffect(() => {
-    async function loadPrograms() {
-      const res = await getActiveAcademicProgramsAction();
-      if (res.success && res.programs) {
-        setAcademicPrograms(res.programs);
+    async function loadReferenceData() {
+      const [progRes, schoolRes] = await Promise.all([
+        getActiveAcademicProgramsAction(),
+        getActiveSchoolsAction()
+      ]);
+      if (progRes.success && progRes.programs) {
+        setAcademicPrograms(progRes.programs);
+      }
+      if (schoolRes.success && schoolRes.schools) {
+        setSchools(schoolRes.schools);
       }
     }
-    loadPrograms();
+    loadReferenceData();
   }, []);
 
   // Edit Profile States
@@ -496,6 +509,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     admissionCategory: "",
     admissionCategoryOther: "",
     siiApplicationNumber: "",
+    iccrApplicationNumber: "",
     phoneHome: "",
     phoneLocal: "",
     permanentAddress: "",
@@ -512,6 +526,9 @@ export default function StudentDetailsPage({ params }: PageProps) {
     emergencyContactEmail: "",
     currentSemester: 1,
     academicStatus: "good_standing" as StudentProfile["academicStatus"],
+    isSchoolOverridden: false,
+    overrideSchoolId: "",
+    schoolOverrideReason: "",
     status: "active" as StudentProfile["status"],
     embassyName: "",
     embassyAddress: "",
@@ -536,11 +553,15 @@ export default function StudentDetailsPage({ params }: PageProps) {
         physicalDisability: student.physicalDisability === true ? "yes" : student.physicalDisability === false ? "no" : "not_specified",
         programId: student.programId || "",
         program: student.programName || student.programCode || "",
+        isSchoolOverridden: Boolean(student.isSchoolOverridden),
+        overrideSchoolId: student.overrideSchoolId || "",
+        schoolOverrideReason: student.schoolOverrideReason || "",
         admissionDate: student.admissionDate ? student.admissionDate.split("T")[0] : "",
         expectedGraduation: student.expectedGraduation ? student.expectedGraduation.split("T")[0] : "",
         admissionCategory: student.admissionCategory || "",
         admissionCategoryOther: student.admissionCategoryOther || "",
         siiApplicationNumber: student.siiApplicationNumber || "",
+        iccrApplicationNumber: student.iccrApplicationNumber || student.siiApplicationNumber || "",
         phoneHome: student.phoneHome,
         phoneLocal: student.phoneLocal || "",
         permanentAddress: student.permanentAddress,
@@ -579,7 +600,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
   };
 
   const handleFormSelectChange = (name: string, value: string) => {
-    setEditForm(prev => ({ ...prev, [name]: value }));
+    setEditForm(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === "admissionCategory" && value !== "iccr") {
+        next.iccrApplicationNumber = "";
+      }
+      return next;
+    });
     setIsDirty(true);
   };
 
@@ -634,12 +661,21 @@ export default function StudentDetailsPage({ params }: PageProps) {
         return;
       }
     }
-    if (editForm.admissionCategory === "iccr" && !editForm.siiApplicationNumber?.trim()) {
-      toast.error("Validation Error", { description: "SII Application Number is required for ICCR admission category." });
+    if (editForm.admissionCategory === "iccr" && !editForm.iccrApplicationNumber?.trim() && !editForm.siiApplicationNumber?.trim()) {
+      toast.error("Validation Error", { description: "ICCR Application Number is required when Admission Category is ICCR." });
       return;
     }
     if (editForm.admissionCategory === "other" && !editForm.admissionCategoryOther?.trim()) {
       toast.error("Validation Error", { description: "Please specify the custom admission track." });
+      return;
+    }
+
+    if (editForm.isSchoolOverridden && !editForm.overrideSchoolId) {
+      toast.error("Validation Error", { description: "Please select an alternative school for the administrative override." });
+      return;
+    }
+    if (editForm.isSchoolOverridden && !editForm.schoolOverrideReason?.trim()) {
+      toast.error("Validation Error", { description: "A mandatory justification is required for the administrative school override." });
       return;
     }
 
@@ -679,11 +715,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
         relationshipEmail: editForm.emergencyContactEmail?.trim() || undefined,
         programId: editForm.programId?.trim() || undefined,
         programCode: editForm.program?.trim() || undefined,
+        overrideSchoolId: editForm.isSchoolOverridden ? (editForm.overrideSchoolId || null) : null,
+        schoolOverrideReason: editForm.isSchoolOverridden ? (editForm.schoolOverrideReason?.trim() || null) : null,
         admissionDate: editForm.admissionDate?.trim() || undefined,
         expectedGraduation: editForm.expectedGraduation?.trim() || undefined,
         admissionCategory: (editForm.admissionCategory as AdmissionCategory) || undefined,
         admissionCategoryOther: editForm.admissionCategory === "other" ? (editForm.admissionCategoryOther?.trim() || undefined) : undefined,
-        siiApplicationNumber: editForm.siiApplicationNumber?.trim() || undefined,
+        siiApplicationNumber: editForm.admissionCategory === "iccr" ? (editForm.iccrApplicationNumber?.trim() || editForm.siiApplicationNumber?.trim() || undefined) : undefined,
+        iccrApplicationNumber: editForm.admissionCategory === "iccr" ? (editForm.iccrApplicationNumber?.trim() || editForm.siiApplicationNumber?.trim() || undefined) : null,
         currentSemester: Number(editForm.currentSemester) || 1,
         academicStatus: editForm.academicStatus,
         status: editForm.status,
@@ -1507,18 +1546,30 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     </span>
                   </div>
 
-                  {(student.siiApplicationNumber || student.admissionCategory === "iccr") && (
+                  {(student.admissionCategory === "iccr" && (student.iccrApplicationNumber || student.siiApplicationNumber)) && (
                     <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
-                      <span className="text-muted-foreground block text-[11px] font-medium">SII Application Number</span>
+                      <span className="text-muted-foreground block text-[11px] font-medium">ICCR Application Number</span>
                       <span className="font-semibold text-foreground block font-mono">
-                        {student.siiApplicationNumber || "Pending Entry"}
+                        {student.iccrApplicationNumber || student.siiApplicationNumber}
                       </span>
                     </div>
                   )}
 
                   <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
-                    <span className="text-muted-foreground block text-[11px] font-medium">Registered School</span>
+                    <div className="flex items-center justify-between gap-1 flex-wrap">
+                      <span className="text-muted-foreground block text-[11px] font-medium">Registered School</span>
+                      {student.isSchoolOverridden && (
+                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-medium">
+                          Administrative Override
+                        </Badge>
+                      )}
+                    </div>
                     <span className="font-semibold text-foreground block break-words">{student.school}</span>
+                    {student.isSchoolOverridden && student.schoolOverrideReason && (
+                      <span className="text-[10px] text-muted-foreground block italic pt-0.5">
+                        Reason: {student.schoolOverrideReason}
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
@@ -2274,6 +2325,83 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 />
               </div>
 
+              {/* Program Derived School & Override Option */}
+              {(() => {
+                const currentProgId = editForm.programId || editForm.program;
+                const matchedProg = academicPrograms.find(p => p.id === currentProgId || p.programName === currentProgId || p.programCode === currentProgId);
+                const defaultSchoolName = matchedProg?.schoolName || student?.school || "Not assigned yet";
+
+                return (
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/50 space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground font-medium text-[11px]">School / Department</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditForm(prev => ({ 
+                            ...prev, 
+                            isSchoolOverridden: !prev.isSchoolOverridden,
+                            overrideSchoolId: !prev.isSchoolOverridden ? (prev.overrideSchoolId || schools[0]?.id || "") : ""
+                          }));
+                          setIsDirty(true);
+                        }}
+                        className="text-[11px] font-medium text-primary hover:underline"
+                      >
+                        {editForm.isSchoolOverridden ? "Use Program Default" : "Administrative Override"}
+                      </button>
+                    </div>
+
+                    {!editForm.isSchoolOverridden ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-muted-foreground block text-[10px]">Program Default School</span>
+                          <span className="font-semibold text-foreground block break-words">
+                            {defaultSchoolName}
+                          </span>
+                        </div>
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal">Auto-Inherited</Badge>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 pt-1 border-t border-border/40">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-foreground" htmlFor="overrideSchoolId">
+                            Override School / Department <span className="text-destructive">*</span>
+                          </label>
+                          <Select 
+                            value={editForm.overrideSchoolId} 
+                            onValueChange={(val) => {
+                              setEditForm(prev => ({ ...prev, overrideSchoolId: val || "" }));
+                              setIsDirty(true);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Select alternative school..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {schools.filter(s => s.isActive).map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.name} ({s.code || "N/A"})</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-foreground" htmlFor="schoolOverrideReason">
+                            Override Justification <span className="text-destructive">*</span>
+                          </label>
+                          <Input
+                            id="schoolOverrideReason"
+                            placeholder="Institutional justification for override..."
+                            value={editForm.schoolOverrideReason}
+                            onChange={handleFormChange}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="admissionCategory">Admission Category</label>
@@ -2289,15 +2417,15 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   </Select>
                 </div>
 
-                {(editForm.admissionCategory === "iccr" || editForm.siiApplicationNumber) && (
+                {editForm.admissionCategory === "iccr" && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground" htmlFor="siiApplicationNumber">
-                      SII Application Number {editForm.admissionCategory === "iccr" && <span className="text-destructive">*</span>}
+                    <label className="text-xs font-medium text-foreground" htmlFor="iccrApplicationNumber">
+                      ICCR Application Number <span className="text-destructive">*</span>
                     </label>
                     <Input 
-                      id="siiApplicationNumber" 
-                      placeholder="e.g. SII-2026-98124" 
-                      value={editForm.siiApplicationNumber} 
+                      id="iccrApplicationNumber" 
+                      placeholder="e.g. ICCR-2026-98124" 
+                      value={editForm.iccrApplicationNumber} 
                       onChange={handleFormChange} 
                       className="h-9 text-sm font-mono" 
                     />
