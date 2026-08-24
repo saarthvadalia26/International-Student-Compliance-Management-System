@@ -641,11 +641,11 @@ export async function getStudentDocumentDownloadUrlAction(
   jwt: string,
   documentType: "passport" | "visa" | "efrro",
   versionId: string
-): Promise<{ success: boolean; url?: string; error?: string }> {
+): Promise<{ success: boolean; url?: string; error?: string; errorCode?: string }> {
   try {
     const studentId = await verifyUserAndGetStudentId(jwt);
     if (!studentId) {
-      return { success: false, error: "Authentication required." };
+      return { success: false, error: "Authentication required.", errorCode: "UNAUTHENTICATED" };
     }
 
     const { getAdminSupabase } = await import("@/lib/supabase/admin");
@@ -667,18 +667,31 @@ export async function getStudentDocumentDownloadUrlAction(
       .maybeSingle();
 
     if (verErr || !ver) {
-      return { success: false, error: "Document version not found or access denied." };
+      return { success: false, error: "Document version not found or access denied.", errorCode: "DOCUMENT_NOT_FOUND" };
     }
 
-    const cleanPath = ver.file_path?.trim();
+    let cleanPath = ver.file_path?.trim();
     if (!cleanPath || cleanPath === "pending_upload" || cleanPath === "null") {
-      return { success: false, error: "No physical copy has been uploaded for this document record." };
+      return { success: false, error: "No physical copy has been uploaded for this document record.", errorCode: "NO_FILE_ATTACHED" };
+    }
+
+    // Normalize full URLs or leading slashes
+    if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://")) {
+      const match = cleanPath.match(/students\/.+/);
+      if (match) {
+        cleanPath = match[0];
+      }
+    }
+    cleanPath = cleanPath.replace(/^\/+/, "");
+
+    if (cleanPath.includes("..")) {
+      return { success: false, error: "Invalid document storage path.", errorCode: "INVALID_PATH" };
     }
 
     const storage = StorageProviderFactory.getProvider();
     const exists = await storage.fileExists("iscms-documents", cleanPath);
     if (!exists) {
-      return { success: false, error: "The requested document file could not be located in storage." };
+      return { success: false, error: "The requested document file could not be located in storage.", errorCode: "STORAGE_MISSING_OBJECT" };
     }
 
     const signedUrl = await storage.generateSignedUrl("iscms-documents", cleanPath, 300);
@@ -695,7 +708,7 @@ export async function getStudentDocumentDownloadUrlAction(
     return { success: true, url: signedUrl };
   } catch (err: unknown) {
     const msg = formatUserFacingError(err, { action: "getStudentDocumentDownloadUrlAction" });
-    return { success: false, error: msg };
+    return { success: false, error: msg, errorCode: "STORAGE_ERROR" };
   }
 }
 

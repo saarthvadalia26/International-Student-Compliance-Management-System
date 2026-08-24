@@ -178,12 +178,10 @@ export class VerificationService {
     // Storage Lifecycle Hooks
     if (status === "rejected") {
       try {
-        await this.storageProvider.delete("iscms-documents", updated.filePath);
-        await this.repository.updateStorageLifecycle(id, type, "DELETED", reason || "Staff Rejected", false);
+        await this.repository.updateStorageLifecycle(id, type, "REJECTED", reason || "Staff Rejected", false);
         await this.repository.logStorageAudit(updated.studentId, updated.id, type, "Rejection", actorId || "System", undefined, { reason });
       } catch (err) {
-        console.error("[STORAGE_LIFECYCLE_ERROR] Failed to physically delete rejected file:", err);
-        await this.repository.updateStorageLifecycle(id, type, "REJECTED_PENDING_DELETE", reason || "Staff Rejected", false);
+        console.error("[STORAGE_LIFECYCLE_ERROR] Failed to record rejection storage lifecycle:", err);
       }
     } else if (status === "verified") {
       await this.repository.updateStorageLifecycle(id, type, "APPROVED_PENDING_RETENTION");

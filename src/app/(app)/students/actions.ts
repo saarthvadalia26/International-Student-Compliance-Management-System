@@ -2438,26 +2438,35 @@ export async function triggerReminderDispatchAction(
  */
 export async function getDocumentDownloadUrlAction(
   filePath: string
-): Promise<{ success: boolean; url?: string; error?: string }> {
+): Promise<{ success: boolean; url?: string; error?: string; errorCode?: string }> {
   try {
     const supabase = await getServerSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return { success: false, error: "Authentication required to access document files." };
+      return { success: false, error: "Authentication required to access document files.", errorCode: "UNAUTHENTICATED" };
     }
 
     const { isInternalUser } = await import("@/lib/auth/permissions");
     if (!isInternalUser(user)) {
-      return { success: false, error: "Forbidden: You do not have permission to view or download compliance documents." };
+      return { success: false, error: "Forbidden: You do not have permission to view or download compliance documents.", errorCode: "FORBIDDEN" };
     }
 
-    const cleanPath = filePath?.trim();
+    let cleanPath = filePath?.trim();
     if (!cleanPath || cleanPath === "pending_upload" || cleanPath === "null") {
-      return { success: false, error: "No physical file is associated with this document record." };
+      return { success: false, error: "No physical file is associated with this document record.", errorCode: "NO_FILE_ATTACHED" };
     }
 
-    if (cleanPath.includes("..") || cleanPath.startsWith("/")) {
-      return { success: false, error: "Invalid document storage path." };
+    // Normalize full URLs or leading slashes
+    if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://")) {
+      const match = cleanPath.match(/students\/.+/);
+      if (match) {
+        cleanPath = match[0];
+      }
+    }
+    cleanPath = cleanPath.replace(/^\/+/, "");
+
+    if (cleanPath.includes("..")) {
+      return { success: false, error: "Invalid document storage path.", errorCode: "INVALID_PATH" };
     }
 
     const storage = StorageProviderFactory.getProvider();
@@ -2466,7 +2475,7 @@ export async function getDocumentDownloadUrlAction(
     const exists = await storage.fileExists("iscms-documents", cleanPath);
     if (!exists) {
       console.warn(`[STORAGE_MISSING_OBJECT] Document file not found in storage at path: ${cleanPath}`);
-      return { success: false, error: "The requested document file could not be located in storage." };
+      return { success: false, error: "The requested document file could not be located in storage.", errorCode: "STORAGE_MISSING_OBJECT" };
     }
 
     const signedUrl = await storage.generateSignedUrl("iscms-documents", cleanPath, 300);
@@ -2491,7 +2500,7 @@ export async function getDocumentDownloadUrlAction(
     return { success: true, url: signedUrl };
   } catch (err: unknown) {
     const sanitized = sanitizeError(err, { action: "getDocumentDownloadUrlAction" });
-    return { success: false, error: sanitized.message };
+    return { success: false, error: sanitized.message, errorCode: "STORAGE_ERROR" };
   }
 }
 

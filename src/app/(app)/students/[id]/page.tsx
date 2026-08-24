@@ -1307,6 +1307,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 versionNumber={student.passport.versionNumber}
                 verificationStatus={student.passport.verificationStatus}
                 hasUploadedDocument={student.passport.hasUploadedDocument}
+                filePath={student.passport.filePath}
                 verifiedAt={student.passport.verifiedAt}
                 verifiedBy={student.passport.verifiedBy}
                 rejectionReason={student.passport.rejectionReason}
@@ -1339,6 +1340,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 versionNumber={student.visa.versionNumber}
                 verificationStatus={student.visa.verificationStatus}
                 hasUploadedDocument={student.visa.hasUploadedDocument}
+                filePath={student.visa.filePath}
                 verifiedAt={student.visa.verifiedAt}
                 verifiedBy={student.visa.verifiedBy}
                 rejectionReason={student.visa.rejectionReason}
@@ -1371,6 +1373,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   versionNumber={student.efrro.versionNumber}
                   verificationStatus={student.efrro.verificationStatus}
                   hasUploadedDocument={student.efrro.hasUploadedDocument}
+                  filePath={student.efrro.filePath}
                   verifiedAt={student.efrro.verifiedAt}
                   verifiedBy={student.efrro.verifiedBy}
                   rejectionReason={student.efrro.rejectionReason}

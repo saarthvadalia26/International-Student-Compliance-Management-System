@@ -116,6 +116,29 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
   const effectiveExpiry = activeDoc?.expiryDate || metadata?.expiryDate || null;
   const daysLeft = effectiveExpiry ? Math.ceil((new Date(effectiveExpiry).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
 
+  const targetDocWithFile = activeDoc?.filePath ? activeDoc : pendingDoc?.filePath ? pendingDoc : versions.find(v => Boolean(v.filePath));
+  const activeFilePath = targetDocWithFile?.filePath || null;
+
+  const handleViewDocument = async (filePath?: string | null) => {
+    if (!filePath) {
+      toast.error("File Unavailable", { description: "No physical file is attached to this document version." });
+      return;
+    }
+    const toastId = toast.loading("Opening document...", { description: "Retrieving secure document..." });
+    try {
+      const { getDocumentDownloadUrlAction } = await import("@/app/(app)/students/actions");
+      const res = await getDocumentDownloadUrlAction(filePath);
+      if (res.success && res.url) {
+        toast.dismiss(toastId);
+        window.open(res.url, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error("Document Unavailable", { id: toastId, description: res.error || "Unable to retrieve document file." });
+      }
+    } catch (err) {
+      toast.error("Error", { id: toastId, description: err instanceof Error ? err.message : "Failed to open document file." });
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-12 text-xs">
       <div className="flex items-center">
@@ -144,7 +167,7 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
             onReplaceClick={() => setIsUploadOpen(true)}
             onCorrectClick={activeDoc || metadata ? () => setIsCorrectOpen(true) : undefined}
             onVerifyClick={pendingDoc || (activeDoc && status === "PENDING_VERIFICATION") ? () => setIsVerifyOpen(true) : undefined}
-            onViewPdfClick={selectedPdfUrl ? () => {} : undefined}
+            onViewPdfClick={activeFilePath ? () => handleViewDocument(activeFilePath) : undefined}
           />
 
           {/* History details table */}
@@ -154,23 +177,7 @@ export function ComplianceDocumentPage({ documentType, studentId }: DocumentPage
                 <ComplianceDocumentTable 
                   versions={versions} 
                   documentType={documentType}
-                  onDownloadClick={async (v) => {
-                    if (!v.filePath) {
-                      toast.error("File Unavailable", { description: "No physical file is attached to this document version." });
-                      return;
-                    }
-                    try {
-                      const { getDocumentDownloadUrlAction } = await import("@/app/(app)/students/actions");
-                      const res = await getDocumentDownloadUrlAction(v.filePath);
-                      if (res.success && res.url) {
-                        window.open(res.url, "_blank", "noopener,noreferrer");
-                      } else {
-                        toast.error("Download Failed", { description: res.error || "Unable to retrieve document file." });
-                      }
-                    } catch (err) {
-                      toast.error("Error", { description: err instanceof Error ? err.message : "Failed to open document file." });
-                    }
-                  }} 
+                  onDownloadClick={(v) => handleViewDocument(v.filePath)} 
                 />
               </CardContent>
             </Card>

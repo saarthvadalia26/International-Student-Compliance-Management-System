@@ -1,3 +1,24 @@
+import "./test-preload";
+import * as fs from "fs";
+import * as path from "path";
+
+try {
+  const envContent = fs.readFileSync(path.join(process.cwd(), ".env.local"), "utf-8");
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      const idx = trimmed.indexOf("=");
+      if (idx > 0) {
+        const key = trimmed.substring(0, idx).trim();
+        const val = trimmed.substring(idx + 1).trim();
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+} catch {}
+
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { TemplateValidator } from "../src/domain/notifications/validators/template.validator";

@@ -129,15 +129,13 @@ export class StudentPortalService {
     const eligibility = await canStudentUploadDocument(studentId, documentType);
     if (!eligibility.canUpload) {
       console.warn(`[STUDENT_PORTAL_SECURITY] Blocked unauthorized upload attempt for student ${studentId}, type ${documentType}. Reason: ${eligibility.reasonCode}`);
-      await this.portalRepo.logUploadAudit({
+      await this.portalRepo.logActivity(
         studentId,
-        filename,
-        fileSize: fileBuffer.length,
-        checksum: "N/A",
-        status: "blocked_locked",
+        `BLOCKED_UPLOAD_LOCKED_${documentType.toUpperCase()}`,
         ipAddress,
-        userAgent
-      });
+        userAgent,
+        { reason: eligibility.reasonCode, filename }
+      ).catch(() => null);
       throw new Error(`Your ${documentType.toUpperCase()} upload is currently locked. A replacement request or an active upload window is required before a new document can be uploaded.`);
     }
 
@@ -235,6 +233,8 @@ export class StudentPortalService {
       throw new Error(`[STORAGE_WRITE_FAILED] ${storageError.message}`);
     }
 
+    let insertedVer: { id: string; version_number: number } | null = null;
+
     try {
       // Cancel future notifications scheduled for old eFRRO if this is an eFRRO upload
       if (documentType === "efrro") {
@@ -247,7 +247,7 @@ export class StudentPortalService {
       // Set a placeholder expiry date (1 year ahead) to satisfy DB check constraint (expiry_date > issue_date).
       // University compliance staff will enter the true document number, issue date, and expiry date upon verification.
       const futureExpiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-      const { data: insertedVer, error: verError } = await supabase
+      const { data: verRecord, error: verError } = await supabase
         .from(tableName)
         .insert({
           student_id: studentId,
@@ -263,16 +263,17 @@ export class StudentPortalService {
         .select("id, version_number")
         .single();
 
-      if (verError || !insertedVer) {
+      if (verError || !verRecord) {
         throw new Error(`[DB_INSERT_FAILED] Failed to record ${documentType} version: ${verError?.message}`);
       }
+      insertedVer = verRecord;
 
       // 8. If an early upload authorization was used or replacement request was active, complete & consume it
       await DocumentUploadEligibilityEngine.consumeActiveAuthorization(
         studentId,
         documentType,
         insertedVer.id
-      );
+      ).catch((authErr) => console.warn("[AUTH_CONSUMPTION_WARNING]", authErr));
 
       // 9. Log upload audit
       await this.portalRepo.logUploadAudit({
@@ -283,7 +284,7 @@ export class StudentPortalService {
         status: "success",
         ipAddress,
         userAgent
-      });
+      }).catch((auditErr) => console.warn("[UPLOAD_AUDIT_WARNING]", auditErr));
 
       // 10. Update student snapshot status to PENDING_VERIFICATION
       const snapshotUpdate: Record<string, unknown> = {
@@ -305,30 +306,34 @@ export class StudentPortalService {
         ipAddress,
         userAgent,
         { versionId: insertedVer.id, versionNumber: nextVersion, filename }
-      );
+      ).catch((actErr) => console.warn("[ACTIVITY_LOG_WARNING]", actErr));
 
-      // 12. Notify compliance staff for review
-      const profile = await this.portalRepo.getStudentProfile(studentId);
-      if (profile) {
-        const adminEmail = Branding.supportEmail;
-        const reviewLink = documentType === "efrro" ? `/reports/efrro` : `/students/${studentId}`;
-        
-        await this.notifRepo.queueNotification({
-          studentId,
-          documentType,
-          status: "queued",
-          channel: "email",
-          recipientAddress: adminEmail,
-          triggerSource: "portal_upload_event",
-          idempotencyKey: `staff_alert:${studentId}:${documentType}:${insertedVer.id}`,
-          notificationContext: {
-            student_name: profile.fullName,
-            registration_number: profile.registrationNumber,
-            country: profile.nationality,
-            upload_time: new Date().toLocaleTimeString(),
-            secure_upload_link: reviewLink
-          }
-        });
+      // 12. Notify compliance staff for review (safely wrapped - non-fatal to document persistence)
+      try {
+        const profile = await this.portalRepo.getStudentProfile(studentId);
+        if (profile) {
+          const adminEmail = Branding.supportEmail;
+          const reviewLink = documentType === "efrro" ? `/reports/efrro` : `/students/${studentId}`;
+          
+          await this.notifRepo.queueNotification({
+            studentId,
+            documentType,
+            status: "queued",
+            channel: "whatsapp",
+            recipientAddress: profile.phoneLocal || profile.phoneHome || adminEmail,
+            triggerSource: "portal_upload_event",
+            idempotencyKey: `staff_alert:${studentId}:${documentType}:${insertedVer.id}`,
+            notificationContext: {
+              student_name: profile.fullName,
+              registration_number: profile.registrationNumber,
+              country: profile.nationality,
+              upload_time: new Date().toLocaleTimeString(),
+              secure_upload_link: reviewLink
+            }
+          });
+        }
+      } catch (notifErr: unknown) {
+        console.warn("[STAFF_NOTIFICATION_NONFATAL] Staff notification alert could not be queued:", notifErr instanceof Error ? notifErr.message : String(notifErr));
       }
 
       return {
@@ -337,9 +342,11 @@ export class StudentPortalService {
       };
 
     } catch (dbErr) {
-      // Roll back storage file if database operations fail
-      console.error("[PORTAL_UPLOAD_ROLLBACK] Database write failed. Rolling back storage file path:", storagePath);
-      await this.storageProvider.delete(bucketName, storagePath);
+      // Roll back storage file ONLY if database version persistence failed
+      if (!insertedVer) {
+        console.error("[PORTAL_UPLOAD_ROLLBACK] Database insert failed before version record was created. Rolling back storage file path:", storagePath);
+        await this.storageProvider.delete(bucketName, storagePath).catch(() => null);
+      }
       throw dbErr;
     }
   }
