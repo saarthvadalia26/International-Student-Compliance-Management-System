@@ -91,7 +91,74 @@ export interface FactoryResetAuditEntry {
   };
 }
 
+export interface AcademicProgramDeletionAuditEntry {
+  adminId: string;
+  adminEmail: string;
+  adminName?: string;
+  programId: string;
+  programName: string;
+  programCode?: string | null;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export interface SchoolDeletionAuditEntry {
+  adminId: string;
+  adminEmail: string;
+  adminName?: string;
+  schoolId: string;
+  schoolName: string;
+  schoolCode?: string | null;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 const auditService = {
+  /**
+   * Log Academic Program Deletion event (Administrator permanently removing a program)
+   */
+  async logAcademicProgramDeletion(entry: AcademicProgramDeletionAuditEntry): Promise<void> {
+    const admin = getAdminSupabase();
+    await admin.from("audit_log").insert({
+      actor_id: entry.adminId,
+      actor_email: entry.adminEmail,
+      actor_name: entry.adminName ?? null,
+      action: "DELETE_ACADEMIC_PROGRAM",
+      resource: "academic_programs",
+      category: "master_data",
+      severity: "warning",
+      ip_address: entry.ipAddress ?? null,
+      user_agent: entry.userAgent ?? null,
+      details: {
+        program_id: entry.programId,
+        program_name: entry.programName,
+        program_code: entry.programCode ?? null,
+      },
+    });
+  },
+
+  /**
+   * Log School / Department Deletion event (Administrator permanently removing a school)
+   */
+  async logSchoolDeletion(entry: SchoolDeletionAuditEntry): Promise<void> {
+    const admin = getAdminSupabase();
+    await admin.from("audit_log").insert({
+      actor_id: entry.adminId,
+      actor_email: entry.adminEmail,
+      actor_name: entry.adminName ?? null,
+      action: "DELETE_SCHOOL",
+      resource: "schools",
+      category: "master_data",
+      severity: "warning",
+      ip_address: entry.ipAddress ?? null,
+      user_agent: entry.userAgent ?? null,
+      details: {
+        school_id: entry.schoolId,
+        school_name: entry.schoolName,
+        school_code: entry.schoolCode ?? null,
+      },
+    });
+  },
   /**
    * Log Initial Administrator Account Setup
    */

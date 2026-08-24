@@ -179,13 +179,17 @@ export class AcademicProgramService {
 
     try {
       const supabase = getAdminSupabase();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("academic_programs")
         .select("*")
         .eq("id", trimmedId)
         .maybeSingle();
 
-      if (data) return this.mapToDomain(data);
+      if (!error && data) return this.mapToDomain(data);
+      if (!error && !data) {
+        // Record does not exist in database (deleted or invalid ID)
+        return null;
+      }
 
       const fallback = DEFAULT_FALLBACK_PROGRAMS.find(p => p.id === trimmedId);
       return fallback || null;
@@ -461,6 +465,75 @@ export class AcademicProgramService {
     }
 
     return this.mapToDomain(data);
+  }
+
+  /**
+   * Permanently delete an academic program master record.
+   * Enforces referential integrity checks before deletion to protect student data.
+   */
+  public async deleteProgram(id: string, _actorId?: string): Promise<{ success: boolean; program?: AcademicProgram; error?: string }> {
+    const trimmedId = id?.trim();
+    if (!trimmedId) {
+      return { success: false, error: "Program ID is required." };
+    }
+
+    const supabase = getAdminSupabase();
+
+    // 1. Verify program exists
+    const { data: existingProgram, error: fetchErr } = await supabase
+      .from("academic_programs")
+      .select("*")
+      .eq("id", trimmedId)
+      .maybeSingle();
+
+    if (fetchErr) {
+      return { success: false, error: `Failed verifying academic program: ${fetchErr.message}` };
+    }
+
+    if (!existingProgram) {
+      return { success: false, error: "Academic program not found or has already been deleted." };
+    }
+
+    // 2. Pre-flight dependency check on student_academic table
+    const { count: studentCount, error: countErr } = await supabase
+      .from("student_academic")
+      .select("student_id", { count: "exact", head: true })
+      .eq("program_id", trimmedId);
+
+    if (countErr) {
+      console.warn("[ACADEMIC_PROGRAM_DELETE] Error checking student dependencies:", countErr.message);
+    }
+
+    if (studentCount && studentCount > 0) {
+      return {
+        success: false,
+        error: `This academic program cannot be deleted because it is currently associated with ${studentCount} student record${studentCount > 1 ? "s" : ""}. Please reassign or update existing students before deleting.`
+      };
+    }
+
+    // 3. Execute permanent deletion
+    const { error: deleteErr } = await supabase
+      .from("academic_programs")
+      .delete()
+      .eq("id", trimmedId);
+
+    if (deleteErr) {
+      if (deleteErr.code === "23503") {
+        return {
+          success: false,
+          error: "This academic program cannot be deleted because dependent student records reference it."
+        };
+      }
+      return {
+        success: false,
+        error: `Failed deleting academic program: ${deleteErr.message}`
+      };
+    }
+
+    return {
+      success: true,
+      program: this.mapToDomain(existingProgram)
+    };
   }
 
   /**

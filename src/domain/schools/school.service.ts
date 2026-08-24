@@ -67,13 +67,17 @@ export class SchoolService {
 
     try {
       const supabase = getAdminSupabase();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("schools")
         .select("*")
         .eq("id", trimmedId)
         .maybeSingle();
 
-      if (data) return this.mapToDomain(data);
+      if (!error && data) return this.mapToDomain(data);
+      if (!error && !data) {
+        // Record does not exist in database (deleted or invalid ID)
+        return null;
+      }
 
       const fallback = DEFAULT_FALLBACK_SCHOOLS.find(s => s.id === trimmedId);
       return fallback || null;
@@ -208,6 +212,92 @@ export class SchoolService {
     }
 
     return this.mapToDomain(data);
+  }
+
+  /**
+   * Permanently delete a school/department master record.
+   * Enforces referential integrity checks before deletion to protect programs and students.
+   */
+  public async deleteSchool(id: string, _actorId?: string): Promise<{ success: boolean; school?: School; error?: string }> {
+    const trimmedId = id?.trim();
+    if (!trimmedId) {
+      return { success: false, error: "School ID is required." };
+    }
+
+    const supabase = getAdminSupabase();
+
+    // 1. Verify school exists
+    const { data: existingSchool, error: fetchErr } = await supabase
+      .from("schools")
+      .select("*")
+      .eq("id", trimmedId)
+      .maybeSingle();
+
+    if (fetchErr) {
+      return { success: false, error: `Failed verifying school: ${fetchErr.message}` };
+    }
+
+    if (!existingSchool) {
+      return { success: false, error: "School / Department not found or has already been deleted." };
+    }
+
+    // 2. Pre-flight dependency check 1: Associated academic programs
+    const { count: programCount, error: progCountErr } = await supabase
+      .from("academic_programs")
+      .select("id", { count: "exact", head: true })
+      .eq("school_id", trimmedId);
+
+    if (progCountErr) {
+      console.warn("[SCHOOL_DELETE] Error checking associated academic programs:", progCountErr.message);
+    }
+
+    if (programCount && programCount > 0) {
+      return {
+        success: false,
+        error: `This school cannot be deleted because it contains ${programCount} academic program${programCount > 1 ? "s" : ""}. Please delete or reassign all programs belonging to this school first.`
+      };
+    }
+
+    // 3. Pre-flight dependency check 2: Administrative student overrides
+    const { count: overrideCount, error: overrideCountErr } = await supabase
+      .from("student_academic")
+      .select("student_id", { count: "exact", head: true })
+      .eq("override_school_id", trimmedId);
+
+    if (overrideCountErr) {
+      console.warn("[SCHOOL_DELETE] Error checking student school overrides:", overrideCountErr.message);
+    }
+
+    if (overrideCount && overrideCount > 0) {
+      return {
+        success: false,
+        error: `This school cannot be deleted because it is currently assigned as an administrative override for ${overrideCount} student record${overrideCount > 1 ? "s" : ""}. Please update the student records before deleting.`
+      };
+    }
+
+    // 4. Execute permanent deletion
+    const { error: deleteErr } = await supabase
+      .from("schools")
+      .delete()
+      .eq("id", trimmedId);
+
+    if (deleteErr) {
+      if (deleteErr.code === "23503") {
+        return {
+          success: false,
+          error: "This school cannot be deleted because dependent academic or student records reference it."
+        };
+      }
+      return {
+        success: false,
+        error: `Failed deleting school: ${deleteErr.message}`
+      };
+    }
+
+    return {
+      success: true,
+      school: this.mapToDomain(existingSchool)
+    };
   }
 
   /**

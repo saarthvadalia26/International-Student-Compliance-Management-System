@@ -7,11 +7,10 @@ import {
   Plus, 
   Search, 
   Edit2, 
-  Archive, 
-  RotateCcw, 
+  Trash2,
+  AlertTriangle,
   Loader2, 
   AlertCircle,
-  Filter,
   Layers,
   BookOpen
 } from "lucide-react";
@@ -29,13 +28,13 @@ import {
   getAllAcademicProgramsAction, 
   createAcademicProgramAction, 
   updateAcademicProgramAction, 
-  toggleAcademicProgramStatusAction 
+  deleteAcademicProgramAction 
 } from "@/app/(app)/settings/academic-programs-actions";
 import {
   getAllSchoolsAction,
   createSchoolAction,
   updateSchoolAction,
-  toggleSchoolStatusAction
+  deleteSchoolAction
 } from "@/app/(app)/settings/schools-actions";
 
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
@@ -49,12 +48,28 @@ export function AcademicProgramsTab() {
   const [schools, setSchools] = React.useState<School[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "archived">("all");
 
   // Program Modal States
   const [isAddProgramOpen, setIsAddProgramOpen] = React.useState(false);
   const [isEditProgramOpen, setIsEditProgramOpen] = React.useState(false);
   const [selectedProgram, setSelectedProgram] = React.useState<AcademicProgram | null>(null);
+
+  // Program Delete Modal State
+  const [isDeleteProgramOpen, setIsDeleteProgramOpen] = React.useState(false);
+  const [programToDelete, setProgramToDelete] = React.useState<AcademicProgram | null>(null);
+  const [isDeletingProgram, setIsDeletingProgram] = React.useState(false);
+  const [deleteProgramError, setDeleteProgramError] = React.useState<string | null>(null);
+
+  // School Modal States
+  const [isAddSchoolOpen, setIsAddSchoolOpen] = React.useState(false);
+  const [isEditSchoolOpen, setIsEditSchoolOpen] = React.useState(false);
+  const [selectedSchool, setSelectedSchool] = React.useState<School | null>(null);
+
+  // School Delete Modal State
+  const [isDeleteSchoolOpen, setIsDeleteSchoolOpen] = React.useState(false);
+  const [schoolToDelete, setSchoolToDelete] = React.useState<School | null>(null);
+  const [isDeletingSchool, setIsDeletingSchool] = React.useState(false);
+  const [deleteSchoolError, setDeleteSchoolError] = React.useState<string | null>(null);
 
   // Program Form State
   const [formName, setFormName] = React.useState("");
@@ -69,10 +84,7 @@ export function AcademicProgramsTab() {
   const [formOrder, setFormOrder] = React.useState(1);
   const [isSavingProgram, setIsSavingProgram] = React.useState(false);
 
-  // School Modal States
-  const [isAddSchoolOpen, setIsAddSchoolOpen] = React.useState(false);
-  const [isEditSchoolOpen, setIsEditSchoolOpen] = React.useState(false);
-  const [selectedSchool, setSelectedSchool] = React.useState<School | null>(null);
+
 
   // School Form State
   const [schoolFormName, setSchoolFormName] = React.useState("");
@@ -128,15 +140,10 @@ export function AcademicProgramsTab() {
         p.programName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.programCode && p.programCode.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (p.schoolName && p.schoolName.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-      const matchesStatus = 
-        statusFilter === "all" ? true :
-        statusFilter === "active" ? p.isActive :
-        !p.isActive;
 
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
-  }, [programs, searchQuery, statusFilter]);
+  }, [programs, searchQuery]);
 
   // Filtered Schools
   const filteredSchools = React.useMemo(() => {
@@ -145,15 +152,10 @@ export function AcademicProgramsTab() {
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (s.code && s.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (s.description && s.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-      const matchesStatus = 
-        statusFilter === "all" ? true :
-        statusFilter === "active" ? s.isActive :
-        !s.isActive;
 
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
-  }, [schools, searchQuery, statusFilter]);
+  }, [schools, searchQuery]);
 
   // Count programs per school
   const programCountBySchoolId = React.useMemo(() => {
@@ -195,6 +197,99 @@ export function AcademicProgramsTab() {
     setFormSemesterDurationUnit((prog.semesterDurationUnit as SemesterDurationUnit) || "months");
     setFormOrder(prog.displayOrder);
     setIsEditProgramOpen(true);
+  };
+
+  // Open Delete Program Dialog
+  const handleOpenDeleteProgram = (prog: AcademicProgram) => {
+    setProgramToDelete(prog);
+    setDeleteProgramError(null);
+    setIsDeleteProgramOpen(true);
+  };
+
+  // Confirm Delete Program
+  const handleConfirmDeleteProgram = async () => {
+    if (!programToDelete || isDeletingProgram) return;
+
+    setIsDeletingProgram(true);
+    setDeleteProgramError(null);
+
+    try {
+      const res = await deleteAcademicProgramAction(programToDelete.id);
+      if (res.success) {
+        toast.success("Academic Program Deleted", {
+          description: `"${programToDelete.programName}" was permanently deleted from the database.`
+        });
+        setIsDeleteProgramOpen(false);
+        setProgramToDelete(null);
+        fetchData();
+      } else {
+        const errMsg = res.error || "Failed to delete academic program.";
+        setDeleteProgramError(errMsg);
+        toast.error("Deletion Blocked", { description: errMsg });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setDeleteProgramError(msg);
+      toast.error("Deletion Failed", { description: msg });
+    } finally {
+      setIsDeletingProgram(false);
+    }
+  };
+
+  // Open Add School Modal
+  const handleOpenAddSchool = () => {
+    setSchoolFormName("");
+    setSchoolFormCode("");
+    setSchoolFormDescription("");
+    setSchoolFormOrder(schools.length + 1);
+    setIsAddSchoolOpen(true);
+  };
+
+  // Open Edit School Modal
+  const handleOpenEditSchool = (sch: School) => {
+    setSelectedSchool(sch);
+    setSchoolFormName(sch.name);
+    setSchoolFormCode(sch.code || "");
+    setSchoolFormDescription(sch.description || "");
+    setSchoolFormOrder(sch.displayOrder);
+    setIsEditSchoolOpen(true);
+  };
+
+  // Open Delete School Dialog
+  const handleOpenDeleteSchool = (sch: School) => {
+    setSchoolToDelete(sch);
+    setDeleteSchoolError(null);
+    setIsDeleteSchoolOpen(true);
+  };
+
+  // Confirm Delete School
+  const handleConfirmDeleteSchool = async () => {
+    if (!schoolToDelete || isDeletingSchool) return;
+
+    setIsDeletingSchool(true);
+    setDeleteSchoolError(null);
+
+    try {
+      const res = await deleteSchoolAction(schoolToDelete.id);
+      if (res.success) {
+        toast.success("School / Department Deleted", {
+          description: `"${schoolToDelete.name}" was permanently deleted from the database.`
+        });
+        setIsDeleteSchoolOpen(false);
+        setSchoolToDelete(null);
+        fetchData();
+      } else {
+        const errMsg = res.error || "Failed to delete school / department.";
+        setDeleteSchoolError(errMsg);
+        toast.error("Deletion Blocked", { description: errMsg });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setDeleteSchoolError(msg);
+      toast.error("Deletion Failed", { description: msg });
+    } finally {
+      setIsDeletingSchool(false);
+    }
   };
 
   // Save Create Program
@@ -292,42 +387,6 @@ export function AcademicProgramsTab() {
     setIsSavingProgram(false);
   };
 
-  // Toggle Active/Archive Status for Program
-  const handleToggleProgramStatus = async (prog: AcademicProgram) => {
-    const nextStatus = !prog.isActive;
-    const actionName = nextStatus ? "Restored" : "Archived";
-
-    const res = await toggleAcademicProgramStatusAction(prog.id, nextStatus);
-
-    if (res.success) {
-      toast.success(`Academic Program ${actionName}`, {
-        description: `"${prog.programName}" is now ${nextStatus ? "active" : "archived"}.`
-      });
-      fetchData();
-    } else {
-      toast.error(res.error || `Failed to ${actionName.toLowerCase()} program.`);
-    }
-  };
-
-  // Open Add School Modal
-  const handleOpenAddSchool = () => {
-    setSchoolFormName("");
-    setSchoolFormCode("");
-    setSchoolFormDescription("");
-    setSchoolFormOrder(schools.length + 1);
-    setIsAddSchoolOpen(true);
-  };
-
-  // Open Edit School Modal
-  const handleOpenEditSchool = (sch: School) => {
-    setSelectedSchool(sch);
-    setSchoolFormName(sch.name);
-    setSchoolFormCode(sch.code || "");
-    setSchoolFormDescription(sch.description || "");
-    setSchoolFormOrder(sch.displayOrder);
-    setIsEditSchoolOpen(true);
-  };
-
   // Save Create School
   const handleSaveCreateSchool = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -382,22 +441,6 @@ export function AcademicProgramsTab() {
       toast.error(res.error || "Failed updating school.");
     }
     setIsSavingSchool(false);
-  };
-
-  // Toggle Active/Archive Status for School
-  const handleToggleSchoolStatus = async (sch: School) => {
-    const nextStatus = !sch.isActive;
-    const actionName = nextStatus ? "Restored" : "Archived";
-
-    const res = await toggleSchoolStatusAction(sch.id, nextStatus);
-    if (res.success) {
-      toast.success(`School / Department ${actionName}`, {
-        description: `"${sch.name}" is now ${nextStatus ? "active" : "archived"}.`
-      });
-      fetchData();
-    } else {
-      toast.error(res.error || `Failed to ${actionName.toLowerCase()} school.`);
-    }
   };
 
   return (
@@ -457,30 +500,16 @@ export function AcademicProgramsTab() {
       </CardHeader>
 
       <CardContent className="p-6 space-y-4">
-        {/* Search & Filter Bar */}
+        {/* Search Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder={subView === "programs" ? "Search programs, codes, or schools..." : "Search schools or codes..."}
+              placeholder={subView === "programs" ? "Search programs, codes, or schools..." : "Search schools, codes, or descriptions..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 text-xs h-9 rounded-xl"
             />
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-            <Select value={statusFilter} onValueChange={(val: "all" | "active" | "archived" | null) => setStatusFilter(val || "all")}>
-              <SelectTrigger className="h-9 text-xs w-36 rounded-xl">
-                <SelectValue placeholder="Status Filter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Records</SelectItem>
-                <SelectItem value="active">Active Only</SelectItem>
-                <SelectItem value="archived">Archived Only</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
@@ -495,7 +524,7 @@ export function AcademicProgramsTab() {
             <div className="p-8 text-center rounded-xl border border-dashed border-border text-xs text-muted-foreground space-y-2">
               <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground/60" />
               <p className="font-medium text-foreground">No Academic Programs Found</p>
-              <p className="text-[11px]">No active or archived programs match your current search or filter criteria.</p>
+              <p className="text-[11px]">No academic programs match your current search query.</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border/60">
@@ -508,7 +537,6 @@ export function AcademicProgramsTab() {
                     <th className="py-2.5 px-3">School / Department</th>
                     <th className="py-2.5 px-3">Level</th>
                     <th className="py-2.5 px-3">Progression Structure</th>
-                    <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -535,11 +563,6 @@ export function AcademicProgramsTab() {
                           <span className="text-muted-foreground text-[10px]">({prog.semesterDuration || 6} {prog.semesterDurationUnit || "mo"}/sem)</span>
                         </div>
                       </td>
-                      <td className="py-2.5 px-3">
-                        <Badge variant={prog.isActive ? "default" : "secondary"} className="text-[10px] rounded-md">
-                          {prog.isActive ? "Active" : "Archived"}
-                        </Badge>
-                      </td>
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
@@ -547,18 +570,20 @@ export function AcademicProgramsTab() {
                             size="icon"
                             onClick={() => handleOpenEditProgram(prog)}
                             className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
-                            title="Edit Program"
+                            title={`Edit ${prog.programName}`}
+                            aria-label={`Edit ${prog.programName}`}
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleToggleProgramStatus(prog)}
-                            className={`h-7 w-7 rounded-lg ${prog.isActive ? "text-amber-600 hover:text-amber-700 hover:bg-amber-500/10" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"}`}
-                            title={prog.isActive ? "Archive Program" : "Restore Program"}
+                            onClick={() => handleOpenDeleteProgram(prog)}
+                            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            title={`Delete ${prog.programName}`}
+                            aria-label={`Delete ${prog.programName}`}
                           >
-                            {prog.isActive ? <Archive className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </td>
@@ -574,7 +599,7 @@ export function AcademicProgramsTab() {
             <div className="p-8 text-center rounded-xl border border-dashed border-border text-xs text-muted-foreground space-y-2">
               <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground/60" />
               <p className="font-medium text-foreground">No Schools / Departments Found</p>
-              <p className="text-[11px]">No active or archived schools match your current search criteria.</p>
+              <p className="text-[11px]">No schools match your current search criteria.</p>
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border/60">
@@ -586,7 +611,6 @@ export function AcademicProgramsTab() {
                     <th className="py-2.5 px-3">Code</th>
                     <th className="py-2.5 px-3">Description</th>
                     <th className="py-2.5 px-3">Associated Programs</th>
-                    <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -602,11 +626,6 @@ export function AcademicProgramsTab() {
                           {programCountBySchoolId[sch.id] || 0} Programs
                         </Badge>
                       </td>
-                      <td className="py-2.5 px-3">
-                        <Badge variant={sch.isActive ? "default" : "secondary"} className="text-[10px] rounded-md">
-                          {sch.isActive ? "Active" : "Archived"}
-                        </Badge>
-                      </td>
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
@@ -614,18 +633,20 @@ export function AcademicProgramsTab() {
                             size="icon"
                             onClick={() => handleOpenEditSchool(sch)}
                             className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
-                            title="Edit School"
+                            title={`Edit ${sch.name}`}
+                            aria-label={`Edit ${sch.name}`}
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleToggleSchoolStatus(sch)}
-                            className={`h-7 w-7 rounded-lg ${sch.isActive ? "text-amber-600 hover:text-amber-700 hover:bg-amber-500/10" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"}`}
-                            title={sch.isActive ? "Archive School" : "Restore School"}
+                            onClick={() => handleOpenDeleteSchool(sch)}
+                            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            title={`Delete ${sch.name}`}
+                            aria-label={`Delete ${sch.name}`}
                           >
-                            {sch.isActive ? <Archive className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </td>
@@ -830,9 +851,9 @@ export function AcademicProgramsTab() {
                   <SelectValue placeholder="Select authoritative school..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {schools.filter(s => s.isActive).map((sch) => (
+                  {schools.filter(s => s.isActive || s.id === formSchoolId).map((sch) => (
                     <SelectItem key={sch.id} value={sch.id}>
-                      {sch.name} {sch.code ? `(${sch.code})` : ""}
+                      {sch.name} {sch.code ? `(${sch.code})` : ""}{!sch.isActive ? " (Archived)" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1088,6 +1109,184 @@ export function AcademicProgramsTab() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Program Confirmation Dialog */}
+      <Dialog 
+        open={isDeleteProgramOpen} 
+        onOpenChange={(open) => {
+          if (!isDeletingProgram) {
+            setIsDeleteProgramOpen(open);
+            if (!open) {
+              setProgramToDelete(null);
+              setDeleteProgramError(null);
+            }
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              Delete Academic Program
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <p className="text-foreground">
+              Are you sure you want to permanently delete <span className="font-semibold text-foreground">&ldquo;{programToDelete?.programName}&rdquo;</span>?
+            </p>
+
+            <div className="p-3 bg-muted/50 rounded-xl border border-border/60 space-y-1 font-mono text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Program Code:</span>
+                <span className="font-medium text-foreground">{programToDelete?.programCode || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Level:</span>
+                <span className="font-medium text-foreground">{getAcademicLevelLabel(programToDelete?.academicLevel)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">School / Department:</span>
+                <span className="font-medium text-foreground">{programToDelete?.schoolName || "—"}</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-[11px] leading-relaxed flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Permanent Database Deletion</p>
+                <p>This action permanently removes this academic program from the database and cannot be undone. Programs associated with existing students cannot be deleted.</p>
+              </div>
+            </div>
+
+            {deleteProgramError && (
+              <div className="p-3 bg-destructive/15 border border-destructive/30 rounded-xl text-destructive text-[11px] leading-relaxed flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Deletion Blocked</p>
+                  <p>{deleteProgramError}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-2 gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteProgramOpen(false)}
+              disabled={isDeletingProgram}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleConfirmDeleteProgram}
+              disabled={isDeletingProgram}
+              className="text-xs gap-1.5"
+            >
+              {isDeletingProgram && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {isDeletingProgram ? "Deleting..." : "Permanently Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete School Confirmation Dialog */}
+      <Dialog 
+        open={isDeleteSchoolOpen} 
+        onOpenChange={(open) => {
+          if (!isDeletingSchool) {
+            setIsDeleteSchoolOpen(open);
+            if (!open) {
+              setSchoolToDelete(null);
+              setDeleteSchoolError(null);
+            }
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              Delete School / Department
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <p className="text-foreground">
+              Are you sure you want to permanently delete <span className="font-semibold text-foreground">&ldquo;{schoolToDelete?.name}&rdquo;</span>?
+            </p>
+
+            <div className="p-3 bg-muted/50 rounded-xl border border-border/60 space-y-1 font-mono text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">School Code:</span>
+                <span className="font-medium text-foreground">{schoolToDelete?.code || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Associated Programs:</span>
+                <span className="font-medium text-foreground">{schoolToDelete ? (programCountBySchoolId[schoolToDelete.id] || 0) : 0}</span>
+              </div>
+            </div>
+
+            {schoolToDelete && (programCountBySchoolId[schoolToDelete.id] || 0) > 0 && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-400 text-[11px] leading-relaxed flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Associated Programs Detected</p>
+                  <p>This school currently contains {programCountBySchoolId[schoolToDelete.id]} academic program(s). You must delete or reassign those programs before this school can be deleted.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive text-[11px] leading-relaxed flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Permanent Database Deletion</p>
+                <p>This action permanently removes this school/department from the database and cannot be undone.</p>
+              </div>
+            </div>
+
+            {deleteSchoolError && (
+              <div className="p-3 bg-destructive/15 border border-destructive/30 rounded-xl text-destructive text-[11px] leading-relaxed flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Deletion Blocked</p>
+                  <p>{deleteSchoolError}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-2 gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteSchoolOpen(false)}
+              disabled={isDeletingSchool}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleConfirmDeleteSchool}
+              disabled={isDeletingSchool || (schoolToDelete ? (programCountBySchoolId[schoolToDelete.id] || 0) > 0 : false)}
+              className="text-xs gap-1.5"
+            >
+              {isDeletingSchool && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {isDeletingSchool ? "Deleting..." : "Permanently Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>
