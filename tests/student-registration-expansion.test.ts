@@ -195,15 +195,13 @@ async function runTestSuite() {
   // --------------------------------------------------------------------------
   // 5. CONDITIONAL ADMISSION CATEGORY VALIDATION
   // --------------------------------------------------------------------------
-  console.log("\n[5] Conditional Admission Category Validation");
-
-  // ICCR without SII Application Number -> Must Fail
+  // ICCR without SII Application Number -> Must Pass (Optional)
   const iccrWithoutSii = RegisterStudentValidationSchema.safeParse({
     fullName: "Kofi Annan",
     admissionCategory: "iccr",
     siiApplicationNumber: ""
   });
-  assert(!iccrWithoutSii.success, "Admission Category ICCR without SII Application Number is rejected");
+  assert(iccrWithoutSii.success, "Admission Category ICCR without SII Application Number is accepted (optional)");
 
   // ICCR with SII Application Number -> Must Pass
   const iccrWithSii = RegisterStudentValidationSchema.safeParse({
@@ -380,8 +378,8 @@ async function runTestSuite() {
     "Row with Age column receives warning that age is calculated dynamically from DOB"
   );
   assert(
-    validationResult.rows[1].status === "error" && validationResult.rows[1].errors.some(e => e.field === "sii_application_number"),
-    "ICCR row missing SII Application Number is rejected with error in bulk validation"
+    validationResult.rows[1].status === "valid",
+    "ICCR row with empty SII Application Number is valid in bulk validation (optional)"
   );
 
   // --------------------------------------------------------------------------

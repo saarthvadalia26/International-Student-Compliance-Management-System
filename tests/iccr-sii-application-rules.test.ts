@@ -1,9 +1,9 @@
 /**
  * ISCMS ICCR & SII Application Number Business Rules Test Suite
  * Validates the canonical business rules across:
- * - Category metadata & helper predicates (requiresIccrApplicationNumber, requiresSiiApplicationNumber)
- * - Complete 9-case validation matrix
- * - Category transition & active-record clearing rules
+ * - Category metadata & helper predicates (both fields are optional across all categories)
+ * - Complete 9-case validation matrix (all categories + empty/filled application numbers are VALID)
+ * - Category transitions preserve application numbers without clearing
  * - Bulk Excel import validation and normalization
  * - Report and Student Portal mapping
  */
@@ -42,124 +42,128 @@ async function runTestSuite() {
 
   const iccrOpt = ADMISSION_CATEGORY_OPTIONS.find(o => o.value === "iccr");
   assert(iccrOpt !== undefined, "ADMISSION_CATEGORY_OPTIONS contains 'iccr'");
-  assert(iccrOpt?.requiresIccrNumber === true, "ICCR category has requiresIccrNumber === true");
-  assert(iccrOpt?.requiresSii === true, "ICCR category has requiresSii === true (ICCR students must also apply via SII)");
+  assert(iccrOpt?.requiresIccrNumber === false, "ICCR category has requiresIccrNumber === false (optional)");
+  assert(iccrOpt?.requiresSii === false, "ICCR category has requiresSii === false (optional)");
 
   const siiOpt = ADMISSION_CATEGORY_OPTIONS.find(o => o.value === "sii");
   assert(siiOpt !== undefined, "ADMISSION_CATEGORY_OPTIONS contains 'sii'");
-  assert(siiOpt?.requiresIccrNumber === false, "SII category has requiresIccrNumber === false");
-  assert(siiOpt?.requiresSii === true, "SII category has requiresSii === true");
+  assert(siiOpt?.requiresIccrNumber === false, "SII category has requiresIccrNumber === false (optional)");
+  assert(siiOpt?.requiresSii === false, "SII category has requiresSii === false (optional)");
 
-  assert(requiresIccrApplicationNumber("iccr") === true, "requiresIccrApplicationNumber('iccr') === true");
+  assert(requiresIccrApplicationNumber("iccr") === false, "requiresIccrApplicationNumber('iccr') === false");
   assert(requiresIccrApplicationNumber("sii") === false, "requiresIccrApplicationNumber('sii') === false");
   assert(requiresIccrApplicationNumber("direct") === false, "requiresIccrApplicationNumber('direct') === false");
   assert(requiresIccrApplicationNumber(null) === false, "requiresIccrApplicationNumber(null) === false");
 
-  assert(requiresSiiApplicationNumber("iccr") === true, "requiresSiiApplicationNumber('iccr') === true");
-  assert(requiresSiiApplicationNumber("sii") === true, "requiresSiiApplicationNumber('sii') === true");
+  assert(requiresSiiApplicationNumber("iccr") === false, "requiresSiiApplicationNumber('iccr') === false");
+  assert(requiresSiiApplicationNumber("sii") === false, "requiresSiiApplicationNumber('sii') === false");
   assert(requiresSiiApplicationNumber("direct") === false, "requiresSiiApplicationNumber('direct') === false");
   assert(requiresSiiApplicationNumber(null) === false, "requiresSiiApplicationNumber(null) === false");
 
   // --------------------------------------------------------------------------
-  // 2. COMPLETE 9-CASE VALIDATION MATRIX
+  // 2. COMPLETE 9-CASE VALIDATION MATRIX (Phase 24)
   // --------------------------------------------------------------------------
-  console.log("\n[2] Complete 9-Case Validation Matrix");
+  console.log("\n[2] Complete 9-Case Validation Matrix (Phase 24)");
 
-  // Case 1: ICCR + both numbers -> VALID
-  const case1 = StudentAcademicSchema.safeParse({
-    admissionCategory: "iccr",
-    iccrApplicationNumber: "ICCR-2026-98124",
-    siiApplicationNumber: "SII-2026-44102",
-    currentSemester: 1
-  });
-  assert(case1.success, "Case 1: Category = ICCR with both ICCR and SII numbers is VALID");
-
-  // Case 2: ICCR + missing ICCR number -> INVALID
-  const case2 = StudentAcademicSchema.safeParse({
-    admissionCategory: "iccr",
-    iccrApplicationNumber: "",
-    siiApplicationNumber: "SII-2026-44102",
-    currentSemester: 1
-  });
-  assert(!case2.success, "Case 2: Category = ICCR with missing ICCR number is INVALID");
-
-  // Case 3: ICCR + missing SII number -> INVALID
-  const case3 = StudentAcademicSchema.safeParse({
-    admissionCategory: "iccr",
-    iccrApplicationNumber: "ICCR-2026-98124",
-    siiApplicationNumber: "",
-    currentSemester: 1
-  });
-  assert(!case3.success, "Case 3: Category = ICCR with missing SII number is INVALID");
-
-  // Case 4: ICCR + both missing -> INVALID
-  const case4 = StudentAcademicSchema.safeParse({
+  // Test 1: Category = ICCR, ICCR = empty, SII = empty -> VALID
+  const test1 = StudentAcademicSchema.safeParse({
     admissionCategory: "iccr",
     iccrApplicationNumber: "",
     siiApplicationNumber: "",
     currentSemester: 1
   });
-  assert(!case4.success, "Case 4: Category = ICCR with both numbers missing is INVALID");
+  assert(test1.success, "Test 1: Category = ICCR, ICCR = empty, SII = empty is VALID");
 
-  // Case 5: SII + SII number -> VALID
-  const case5 = StudentAcademicSchema.safeParse({
-    admissionCategory: "sii",
-    iccrApplicationNumber: null,
-    siiApplicationNumber: "SII-2026-44102",
-    currentSemester: 1
-  });
-  assert(case5.success, "Case 5: Category = SII with SII number is VALID");
-
-  // Case 6: SII + missing SII number -> INVALID
-  const case6 = StudentAcademicSchema.safeParse({
-    admissionCategory: "sii",
-    iccrApplicationNumber: null,
+  // Test 2: Category = ICCR, ICCR = ABC123, SII = empty -> VALID
+  const test2 = StudentAcademicSchema.safeParse({
+    admissionCategory: "iccr",
+    iccrApplicationNumber: "ABC123",
     siiApplicationNumber: "",
     currentSemester: 1
   });
-  assert(!case6.success, "Case 6: Category = SII with missing SII number is INVALID");
+  assert(test2.success, "Test 2: Category = ICCR, ICCR = ABC123, SII = empty is VALID");
 
-  // Case 7: SII with ICCR number supplied (normalized / cleared)
-  const case7Payload = {
-    admissionCategory: "sii",
-    iccrApplicationNumber: "ICCR-EXTRA-999",
-    siiApplicationNumber: "SII-2026-44102"
-  };
-  const case7 = StudentAcademicSchema.safeParse(case7Payload);
-  assert(case7.success, "Case 7a: Category = SII with SII number passes schema validation");
-  // Normalize per active-record retention rule
-  if (case7Payload.admissionCategory === "sii") {
-    case7Payload.iccrApplicationNumber = "";
-  }
-  assert(case7Payload.iccrApplicationNumber === "", "Case 7b: Category = SII clears/normalizes ICCR application number to null/empty");
-
-  // Case 8: Other + no numbers -> VALID
-  const case8 = StudentAcademicSchema.safeParse({
-    admissionCategory: "direct",
-    iccrApplicationNumber: null,
-    siiApplicationNumber: null,
+  // Test 3: Category = ICCR, ICCR = empty, SII = SII456 -> VALID
+  const test3 = StudentAcademicSchema.safeParse({
+    admissionCategory: "iccr",
+    iccrApplicationNumber: "",
+    siiApplicationNumber: "SII456",
     currentSemester: 1
   });
-  assert(case8.success, "Case 8: Category = direct with no application numbers is VALID");
+  assert(test3.success, "Test 3: Category = ICCR, ICCR = empty, SII = SII456 is VALID");
 
-  // Case 9: Other + numbers supplied (normalized / cleared)
-  const case9Payload = {
-    admissionCategory: "direct",
-    iccrApplicationNumber: "ICCR-STALE-1",
-    siiApplicationNumber: "SII-STALE-2"
-  };
-  if (case9Payload.admissionCategory !== "iccr" && case9Payload.admissionCategory !== "sii") {
-    case9Payload.iccrApplicationNumber = "";
-    case9Payload.siiApplicationNumber = "";
-  }
-  assert(case9Payload.iccrApplicationNumber === "" && case9Payload.siiApplicationNumber === "", "Case 9: Other category clears/normalizes both application numbers to null/empty");
+  // Test 4: Category = ICCR, ICCR = ABC123, SII = SII456 -> VALID
+  const test4 = StudentAcademicSchema.safeParse({
+    admissionCategory: "iccr",
+    iccrApplicationNumber: "ABC123",
+    siiApplicationNumber: "SII456",
+    currentSemester: 1
+  });
+  assert(test4.success, "Test 4: Category = ICCR, ICCR = ABC123, SII = SII456 is VALID");
+
+  // Test 5: Category = SII, ICCR = empty, SII = empty -> VALID
+  const test5 = StudentAcademicSchema.safeParse({
+    admissionCategory: "sii",
+    iccrApplicationNumber: "",
+    siiApplicationNumber: "",
+    currentSemester: 1
+  });
+  assert(test5.success, "Test 5: Category = SII, ICCR = empty, SII = empty is VALID");
+
+  // Test 6: Category = SII, ICCR = ABC123, SII = empty -> VALID
+  const test6 = StudentAcademicSchema.safeParse({
+    admissionCategory: "sii",
+    iccrApplicationNumber: "ABC123",
+    siiApplicationNumber: "",
+    currentSemester: 1
+  });
+  assert(test6.success, "Test 6: Category = SII, ICCR = ABC123, SII = empty is VALID");
+
+  // Test 7: Category = SII, ICCR = empty, SII = SII456 -> VALID
+  const test7 = StudentAcademicSchema.safeParse({
+    admissionCategory: "sii",
+    iccrApplicationNumber: "",
+    siiApplicationNumber: "SII456",
+    currentSemester: 1
+  });
+  assert(test7.success, "Test 7: Category = SII, ICCR = empty, SII = SII456 is VALID");
+
+  // Test 8: Category = Other, ICCR = empty, SII = empty -> VALID
+  const test8 = StudentAcademicSchema.safeParse({
+    admissionCategory: "other",
+    admissionCategoryOther: "Custom Track",
+    iccrApplicationNumber: "",
+    siiApplicationNumber: "",
+    currentSemester: 1
+  });
+  assert(test8.success, "Test 8: Category = Other, ICCR = empty, SII = empty is VALID");
+
+  // Test 9: Category = Other, ICCR = ABC123, SII = SII456 -> VALID
+  const test9 = StudentAcademicSchema.safeParse({
+    admissionCategory: "other",
+    admissionCategoryOther: "Custom Track",
+    iccrApplicationNumber: "ABC123",
+    siiApplicationNumber: "SII456",
+    currentSemester: 1
+  });
+  assert(test9.success, "Test 9: Category = Other, ICCR = ABC123, SII = SII456 is VALID");
 
   // --------------------------------------------------------------------------
   // 3. FULL REGISTRATION SCHEMA ENFORCEMENT
   // --------------------------------------------------------------------------
   console.log("\n[3] Full Registration Schema Dual-Requirement Tests");
 
-  const regIccrValid = RegisterStudentValidationSchema.safeParse({
+  const regIccrNoAppNumbers = RegisterStudentValidationSchema.safeParse({
+    fullName: "Tariq Aziz",
+    nationalityCode: "AFG",
+    gender: "male",
+    admissionCategory: "iccr",
+    iccrApplicationNumber: "",
+    siiApplicationNumber: ""
+  });
+  assert(regIccrNoAppNumbers.success, "Full registration with Category = ICCR and empty application numbers passes");
+
+  const regIccrBoth = RegisterStudentValidationSchema.safeParse({
     fullName: "Tariq Aziz",
     nationalityCode: "AFG",
     gender: "male",
@@ -167,31 +171,21 @@ async function runTestSuite() {
     iccrApplicationNumber: "ICCR-2026-KBL-01",
     siiApplicationNumber: "SII-2026-AFG-01"
   });
-  assert(regIccrValid.success, "Full registration with Category = ICCR and both numbers passes");
+  assert(regIccrBoth.success, "Full registration with Category = ICCR and both numbers passes");
 
-  const regIccrMissingSii = RegisterStudentValidationSchema.safeParse({
-    fullName: "Tariq Aziz",
-    nationalityCode: "AFG",
-    gender: "male",
-    admissionCategory: "iccr",
-    iccrApplicationNumber: "ICCR-2026-KBL-01",
-    siiApplicationNumber: ""
-  });
-  assert(!regIccrMissingSii.success, "Full registration with Category = ICCR missing SII number is blocked");
-
-  const regSiiValid = RegisterStudentValidationSchema.safeParse({
+  const regSiiNoAppNumbers = RegisterStudentValidationSchema.safeParse({
     fullName: "Fatima Noor",
     nationalityCode: "BGD",
     gender: "female",
     admissionCategory: "sii",
-    siiApplicationNumber: "SII-2026-DHK-99"
+    siiApplicationNumber: ""
   });
-  assert(regSiiValid.success, "Full registration with Category = SII and SII number passes");
+  assert(regSiiNoAppNumbers.success, "Full registration with Category = SII and empty SII number passes");
 
   // --------------------------------------------------------------------------
-  // 4. CATEGORY TRANSITIONS & DATA RETENTION RULES
+  // 4. CATEGORY TRANSITIONS & DATA PRESERVATION RULES (Phase 6 & Phase 13)
   // --------------------------------------------------------------------------
-  console.log("\n[4] Category Transitions & Data Retention Rules");
+  console.log("\n[4] Category Transitions & Data Preservation Rules (Phase 6 & 13)");
 
   function simulateCategoryTransition(
     currentCategory: string,
@@ -201,44 +195,36 @@ async function runTestSuite() {
     inputIccr?: string | null,
     inputSii?: string | null
   ) {
-    let resultingIccr: string | null = null;
-    let resultingSii: string | null = null;
-
-    if (newCategory === "iccr") {
-      resultingIccr = inputIccr ?? currentIccr;
-      resultingSii = inputSii ?? currentSii;
-    } else if (newCategory === "sii") {
-      resultingIccr = null; // ICCR cleared per retention rule
-      resultingSii = inputSii ?? currentSii;
-    } else {
-      resultingIccr = null; // Both cleared per retention rule
-      resultingSii = null;
-    }
-
+    // Both fields remain unchanged across category transitions unless explicitly edited
+    const resultingIccr = inputIccr !== undefined ? inputIccr : currentIccr;
+    const resultingSii = inputSii !== undefined ? inputSii : currentSii;
     return { resultingIccr, resultingSii };
   }
 
   // Transition: ICCR -> SII
-  const t1 = simulateCategoryTransition("iccr", "ICCR-100", "SII-200", "sii");
-  assert(t1.resultingIccr === null, "ICCR -> SII transition clears ICCR number to NULL");
-  assert(t1.resultingSii === "SII-200", "ICCR -> SII transition retains SII number");
+  const t1 = simulateCategoryTransition("iccr", "ABC123", "SII456", "sii");
+  assert(t1.resultingIccr === "ABC123", "ICCR -> SII transition preserves ICCR number");
+  assert(t1.resultingSii === "SII456", "ICCR -> SII transition preserves SII number");
 
   // Transition: ICCR -> Other
-  const t2 = simulateCategoryTransition("iccr", "ICCR-100", "SII-200", "direct");
-  assert(t2.resultingIccr === null && t2.resultingSii === null, "ICCR -> Other transition clears both numbers to NULL");
-
-  // Transition: SII -> Other
-  const t3 = simulateCategoryTransition("sii", null, "SII-200", "other");
-  assert(t3.resultingIccr === null && t3.resultingSii === null, "SII -> Other transition clears SII number to NULL");
+  const t2 = simulateCategoryTransition("iccr", "ABC123", "SII456", "direct");
+  assert(t2.resultingIccr === "ABC123" && t2.resultingSii === "SII456", "ICCR -> Other transition preserves both numbers");
 
   // Transition: SII -> ICCR
-  const t4 = simulateCategoryTransition("sii", null, "SII-200", "iccr", "ICCR-NEW-300");
-  assert(t4.resultingIccr === "ICCR-NEW-300", "SII -> ICCR transition adds required ICCR number");
-  assert(t4.resultingSii === "SII-200", "SII -> ICCR transition retains existing SII number");
+  const t3 = simulateCategoryTransition("sii", "ABC123", "SII456", "iccr");
+  assert(t3.resultingIccr === "ABC123" && t3.resultingSii === "SII456", "SII -> ICCR transition preserves both numbers");
+
+  // Transition: SII -> Other
+  const t4 = simulateCategoryTransition("sii", "ABC123", "SII456", "other");
+  assert(t4.resultingIccr === "ABC123" && t4.resultingSii === "SII456", "SII -> Other transition preserves both numbers");
 
   // Transition: Other -> ICCR
-  const t5 = simulateCategoryTransition("direct", null, null, "iccr", "ICCR-NEW-400", "SII-NEW-400");
-  assert(t5.resultingIccr === "ICCR-NEW-400" && t5.resultingSii === "SII-NEW-400", "Other -> ICCR transition sets both numbers");
+  const t5 = simulateCategoryTransition("direct", "ABC123", "SII456", "iccr");
+  assert(t5.resultingIccr === "ABC123" && t5.resultingSii === "SII456", "Other -> ICCR transition preserves both numbers");
+
+  // Transition: Other -> SII
+  const t6 = simulateCategoryTransition("direct", "ABC123", "SII456", "sii");
+  assert(t6.resultingIccr === "ABC123" && t6.resultingSii === "SII456", "Other -> SII transition preserves both numbers");
 
   // --------------------------------------------------------------------------
   // 5. REPORT & STUDENT PORTAL MAPPER
@@ -268,11 +254,11 @@ async function runTestSuite() {
     school: "School of Management Studies",
     programme: "MBA",
     admission_category: "sii",
-    iccr_application_number: "SHOULD-BE-IGNORED",
+    iccr_application_number: "ICCR-EXTRA-99",
     sii_application_number: "SII-2026-BGD-2"
   });
   assert(siiReportRow.admissionCategory === "sii", "ReportMapper maps SII category");
-  assert(siiReportRow.iccrApplicationNumber === null, "ReportMapper omits ICCR number for SII student");
+  assert(siiReportRow.iccrApplicationNumber === "ICCR-EXTRA-99", "ReportMapper maps ICCR number for SII student");
   assert(siiReportRow.siiApplicationNumber === "SII-2026-BGD-2", "ReportMapper maps SII number for SII student");
 
   const directReportRow = ReportMapper.toStudentReportRow({
@@ -283,12 +269,12 @@ async function runTestSuite() {
     school: "School of Forensic Sciences",
     programme: "M.Sc Forensic Science",
     admission_category: "direct",
-    iccr_application_number: "SHOULD-BE-NULL",
-    sii_application_number: "SHOULD-BE-NULL"
+    iccr_application_number: "ICCR-DIRECT-1",
+    sii_application_number: "SII-DIRECT-2"
   });
   assert(directReportRow.admissionCategory === "direct", "ReportMapper maps direct category");
-  assert(directReportRow.iccrApplicationNumber === null, "ReportMapper sets iccrApplicationNumber = null for direct student");
-  assert(directReportRow.siiApplicationNumber === null, "ReportMapper sets siiApplicationNumber = null for direct student");
+  assert(directReportRow.iccrApplicationNumber === "ICCR-DIRECT-1", "ReportMapper preserves iccrApplicationNumber for direct student");
+  assert(directReportRow.siiApplicationNumber === "SII-DIRECT-2", "ReportMapper preserves siiApplicationNumber for direct student");
 
   // --------------------------------------------------------------------------
   // SUMMARY

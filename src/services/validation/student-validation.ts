@@ -102,24 +102,6 @@ export const RegisterStudentValidationSchema = z.object({
   efrroIssueDate: z.string().optional().nullable(),
   efrroExpiry: z.string().optional().nullable()
 }).refine((data) => {
-  // Conditional rule: If admissionCategory is ICCR, iccrApplicationNumber is mandatory
-  if (data.admissionCategory === "iccr") {
-    return Boolean(data.iccrApplicationNumber && data.iccrApplicationNumber.trim().length > 0);
-  }
-  return true;
-}, {
-  message: "ICCR Application Number is required when Category is ICCR",
-  path: ["iccrApplicationNumber"]
-}).refine((data) => {
-  // Conditional rule: If admissionCategory is ICCR or SII, siiApplicationNumber is mandatory
-  if (data.admissionCategory === "iccr" || data.admissionCategory === "sii") {
-    return Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
-  }
-  return true;
-}, {
-  message: "SII Application Number is required when Category is ICCR or SII",
-  path: ["siiApplicationNumber"]
-}).refine((data) => {
   // Conditional rule: If admissionCategory is Other, admissionCategoryOther (Please specify) is mandatory
   if (data.admissionCategory === "other") {
     return Boolean(data.admissionCategoryOther && data.admissionCategoryOther.trim().length > 0);
@@ -230,6 +212,7 @@ export const UpdateStudentValidationSchema = z.object({
   admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"]).optional().nullable(),
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
+  iccrApplicationNumber: z.string().optional().nullable(),
   relationshipType: z.enum([
     "father", 
     "mother", 
@@ -258,14 +241,6 @@ export const UpdateStudentValidationSchema = z.object({
   }, { message: "Invalid consular email address format" }),
   embassyWebsite: z.string().optional().nullable(),
   embassyContactPerson: z.string().optional().nullable()
-}).refine((data) => {
-  if (data.admissionCategory === "iccr") {
-    return Boolean(data.siiApplicationNumber && data.siiApplicationNumber.trim().length > 0);
-  }
-  return true;
-}, {
-  message: "SII Application Number is required for ICCR admission category",
-  path: ["siiApplicationNumber"]
 }).refine((data) => {
   if (data.admissionCategory === "other") {
     return Boolean(data.admissionCategoryOther && data.admissionCategoryOther.trim().length > 0);

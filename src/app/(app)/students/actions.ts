@@ -231,41 +231,6 @@ export async function registerStudentAction(input: RegisterStudentInput): Promis
       };
     }
 
-    if (input.admissionCategory === "iccr") {
-      const hasIccr = Boolean(input.iccrApplicationNumber?.trim());
-      const hasSii = Boolean(input.siiApplicationNumber?.trim());
-      if (!hasIccr) {
-        return {
-          success: false,
-          errorCode: "VALIDATION_ERROR",
-          errorTitle: "Missing Required Field",
-          error: "ICCR Application Number is required when Admission Category is ICCR."
-        };
-      }
-      if (!hasSii) {
-        return {
-          success: false,
-          errorCode: "VALIDATION_ERROR",
-          errorTitle: "Missing Required Field",
-          error: "SII Application Number is required for ICCR students (ICCR applicants must also apply via SII portal)."
-        };
-      }
-    } else if (input.admissionCategory === "sii") {
-      const hasSii = Boolean(input.siiApplicationNumber?.trim());
-      if (!hasSii) {
-        return {
-          success: false,
-          errorCode: "VALIDATION_ERROR",
-          errorTitle: "Missing Required Field",
-          error: "SII Application Number is required when Admission Category is Study in India (SII)."
-        };
-      }
-      input.iccrApplicationNumber = null;
-    } else if (input.admissionCategory) {
-      input.iccrApplicationNumber = null;
-      input.siiApplicationNumber = null;
-    }
-
     const created = await studentService.registerStudent(input, user.id);
 
     // Evaluate and initialize automated reminder schedule for any provided document metadata
@@ -396,7 +361,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
           created_at,
           student_personal(full_name, nationality_code),
           student_contact(email, phone_home),
-          student_academic(program_id, program_code, academic_status, admission_category, sii_application_number),
+          student_academic(program_id, program_code, academic_status, admission_category, sii_application_number, iccr_application_number),
           student_snapshot(compliance_status, passport_number, visa_number)
         `)
         .is("deleted_at", null)
@@ -562,12 +527,8 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         complianceStatus: mappedCompliance,
         academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing",
         admissionCategory: academic?.admission_category || null,
-        iccrApplicationNumber: (academic?.admission_category === "iccr")
-          ? (academic?.iccr_application_number || academic?.sii_application_number || null)
-          : null,
-        siiApplicationNumber: (academic?.admission_category === "iccr" || academic?.admission_category === "sii")
-          ? (academic?.sii_application_number || null)
-          : null
+        iccrApplicationNumber: academic?.iccr_application_number || null,
+        siiApplicationNumber: academic?.sii_application_number || null
       };
     });
 
@@ -924,38 +885,6 @@ export async function updateStudentAction(
         success: false,
         error: "Forbidden: Staff or Administrator privileges are required to update student profiles."
       };
-    }
-
-    if (updates.admissionCategory === "iccr") {
-      const hasIccr = updates.iccrApplicationNumber !== undefined
-        ? Boolean(updates.iccrApplicationNumber?.trim())
-        : true;
-      const hasSii = updates.siiApplicationNumber !== undefined
-        ? Boolean(updates.siiApplicationNumber?.trim())
-        : true;
-      if (!hasIccr) {
-        return {
-          success: false,
-          error: "ICCR Application Number is required when Admission Category is ICCR."
-        };
-      }
-      if (!hasSii) {
-        return {
-          success: false,
-          error: "SII Application Number is required for ICCR students (ICCR applicants must also apply via SII portal)."
-        };
-      }
-    } else if (updates.admissionCategory === "sii") {
-      if (updates.siiApplicationNumber !== undefined && !updates.siiApplicationNumber?.trim()) {
-        return {
-          success: false,
-          error: "SII Application Number is required when Admission Category is Study in India (SII)."
-        };
-      }
-      updates.iccrApplicationNumber = null;
-    } else if (updates.admissionCategory) {
-      updates.iccrApplicationNumber = null;
-      updates.siiApplicationNumber = null;
     }
 
     await studentService.updateStudent(studentId, updates, user.id);

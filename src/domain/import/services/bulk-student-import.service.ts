@@ -752,50 +752,11 @@ export class BulkStudentImportService {
         }
       }
 
-      // Conditional ICCR & SII Application Number checks
-      const isIccr = mappedData.admission_category === "iccr";
-      const isSii = mappedData.admission_category === "sii";
+      // Optional ICCR & SII Application Numbers (independent of category)
       const iccrAppNo = mappedData.iccr_application_number?.trim() || "";
       const siiAppNo = mappedData.sii_application_number?.trim() || "";
-
-      if (isIccr) {
-        if (!iccrAppNo) {
-          errors.push({
-            field: "iccr_application_number",
-            fieldLabel: "ICCR Application Number",
-            value: "",
-            problem: "ICCR Application Number is mandatory when Admission Category is ICCR.",
-            suggestion: "Provide the official ICCR application identifier (e.g. ICCR-2026-98124)."
-          });
-        }
-        if (!siiAppNo) {
-          errors.push({
-            field: "sii_application_number",
-            fieldLabel: "SII Application Number",
-            value: "",
-            problem: "SII Application Number is mandatory for ICCR students (ICCR applicants must also apply via SII portal).",
-            suggestion: "Provide the Study in India application identifier (e.g. SII-2026-88192)."
-          });
-        }
-        mappedData.iccr_application_number = iccrAppNo;
-        mappedData.sii_application_number = siiAppNo;
-      } else if (isSii) {
-        if (!siiAppNo) {
-          errors.push({
-            field: "sii_application_number",
-            fieldLabel: "SII Application Number",
-            value: "",
-            problem: "SII Application Number is mandatory when Admission Category is Study in India (SII).",
-            suggestion: "Provide the Study in India application identifier (e.g. SII-2026-88192)."
-          });
-        }
-        mappedData.iccr_application_number = "";
-        mappedData.sii_application_number = siiAppNo;
-      } else {
-        // Data retention rule: non-ICCR/non-SII rows normalize both application numbers to empty
-        mappedData.iccr_application_number = "";
-        mappedData.sii_application_number = "";
-      }
+      mappedData.iccr_application_number = iccrAppNo;
+      mappedData.sii_application_number = siiAppNo;
 
       // Conditional Other -> Admission Category Other check
       if (mappedData.admission_category === "other" && !mappedData.admission_category_other?.trim()) {
@@ -1315,10 +1276,8 @@ export class BulkStudentImportService {
           }
         }
 
-        const isIccrRow = data.admission_category === "iccr";
-        const isSiiRow = data.admission_category === "sii";
-        const resolvedIccrAppNo = isIccrRow ? (data.iccr_application_number?.trim() || null) : null;
-        const resolvedSiiNo = (isIccrRow || isSiiRow) ? (data.sii_application_number?.trim() || null) : null;
+        const resolvedIccrAppNo = data.iccr_application_number?.trim() || null;
+        const resolvedSiiNo = data.sii_application_number?.trim() || null;
 
         let { error: acadErr } = await supabase
           .from("student_academic")

@@ -334,7 +334,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     label: "ICCR Application Number",
     category: "Academic",
     required: false,
-    description: "Indian Council for Cultural Relations (ICCR) application number (Mandatory when Admission Category is ICCR).",
+    description: "Indian Council for Cultural Relations (ICCR) scholarship application number.",
     sample: "ICCR-2026-98124",
     aliases: [
       "iccr_application_number",

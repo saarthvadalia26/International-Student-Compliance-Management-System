@@ -91,16 +91,16 @@ export const ADMISSION_CATEGORY_OPTIONS: Array<{ value: AdmissionCategory; label
   { 
     value: "iccr", 
     label: "Indian Council for Cultural Relations (ICCR)", 
-    requiresSii: true,
-    requiresIccrNumber: true,
-    description: "Requires mandatory ICCR Application Number and SII Application Number (ICCR applicants must also apply via SII)."
+    requiresSii: false,
+    requiresIccrNumber: false,
+    description: "Indian Council for Cultural Relations (ICCR) scholarship program."
   },
   { 
     value: "sii", 
     label: "Study in India (SII)", 
-    requiresSii: true,
+    requiresSii: false,
     requiresIccrNumber: false,
-    description: "Requires mandatory Study in India (SII) Application Number."
+    description: "Study in India (SII) admission portal track."
   },
   { 
     value: "direct", 
@@ -127,18 +127,18 @@ export const ADMISSION_CATEGORY_OPTIONS: Array<{ value: AdmissionCategory; label
 
 /**
  * Returns true if the given admission category requires an ICCR Application Number.
- * Invariant: Only 'iccr' requires an ICCR application number.
+ * Invariant: ICCR Application Number is optional across all categories.
  */
-export function requiresIccrApplicationNumber(category: string | null | undefined): boolean {
-  return category === "iccr";
+export function requiresIccrApplicationNumber(_category?: string | null): boolean {
+  return false;
 }
 
 /**
  * Returns true if the given admission category requires a Study in India (SII) Application Number.
- * Invariant: Both 'iccr' and 'sii' require an SII application number.
+ * Invariant: SII Application Number is optional across all categories.
  */
-export function requiresSiiApplicationNumber(category: string | null | undefined): boolean {
-  return category === "iccr" || category === "sii";
+export function requiresSiiApplicationNumber(_category?: string | null): boolean {
+  return false;
 }
 
 /**

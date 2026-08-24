@@ -413,12 +413,8 @@ export class SupabaseReportRepository implements IReportRepository {
         status: row.status,
         compliance_status: snapshot?.compliance_status,
         admission_category: academic?.admission_category || null,
-        iccr_application_number: (academic?.admission_category === "iccr") 
-          ? (academic?.iccr_application_number || null)
-          : null,
-        sii_application_number: (academic?.admission_category === "iccr" || academic?.admission_category === "sii")
-          ? (academic?.sii_application_number || null)
-          : null
+        iccr_application_number: academic?.iccr_application_number || null,
+        sii_application_number: academic?.sii_application_number || null
       });
     });
 

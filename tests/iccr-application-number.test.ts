@@ -1,11 +1,11 @@
 /**
  * ISCMS ICCR Application Number Test Suite
  * Validates end-to-end implementation of ICCR Application Number across:
- * - Category options and requirements metadata
- * - Conditional schema validation (all 8 matrix cases)
- * - Data retention & normalization rules
- * - Bulk Excel import validation and normalization
- * - Report mapping and legacy backward-compatibility
+ * - Category options and requirements metadata (optional across all categories)
+ * - Schema validation across all categories
+ * - Data preservation rules
+ * - Bulk Excel import field definitions
+ * - Report mapping
  */
 
 import { StudentAcademicSchema } from "../src/services/validation/validation.service";
@@ -39,17 +39,16 @@ async function runTestSuite() {
 
   const iccrOpt = ADMISSION_CATEGORY_OPTIONS.find(o => o.value === "iccr");
   assert(iccrOpt !== undefined, "ADMISSION_CATEGORY_OPTIONS contains 'iccr'");
-  assert(iccrOpt?.requiresIccrNumber === true, "ICCR category has requiresIccrNumber === true");
-  assert(iccrOpt?.requiresSii === true, "ICCR category requiresSii is true (ICCR students must also apply via SII)");
+  assert(iccrOpt?.requiresIccrNumber === false, "ICCR category has requiresIccrNumber === false (optional)");
+  assert(iccrOpt?.requiresSii === false, "ICCR category requiresSii is false (optional)");
 
-  const nonIccrOpts = ADMISSION_CATEGORY_OPTIONS.filter(o => o.value !== "iccr");
-  const allNonIccrFalse = nonIccrOpts.every(o => o.requiresIccrNumber === false);
-  assert(allNonIccrFalse, "All non-ICCR categories (sii, direct, foreign_govt_sponsored, other) have requiresIccrNumber === false");
+  const allCategoriesOptional = ADMISSION_CATEGORY_OPTIONS.every(o => o.requiresIccrNumber === false && o.requiresSii === false);
+  assert(allCategoriesOptional, "All categories have requiresIccrNumber === false and requiresSii === false");
 
   // --------------------------------------------------------------------------
-  // 2. VALIDATION MATRIX (8 TEST CASES)
+  // 2. VALIDATION MATRIX
   // --------------------------------------------------------------------------
-  console.log("\n[2] Validation Matrix (8 Cases)");
+  console.log("\n[2] Validation Matrix");
 
   // Case 1: Category = ICCR with valid app numbers -> Valid
   const case1Res = StudentAcademicSchema.safeParse({
@@ -60,14 +59,14 @@ async function runTestSuite() {
   });
   assert(case1Res.success, "Case 1: Category = ICCR with valid iccrApplicationNumber and siiApplicationNumber is accepted");
 
-  // Case 2: Category = ICCR with empty app number -> Invalid
+  // Case 2: Category = ICCR with empty app number -> Valid (Optional)
   const case2EmptyRes = StudentAcademicSchema.safeParse({
     admissionCategory: "iccr",
     iccrApplicationNumber: "",
     siiApplicationNumber: "SII-2026-88192",
     currentSemester: 1
   });
-  assert(!case2EmptyRes.success, "Case 2a: Category = ICCR with empty string iccrApplicationNumber is rejected");
+  assert(case2EmptyRes.success, "Case 2a: Category = ICCR with empty string iccrApplicationNumber is accepted (optional)");
 
   const case2NullRes = StudentAcademicSchema.safeParse({
     admissionCategory: "iccr",
@@ -75,7 +74,7 @@ async function runTestSuite() {
     siiApplicationNumber: "SII-2026-88192",
     currentSemester: 1
   });
-  assert(!case2NullRes.success, "Case 2b: Category = ICCR with null iccrApplicationNumber is rejected");
+  assert(case2NullRes.success, "Case 2b: Category = ICCR with null iccrApplicationNumber is accepted (optional)");
 
   // Case 3: Category = SII with SII app number -> Valid
   const case3Res = StudentAcademicSchema.safeParse({
@@ -102,16 +101,16 @@ async function runTestSuite() {
   });
   assert(case5Res.success, "Case 5: Student without admissionCategory is valid (no regression)");
 
-  // Case 6: ICCR requires both numbers
+  // Case 6: ICCR with empty SII application number -> Valid (Optional)
   const case6Res = StudentAcademicSchema.safeParse({
     admissionCategory: "iccr",
     iccrApplicationNumber: "ICCR-2026-98124",
     siiApplicationNumber: "",
     currentSemester: 1
   });
-  assert(!case6Res.success, "Case 6: Category = ICCR missing SII application number is rejected");
+  assert(case6Res.success, "Case 6: Category = ICCR with empty SII application number is accepted (optional)");
 
-  // Case 7: Full Registration Schema with ICCR requirement
+  // Case 7: Full Registration Schema
   const case7Valid = RegisterStudentValidationSchema.safeParse({
     fullName: "Fatima Al-Mansoor",
     nationalityCode: "AFG",
@@ -122,15 +121,15 @@ async function runTestSuite() {
   });
   assert(case7Valid.success, "Case 7a: Full registration with valid ICCR and SII application numbers passes");
 
-  const case7Invalid = RegisterStudentValidationSchema.safeParse({
+  const case7EmptyAppNos = RegisterStudentValidationSchema.safeParse({
     fullName: "Fatima Al-Mansoor",
     nationalityCode: "AFG",
     gender: "female",
     admissionCategory: "iccr",
     iccrApplicationNumber: "",
-    siiApplicationNumber: "SII-2026-KBL-001"
+    siiApplicationNumber: ""
   });
-  assert(!case7Invalid.success, "Case 7b: Full registration with empty ICCR application number fails");
+  assert(case7EmptyAppNos.success, "Case 7b: Full registration with empty application numbers passes (optional)");
 
   // Case 8: Category = other requires admissionCategoryOther
   const case8NoOther = StudentAcademicSchema.safeParse({
@@ -146,9 +145,9 @@ async function runTestSuite() {
   assert(case8WithOther.success, "Case 8b: Category = other with specification succeeds");
 
   // --------------------------------------------------------------------------
-  // 3. BULK IMPORT FIELD DEFINITIONS & NORMALIZATION
+  // 3. BULK IMPORT FIELD DEFINITIONS
   // --------------------------------------------------------------------------
-  console.log("\n[3] Bulk Excel Import Field Definitions & Normalization");
+  console.log("\n[3] Bulk Excel Import Field Definitions");
 
   const iccrFieldDef = ISCMS_FIELD_DEFINITIONS.find(f => f.field === "iccr_application_number");
   assert(iccrFieldDef !== undefined, "ISCMS_FIELD_DEFINITIONS includes 'iccr_application_number'");
@@ -157,30 +156,10 @@ async function runTestSuite() {
   assert(iccrFieldDef?.aliases.includes("iccr_no") || false, "Contains alias 'iccr_no'");
   assert(iccrFieldDef?.aliases.includes("iccr id") || false, "Contains alias 'iccr id'");
 
-  // Test Data Retention normalization simulation
-  const nonIccrImportRow: Record<string, string> = {
-    admission_category: "sii",
-    iccr_application_number: "SOME-ICCR-NUM"
-  };
-  if (nonIccrImportRow.admission_category !== "iccr") {
-    nonIccrImportRow.iccr_application_number = "";
-  }
-  assert(
-    nonIccrImportRow.iccr_application_number === "",
-    "Data retention rule: Non-ICCR rows normalize ICCR application number to empty string"
-  );
-
-  const iccrImportRow: Record<string, string> = {
-    admission_category: "iccr",
-    iccr_application_number: "ICCR-2026-IND-01"
-  };
-  const isIccrValid = iccrImportRow.admission_category === "iccr" && Boolean(iccrImportRow.iccr_application_number?.trim());
-  assert(isIccrValid, "ICCR import row with valid application number passes validation");
-
   // --------------------------------------------------------------------------
-  // 4. REPORT MAPPER & BACKWARD-COMPATIBILITY
+  // 4. REPORT MAPPER & INDEPENDENCE
   // --------------------------------------------------------------------------
-  console.log("\n[4] Report Mapper & Legacy Row Mapping");
+  console.log("\n[4] Report Mapper & Independence");
 
   const reportRow = ReportMapper.toStudentReportRow({
     student_id: "stu-1001",
