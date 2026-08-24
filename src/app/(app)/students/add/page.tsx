@@ -359,18 +359,32 @@ export default function StudentRegistrationPage() {
       });
     }
 
-    if (field === "admissionCategory" && normalizedVal !== "iccr") {
-      setValidationErrors(prev => {
-        const next = { ...prev };
-        delete next.iccrApplicationNumber;
-        return next;
-      });
+    if (field === "admissionCategory") {
+      if (normalizedVal === "sii") {
+        setValidationErrors(prev => {
+          const next = { ...prev };
+          delete next.iccrApplicationNumber;
+          return next;
+        });
+      } else if (normalizedVal !== "iccr") {
+        setValidationErrors(prev => {
+          const next = { ...prev };
+          delete next.iccrApplicationNumber;
+          delete next.siiApplicationNumber;
+          return next;
+        });
+      }
     }
 
     setFormData(prev => {
       const next = { ...prev, [field]: normalizedVal };
-      if (field === "admissionCategory" && normalizedVal !== "iccr") {
-        next.iccrApplicationNumber = "";
+      if (field === "admissionCategory") {
+        if (normalizedVal === "sii") {
+          next.iccrApplicationNumber = "";
+        } else if (normalizedVal !== "iccr") {
+          next.iccrApplicationNumber = "";
+          next.siiApplicationNumber = "";
+        }
       }
       if (field === "admissionDate" && (prev.programId || prev.program)) {
         next.expectedGraduation = calculateGraduationDate(prev.programId || prev.program, normalizedVal);
@@ -945,6 +959,36 @@ export default function StudentRegistrationPage() {
                       {validationErrors.iccrApplicationNumber && (
                         <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                           {validationErrors.iccrApplicationNumber}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Conditional: SII Application Number (Required for both ICCR and SII) */}
+                  {(formData.admissionCategory === "iccr" || formData.admissionCategory === "sii") && (
+                    <div className="space-y-1.5 sm:col-span-2 animate-in fade-in-0 slide-in-from-top-1">
+                      <label className="text-xs font-medium text-foreground flex items-center justify-between" htmlFor="siiApplicationNumber">
+                        <span className="flex items-center gap-1">
+                          Study in India (SII) Application Number
+                          <span className="text-rose-500 font-bold">*</span>
+                        </span>
+                      </label>
+                      <Input
+                        id="siiApplicationNumber"
+                        placeholder="e.g. SII-2026-88192"
+                        value={formData.siiApplicationNumber}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm font-mono ${validationErrors.siiApplicationNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      <p className="text-[11px] text-muted-foreground font-caption">
+                        {formData.admissionCategory === "iccr"
+                          ? "ICCR scholarship recipients must also provide their Study in India (SII) portal application number."
+                          : "Mandatory Study in India (SII) portal application number for direct SII admissions."}
+                      </p>
+                      {validationErrors.siiApplicationNumber && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.siiApplicationNumber}
                         </p>
                       )}
                     </div>

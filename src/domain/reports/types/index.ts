@@ -26,6 +26,7 @@ export interface StudentReportRow {
   complianceStatus: ComplianceStatus;
   admissionCategory?: string | null;
   iccrApplicationNumber?: string | null;
+  siiApplicationNumber?: string | null;
 }
 
 export interface EfrroReportRow {

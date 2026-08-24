@@ -40,7 +40,7 @@ async function runTestSuite() {
   const iccrOpt = ADMISSION_CATEGORY_OPTIONS.find(o => o.value === "iccr");
   assert(iccrOpt !== undefined, "ADMISSION_CATEGORY_OPTIONS contains 'iccr'");
   assert(iccrOpt?.requiresIccrNumber === true, "ICCR category has requiresIccrNumber === true");
-  assert(iccrOpt?.requiresSii === false, "ICCR category requiresSii is false");
+  assert(iccrOpt?.requiresSii === true, "ICCR category requiresSii is true (ICCR students must also apply via SII)");
 
   const nonIccrOpts = ADMISSION_CATEGORY_OPTIONS.filter(o => o.value !== "iccr");
   const allNonIccrFalse = nonIccrOpts.every(o => o.requiresIccrNumber === false);
@@ -51,18 +51,20 @@ async function runTestSuite() {
   // --------------------------------------------------------------------------
   console.log("\n[2] Validation Matrix (8 Cases)");
 
-  // Case 1: Category = ICCR with valid app number -> Valid
+  // Case 1: Category = ICCR with valid app numbers -> Valid
   const case1Res = StudentAcademicSchema.safeParse({
     admissionCategory: "iccr",
     iccrApplicationNumber: "ICCR-2026-98124",
+    siiApplicationNumber: "SII-2026-88192",
     currentSemester: 1
   });
-  assert(case1Res.success, "Case 1: Category = ICCR with valid iccrApplicationNumber is accepted");
+  assert(case1Res.success, "Case 1: Category = ICCR with valid iccrApplicationNumber and siiApplicationNumber is accepted");
 
   // Case 2: Category = ICCR with empty app number -> Invalid
   const case2EmptyRes = StudentAcademicSchema.safeParse({
     admissionCategory: "iccr",
     iccrApplicationNumber: "",
+    siiApplicationNumber: "SII-2026-88192",
     currentSemester: 1
   });
   assert(!case2EmptyRes.success, "Case 2a: Category = ICCR with empty string iccrApplicationNumber is rejected");
@@ -70,25 +72,28 @@ async function runTestSuite() {
   const case2NullRes = StudentAcademicSchema.safeParse({
     admissionCategory: "iccr",
     iccrApplicationNumber: null,
+    siiApplicationNumber: "SII-2026-88192",
     currentSemester: 1
   });
   assert(!case2NullRes.success, "Case 2b: Category = ICCR with null iccrApplicationNumber is rejected");
 
-  // Case 3: Category = SII with empty app number -> Valid
+  // Case 3: Category = SII with SII app number -> Valid
   const case3Res = StudentAcademicSchema.safeParse({
     admissionCategory: "sii",
     iccrApplicationNumber: null,
+    siiApplicationNumber: "SII-2026-88192",
     currentSemester: 1
   });
-  assert(case3Res.success, "Case 3: Category = SII with empty iccrApplicationNumber is accepted");
+  assert(case3Res.success, "Case 3: Category = SII with siiApplicationNumber is accepted");
 
-  // Case 4: Category = direct or other standard with or without app number -> Valid
+  // Case 4: Category = direct with empty app numbers -> Valid
   const case4Res = StudentAcademicSchema.safeParse({
     admissionCategory: "direct",
     iccrApplicationNumber: null,
+    siiApplicationNumber: null,
     currentSemester: 1
   });
-  assert(case4Res.success, "Case 4: Category = direct with empty iccrApplicationNumber is accepted");
+  assert(case4Res.success, "Case 4: Category = direct with empty application numbers is accepted");
 
   // Case 5: Existing non-ICCR student (no admission category) -> Valid
   const case5Res = StudentAcademicSchema.safeParse({
@@ -97,13 +102,14 @@ async function runTestSuite() {
   });
   assert(case5Res.success, "Case 5: Student without admissionCategory is valid (no regression)");
 
-  // Case 6: Backward compatibility with legacy siiApplicationNumber for ICCR
+  // Case 6: ICCR requires both numbers
   const case6Res = StudentAcademicSchema.safeParse({
     admissionCategory: "iccr",
-    siiApplicationNumber: "SII-2026-LEGACY-01",
+    iccrApplicationNumber: "ICCR-2026-98124",
+    siiApplicationNumber: "",
     currentSemester: 1
   });
-  assert(case6Res.success, "Case 6: Legacy siiApplicationNumber provides graceful fallback for ICCR category");
+  assert(!case6Res.success, "Case 6: Category = ICCR missing SII application number is rejected");
 
   // Case 7: Full Registration Schema with ICCR requirement
   const case7Valid = RegisterStudentValidationSchema.safeParse({
@@ -111,16 +117,18 @@ async function runTestSuite() {
     nationalityCode: "AFG",
     gender: "female",
     admissionCategory: "iccr",
-    iccrApplicationNumber: "ICCR-2026-KBL-001"
+    iccrApplicationNumber: "ICCR-2026-KBL-001",
+    siiApplicationNumber: "SII-2026-KBL-001"
   });
-  assert(case7Valid.success, "Case 7a: Full registration with valid ICCR application number passes");
+  assert(case7Valid.success, "Case 7a: Full registration with valid ICCR and SII application numbers passes");
 
   const case7Invalid = RegisterStudentValidationSchema.safeParse({
     fullName: "Fatima Al-Mansoor",
     nationalityCode: "AFG",
     gender: "female",
     admissionCategory: "iccr",
-    iccrApplicationNumber: ""
+    iccrApplicationNumber: "",
+    siiApplicationNumber: "SII-2026-KBL-001"
   });
   assert(!case7Invalid.success, "Case 7b: Full registration with empty ICCR application number fails");
 
@@ -187,7 +195,7 @@ async function runTestSuite() {
   assert(reportRow.admissionCategory === "iccr", "ReportMapper maps admissionCategory correctly");
   assert(reportRow.iccrApplicationNumber === "ICCR-2026-AFG-999", "ReportMapper maps iccrApplicationNumber correctly");
 
-  const legacyReportRow = ReportMapper.toStudentReportRow({
+  const fullIccrRow = ReportMapper.toStudentReportRow({
     student_id: "stu-1002",
     registration_number: "REG-2026-002",
     full_name: "Mariam Ba",
@@ -195,13 +203,12 @@ async function runTestSuite() {
     school: "School of Management Studies",
     programme: "Master of Business Administration",
     admission_category: "iccr",
-    sii_application_number: "SII-LEGACY-ROW-55"
+    iccr_application_number: "ICCR-ROW-55",
+    sii_application_number: "SII-ROW-55"
   });
-  assert(legacyReportRow.admissionCategory === "iccr", "Legacy row maps admissionCategory 'iccr'");
-  assert(
-    legacyReportRow.iccrApplicationNumber === "SII-LEGACY-ROW-55",
-    "Legacy row falls back gracefully to sii_application_number if iccr_application_number is unpopulated"
-  );
+  assert(fullIccrRow.admissionCategory === "iccr", "ICCR row maps admissionCategory 'iccr'");
+  assert(fullIccrRow.iccrApplicationNumber === "ICCR-ROW-55", "ICCR row maps iccrApplicationNumber");
+  assert(fullIccrRow.siiApplicationNumber === "SII-ROW-55", "ICCR row maps siiApplicationNumber");
 
   // --------------------------------------------------------------------------
   // SUMMARY

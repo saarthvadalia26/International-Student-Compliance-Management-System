@@ -11,6 +11,7 @@ export interface StudentPortalProfile {
   avatarUrl?: string | null;
   admissionCategory?: string | null;
   iccrApplicationNumber?: string | null;
+  siiApplicationNumber?: string | null;
   
   // Overall Status
   overallCompliance: "COMPLIANT" | "ATTENTION_REQUIRED";

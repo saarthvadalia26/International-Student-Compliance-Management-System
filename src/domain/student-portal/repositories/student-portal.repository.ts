@@ -184,7 +184,10 @@ export class SupabaseStudentPortalRepository implements IStudentPortalRepository
       phoneLocal: contact?.phone_local || "",
       admissionCategory: academic?.admission_category || null,
       iccrApplicationNumber: (academic?.admission_category === "iccr") 
-        ? (academic?.iccr_application_number || academic?.sii_application_number || null)
+        ? (academic?.iccr_application_number || null)
+        : null,
+      siiApplicationNumber: (academic?.admission_category === "iccr" || academic?.admission_category === "sii")
+        ? (academic?.sii_application_number || null)
         : null,
 
       overallCompliance,

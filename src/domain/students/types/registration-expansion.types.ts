@@ -87,20 +87,20 @@ export const RELATIONSHIP_TYPE_OPTIONS: Array<{ value: RelationshipType; label: 
   { value: "other", label: "Other" }
 ];
 
-export const ADMISSION_CATEGORY_OPTIONS: Array<{ value: AdmissionCategory; label: string; requiresSii?: boolean; requiresIccrNumber?: boolean; description?: string }> = [
+export const ADMISSION_CATEGORY_OPTIONS: Array<{ value: AdmissionCategory; label: string; requiresSii: boolean; requiresIccrNumber: boolean; description?: string }> = [
   { 
     value: "iccr", 
     label: "Indian Council for Cultural Relations (ICCR)", 
-    requiresSii: false,
+    requiresSii: true,
     requiresIccrNumber: true,
-    description: "Requires mandatory ICCR Application Number."
+    description: "Requires mandatory ICCR Application Number and SII Application Number (ICCR applicants must also apply via SII)."
   },
   { 
     value: "sii", 
     label: "Study in India (SII)", 
-    requiresSii: false,
+    requiresSii: true,
     requiresIccrNumber: false,
-    description: "Direct Study in India portal admission track."
+    description: "Requires mandatory Study in India (SII) Application Number."
   },
   { 
     value: "direct", 
@@ -124,6 +124,22 @@ export const ADMISSION_CATEGORY_OPTIONS: Array<{ value: AdmissionCategory; label
     description: "Custom institutional or bilateral program track."
   }
 ];
+
+/**
+ * Returns true if the given admission category requires an ICCR Application Number.
+ * Invariant: Only 'iccr' requires an ICCR application number.
+ */
+export function requiresIccrApplicationNumber(category: string | null | undefined): boolean {
+  return category === "iccr";
+}
+
+/**
+ * Returns true if the given admission category requires a Study in India (SII) Application Number.
+ * Invariant: Both 'iccr' and 'sii' require an SII application number.
+ */
+export function requiresSiiApplicationNumber(category: string | null | undefined): boolean {
+  return category === "iccr" || category === "sii";
+}
 
 /**
  * Normalizes any incoming date value (string or Date) into a valid Date object.

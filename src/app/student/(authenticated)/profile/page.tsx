@@ -104,16 +104,38 @@ export default function StudentProfilePage() {
               <span className="text-muted-foreground">School / Faculty</span>
               <span className="font-medium text-foreground">{profile.school}</span>
             </div>
-            {profile.admissionCategory === "iccr" && profile.iccrApplicationNumber && (
+            {profile.admissionCategory === "iccr" && (
               <>
                 <div className="flex justify-between py-1.5 border-b border-border/40">
                   <span className="text-muted-foreground">Admission Category</span>
-                  <span className="font-medium text-foreground">ICCR</span>
+                  <span className="font-medium text-foreground">ICCR Scholarship</span>
                 </div>
+                {profile.iccrApplicationNumber && (
+                  <div className="flex justify-between py-1.5 border-b border-border/40">
+                    <span className="text-muted-foreground">ICCR Application Number</span>
+                    <span className="font-mono font-medium text-foreground">{profile.iccrApplicationNumber}</span>
+                  </div>
+                )}
+                {profile.siiApplicationNumber && (
+                  <div className="flex justify-between py-1.5 border-b border-border/40">
+                    <span className="text-muted-foreground">SII Application Number</span>
+                    <span className="font-mono font-medium text-foreground">{profile.siiApplicationNumber}</span>
+                  </div>
+                )}
+              </>
+            )}
+            {profile.admissionCategory === "sii" && (
+              <>
                 <div className="flex justify-between py-1.5 border-b border-border/40">
-                  <span className="text-muted-foreground">ICCR Application Number</span>
-                  <span className="font-mono font-medium text-foreground">{profile.iccrApplicationNumber}</span>
+                  <span className="text-muted-foreground">Admission Category</span>
+                  <span className="font-medium text-foreground">Study in India (SII)</span>
                 </div>
+                {profile.siiApplicationNumber && (
+                  <div className="flex justify-between py-1.5 border-b border-border/40">
+                    <span className="text-muted-foreground">SII Application Number</span>
+                    <span className="font-mono font-medium text-foreground">{profile.siiApplicationNumber}</span>
+                  </div>
+                )}
               </>
             )}
             <div className="flex justify-between py-1.5">

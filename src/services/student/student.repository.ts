@@ -220,7 +220,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
       }
 
       const isIccr = input.admissionCategory === "iccr";
-      const resolvedIccrNo = isIccr ? (input.iccrApplicationNumber?.trim() || input.siiApplicationNumber?.trim() || null) : null;
+      const isSii = input.admissionCategory === "sii";
+      const resolvedIccrNo = isIccr ? (input.iccrApplicationNumber?.trim() || null) : null;
+      const resolvedSiiNo = (isIccr || isSii) ? (input.siiApplicationNumber?.trim() || null) : null;
 
       let { data: academicData, error: academicError } = await supabase
         .from("student_academic")
@@ -236,7 +238,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           academic_status: "good_standing",
           admission_category: input.admissionCategory || null,
           admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
-          sii_application_number: isIccr ? resolvedIccrNo : (input.siiApplicationNumber?.trim() || null),
+          sii_application_number: resolvedSiiNo,
           iccr_application_number: resolvedIccrNo,
           created_by: actorId,
           updated_by: actorId
@@ -257,7 +259,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
             academic_status: "good_standing",
             admission_category: input.admissionCategory || null,
             admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
-            sii_application_number: isIccr ? resolvedIccrNo : (input.siiApplicationNumber?.trim() || null),
+            sii_application_number: resolvedSiiNo,
             created_by: actorId,
             updated_by: actorId
           })
@@ -588,7 +590,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         admissionCategory: academic?.admission_category || null,
         admissionCategoryOther: academic?.admission_category_other || null,
         siiApplicationNumber: academic?.sii_application_number || null,
-        iccrApplicationNumber: academic?.iccr_application_number || academic?.sii_application_number || null,
+        iccrApplicationNumber: academic?.iccr_application_number || null,
         createdAt: academic?.created_at ? new Date(academic.created_at) : new Date(student.created_at),
         updatedAt: academic?.updated_at ? new Date(academic.updated_at) : new Date(student.updated_at),
         deletedAt: academic?.deleted_at ? new Date(academic.deleted_at) : null,
@@ -771,23 +773,30 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.admissionCategory !== undefined) {
       academicUpdates.admission_category = input.admissionCategory || null;
       if (input.admissionCategory === "iccr") {
-        const iccrVal = input.iccrApplicationNumber !== undefined
-          ? (input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null)
-          : (input.siiApplicationNumber ? input.siiApplicationNumber.trim() : undefined);
-        if (iccrVal !== undefined) {
-          academicUpdates.iccr_application_number = iccrVal;
-          academicUpdates.sii_application_number = iccrVal;
+        if (input.iccrApplicationNumber !== undefined) {
+          academicUpdates.iccr_application_number = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
+        }
+        if (input.siiApplicationNumber !== undefined) {
+          academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
+        }
+      } else if (input.admissionCategory === "sii") {
+        // Data retention rule: switching to SII clears ICCR number, retains/updates SII number
+        academicUpdates.iccr_application_number = null;
+        if (input.siiApplicationNumber !== undefined) {
+          academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
         }
       } else {
-        // Data retention rule: non-ICCR category clears ICCR application number
+        // Data retention rule: non-ICCR/non-SII category clears both application numbers
         academicUpdates.iccr_application_number = null;
         academicUpdates.sii_application_number = null;
       }
-    } else if (input.iccrApplicationNumber !== undefined) {
-      academicUpdates.iccr_application_number = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
-      academicUpdates.sii_application_number = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
-    } else if (input.siiApplicationNumber !== undefined) {
-      academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
+    } else {
+      if (input.iccrApplicationNumber !== undefined) {
+        academicUpdates.iccr_application_number = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
+      }
+      if (input.siiApplicationNumber !== undefined) {
+        academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
+      }
     }
     if (input.admissionCategoryOther !== undefined) academicUpdates.admission_category_other = input.admissionCategoryOther ? input.admissionCategoryOther.trim() : null;
     if (input.overrideSchoolId !== undefined) academicUpdates.override_school_id = input.overrideSchoolId ? input.overrideSchoolId.trim() : null;

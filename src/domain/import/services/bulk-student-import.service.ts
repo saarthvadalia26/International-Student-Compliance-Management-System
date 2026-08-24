@@ -752,9 +752,11 @@ export class BulkStudentImportService {
         }
       }
 
-      // Conditional ICCR -> ICCR Application Number check
+      // Conditional ICCR & SII Application Number checks
       const isIccr = mappedData.admission_category === "iccr";
-      const iccrAppNo = (mappedData.iccr_application_number || mappedData.sii_application_number)?.trim() || "";
+      const isSii = mappedData.admission_category === "sii";
+      const iccrAppNo = mappedData.iccr_application_number?.trim() || "";
+      const siiAppNo = mappedData.sii_application_number?.trim() || "";
 
       if (isIccr) {
         if (!iccrAppNo) {
@@ -765,12 +767,34 @@ export class BulkStudentImportService {
             problem: "ICCR Application Number is mandatory when Admission Category is ICCR.",
             suggestion: "Provide the official ICCR application identifier (e.g. ICCR-2026-98124)."
           });
-        } else {
-          mappedData.iccr_application_number = iccrAppNo;
         }
-      } else {
-        // Data retention rule: non-ICCR rows normalize ICCR application number to empty/null
+        if (!siiAppNo) {
+          errors.push({
+            field: "sii_application_number",
+            fieldLabel: "SII Application Number",
+            value: "",
+            problem: "SII Application Number is mandatory for ICCR students (ICCR applicants must also apply via SII portal).",
+            suggestion: "Provide the Study in India application identifier (e.g. SII-2026-88192)."
+          });
+        }
+        mappedData.iccr_application_number = iccrAppNo;
+        mappedData.sii_application_number = siiAppNo;
+      } else if (isSii) {
+        if (!siiAppNo) {
+          errors.push({
+            field: "sii_application_number",
+            fieldLabel: "SII Application Number",
+            value: "",
+            problem: "SII Application Number is mandatory when Admission Category is Study in India (SII).",
+            suggestion: "Provide the Study in India application identifier (e.g. SII-2026-88192)."
+          });
+        }
         mappedData.iccr_application_number = "";
+        mappedData.sii_application_number = siiAppNo;
+      } else {
+        // Data retention rule: non-ICCR/non-SII rows normalize both application numbers to empty
+        mappedData.iccr_application_number = "";
+        mappedData.sii_application_number = "";
       }
 
       // Conditional Other -> Admission Category Other check
@@ -1292,7 +1316,9 @@ export class BulkStudentImportService {
         }
 
         const isIccrRow = data.admission_category === "iccr";
-        const resolvedIccrAppNo = isIccrRow ? (data.iccr_application_number?.trim() || data.sii_application_number?.trim() || null) : null;
+        const isSiiRow = data.admission_category === "sii";
+        const resolvedIccrAppNo = isIccrRow ? (data.iccr_application_number?.trim() || null) : null;
+        const resolvedSiiNo = (isIccrRow || isSiiRow) ? (data.sii_application_number?.trim() || null) : null;
 
         let { error: acadErr } = await supabase
           .from("student_academic")
@@ -1305,7 +1331,7 @@ export class BulkStudentImportService {
             current_semester: currentSemester,
             admission_category: data.admission_category ? data.admission_category.toLowerCase() : null,
             admission_category_other: data.admission_category === "other" ? (data.admission_category_other?.trim() || null) : null,
-            sii_application_number: isIccrRow ? resolvedIccrAppNo : (data.sii_application_number?.trim() || null),
+            sii_application_number: resolvedSiiNo,
             iccr_application_number: resolvedIccrAppNo,
             academic_status: "good_standing",
             created_by: params.actorId,
@@ -1324,7 +1350,7 @@ export class BulkStudentImportService {
               current_semester: currentSemester,
               admission_category: data.admission_category ? data.admission_category.toLowerCase() : null,
               admission_category_other: data.admission_category === "other" ? (data.admission_category_other?.trim() || null) : null,
-              sii_application_number: isIccrRow ? resolvedIccrAppNo : (data.sii_application_number?.trim() || null),
+              sii_application_number: resolvedSiiNo,
               academic_status: "good_standing",
               created_by: params.actorId,
               updated_by: params.actorId

@@ -38,7 +38,8 @@ export class ReportMapper {
       status: row.status || "",
       complianceStatus: (row.compliance_status || "MISSING") as ComplianceStatus,
       admissionCategory: row.admission_category || null,
-      iccrApplicationNumber: row.iccr_application_number || row.sii_application_number || null,
+      iccrApplicationNumber: row.admission_category === "iccr" ? (row.iccr_application_number || null) : null,
+      siiApplicationNumber: (row.admission_category === "iccr" || row.admission_category === "sii") ? (row.sii_application_number || null) : null,
     };
   }
 

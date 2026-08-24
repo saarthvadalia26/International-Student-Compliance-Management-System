@@ -602,8 +602,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const handleFormSelectChange = (name: string, value: string) => {
     setEditForm(prev => {
       const next = { ...prev, [name]: value };
-      if (name === "admissionCategory" && value !== "iccr") {
-        next.iccrApplicationNumber = "";
+      if (name === "admissionCategory") {
+        if (value === "sii") {
+          next.iccrApplicationNumber = "";
+        } else if (value !== "iccr") {
+          next.iccrApplicationNumber = "";
+          next.siiApplicationNumber = "";
+        }
       }
       return next;
     });
@@ -661,8 +666,18 @@ export default function StudentDetailsPage({ params }: PageProps) {
         return;
       }
     }
-    if (editForm.admissionCategory === "iccr" && !editForm.iccrApplicationNumber?.trim() && !editForm.siiApplicationNumber?.trim()) {
-      toast.error("Validation Error", { description: "ICCR Application Number is required when Admission Category is ICCR." });
+    if (editForm.admissionCategory === "iccr") {
+      if (!editForm.iccrApplicationNumber?.trim()) {
+        toast.error("Validation Error", { description: "ICCR Application Number is required when Admission Category is ICCR." });
+        return;
+      }
+      if (!editForm.siiApplicationNumber?.trim()) {
+        toast.error("Validation Error", { description: "SII Application Number is required for ICCR students (ICCR applicants must also apply via SII portal)." });
+        return;
+      }
+    }
+    if (editForm.admissionCategory === "sii" && !editForm.siiApplicationNumber?.trim()) {
+      toast.error("Validation Error", { description: "SII Application Number is required when Admission Category is Study in India (SII)." });
       return;
     }
     if (editForm.admissionCategory === "other" && !editForm.admissionCategoryOther?.trim()) {
@@ -1546,11 +1561,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     </span>
                   </div>
 
-                  {(student.admissionCategory === "iccr" && (student.iccrApplicationNumber || student.siiApplicationNumber)) && (
+                  {student.admissionCategory === "iccr" && (
                     <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                       <span className="text-muted-foreground block text-[11px] font-medium">ICCR Application Number</span>
                       <span className="font-semibold text-foreground block font-mono">
-                        {student.iccrApplicationNumber || student.siiApplicationNumber}
+                        {student.iccrApplicationNumber || "Not provided"}
+                      </span>
+                    </div>
+                  )}
+
+                  {(student.admissionCategory === "iccr" || student.admissionCategory === "sii") && (
+                    <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                      <span className="text-muted-foreground block text-[11px] font-medium">Study in India (SII) Number</span>
+                      <span className="font-semibold text-foreground block font-mono">
+                        {student.siiApplicationNumber || "Not provided"}
                       </span>
                     </div>
                   )}
@@ -2426,6 +2450,21 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       id="iccrApplicationNumber" 
                       placeholder="e.g. ICCR-2026-98124" 
                       value={editForm.iccrApplicationNumber} 
+                      onChange={handleFormChange} 
+                      className="h-9 text-sm font-mono" 
+                    />
+                  </div>
+                )}
+
+                {(editForm.admissionCategory === "iccr" || editForm.admissionCategory === "sii") && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="siiApplicationNumber">
+                      Study in India (SII) Number <span className="text-destructive">*</span>
+                    </label>
+                    <Input 
+                      id="siiApplicationNumber" 
+                      placeholder="e.g. SII-2026-88192" 
+                      value={editForm.siiApplicationNumber} 
                       onChange={handleFormChange} 
                       className="h-9 text-sm font-mono" 
                     />
