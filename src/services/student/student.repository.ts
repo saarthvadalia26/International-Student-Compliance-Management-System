@@ -123,7 +123,6 @@ export class SupabaseStudentRepository implements IStudentRepository {
           full_name: input.fullName.trim(),
           nationality_code: nationalityCode,
           gender: input.gender || null,
-          dateOfBirth: dobFormatted,
           date_of_birth: dobFormatted,
           blood_group: input.bloodGroup?.trim() || null,
           marital_status: input.maritalStatus || null,

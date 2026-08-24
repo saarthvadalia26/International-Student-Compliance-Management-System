@@ -447,7 +447,7 @@ export default function StudentRegistrationPage() {
       admissionCategory: (formData.admissionCategory as AdmissionCategory) || undefined,
       admissionCategoryOther: formData.admissionCategory === "other" ? (formData.admissionCategoryOther.trim() || undefined) : undefined,
       siiApplicationNumber: formData.siiApplicationNumber?.trim() || undefined,
-      iccrApplicationNumber: formData.admissionCategory === "iccr" ? (formData.iccrApplicationNumber.trim() || undefined) : undefined,
+      iccrApplicationNumber: formData.iccrApplicationNumber?.trim() || undefined,
 
       // Emergency relationship
       relationshipType: formData.emergencyContactName.trim() ? (formData.emergencyContactRelation as RelationshipType) : undefined,
