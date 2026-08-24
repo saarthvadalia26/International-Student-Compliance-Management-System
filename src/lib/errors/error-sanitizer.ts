@@ -151,6 +151,104 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
     };
   }
 
+  // 2.2 Database Check Constraints & Document Validation (Status: 400)
+  if (
+    normalized.includes("chk_passport_expiry_after_issue") ||
+    normalized.includes("chk_visa_expiry_after_issue") ||
+    normalized.includes("chk_efrro_expiry_after_issue") ||
+    normalized.includes("expiry_after_issue") ||
+    normalized.includes("expiry date must be strictly after")
+  ) {
+    return {
+      title: "Invalid Expiration Date",
+      message: "The document expiration date must be after the issue date. Please check the entered dates.",
+      category: "validation",
+      errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "validation",
+        timestamp,
+        route,
+        statusCode: 400,
+      },
+    };
+  }
+
+  if (normalized.includes("chk_upload_auth_valid_dates")) {
+    return {
+      title: "Invalid Authorization Dates",
+      message: "The authorization valid until date must be after the start date.",
+      category: "validation",
+      errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "validation",
+        timestamp,
+        route,
+        statusCode: 400,
+      },
+    };
+  }
+
+  if (normalized.includes("chk_academic_graduation_after_admission")) {
+    return {
+      title: "Invalid Graduation Date",
+      message: "Expected graduation date must be after the admission date.",
+      category: "validation",
+      errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "validation",
+        timestamp,
+        route,
+        statusCode: 400,
+      },
+    };
+  }
+
+  if (
+    normalized.includes("violates check constraint") ||
+    normalized.includes("check constraint")
+  ) {
+    return {
+      title: "Invalid Information Provided",
+      message: "Some of the provided details do not meet validation requirements. Please review your input and try again.",
+      category: "validation",
+      errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "validation",
+        timestamp,
+        route,
+        statusCode: 400,
+      },
+    };
+  }
+
+  // 2.3 Storage & File Upload Errors (Status: 500)
+  if (
+    normalized.includes("[storage_write_failed]") ||
+    normalized.includes("[storage_upload_failed]") ||
+    normalized.includes("[storage_upload_error]") ||
+    normalized.includes("storage_write_failed") ||
+    normalized.includes("storage write failed") ||
+    normalized.includes("storage_upload_failed")
+  ) {
+    return {
+      title: "File Upload Failed",
+      message: "We were unable to store your file. Please verify the file is not corrupted and try again.",
+      category: "database",
+      errorId,
+      diagnostics: {
+        logReferenceId: errorId,
+        category: "database",
+        timestamp,
+        route,
+        statusCode: 500,
+      },
+    };
+  }
+
   // 3. Network & Connection Errors (Status: 503)
   if (
     normalized.includes("failed to fetch") ||
@@ -185,12 +283,15 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
     normalized.includes("timeout") ||
     normalized.includes("statement_timeout") ||
     normalized.includes("violates foreign key") ||
-    normalized.includes("duplicate key")
+    normalized.includes("duplicate key") ||
+    normalized.includes("[db_insert_failed]") ||
+    normalized.includes("[db_update_failed]") ||
+    normalized.includes("[db_query_failed]")
   ) {
-    const isSaveAction = context?.action?.includes("register") || context?.action?.includes("create") || context?.action?.includes("save");
+    const isSaveAction = context?.action?.includes("register") || context?.action?.includes("create") || context?.action?.includes("save") || context?.action?.includes("upload");
     return {
-      title: isSaveAction ? "Unable to save the student" : "Unable to Load Data",
-      message: "The system could not connect to the database. Please try again.",
+      title: isSaveAction ? "Unable to save record" : "Unable to Load Data",
+      message: isSaveAction ? "The system could not save the document record. Please try again." : "The system could not connect to the database. Please try again.",
       category: "database",
       errorId,
       diagnostics: {
@@ -233,9 +334,11 @@ export function sanitizeError(err: unknown, context?: ErrorLogContext): HumanFri
     normalized.includes("cannot delete") ||
     normalized.includes("action denied")
   ) {
+    // Clean any bracketed internal prefix like [ACTION_FAILED]
+    const cleanMsg = rawMessage.replace(/^\[[A-Z0-9_]+\]\s*/i, "");
     return {
       title: "Validation Error",
-      message: rawMessage,
+      message: cleanMsg,
       category: "validation",
       errorId,
       diagnostics: {

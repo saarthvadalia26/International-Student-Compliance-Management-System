@@ -241,7 +241,11 @@ export class StudentPortalService {
       }
 
       // 7. Write version record (pending verification, preserving active v1 if exists)
-      const nowStr = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const nowStr = now.toISOString().split("T")[0];
+      // Set a placeholder expiry date (1 year ahead) to satisfy DB check constraint (expiry_date > issue_date).
+      // University compliance staff will enter the true document number, issue date, and expiry date upon verification.
+      const futureExpiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
       const { data: insertedVer, error: verError } = await supabase
         .from(tableName)
         .insert({
@@ -249,7 +253,7 @@ export class StudentPortalService {
           version_number: nextVersion,
           document_number: "PENDING_VERIFICATION",
           issue_date: nowStr,
-          expiry_date: nowStr,
+          expiry_date: futureExpiry,
           file_path: storagePath,
           verification_status: "pending",
           is_active: false,

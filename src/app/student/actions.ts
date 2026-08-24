@@ -11,6 +11,7 @@ import {
   StudentHistoryRow, 
   StudentReminderHistoryRow 
 } from "@/domain/student-portal/types";
+import { formatUserFacingError } from "@/lib/errors/error-sanitizer";
 
 const portalRepo = new SupabaseStudentPortalRepository();
 const portalService = new StudentPortalService();
@@ -545,7 +546,7 @@ export async function uploadStudentDocumentAction(
       versionNumber: res.versionNumber 
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = formatUserFacingError(err, { action: "uploadStudentDocumentAction", route: "/student/efrro" });
     return { success: false, error: msg };
   }
 }
@@ -592,7 +593,7 @@ export async function submitDocumentReplacementRequestAction(
         }
       };
     }
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = formatUserFacingError(err, { action: "submitDocumentReplacementRequestAction", route: "/student/efrro" });
     return { success: false, error: msg };
   }
 }
@@ -627,7 +628,7 @@ export async function cancelDocumentReplacementRequestAction(
 
     return await DocumentReplacementRequestService.cancelRequest(requestId, studentId);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = formatUserFacingError(err, { action: "cancelDocumentReplacementRequestAction", route: "/student/efrro" });
     return { success: false, error: msg };
   }
 }
@@ -693,7 +694,7 @@ export async function getStudentDocumentDownloadUrlAction(
 
     return { success: true, url: signedUrl };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = formatUserFacingError(err, { action: "getStudentDocumentDownloadUrlAction" });
     return { success: false, error: msg };
   }
 }
