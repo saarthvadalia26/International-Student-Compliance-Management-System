@@ -39,11 +39,15 @@ import {
   BLOOD_GROUP_OPTIONS, 
   RELATIONSHIP_TYPE_OPTIONS, 
   ADMISSION_CATEGORY_OPTIONS, 
+  FEE_PAYMENT_CATEGORY_OPTIONS,
+  FEE_CURRENCY_OPTIONS,
   formatAgeDisplay,
   MaritalStatus,
   BloodGroup,
   RelationshipType,
-  AdmissionCategory
+  AdmissionCategory,
+  FeePaymentCategory,
+  FeeCurrency
 } from "@/domain/students/types/registration-expansion.types";
 
 type TabKey = "personal" | "academic" | "contact" | "documents";
@@ -77,6 +81,12 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   siiApplicationNumber: { tab: "academic", elementId: "siiApplicationNumber", label: "SII Application Number" },
   iccrApplicationNumber: { tab: "academic", elementId: "iccrApplicationNumber", label: "ICCR Application Number" },
   nfsuCampus: { tab: "academic", elementId: "nfsuCampus", label: "NFSU Campus" },
+  admissionAcademicYear: { tab: "academic", elementId: "admissionAcademicYear", label: "Admission / Academic Year" },
+  feePaymentCategory: { tab: "academic", elementId: "feePaymentCategory", label: "Fee Payment Category" },
+  tuitionFeeAmount: { tab: "academic", elementId: "tuitionFeeAmount", label: "Tuition Fees Amount" },
+  tuitionFeeCurrency: { tab: "academic", elementId: "tuitionFeeCurrency", label: "Tuition Fees Currency" },
+  hostelFeeAmount: { tab: "academic", elementId: "hostelFeeAmount", label: "Hostel Fees Amount" },
+  hostelFeeCurrency: { tab: "academic", elementId: "hostelFeeCurrency", label: "Hostel Fees Currency" },
   
   phoneHome: { tab: "contact", elementId: "phoneHome", label: "Home Country Phone" },
   email: { tab: "contact", elementId: "email", label: "Student Email" },
@@ -193,6 +203,12 @@ export default function StudentRegistrationPage() {
     siiApplicationNumber: "",
     iccrApplicationNumber: "",
     nfsuCampus: "",
+    admissionAcademicYear: "",
+    feePaymentCategory: "",
+    tuitionFeeAmount: "",
+    tuitionFeeCurrency: "INR",
+    hostelFeeAmount: "",
+    hostelFeeCurrency: "INR",
 
     // Contact Coordinates
     email: "",
@@ -451,6 +467,12 @@ export default function StudentRegistrationPage() {
       siiApplicationNumber: formData.siiApplicationNumber?.trim() || undefined,
       iccrApplicationNumber: formData.iccrApplicationNumber?.trim() || undefined,
       nfsuCampus: formData.nfsuCampus?.trim() || undefined,
+      admissionAcademicYear: formData.admissionAcademicYear?.trim() || undefined,
+      feePaymentCategory: (formData.feePaymentCategory as FeePaymentCategory) || undefined,
+      tuitionFeeAmount: formData.tuitionFeeAmount?.trim() !== "" ? Number(formData.tuitionFeeAmount) : undefined,
+      tuitionFeeCurrency: formData.tuitionFeeAmount?.trim() !== "" ? ((formData.tuitionFeeCurrency as FeeCurrency) || "INR") : undefined,
+      hostelFeeAmount: formData.hostelFeeAmount?.trim() !== "" ? Number(formData.hostelFeeAmount) : undefined,
+      hostelFeeCurrency: formData.hostelFeeAmount?.trim() !== "" ? ((formData.hostelFeeCurrency as FeeCurrency) || "INR") : undefined,
 
       // Emergency relationship
       relationshipType: formData.emergencyContactName.trim() ? (formData.emergencyContactRelation as RelationshipType) : undefined,
@@ -970,6 +992,144 @@ export default function StudentRegistrationPage() {
                     {validationErrors.nfsuCampus && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                         {validationErrors.nfsuCampus}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Admission / Academic Year - Always visible, optional */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="admissionAcademicYear">
+                      Admission / Academic Year <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Input
+                      id="admissionAcademicYear"
+                      placeholder="e.g. 2024-25, 2025-26, 2026-27"
+                      value={formData.admissionAcademicYear}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className={`h-10 text-sm ${validationErrors.admissionAcademicYear ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                    />
+                    {validationErrors.admissionAcademicYear && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.admissionAcademicYear}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Fee Payment Category / Funding Type - Always visible, optional */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="feePaymentCategory">
+                      Fee Payment Category / Funding Type <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Select
+                      value={formData.feePaymentCategory || "not_specified"}
+                      onValueChange={(v) => handleSelectChange("feePaymentCategory", !v || v === "not_specified" ? "" : v)}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger
+                        id="feePaymentCategory"
+                        className={`h-10 text-xs ${validationErrors.feePaymentCategory ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      >
+                        <SelectValue placeholder="Select Funding Type (Not Specified)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_specified">Not Specified</SelectItem>
+                        {FEE_PAYMENT_CATEGORY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {validationErrors.feePaymentCategory && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.feePaymentCategory}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Tuition Fees - Amount + Currency */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground">
+                      Tuition Fees <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <Input
+                          id="tuitionFeeAmount"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Amount (leave blank if not specified)"
+                          value={formData.tuitionFeeAmount}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.tuitionFeeAmount ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                      </div>
+                      <div>
+                        <Select
+                          value={formData.tuitionFeeCurrency || "INR"}
+                          onValueChange={(v) => handleSelectChange("tuitionFeeCurrency", v || "INR")}
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger className="h-10 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FEE_CURRENCY_OPTIONS.map((c) => (
+                              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {validationErrors.tuitionFeeAmount && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.tuitionFeeAmount}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Hostel Fees - Amount + Currency */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground">
+                      Hostel Fees <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2">
+                        <Input
+                          id="hostelFeeAmount"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Amount (leave blank if not specified)"
+                          value={formData.hostelFeeAmount}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.hostelFeeAmount ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                      </div>
+                      <div>
+                        <Select
+                          value={formData.hostelFeeCurrency || "INR"}
+                          onValueChange={(v) => handleSelectChange("hostelFeeCurrency", v || "INR")}
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger className="h-10 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FEE_CURRENCY_OPTIONS.map((c) => (
+                              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {validationErrors.hostelFeeAmount && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.hostelFeeAmount}
                       </p>
                     )}
                   </div>

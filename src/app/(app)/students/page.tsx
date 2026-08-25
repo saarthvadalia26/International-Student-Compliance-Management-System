@@ -11,8 +11,11 @@ import {
   Trash2,
   AlertCircle,
   Loader2,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Download,
+  ChevronDown
 } from "lucide-react";
+import { toast } from "sonner";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +39,7 @@ import {
   DropdownMenuSeparator 
 } from "@/components/ui/dropdown-menu";
 import { ACADEMIC_LEVEL_OPTIONS, normalizeAcademicLevel } from "@/domain/academic-programs/academic-level";
+import { matchStudentFilters, StudentExportFilterCriteria } from "@/domain/students/utils/student-filter.util";
 
 export interface Student {
   id: string;
@@ -53,6 +57,7 @@ export interface Student {
   iccrApplicationNumber?: string | null;
   siiApplicationNumber?: string | null;
   nfsuCampus?: string | null;
+  feePaymentCategory?: string | null;
   passport: { number: string };
   visa: { number: string };
   email: string;
@@ -62,7 +67,7 @@ export interface Student {
 
 import { useRouter } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
-import { getStudentsListAction } from "@/app/(app)/students/actions";
+import { getStudentsListAction, exportStudentsExcelAction } from "@/app/(app)/students/actions";
 
 export default function StudentListPage() {
   const router = useRouter();
@@ -71,10 +76,12 @@ export default function StudentListPage() {
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
   const [academicLevelFilter, setAcademicLevelFilter] = React.useState<string>("all");
   const [campusFilter, setCampusFilter] = React.useState<string>("all");
+  const [feePaymentCategoryFilter, setFeePaymentCategoryFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
   const [students, setStudents] = React.useState<Student[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isExporting, setIsExporting] = React.useState(false);
 
   const loadStudents = React.useCallback(async () => {
     try {
@@ -143,53 +150,112 @@ export default function StudentListPage() {
     return { list: sortedCampuses, notSpecifiedCount };
   }, [students]);
 
-  // Filter logic
+  // Determine whether any filtering is currently active
+  const isFilterActive = Boolean(
+    (searchQuery && searchQuery.trim() !== "") ||
+    complianceFilter !== "all" ||
+    academicFilter !== "all" ||
+    academicLevelFilter !== "all" ||
+    campusFilter !== "all" ||
+    feePaymentCategoryFilter !== "all"
+  );
+
+  // Authoritative filter logic utilizing shared domain matcher
   const filteredStudents = React.useMemo(() => {
-    return students.filter((student) => {
-      // 1. Search Query
-      const query = searchQuery.toLowerCase().trim();
-      const matchesSearch = 
-        student.fullName.toLowerCase().includes(query) ||
-        (student.registrationNumber || "").toLowerCase().includes(query) ||
-        student.nationalityName.toLowerCase().includes(query) ||
-        student.programName.toLowerCase().includes(query) ||
-        (student.programCode || "").toLowerCase().includes(query) ||
-        (student.academicLevelLabel || "").toLowerCase().includes(query) ||
-        (student.academicLevel || "").toLowerCase().includes(query) ||
-        student.school.toLowerCase().includes(query) ||
-        (student.iccrApplicationNumber || "").toLowerCase().includes(query) ||
-        (student.siiApplicationNumber || "").toLowerCase().includes(query) ||
-        (student.nfsuCampus || "").toLowerCase().includes(query) ||
-        student.passport.number.toLowerCase().includes(query) ||
-        student.visa.number.toLowerCase().includes(query) ||
-        student.email.toLowerCase().includes(query);
+    const filterCriteria: StudentExportFilterCriteria = {
+      searchQuery,
+      complianceFilter,
+      academicFilter,
+      academicLevelFilter,
+      campusFilter,
+      feePaymentCategoryFilter,
+      scope: "filtered"
+    };
 
-      // 2. Compliance Status
-      const matchesCompliance = 
-        complianceFilter === "all" || 
-        student.complianceStatus === complianceFilter ||
-        (complianceFilter === "critical" && (student.complianceStatus === "non_compliant" || student.complianceStatus === "expired"));
+    return students.filter((student) =>
+      matchStudentFilters(
+        {
+          fullName: student.fullName,
+          registrationNumber: student.registrationNumber,
+          nationalityCode: student.nationalityCode,
+          nationalityName: student.nationalityName,
+          programName: student.programName,
+          programCode: student.programCode,
+          programId: student.programId,
+          academicLevel: student.academicLevel,
+          academicLevelLabel: student.academicLevelLabel,
+          school: student.school,
+          admissionCategory: student.admissionCategory,
+          iccrApplicationNumber: student.iccrApplicationNumber,
+          siiApplicationNumber: student.siiApplicationNumber,
+          nfsuCampus: student.nfsuCampus,
+          feePaymentCategory: student.feePaymentCategory,
+          passportNumber: student.passport?.number,
+          visaNumber: student.visa?.number,
+          email: student.email,
+          complianceStatus: student.complianceStatus,
+          academicStatus: student.academicStatus
+        },
+        filterCriteria
+      )
+    );
+  }, [students, searchQuery, complianceFilter, academicFilter, academicLevelFilter, campusFilter, feePaymentCategoryFilter]);
 
-      // 3. Academic Status
-      const matchesAcademic = 
-        academicFilter === "all" || 
-        student.academicStatus === academicFilter;
+  // Download filtered or full student directory as formatted Excel workbook (.xlsx)
+  const handleExport = async (scope: "filtered" | "all" = "filtered") => {
+    if (isExporting) return;
+    if (scope === "filtered" && filteredStudents.length === 0) {
+      toast.error("No students match the current filters.");
+      return;
+    }
+    if (students.length === 0) {
+      toast.error("No student records available to export.");
+      return;
+    }
 
-      // 4. Academic Level
-      const studentNormLevel = normalizeAcademicLevel(student.academicLevel);
-      const matchesLevel = 
-        academicLevelFilter === "all" ||
-        studentNormLevel === academicLevelFilter;
+    setIsExporting(true);
+    const toastId = toast.loading("Preparing Excel export...");
+    try {
+      const criteria: StudentExportFilterCriteria = {
+        searchQuery,
+        complianceFilter,
+        academicFilter,
+        academicLevelFilter,
+        campusFilter,
+        feePaymentCategoryFilter,
+        scope
+      };
 
-      // 5. NFSU Campus Filter
-      const matchesCampus = 
-        campusFilter === "all" ||
-        (campusFilter === "not_specified" && !student.nfsuCampus?.trim()) ||
-        (student.nfsuCampus?.trim().toLowerCase() === campusFilter.trim().toLowerCase());
-
-      return matchesSearch && matchesCompliance && matchesAcademic && matchesLevel && matchesCampus;
-    });
-  }, [students, searchQuery, complianceFilter, academicFilter, academicLevelFilter, campusFilter]);
+      const res = await exportStudentsExcelAction(criteria);
+      if (res.success && res.base64 && res.fileName) {
+        const byteCharacters = atob(res.base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { 
+          type: res.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = res.fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success(`Export completed: ${res.count ?? (scope === "all" ? students.length : filteredStudents.length)} students downloaded (${res.fileName})`, { id: toastId });
+      } else {
+        toast.error(res.error || "Failed to generate Excel export. Please try again.", { id: toastId });
+      }
+    } catch (err) {
+      console.error("[STUDENT_EXCEL_EXPORT_ERROR]", err);
+      toast.error("An unexpected error occurred while preparing the Excel file.", { id: toastId });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Reset all filters
   const resetFilters = () => {
@@ -198,6 +264,7 @@ export default function StudentListPage() {
     setAcademicFilter("all");
     setAcademicLevelFilter("all");
     setCampusFilter("all");
+    setFeePaymentCategoryFilter("all");
     setCurrentPage(1);
   };
 
@@ -249,6 +316,63 @@ export default function StudentListPage() {
         </div>
         
         <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+          {/* Export Excel Action */}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={
+              <Button 
+                variant="outline" 
+                size="sm" 
+                disabled={isExporting || students.length === 0}
+                className="h-9 gap-1.5 border-border hover:bg-muted/50"
+              >
+                {isExporting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                    <span>Preparing Excel...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                    <span>Export Excel</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
+                  </>
+                )}
+              </Button>
+            } />
+            <DropdownMenuContent align="end" className="w-[260px]">
+              <DropdownMenuLabel className="text-xs font-semibold">Student Excel Export</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={isExporting || filteredStudents.length === 0}
+                onClick={() => handleExport("filtered")}
+                className="text-xs cursor-pointer flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <Download className="h-3.5 w-3.5 text-emerald-600" />
+                  {isFilterActive ? "Export Filtered Students" : "Export All Students"}
+                </span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {filteredStudents.length}
+                </Badge>
+              </DropdownMenuItem>
+              {isFilterActive && (
+                <DropdownMenuItem
+                  disabled={isExporting || students.length === 0}
+                  onClick={() => handleExport("all")}
+                  className="text-xs cursor-pointer flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                    Export All Students
+                  </span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {students.length}
+                  </Badge>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Link href="/students/import" passHref>
             <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border hover:bg-muted/50">
               <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Bulk Import
@@ -264,134 +388,200 @@ export default function StudentListPage() {
 
       {/* Filters and Search controls */}
       <Card className="border border-border/60 shadow-sm bg-card/50">
-        <CardContent className="p-4 flex flex-col gap-3 md:flex-row md:items-center">
-          {/* Search bar */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, registration ID, or nationality..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-9 h-9 text-sm"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-2.5 hover:text-foreground text-muted-foreground"
-                aria-label="Clear search"
+        <CardContent className="p-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            {/* Search bar */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, registration ID, campus, or nationality..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-9 h-9 text-sm"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-2.5 hover:text-foreground text-muted-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Compliance filter */}
+            <div className="w-full md:w-[200px]">
+              <Select 
+                value={complianceFilter} 
+                onValueChange={(val) => {
+                  setComplianceFilter(val || "all");
+                  setCurrentPage(1);
+                }}
               >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Compliance Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Compliance Statuses</SelectItem>
+                  <SelectItem value="compliant">Compliant</SelectItem>
+                  <SelectItem value="warning">Warning State</SelectItem>
+                  <SelectItem value="critical">Critical / Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Academic Level filter */}
+            <div className="w-full md:w-[200px]">
+              <Select 
+                value={academicLevelFilter} 
+                onValueChange={(val) => {
+                  setAcademicLevelFilter(val || "all");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Academic Level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Academic Levels</SelectItem>
+                  {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.code} value={opt.code}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Academic Status filter */}
+            <div className="w-full md:w-[200px]">
+              <Select 
+                value={academicFilter} 
+                onValueChange={(val) => {
+                  setAcademicFilter(val || "all");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Academic Standing" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Academic Standings</SelectItem>
+                  <SelectItem value="good_standing">Good Standing</SelectItem>
+                  <SelectItem value="probation">Academic Probation</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* NFSU Campus filter */}
+            <div className="w-full md:w-[180px]">
+              <Select 
+                value={campusFilter} 
+                onValueChange={(val) => {
+                  setCampusFilter(val || "all");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="NFSU Campus" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All NFSU Campuses ({students.length})</SelectItem>
+                  {availableCampuses.list.map((c) => (
+                    <SelectItem key={c.name} value={c.name}>
+                      {c.name} ({c.count})
+                    </SelectItem>
+                  ))}
+                  {availableCampuses.notSpecifiedCount > 0 && (
+                    <SelectItem value="not_specified">
+                      Not Specified ({availableCampuses.notSpecifiedCount})
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Fee Payment Category / Funding Type filter */}
+            <div className="w-full md:w-[180px]">
+              <Select 
+                value={feePaymentCategoryFilter} 
+                onValueChange={(val) => {
+                  setFeePaymentCategoryFilter(val || "all");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Funding Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Funding Types</SelectItem>
+                  <SelectItem value="self_financed">Self Financed</SelectItem>
+                  <SelectItem value="scholarship">Scholarship</SelectItem>
+                  <SelectItem value="not_specified">Not Specified</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Compliance filter */}
-          <div className="w-full md:w-[200px]">
-            <Select 
-              value={complianceFilter} 
-              onValueChange={(val) => {
-                setComplianceFilter(val || "all");
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Compliance Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Compliance Statuses</SelectItem>
-                <SelectItem value="compliant">Compliant</SelectItem>
-                <SelectItem value="warning">Warning State</SelectItem>
-                <SelectItem value="critical">Critical / Expired</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Active Filter Summary and Export Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-2 border-t border-border/40 text-xs">
+            <div className="flex items-center gap-2">
+              {isFilterActive ? (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs font-semibold px-2 py-0.5">
+                    {filteredStudents.length}
+                  </Badge>
+                  <span className="font-medium text-foreground">
+                    {filteredStudents.length === 1 ? "student matches your filters" : "students match your filters"}
+                  </span>
+                  <span className="text-muted-foreground">
+                    (out of {students.length} total)
+                  </span>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">
+                  Showing all <span className="font-medium text-foreground">{students.length}</span> registered international students
+                </span>
+              )}
+            </div>
 
-          {/* Academic Level filter */}
-          <div className="w-full md:w-[200px]">
-            <Select 
-              value={academicLevelFilter} 
-              onValueChange={(val) => {
-                setAcademicLevelFilter(val || "all");
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Academic Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Academic Levels</SelectItem>
-                {ACADEMIC_LEVEL_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.code} value={opt.code}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Academic Status filter */}
-          <div className="w-full md:w-[200px]">
-            <Select 
-              value={academicFilter} 
-              onValueChange={(val) => {
-                setAcademicFilter(val || "all");
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Academic Standing" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Academic Standings</SelectItem>
-                <SelectItem value="good_standing">Good Standing</SelectItem>
-                <SelectItem value="probation">Academic Probation</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* NFSU Campus filter */}
-          <div className="w-full md:w-[200px]">
-            <Select 
-              value={campusFilter} 
-              onValueChange={(val) => {
-                setCampusFilter(val || "all");
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="NFSU Campus" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All NFSU Campuses ({students.length})</SelectItem>
-                {availableCampuses.list.map((c) => (
-                  <SelectItem key={c.name} value={c.name}>
-                    {c.name} ({c.count})
-                  </SelectItem>
-                ))}
-                {availableCampuses.notSpecifiedCount > 0 && (
-                  <SelectItem value="not_specified">
-                    Not Specified ({availableCampuses.notSpecifiedCount})
-                  </SelectItem>
+            <div className="flex items-center gap-2 shrink-0">
+              {isFilterActive && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={resetFilters}
+                  className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Reset Filters
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isExporting || filteredStudents.length === 0}
+                onClick={() => handleExport(isFilterActive ? "filtered" : "all")}
+                className="h-8 text-xs gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              >
+                {isExporting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                    <span>Preparing Excel...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Export {isFilterActive ? `Filtered (${filteredStudents.length})` : `All (${students.length})`}</span>
+                  </>
                 )}
-              </SelectContent>
-            </Select>
+              </Button>
+            </div>
           </div>
-
-          {/* Clear filters trigger */}
-          {(searchQuery || complianceFilter !== "all" || academicFilter !== "all" || academicLevelFilter !== "all" || campusFilter !== "all") && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={resetFilters}
-              className="h-9 px-2 text-xs text-muted-foreground hover:text-foreground"
-            >
-              Reset Filters
-            </Button>
-          )}
         </CardContent>
       </Card>
 

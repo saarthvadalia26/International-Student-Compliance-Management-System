@@ -289,7 +289,7 @@ function getFallbackNotifications(portal: "staff" | "student"): InAppNotificatio
       priority: "critical",
       eventType: "efrro_expiring",
       isRead: false,
-      actionUrl: "/students/1/efrro",
+      actionUrl: "/students/1",
       createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
     },
     {
@@ -311,7 +311,7 @@ function getFallbackNotifications(portal: "staff" | "student"): InAppNotificatio
       priority: "low",
       eventType: "document_approved",
       isRead: false,
-      actionUrl: "/students/1/passport",
+      actionUrl: "/students/1",
       createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
     },
     {

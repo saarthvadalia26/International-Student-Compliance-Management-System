@@ -7,41 +7,26 @@ import {
   Globe, 
   Phone, 
   Mail, 
-  FileText, 
-  CheckCircle2, 
-  AlertTriangle, 
   XCircle, 
-  Check, 
-  X,
   Building,
   Loader2,
-  Bell,
   Calendar,
-  Send,
-  RotateCw,
   ExternalLink,
   Edit3,
   ShieldCheck,
-  CalendarDays,
   Clock,
   History,
-  UploadCloud,
   SlidersHorizontal,
   Sparkles,
   Layers,
   GraduationCap,
-  Info,
   User,
   Users
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
   updateStudentAction, 
-  updateDocumentVerificationAction,
-  updateDocumentMetadataAction,
-  updateExpiryDateAction,
   getStudentReminderScheduleAction,
-  triggerReminderDispatchAction,
   recordAcademicAdjustmentAction
 } from "@/app/(app)/students/actions";
 import { getActiveSchoolsAction } from "@/app/(app)/settings/schools-actions";
@@ -62,19 +47,13 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { SearchableProgramSelector } from "@/components/ui/searchable-program-selector";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { RejectionDialog } from "@/components/ui/rejection-dialog";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
-import { AcademicProgram, getAcademicLevelLabel } from "@/domain/academic-programs/types";
-import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
+import { AcademicProgram } from "@/domain/academic-programs/types";
 import { ExpiryReminderEngine } from "@/domain/notifications/services/reminder-engine.service";
 import { 
-  StudentReminderScheduleResponse, 
-  ReminderStatus 
+  StudentReminderScheduleResponse 
 } from "@/domain/notifications/types/reminder.types";
-import { DocumentUploadDialog, AllowEarlyUploadDialog } from "@/features/compliance/components/document-dialogs";
 import { DispatchReminderDialog } from "@/features/compliance/components/dispatch-reminder-dialog";
-import { DOCUMENT_CONFIGS, getDocumentTheme } from "@/features/compliance/constants/constants";
-import { StudentDocumentCard } from "@/features/compliance/components/student-document-card";
 import { DocumentReminderSchedule } from "@/features/compliance/components/document-reminder-schedule";
 import { ProfileCompletionEngine, ProfileCompletionResult } from "@/domain/students/services/profile-completion.service";
 
@@ -83,13 +62,15 @@ import {
   BLOOD_GROUP_OPTIONS, 
   RELATIONSHIP_TYPE_OPTIONS, 
   ADMISSION_CATEGORY_OPTIONS, 
+  FEE_PAYMENT_CATEGORY_OPTIONS,
+  FEE_CURRENCY_OPTIONS,
   formatAgeDisplay,
   MaritalStatus,
-  BloodGroup,
   RelationshipType,
-  AdmissionCategory
+  AdmissionCategory,
+  FeePaymentCategory,
+  FeeCurrency
 } from "@/domain/students/types/registration-expansion.types";
-import { PhoneInput } from "@/components/ui/phone-input";
 
 export interface StudentDocument {
   number: string;
@@ -178,6 +159,12 @@ export interface StudentProfile {
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   nfsuCampus?: string | null;
+  admissionAcademicYear?: string | null;
+  feePaymentCategory?: FeePaymentCategory | string | null;
+  tuitionFeeAmount?: number | null;
+  tuitionFeeCurrency?: FeeCurrency | string | null;
+  hostelFeeAmount?: number | null;
+  hostelFeeCurrency?: FeeCurrency | string | null;
   complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
   daysToPassportExpiry?: number;
   daysToVisaExpiry?: number;
@@ -213,7 +200,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
   
   const [student, setStudent] = React.useState<StudentProfile | undefined>(undefined);
   const [isLoadingStudent, setIsLoadingStudent] = React.useState(true);
-  const [activeSubTab, setActiveSubTab] = React.useState<"immigration" | "personal" | "academic" | "contact">("immigration");
+  const [activeSubTab, setActiveSubTab] = React.useState<"personal" | "academic" | "contact">("personal");
 
   // Academic Programs & Schools Reference State
   const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
@@ -223,20 +210,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [reminderSchedule, setReminderSchedule] = React.useState<StudentReminderScheduleResponse | null>(null);
   const [selectedReminderDoc, setSelectedReminderDoc] = React.useState<"passport" | "visa" | "efrro">("passport");
   const [isLoadingReminders, setIsLoadingReminders] = React.useState(true);
-  const [isDispatchingReminder, setIsDispatchingReminder] = React.useState<string | null>(null);
+  const isDispatchingReminder = null;
 
   // Unsaved Changes Confirmation Dialog State
   const [isConfirmDiscardOpen, setIsConfirmDiscardOpen] = React.useState(false);
-
-  // Document Rejection Dialog State
-  const [isRejectDialogOpen, setIsRejectDialogOpen] = React.useState(false);
-  const [rejectDocType, setRejectDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
-  const [isRejecting, setIsRejecting] = React.useState(false);
-  const [approvingDocType, setApprovingDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
-
-  // Renewal / New Version Upload Dialog State
-  const [isRenewalUploadOpen, setIsRenewalUploadOpen] = React.useState(false);
-  const [renewalDocType, setRenewalDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
 
   // Dispatch Reminder Dialog State
   const [dispatchDialogState, setDispatchDialogState] = React.useState<{
@@ -266,46 +243,6 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const closeDispatchDialog = () => {
     setDispatchDialogState(prev => ({ ...prev, isOpen: false }));
   };
-
-  const openRenewalDialog = (docType: "passport" | "visa" | "efrro") => {
-    setRenewalDocType(docType);
-    setIsRenewalUploadOpen(true);
-  };
-
-  // Staff Early Document Upload Exception Dialog State
-  const [isEarlyUploadDialogOpen, setIsEarlyUploadDialogOpen] = React.useState(false);
-  const [earlyUploadDocType, setEarlyUploadDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
-
-  // First-Class "Update Expiry Date" Dialog State
-  const [isExpiryDialogOpen, setIsExpiryDialogOpen] = React.useState(false);
-  const [expiryDocType, setExpiryDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
-  const [currentDocNumberDisplay, setCurrentDocNumberDisplay] = React.useState("");
-  const [currentVersionNumberDisplay, setCurrentVersionNumberDisplay] = React.useState(1);
-  const [currentIssueDateDisplay, setCurrentIssueDateDisplay] = React.useState("");
-  const [currentExpiryDateDisplay, setCurrentExpiryDateDisplay] = React.useState("");
-  const [expiryIssueDate, setExpiryIssueDate] = React.useState("");
-  const [newExpiryDate, setNewExpiryDate] = React.useState("");
-  const [expiryReason, setExpiryReason] = React.useState("");
-  const [expiryErrors, setExpiryErrors] = React.useState<Record<string, string>>({});
-  const [isSavingExpiry, setIsSavingExpiry] = React.useState(false);
-  const [saveExpirySuccess, setSaveExpirySuccess] = React.useState(false);
-  const [saveExpiryError, setSaveExpiryError] = React.useState(false);
-
-  // Document Metadata Update Dialog State
-  const [isDocMetadataOpen, setIsDocMetadataOpen] = React.useState(false);
-  const [editingDocType, setEditingDocType] = React.useState<"passport" | "visa" | "efrro" | null>(null);
-  const [docMetadataForm, setDocMetadataForm] = React.useState({
-    documentNumber: "",
-    placeOfIssue: "",
-    visaType: "Student (S-1)",
-    issueDate: "",
-    expiryDate: "",
-    changeReason: ""
-  });
-  const [docMetadataErrors, setDocMetadataErrors] = React.useState<Record<string, string>>({});
-  const [isSavingDocMetadata, setIsSavingDocMetadata] = React.useState(false);
-  const [saveDocSuccess, setSaveDocSuccess] = React.useState(false);
-  const [saveDocError, setSaveDocError] = React.useState(false);
 
   // Academic Adjustment Dialog State
   const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = React.useState(false);
@@ -470,7 +407,6 @@ export default function StudentDetailsPage({ params }: PageProps) {
   }, [effectiveSchedule, selectedReminderDoc]);
 
   React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStudentData();
     loadReminderSchedule();
   }, [loadStudentData, loadReminderSchedule]);
@@ -512,6 +448,12 @@ export default function StudentDetailsPage({ params }: PageProps) {
     siiApplicationNumber: "",
     iccrApplicationNumber: "",
     nfsuCampus: "",
+    admissionAcademicYear: "",
+    feePaymentCategory: "",
+    tuitionFeeAmount: "",
+    tuitionFeeCurrency: "INR",
+    hostelFeeAmount: "",
+    hostelFeeCurrency: "INR",
     phoneHome: "",
     phoneLocal: "",
     permanentAddress: "",
@@ -565,6 +507,12 @@ export default function StudentDetailsPage({ params }: PageProps) {
         siiApplicationNumber: student.siiApplicationNumber || "",
         iccrApplicationNumber: student.iccrApplicationNumber || "",
         nfsuCampus: student.nfsuCampus || "",
+        admissionAcademicYear: student.admissionAcademicYear || "",
+        feePaymentCategory: student.feePaymentCategory || "",
+        tuitionFeeAmount: student.tuitionFeeAmount !== null && student.tuitionFeeAmount !== undefined ? String(student.tuitionFeeAmount) : "",
+        tuitionFeeCurrency: student.tuitionFeeCurrency || "INR",
+        hostelFeeAmount: student.hostelFeeAmount !== null && student.hostelFeeAmount !== undefined ? String(student.hostelFeeAmount) : "",
+        hostelFeeCurrency: student.hostelFeeCurrency || "INR",
         phoneHome: student.phoneHome,
         phoneLocal: student.phoneLocal || "",
         permanentAddress: student.permanentAddress,
@@ -717,6 +665,12 @@ export default function StudentDetailsPage({ params }: PageProps) {
         siiApplicationNumber: editForm.siiApplicationNumber ? editForm.siiApplicationNumber.trim() : null,
         iccrApplicationNumber: editForm.iccrApplicationNumber ? editForm.iccrApplicationNumber.trim() : null,
         nfsuCampus: editForm.nfsuCampus ? editForm.nfsuCampus.trim() : null,
+        admissionAcademicYear: editForm.admissionAcademicYear?.trim() || null,
+        feePaymentCategory: (editForm.feePaymentCategory as FeePaymentCategory) || null,
+        tuitionFeeAmount: editForm.tuitionFeeAmount?.trim() !== "" ? Number(editForm.tuitionFeeAmount) : null,
+        tuitionFeeCurrency: editForm.tuitionFeeAmount?.trim() !== "" ? ((editForm.tuitionFeeCurrency as FeeCurrency) || "INR") : null,
+        hostelFeeAmount: editForm.hostelFeeAmount?.trim() !== "" ? Number(editForm.hostelFeeAmount) : null,
+        hostelFeeCurrency: editForm.hostelFeeAmount?.trim() !== "" ? ((editForm.hostelFeeCurrency as FeeCurrency) || "INR") : null,
         currentSemester: Number(editForm.currentSemester) || 1,
         academicStatus: editForm.academicStatus,
         status: editForm.status,
@@ -775,261 +729,16 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setIsConfirmDiscardOpen(false);
   };
 
-  // FIRST-CLASS "UPDATE EXPIRY DATE" HANDLERS
-  const openExpiryDialog = (docType: "passport" | "visa" | "efrro") => {
-    if (!student) return;
-    const doc = docType === "passport" ? student.passport : docType === "visa" ? student.visa : student.efrro;
-    
-    setExpiryDocType(docType);
-    setCurrentDocNumberDisplay(doc?.number && doc.number !== "Not provided" && doc.number !== "Not Recorded" ? doc.number : "Not Recorded");
-    setCurrentVersionNumberDisplay(doc?.versionNumber || 1);
-    setCurrentIssueDateDisplay(doc?.issueDate ? formatDisplayDate(doc.issueDate) : "Not Recorded");
-    setCurrentExpiryDateDisplay(doc?.expiryDate ? formatDisplayDate(doc.expiryDate) : "Not Recorded");
-    setExpiryIssueDate(doc?.issueDate ? doc.issueDate.split("T")[0] : "");
-    setNewExpiryDate(doc?.expiryDate ? doc.expiryDate.split("T")[0] : "");
-    setExpiryReason("");
-    setExpiryErrors({});
-    setIsExpiryDialogOpen(true);
-  };
-
-  const handleSaveExpiryDate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!expiryDocType || !student) return;
-
-    const errors: Record<string, string> = {};
-
-    if (!expiryIssueDate || !expiryIssueDate.trim()) {
-      errors.expiryIssueDate = "An issue date is required before updating the expiration date.";
-    }
-
-    if (!newExpiryDate || !newExpiryDate.trim()) {
-      errors.newExpiryDate = "Please select a valid expiration date.";
-    } else if (expiryIssueDate && new Date(newExpiryDate.trim()) <= new Date(expiryIssueDate.trim())) {
-      errors.newExpiryDate = `The new expiration date must be strictly after the document issue date (${formatDisplayDate(expiryIssueDate)}).`;
-    }
-
-    if (!expiryReason || !expiryReason.trim()) {
-      errors.expiryReason = "A reason for modifying the expiration date is required for compliance audit logging.";
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setExpiryErrors(errors);
-      toast.error("Validation Error", { description: "Please resolve the highlighted field errors." });
-      return;
-    }
-
-    setIsSavingExpiry(true);
-    setSaveExpirySuccess(false);
-    setSaveExpiryError(false);
-
-    try {
-      const docLabel = expiryDocType === "passport" ? "Passport" : expiryDocType === "visa" ? "Visa" : "eFRRO";
-      const res = await updateExpiryDateAction({
-        studentId,
-        documentType: expiryDocType,
-        newExpiryDate: newExpiryDate.trim(),
-        issueDate: expiryIssueDate.trim(),
-        reason: expiryReason.trim()
-      });
-
-      if (res.success) {
-        setSaveExpirySuccess(true);
-        toast.success(`${docLabel} Expiry Updated`, {
-          description: `${docLabel} expiration date updated to ${formatDisplayDate(newExpiryDate)}. Reminder schedule recalculated.`
-        });
-        await Promise.all([loadStudentData(), loadReminderSchedule()]);
-        setTimeout(() => {
-          setIsExpiryDialogOpen(false);
-          setExpiryDocType(null);
-        }, 600);
-      } else {
-        setSaveExpiryError(true);
-        toast.error("Update Failed", { description: res.error || `Unable to update ${docLabel} expiration date.` });
-      }
-    } catch (err) {
-      setSaveExpiryError(true);
-      toast.error("Database Error", {
-        description: err instanceof Error ? err.message : "Unable to communicate with database."
-      });
-    } finally {
-      setIsSavingExpiry(false);
-    }
-  };
-
-  // FULL METADATA UPDATE HANDLERS
-  const openDocMetadataDialog = (docType: "passport" | "visa" | "efrro") => {
-    if (!student) return;
-    const doc = docType === "passport" ? student.passport : docType === "visa" ? student.visa : student.efrro;
-    
-    setEditingDocType(docType);
-    setDocMetadataForm({
-      documentNumber: doc?.number && doc.number !== "Not provided" && doc.number !== "Not Recorded" ? doc.number : "",
-      placeOfIssue: doc?.placeOfIssue || "",
-      visaType: doc?.visaType || "Student (S-1)",
-      issueDate: doc?.issueDate ? doc.issueDate.split("T")[0] : "",
-      expiryDate: doc?.expiryDate ? doc.expiryDate.split("T")[0] : "",
-      changeReason: ""
-    });
-    setDocMetadataErrors({});
-    setIsDocMetadataOpen(true);
-  };
-
-  const handleSaveDocMetadata = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingDocType) return;
-
-    const errors: Record<string, string> = {};
-    if (!docMetadataForm.documentNumber.trim()) {
-      errors.documentNumber = "Document number is required.";
-    }
-    if (!docMetadataForm.issueDate.trim()) {
-      errors.issueDate = "Issue date is required.";
-    }
-    if (!docMetadataForm.expiryDate.trim()) {
-      errors.expiryDate = "Expiration date is required.";
-    } else if (docMetadataForm.issueDate.trim() && new Date(docMetadataForm.expiryDate) <= new Date(docMetadataForm.issueDate)) {
-      errors.expiryDate = "Expiration date must be strictly after the issue date.";
-    }
-
-    if (!docMetadataForm.changeReason.trim()) {
-      errors.changeReason = "A mandatory reason for correction is required for compliance audit logs.";
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setDocMetadataErrors(errors);
-      toast.error("Validation Error", { description: "Please correct the highlighted fields before saving." });
-      return;
-    }
-
-    setIsSavingDocMetadata(true);
-    setSaveDocSuccess(false);
-    setSaveDocError(false);
-
-    try {
-      const res = await updateDocumentMetadataAction({
-        studentId,
-        documentType: editingDocType,
-        documentNumber: docMetadataForm.documentNumber.trim(),
-        issueDate: docMetadataForm.issueDate.trim(),
-        expiryDate: docMetadataForm.expiryDate.trim(),
-        placeOfIssue: editingDocType === "passport" ? docMetadataForm.placeOfIssue.trim() : undefined,
-        visaType: editingDocType === "visa" ? docMetadataForm.visaType.trim() : undefined,
-        changeReason: docMetadataForm.changeReason.trim()
-      });
-
-      if (res.success) {
-        setSaveDocSuccess(true);
-        toast.success("Document Information Corrected", {
-          description: `Active document record updated in-place and reminder schedule synchronized for ${editingDocType.toUpperCase()}.`
-        });
-        await Promise.all([loadStudentData(), loadReminderSchedule()]);
-        setTimeout(() => {
-          setIsDocMetadataOpen(false);
-          setEditingDocType(null);
-        }, 600);
-      } else {
-        setSaveDocError(true);
-        toast.error("Correction Failed", { description: res.error || "Unable to update document details." });
-      }
-    } catch (err) {
-      setSaveDocError(true);
-      toast.error("Database Error", {
-        description: err instanceof Error ? err.message : "Unable to communicate with database."
-      });
-    } finally {
-      setIsSavingDocMetadata(false);
-    }
-  };
-
-  // Verification & Rejection Handlers
-  const handleOpenRejectDialog = (docType: "passport" | "visa" | "efrro") => {
-    setRejectDocType(docType);
-    setIsRejectDialogOpen(true);
-  };
-
-  const handleConfirmRejection = async (reason: string) => {
-    if (!rejectDocType) return;
-    setIsRejecting(true);
-    try {
-      const res = await updateDocumentVerificationAction(
-        studentId,
-        rejectDocType,
-        null,
-        "rejected",
-        reason
-      );
-
-      if (res.success) {
-        toast.success("Document Rejected", {
-          description: "Document marked as rejected and audit entry logged."
-        });
-        setIsRejectDialogOpen(false);
-        setRejectDocType(null);
-        await Promise.all([loadStudentData(), loadReminderSchedule()]);
-      } else {
-        toast.error("Rejection Failed", {
-          description: res.error || "Unable to update document verification status."
-        });
-      }
-    } catch (err) {
-      toast.error("Database Error", {
-        description: err instanceof Error ? err.message : "Unable to communicate with database."
-      });
-    } finally {
-      setIsRejecting(false);
-    }
-  };
-
-  const handleApproveDocument = async (docType: "passport" | "visa" | "efrro") => {
-    setApprovingDocType(docType);
-    try {
-      const res = await updateDocumentVerificationAction(
-        studentId,
-        docType,
-        null,
-        "verified",
-        undefined
-      );
-
-      if (res.success) {
-        toast.success("Document Approved", {
-          description: "Document verified successfully. Compliance standing updated."
-        });
-        await Promise.all([loadStudentData(), loadReminderSchedule()]);
-      } else {
-        toast.error("Verification Update Failed", {
-          description: res.error || "Unable to update document verification status."
-        });
-      }
-    } catch (err) {
-      toast.error("Database Error", {
-        description: err instanceof Error ? err.message : "Unable to communicate with database."
-      });
-    } finally {
-      setApprovingDocType(null);
-    }
-  };
-
-  const handleManualDispatch = async (docType: "passport" | "visa" | "efrro", thresholdDays: number, ruleId: string) => {
-    setIsDispatchingReminder(ruleId);
-    try {
-      const res = await triggerReminderDispatchAction(studentId, docType, thresholdDays);
-      if (res.success) {
-        toast.success("Reminder Alert Dispatched", {
-          description: `Dispatched ${thresholdDays}-day reminder for ${docType.toUpperCase()}.`
-        });
-        await loadReminderSchedule();
-      } else {
-        toast.error("Dispatch Failed", {
-          description: res.error || "Unable to dispatch reminder notification."
-        });
-      }
-    } catch (err) {
-      toast.error("Dispatch Error", {
-        description: err instanceof Error ? err.message : "Failed to dispatch reminder."
-      });
-    } finally {
-      setIsDispatchingReminder(null);
+  const getComplianceHeaderBadge = (status: StudentProfile["complianceStatus"]) => {
+    switch (status) {
+      case "compliant":
+        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs px-2.5 py-0.5">Compliant</Badge>;
+      case "warning":
+        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs px-2.5 py-0.5">Warning / Expiring Soon</Badge>;
+      case "expired":
+        return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2.5 py-0.5">Expired Document</Badge>;
+      default:
+        return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2.5 py-0.5">Non-Compliant</Badge>;
     }
   };
 
@@ -1056,118 +765,6 @@ export default function StudentDetailsPage({ params }: PageProps) {
       </div>
     );
   }
-
-  const getComplianceHeaderBadge = (status: StudentProfile["complianceStatus"]) => {
-    switch (status) {
-      case "compliant":
-        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs px-2.5 py-0.5">Compliant</Badge>;
-      case "warning":
-        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs px-2.5 py-0.5">Warning / Expiring Soon</Badge>;
-      case "expired":
-        return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2.5 py-0.5">Expired Document</Badge>;
-      default:
-        return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2.5 py-0.5">Non-Compliant</Badge>;
-    }
-  };
-
-  const getDocStatusIcon = (doc: StudentDocument, daysLeft?: number) => {
-    if (!doc.hasUploadedDocument || doc.verificationStatus === "not_uploaded") {
-      return <div className="h-3.5 w-3.5 rounded-full bg-muted-foreground/40 shrink-0" />;
-    }
-    if (doc.verificationStatus === "rejected") {
-      return <XCircle className="h-4 w-4 text-destructive shrink-0" />;
-    }
-    if (doc.verificationStatus === "pending") {
-      return <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />;
-    }
-    if (daysLeft !== undefined && daysLeft < 0) {
-      return <XCircle className="h-4 w-4 text-destructive shrink-0" />;
-    }
-    if (daysLeft !== undefined && daysLeft <= 30) {
-      return <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />;
-    }
-    return <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />;
-  };
-
-  const getReminderStatusBadge = (status: ReminderStatus, statusLabel?: string) => {
-    switch (status) {
-      case "DISPATCHED":
-        return (
-          <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium">
-            {statusLabel || "Dispatched"}
-          </Badge>
-        );
-      case "DUE":
-        if (statusLabel === "Passed") {
-          return (
-            <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground/80 border-border/50 bg-muted/20 font-normal">
-              Passed
-            </Badge>
-          );
-        }
-        if (statusLabel === "Due Today") {
-          return (
-            <Badge 
-              variant="outline" 
-              className="text-[9px] px-1.5 py-0.5 h-4 bg-amber-500/25 text-amber-700 dark:text-amber-300 border-amber-500/50 font-bold animate-pulse"
-            >
-              Due Today
-            </Badge>
-          );
-        }
-        return (
-          <Badge 
-            variant="outline" 
-            className={`text-[9px] px-1.5 py-0.5 h-4 ${
-              statusLabel === "Due Now" 
-                ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 font-bold" 
-                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold"
-            }`}
-          >
-            {statusLabel || "Due"}
-          </Badge>
-        );
-      case "FAILED":
-        return <Badge variant="destructive" className="text-[9px] px-1.5 py-0.5 h-4 font-medium">Failed</Badge>;
-      case "EXPIRED":
-        return (
-          <Badge variant="destructive" className="text-[9px] px-1.5 py-0.5 h-4 bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 font-medium">
-            {statusLabel === "Passed" ? "Passed" : "Expired"}
-          </Badge>
-        );
-      case "CANCELLED":
-        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground border-border/60 bg-muted/20">Cancelled</Badge>;
-      case "NOT_APPLICABLE":
-        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground border-border/60">Not Available</Badge>;
-      case "NOT_DUE":
-      default:
-        return <Badge variant="outline" className="text-[9px] px-1.5 py-0.5 h-4 text-muted-foreground/80 border-border/50">Scheduled</Badge>;
-    }
-  };
-
-  const formatDisplayDate = (dateStr?: string | null) => {
-    if (!dateStr || dateStr.trim() === "" || dateStr === "Not provided" || dateStr === "Not Recorded") {
-      return "Not provided";
-    }
-    return CalendarDateEngine.formatDateDisplay(dateStr);
-  };
-
-  const renderExpiryHealthBadge = (expiryDate?: string | null, daysRemaining?: number | null) => {
-    if (!expiryDate || expiryDate === "Not provided" || expiryDate === "Not Recorded") {
-      return (
-        <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground border-border/60 bg-muted/20">
-          No Expiry Recorded
-        </Badge>
-      );
-    }
-
-    const health = CalendarDateEngine.getExpiryHealth(daysRemaining);
-    return (
-      <Badge variant={health.badgeVariant} className={`text-[10px] h-5 font-medium ${health.colorClass}`}>
-        {health.label}
-      </Badge>
-    );
-  };
 
   return (
     <div className="space-y-6 w-full max-w-full min-w-0">
@@ -1257,18 +854,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
       {/* Main Grid View */}
       <div className="grid gap-6 lg:grid-cols-3 w-full max-w-full min-w-0">
-        {/* Left 2 Cols: Tabbed Content & Immigration Documents */}
+        {/* Left 2 Cols: Tabbed Content */}
         <div className="lg:col-span-2 space-y-6 w-full max-w-full min-w-0">
           {/* Sub-tabs for detailed drill-down */}
           <SectionNavGroup orientation="horizontal" variant="segmented" className="w-full max-w-full min-w-0">
-            <SectionNavCard
-              icon={FileText}
-              title="Legal & Immigration"
-              isActive={activeSubTab === "immigration"}
-              onClick={() => setActiveSubTab("immigration")}
-              variant="segmented"
-              size="sm"
-            />
             <SectionNavCard
               icon={User}
               title="Personal Identity"
@@ -1295,120 +884,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
             />
           </SectionNavGroup>
 
-          {/* Tab 1: Immigration Documents */}
-          {activeSubTab === "immigration" && (
-            <div className="space-y-5">
-              {/* PASSPORT DOCUMENT CARD */}
-              <StudentDocumentCard
-                documentType="passport"
-                title="PASSPORT DOCUMENT"
-                description="Official primary international identity document."
-                studentId={student.id}
-                documentNumber={student.passport.number}
-                issueDate={student.passport.issueDate}
-                expiryDate={student.passport.expiryDate}
-                placeOfIssue={student.passport.placeOfIssue}
-                versionNumber={student.passport.versionNumber}
-                verificationStatus={student.passport.verificationStatus}
-                hasUploadedDocument={student.passport.hasUploadedDocument}
-                filePath={student.passport.filePath}
-                verifiedAt={student.passport.verifiedAt}
-                verifiedBy={student.passport.verifiedBy}
-                rejectionReason={student.passport.rejectionReason}
-                daysToExpiry={student.daysToPassportExpiry}
-                expectedGraduationDate={student.expectedGraduation}
-                activeEarlyAuthorization={student.passport.activeEarlyAuthorization}
-                onUploadRenewalClick={() => openRenewalDialog("passport")}
-                onCorrectExpiryClick={() => openExpiryDialog("passport")}
-                onCorrectMetadataClick={() => openDocMetadataDialog("passport")}
-                onAllowEarlyUploadClick={() => {
-                  setEarlyUploadDocType("passport");
-                  setIsEarlyUploadDialogOpen(true);
-                }}
-                onApproveClick={() => handleApproveDocument("passport")}
-                onRejectClick={() => handleOpenRejectDialog("passport")}
-                isApproving={approvingDocType === "passport"}
-                isRejecting={isRejecting && rejectDocType === "passport"}
-              />
-
-              {/* VISA DOCUMENT CARD */}
-              <StudentDocumentCard
-                documentType="visa"
-                title="VISA DOCUMENT"
-                description="Verification of active Student Visa validity."
-                studentId={student.id}
-                documentNumber={student.visa.number}
-                issueDate={student.visa.issueDate}
-                expiryDate={student.visa.expiryDate}
-                visaType={student.visa.visaType}
-                versionNumber={student.visa.versionNumber}
-                verificationStatus={student.visa.verificationStatus}
-                hasUploadedDocument={student.visa.hasUploadedDocument}
-                filePath={student.visa.filePath}
-                verifiedAt={student.visa.verifiedAt}
-                verifiedBy={student.visa.verifiedBy}
-                rejectionReason={student.visa.rejectionReason}
-                daysToExpiry={student.daysToVisaExpiry}
-                expectedGraduationDate={student.expectedGraduation}
-                activeEarlyAuthorization={student.visa.activeEarlyAuthorization}
-                onUploadRenewalClick={() => openRenewalDialog("visa")}
-                onCorrectExpiryClick={() => openExpiryDialog("visa")}
-                onCorrectMetadataClick={() => openDocMetadataDialog("visa")}
-                onAllowEarlyUploadClick={() => {
-                  setEarlyUploadDocType("visa");
-                  setIsEarlyUploadDialogOpen(true);
-                }}
-                onApproveClick={() => handleApproveDocument("visa")}
-                onRejectClick={() => handleOpenRejectDialog("visa")}
-                isApproving={approvingDocType === "visa"}
-                isRejecting={isRejecting && rejectDocType === "visa"}
-              />
-
-              {/* EFRRO REGISTRATION CARD */}
-              {student.efrro ? (
-                <StudentDocumentCard
-                  documentType="efrro"
-                  title="eFRRO / RESIDENTIAL PERMIT"
-                  description="Local registration status with Indian Immigration services."
-                  studentId={student.id}
-                  documentNumber={student.efrro.number}
-                  issueDate={student.efrro.issueDate}
-                  expiryDate={student.efrro.expiryDate}
-                  versionNumber={student.efrro.versionNumber}
-                  verificationStatus={student.efrro.verificationStatus}
-                  hasUploadedDocument={student.efrro.hasUploadedDocument}
-                  filePath={student.efrro.filePath}
-                  verifiedAt={student.efrro.verifiedAt}
-                  verifiedBy={student.efrro.verifiedBy}
-                  rejectionReason={student.efrro.rejectionReason}
-                  daysToExpiry={student.daysToEfrroExpiry}
-                  expectedGraduationDate={student.expectedGraduation}
-                  activeEarlyAuthorization={student.efrro.activeEarlyAuthorization}
-                  onUploadRenewalClick={() => openRenewalDialog("efrro")}
-                  onCorrectExpiryClick={() => openExpiryDialog("efrro")}
-                  onCorrectMetadataClick={() => openDocMetadataDialog("efrro")}
-                  onAllowEarlyUploadClick={() => {
-                    setEarlyUploadDocType("efrro");
-                    setIsEarlyUploadDialogOpen(true);
-                  }}
-                  onApproveClick={() => handleApproveDocument("efrro")}
-                  onRejectClick={() => handleOpenRejectDialog("efrro")}
-                  isApproving={approvingDocType === "efrro"}
-                  isRejecting={isRejecting && rejectDocType === "efrro"}
-                />
-              ) : (
-                <Card className="border border-border/60 shadow-sm bg-muted/10 p-6 text-center">
-                  <Globe className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2" />
-                  <p className="font-medium text-sm text-foreground">eFRRO Exemption Active</p>
-                  <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 font-caption">
-                    Based on international bilateral treaties, students from {student.nationalityName} are exempted from mandatory eFRRO Residential Permit filings.
-                  </p>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* Tab 2: Personal & Demographic Info */}
+          {/* Tab 1: Personal & Demographic Info */}
           {activeSubTab === "personal" && (
             <Card className="border border-border/60 shadow-sm rounded-2xl overflow-hidden">
               <CardHeader className="pb-4 border-b border-border/50">
@@ -1625,6 +1101,46 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <p className="text-[10px] text-muted-foreground leading-tight">
                       Automatically calculated from admission date ({AcademicProgressionEngine.formatDisplayDate(student.admissionDate)}) and {student.semesterDuration || 6}-{student.semesterDurationUnit || "month"} intervals.
                     </p>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Admission / Academic Year</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.admissionAcademicYear || "Not specified"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Fee Payment Category / Funding Type</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.feePaymentCategory === "self_financed"
+                        ? "Self Financed"
+                        : student.feePaymentCategory === "scholarship"
+                        ? "Scholarship"
+                        : "Not specified"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Tuition Fees</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.tuitionFeeAmount !== null && student.tuitionFeeAmount !== undefined ? (
+                        `${student.tuitionFeeCurrency === "USD" ? "$" : "₹"}${student.tuitionFeeAmount.toLocaleString()} ${student.tuitionFeeCurrency || ""}`.trim()
+                      ) : (
+                        "Not specified"
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Hostel Fees</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.hostelFeeAmount !== null && student.hostelFeeAmount !== undefined ? (
+                        `${student.hostelFeeCurrency === "USD" ? "$" : "₹"}${student.hostelFeeAmount.toLocaleString()} ${student.hostelFeeCurrency || ""}`.trim()
+                      ) : (
+                        "Not specified"
+                      )}
+                    </span>
                   </div>
 
                   <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
@@ -1925,277 +1441,6 @@ export default function StudentDetailsPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* FIRST-CLASS "UPDATE EXPIRY DATE" DIALOG */}
-      <Dialog open={isExpiryDialogOpen} onOpenChange={setIsExpiryDialogOpen}>
-        <DialogContent className="sm:max-w-md w-full">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-bold flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-primary" />
-              Update {expiryDocType ? expiryDocType.toUpperCase() : "Document"} Expiration Date
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveExpiryDate} className="space-y-4 py-2 text-xs">
-            {/* Current Document Summary Card */}
-            <div className="p-3 rounded-lg bg-muted/30 border border-border/60 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground font-caption uppercase tracking-wider font-semibold">
-                  Current Active Document
-                </span>
-                <Badge variant="outline" className="text-[9px] h-4 font-mono">
-                  v{currentVersionNumberDisplay}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-[10px] text-muted-foreground font-caption block">Document Number</span>
-                  <span className="font-mono font-semibold text-foreground">{currentDocNumberDisplay}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-muted-foreground font-caption block">Current Expiry</span>
-                  <span className="font-mono font-semibold text-foreground">{currentExpiryDateDisplay}</span>
-                </div>
-                <div className="col-span-2 pt-1 border-t border-border/30">
-                  <span className="text-[10px] text-muted-foreground font-caption block">Current Issue Date</span>
-                  <span className="font-medium text-foreground">{currentIssueDateDisplay}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Document Issue Date (Preserved or Required) */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-foreground" htmlFor="expiryIssueDate">
-                  Document Issue Date *
-                </label>
-                <span className="text-[10px] text-muted-foreground font-caption">
-                  {currentIssueDateDisplay !== "Not Recorded" ? "(Preserved from active record)" : "(Required to validate expiry)"}
-                </span>
-              </div>
-              <DatePicker
-                id="expiryIssueDate"
-                value={expiryIssueDate}
-                onChange={(e) => {
-                  setExpiryIssueDate(e.target.value);
-                  setExpiryErrors(prev => ({ ...prev, expiryIssueDate: "", newExpiryDate: "" }));
-                }}
-                error={expiryErrors.expiryIssueDate}
-                placeholder="Select document issue date..."
-              />
-              {expiryErrors.expiryIssueDate && (
-                <p className="text-[10px] text-destructive font-caption font-medium">{expiryErrors.expiryIssueDate}</p>
-              )}
-            </div>
-
-            {/* New Expiration Date */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground" htmlFor="newExpiryDate">
-                New Expiration Date *
-              </label>
-              <DatePicker
-                id="newExpiryDate"
-                value={newExpiryDate}
-                onChange={(e) => {
-                  setNewExpiryDate(e.target.value);
-                  setExpiryErrors(prev => ({ ...prev, newExpiryDate: "" }));
-                }}
-                error={expiryErrors.newExpiryDate}
-                placeholder="Select new expiration date..."
-              />
-              {expiryErrors.newExpiryDate && (
-                <p className="text-[10px] text-destructive font-caption font-medium">{expiryErrors.newExpiryDate}</p>
-              )}
-            </div>
-
-            {/* Mandatory Reason */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground" htmlFor="expiryReason">
-                Reason for Expiry Modification *
-              </label>
-              <Textarea
-                id="expiryReason"
-                value={expiryReason}
-                onChange={(e) => {
-                  setExpiryReason(e.target.value);
-                  setExpiryErrors(prev => ({ ...prev, expiryReason: "" }));
-                }}
-                placeholder="e.g. Visa extension endorsed by FRRO; passport validity extended by Embassy..."
-                className={`min-h-18 text-xs ${expiryErrors.expiryReason ? "border-destructive focus-visible:ring-destructive" : ""}`}
-              />
-              {expiryErrors.expiryReason && (
-                <p className="text-[10px] text-destructive font-caption font-medium">{expiryErrors.expiryReason}</p>
-              )}
-              <p className="text-[10px] text-muted-foreground font-caption">
-                This modification corrects the active document expiration date in-place with audit log traceability. To submit a newly issued renewal document with file evidence, use &quot;Upload New Document&quot;.
-              </p>
-            </div>
-
-            <DialogFooter className="pt-3">
-              <Button type="button" variant="outline" size="sm" onClick={() => setIsExpiryDialogOpen(false)}>
-                Cancel
-              </Button>
-              <AsyncActionButton
-                type="submit"
-                size="sm"
-                isLoading={isSavingExpiry}
-                isSuccess={saveExpirySuccess}
-                isError={saveExpiryError}
-                idleText="Save Expiration Date"
-                loadingText="Updating expiry..."
-                successText="Expiry date updated"
-                errorText="Try Again"
-              />
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* FULL METADATA CORRECTION DIALOG */}
-      <Dialog open={isDocMetadataOpen} onOpenChange={setIsDocMetadataOpen}>
-        <DialogContent className="sm:max-w-md w-full max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-semibold flex items-center gap-2">
-              <Edit3 className="h-4 w-4 text-primary" />
-              Correct {editingDocType ? editingDocType.toUpperCase() : "Document"} Information
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveDocMetadata} className="space-y-4 py-2 text-xs">
-            <p className="text-muted-foreground font-caption">
-              Use this option only when the information recorded for the existing document is incorrect. This updates the current active record in-place without creating a new document version.
-            </p>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="documentNumber">
-                {editingDocType === "passport" ? "Passport Number" : editingDocType === "visa" ? "Visa Number" : "Certificate Number"} *
-              </label>
-              <Input
-                id="documentNumber"
-                value={docMetadataForm.documentNumber}
-                onChange={(e) => {
-                  setDocMetadataForm(prev => ({ ...prev, documentNumber: e.target.value }));
-                  setDocMetadataErrors(prev => ({ ...prev, documentNumber: "" }));
-                }}
-                className={`h-9 text-sm font-mono ${docMetadataErrors.documentNumber ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                placeholder="e.g. A-12345678"
-              />
-              {docMetadataErrors.documentNumber && (
-                <p className="text-[10px] text-destructive font-caption">{docMetadataErrors.documentNumber}</p>
-              )}
-            </div>
-
-            {editingDocType === "passport" && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="placeOfIssue">Place of Issue</label>
-                <Input
-                  id="placeOfIssue"
-                  value={docMetadataForm.placeOfIssue}
-                  onChange={(e) => setDocMetadataForm(prev => ({ ...prev, placeOfIssue: e.target.value }))}
-                  className="h-9 text-sm"
-                  placeholder="e.g. Berlin / Embassy of Germany, New Delhi"
-                />
-              </div>
-            )}
-
-            {editingDocType === "visa" && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="visaType">Visa Classification</label>
-                <Select 
-                  value={docMetadataForm.visaType} 
-                  onValueChange={(val) => setDocMetadataForm(prev => ({ ...prev, visaType: val || "Student (S-1)" }))}
-                >
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Student (S-1)">Student (S-1)</SelectItem>
-                    <SelectItem value="Student (S-2)">Student (S-2)</SelectItem>
-                    <SelectItem value="Research (R-1)">Research (R-1)</SelectItem>
-                    <SelectItem value="Intern (I-1)">Intern (I-1)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="docIssueDate">Issue Date *</label>
-                <DatePicker
-                  id="docIssueDate"
-                  value={docMetadataForm.issueDate}
-                  onChange={(e) => {
-                    setDocMetadataForm(prev => ({ ...prev, issueDate: e.target.value }));
-                    setDocMetadataErrors(prev => ({ ...prev, issueDate: "", expiryDate: "" }));
-                  }}
-                  error={docMetadataErrors.issueDate}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="docExpiryDate">Expiration Date *</label>
-                <DatePicker
-                  id="docExpiryDate"
-                  value={docMetadataForm.expiryDate}
-                  onChange={(e) => {
-                    setDocMetadataForm(prev => ({ ...prev, expiryDate: e.target.value }));
-                    setDocMetadataErrors(prev => ({ ...prev, expiryDate: "" }));
-                  }}
-                  error={docMetadataErrors.expiryDate}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground" htmlFor="changeReason">Reason for Correction *</label>
-              <Textarea
-                id="changeReason"
-                value={docMetadataForm.changeReason}
-                onChange={(e) => {
-                  setDocMetadataForm(prev => ({ ...prev, changeReason: e.target.value }));
-                  setDocMetadataErrors(prev => ({ ...prev, changeReason: "" }));
-                }}
-                placeholder="e.g. Corrected typo in expiration date following physical document audit..."
-                className={`min-h-16 text-sm ${docMetadataErrors.changeReason ? "border-destructive" : ""}`}
-              />
-              {docMetadataErrors.changeReason && (
-                <p className="text-[10px] text-destructive font-caption">{docMetadataErrors.changeReason}</p>
-              )}
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setIsDocMetadataOpen(false)}>
-                Cancel
-              </Button>
-              <AsyncActionButton
-                type="submit"
-                size="sm"
-                isLoading={isSavingDocMetadata}
-                isSuccess={saveDocSuccess}
-                isError={saveDocError}
-                idleText="Save Correction"
-                loadingText="Updating metadata..."
-                successText="Saved"
-                errorText="Try Again"
-              />
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* GENUINE RENEWAL / REPLACEMENT UPLOAD MODAL */}
-      {renewalDocType && (
-        <DocumentUploadDialog
-          config={DOCUMENT_CONFIGS[renewalDocType]}
-          studentId={studentId}
-          isOpen={isRenewalUploadOpen}
-          onOpenChange={setIsRenewalUploadOpen}
-          onSuccess={async () => {
-            await Promise.all([loadStudentData(), loadReminderSchedule()]);
-          }}
-        />
-      )}
-
       {/* Edit Student Profile Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={handleCloseDialog}>
         <DialogContent className="sm:max-w-xl w-full max-h-[90vh] overflow-y-auto">
@@ -2463,6 +1708,109 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     onChange={handleFormChange} 
                     className="h-9 text-sm" 
                   />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-foreground" htmlFor="admissionAcademicYear">
+                    Admission / Academic Year
+                  </label>
+                  <Input 
+                    id="admissionAcademicYear" 
+                    placeholder="e.g. 2024-25, 2025-26, 2026-27" 
+                    value={editForm.admissionAcademicYear} 
+                    onChange={handleFormChange} 
+                    className="h-9 text-sm" 
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-foreground" htmlFor="feePaymentCategory">
+                    Fee Payment Category / Funding Type
+                  </label>
+                  <Select 
+                    value={editForm.feePaymentCategory || "not_specified"} 
+                    onValueChange={(val) => handleFormSelectChange("feePaymentCategory", !val || val === "not_specified" ? "" : val)}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select funding type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="not_specified">Not Specified</SelectItem>
+                      {FEE_PAYMENT_CATEGORY_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-foreground">
+                    Tuition Fees
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <Input 
+                        id="tuitionFeeAmount" 
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Amount (leave blank if not specified)" 
+                        value={editForm.tuitionFeeAmount} 
+                        onChange={handleFormChange} 
+                        className="h-9 text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <Select 
+                        value={editForm.tuitionFeeCurrency || "INR"} 
+                        onValueChange={(val) => handleFormSelectChange("tuitionFeeCurrency", val || "INR")}
+                      >
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FEE_CURRENCY_OPTIONS.map(c => (
+                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-foreground">
+                    Hostel Fees
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <Input 
+                        id="hostelFeeAmount" 
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Amount (leave blank if not specified)" 
+                        value={editForm.hostelFeeAmount} 
+                        onChange={handleFormChange} 
+                        className="h-9 text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <Select 
+                        value={editForm.hostelFeeCurrency || "INR"} 
+                        onValueChange={(val) => handleFormSelectChange("hostelFeeCurrency", val || "INR")}
+                      >
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FEE_CURRENCY_OPTIONS.map(c => (
+                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
 
                 {editForm.admissionCategory === "other" && (
@@ -2923,41 +2271,6 @@ export default function StudentDetailsPage({ params }: PageProps) {
         onClose={handleCancelDiscard}
         onConfirm={handleConfirmDiscard}
       />
-
-      {/* ISCMS Document Rejection Modal */}
-      <RejectionDialog
-        open={isRejectDialogOpen}
-        title={`Reject ${rejectDocType ? rejectDocType.toUpperCase() : "Document"} Verification`}
-        description="Please provide an explanation for rejecting this uploaded document. This note will be recorded in the student audit log and compliance history."
-        placeholder="Explain reason for rejection (e.g. blurred scan, incorrect document details, expired document)..."
-        confirmText="Reject Document"
-        cancelText="Cancel"
-        isLoading={isRejecting}
-        onClose={() => {
-          if (!isRejecting) {
-            setIsRejectDialogOpen(false);
-            setRejectDocType(null);
-          }
-        }}
-        onConfirm={handleConfirmRejection}
-      />
-
-      {/* Staff Early Document Upload Exception Modal */}
-      {earlyUploadDocType && (
-        <AllowEarlyUploadDialog
-          isOpen={isEarlyUploadDialogOpen}
-          onOpenChange={(open) => {
-            setIsEarlyUploadDialogOpen(open);
-            if (!open) setEarlyUploadDocType(null);
-          }}
-          documentType={earlyUploadDocType}
-          documentTitle={earlyUploadDocType === "passport" ? "Passport" : earlyUploadDocType === "visa" ? "Visa" : "eFRRO"}
-          studentId={studentId}
-          onSuccess={async () => {
-            await loadStudentData();
-          }}
-        />
-      )}
 
       {/* WhatsApp Reminder Dispatch Preview & Confirmation Modal */}
       <DispatchReminderDialog

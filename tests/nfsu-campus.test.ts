@@ -134,7 +134,7 @@ test("Lifecycle: empty -> campus", () => {
 });
 
 test("Lifecycle: campus -> different campus", () => {
-  let record = {
+  let record: { nfsu_campus: string | null; iccr_application_number: string; sii_application_number: string } = {
     nfsu_campus: "Delhi Campus",
     iccr_application_number: "ICCR-001",
     sii_application_number: "SII-002"
@@ -152,13 +152,13 @@ test("Lifecycle: campus -> different campus", () => {
 });
 
 test("Lifecycle: campus -> cleared (null)", () => {
-  let record = {
+  let record: { nfsu_campus: string | null; iccr_application_number: string; sii_application_number: string } = {
     nfsu_campus: "Gandhinagar Campus",
     iccr_application_number: "ICCR-001",
     sii_application_number: "SII-002"
   };
 
-  const clearedCampus = "";
+  const clearedCampus: string = "";
   record = {
     ...record,
     nfsu_campus: clearedCampus ? clearedCampus.trim() : null

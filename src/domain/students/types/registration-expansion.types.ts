@@ -41,6 +41,10 @@ export type AdmissionCategory =
   | "foreign_govt_sponsored" 
   | "other";
 
+export type FeePaymentCategory = "self_financed" | "scholarship";
+
+export type FeeCurrency = "INR" | "USD";
+
 export const MARITAL_STATUS_OPTIONS: Array<{ value: MaritalStatus; label: string }> = [
   { value: "single", label: "Single" },
   { value: "married", label: "Married" },
@@ -123,6 +127,16 @@ export const ADMISSION_CATEGORY_OPTIONS: Array<{ value: AdmissionCategory; label
     requiresIccrNumber: false,
     description: "Custom institutional or bilateral program track."
   }
+];
+
+export const FEE_PAYMENT_CATEGORY_OPTIONS: Array<{ value: FeePaymentCategory; label: string }> = [
+  { value: "self_financed", label: "Self Financed" },
+  { value: "scholarship", label: "Scholarship" }
+];
+
+export const FEE_CURRENCY_OPTIONS: Array<{ value: FeeCurrency; label: string }> = [
+  { value: "INR", label: "INR (₹)" },
+  { value: "USD", label: "USD ($)" }
 ];
 
 /**

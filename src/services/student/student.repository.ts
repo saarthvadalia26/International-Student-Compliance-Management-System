@@ -239,6 +239,12 @@ export class SupabaseStudentRepository implements IStudentRepository {
           sii_application_number: resolvedSiiNo,
           iccr_application_number: resolvedIccrNo,
           nfsu_campus: resolvedNfsuCampus,
+          admission_academic_year: input.admissionAcademicYear ? input.admissionAcademicYear.trim() : null,
+          fee_payment_category: input.feePaymentCategory || null,
+          tuition_fee_amount: input.tuitionFeeAmount !== undefined && input.tuitionFeeAmount !== null ? input.tuitionFeeAmount : null,
+          tuition_fee_currency: input.tuitionFeeCurrency || null,
+          hostel_fee_amount: input.hostelFeeAmount !== undefined && input.hostelFeeAmount !== null ? input.hostelFeeAmount : null,
+          hostel_fee_currency: input.hostelFeeCurrency || null,
           created_by: actorId,
           updated_by: actorId
         })
@@ -444,6 +450,12 @@ export class SupabaseStudentRepository implements IStudentRepository {
           siiApplicationNumber: academicData.sii_application_number || null,
           iccrApplicationNumber: academicData.iccr_application_number || null,
           nfsuCampus: academicData.nfsu_campus || null,
+          admissionAcademicYear: academicData.admission_academic_year || null,
+          feePaymentCategory: academicData.fee_payment_category || null,
+          tuitionFeeAmount: academicData.tuition_fee_amount !== null && academicData.tuition_fee_amount !== undefined ? Number(academicData.tuition_fee_amount) : null,
+          tuitionFeeCurrency: academicData.tuition_fee_currency || null,
+          hostelFeeAmount: academicData.hostel_fee_amount !== null && academicData.hostel_fee_amount !== undefined ? Number(academicData.hostel_fee_amount) : null,
+          hostelFeeCurrency: academicData.hostel_fee_currency || null,
           createdAt: new Date(academicData.created_at),
           updatedAt: new Date(academicData.updated_at),
           deletedAt: academicData.deleted_at ? new Date(academicData.deleted_at) : null,
@@ -592,6 +604,12 @@ export class SupabaseStudentRepository implements IStudentRepository {
         siiApplicationNumber: academic?.sii_application_number || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
         nfsuCampus: academic?.nfsu_campus || null,
+        admissionAcademicYear: academic?.admission_academic_year || null,
+        feePaymentCategory: academic?.fee_payment_category || null,
+        tuitionFeeAmount: academic?.tuition_fee_amount !== null && academic?.tuition_fee_amount !== undefined ? Number(academic.tuition_fee_amount) : null,
+        tuitionFeeCurrency: academic?.tuition_fee_currency || null,
+        hostelFeeAmount: academic?.hostel_fee_amount !== null && academic?.hostel_fee_amount !== undefined ? Number(academic.hostel_fee_amount) : null,
+        hostelFeeCurrency: academic?.hostel_fee_currency || null,
         createdAt: academic?.created_at ? new Date(academic.created_at) : new Date(student.created_at),
         updatedAt: academic?.updated_at ? new Date(academic.updated_at) : new Date(student.updated_at),
         deletedAt: academic?.deleted_at ? new Date(academic.deleted_at) : null,
@@ -782,6 +800,25 @@ export class SupabaseStudentRepository implements IStudentRepository {
     }
     if (input.nfsuCampus !== undefined) {
       academicUpdates.nfsu_campus = input.nfsuCampus ? input.nfsuCampus.trim() : null;
+    }
+    if (input.admissionAcademicYear !== undefined) {
+      academicUpdates.admission_academic_year = input.admissionAcademicYear ? input.admissionAcademicYear.trim() : null;
+    }
+    if (input.feePaymentCategory !== undefined) {
+      academicUpdates.fee_payment_category = input.feePaymentCategory || null;
+    }
+    if (input.tuitionFeeAmount !== undefined) {
+      // Preserve NULL vs 0: only store null when explicitly set to null/undefined
+      academicUpdates.tuition_fee_amount = input.tuitionFeeAmount !== null ? input.tuitionFeeAmount : null;
+    }
+    if (input.tuitionFeeCurrency !== undefined) {
+      academicUpdates.tuition_fee_currency = input.tuitionFeeCurrency || null;
+    }
+    if (input.hostelFeeAmount !== undefined) {
+      academicUpdates.hostel_fee_amount = input.hostelFeeAmount !== null ? input.hostelFeeAmount : null;
+    }
+    if (input.hostelFeeCurrency !== undefined) {
+      academicUpdates.hostel_fee_currency = input.hostelFeeCurrency || null;
     }
     if (input.admissionCategoryOther !== undefined) academicUpdates.admission_category_other = input.admissionCategoryOther ? input.admissionCategoryOther.trim() : null;
     if (input.overrideSchoolId !== undefined) academicUpdates.override_school_id = input.overrideSchoolId ? input.overrideSchoolId.trim() : null;

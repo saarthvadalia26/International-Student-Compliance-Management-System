@@ -60,6 +60,18 @@ export const RegisterStudentValidationSchema = z.object({
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
   nfsuCampus: z.string().max(255).optional().nullable(),
+  admissionAcademicYear: z.string().max(20).optional().nullable(),
+  feePaymentCategory: z.enum(["self_financed", "scholarship"], {
+    message: "Please select a valid fee payment category"
+  }).optional().nullable(),
+  tuitionFeeAmount: z.number().nonnegative("Tuition fee amount must be zero or a positive number").optional().nullable(),
+  tuitionFeeCurrency: z.enum(["INR", "USD"], {
+    message: "Please select INR or USD for tuition fee currency"
+  }).optional().nullable(),
+  hostelFeeAmount: z.number().nonnegative("Hostel fee amount must be zero or a positive number").optional().nullable(),
+  hostelFeeCurrency: z.enum(["INR", "USD"], {
+    message: "Please select INR or USD for hostel fee currency"
+  }).optional().nullable(),
   relationshipType: z.enum([
     "father", 
     "mother", 
@@ -214,6 +226,13 @@ export const UpdateStudentValidationSchema = z.object({
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
+  nfsuCampus: z.string().max(255).optional().nullable(),
+  admissionAcademicYear: z.string().max(20).optional().nullable(),
+  feePaymentCategory: z.enum(["self_financed", "scholarship"]).optional().nullable(),
+  tuitionFeeAmount: z.number().nonnegative().optional().nullable(),
+  tuitionFeeCurrency: z.enum(["INR", "USD"]).optional().nullable(),
+  hostelFeeAmount: z.number().nonnegative().optional().nullable(),
+  hostelFeeCurrency: z.enum(["INR", "USD"]).optional().nullable(),
   relationshipType: z.enum([
     "father", 
     "mother", 

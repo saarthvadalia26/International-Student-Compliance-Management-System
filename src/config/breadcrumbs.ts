@@ -129,34 +129,19 @@ export function getRouteMetadata(pathname: string, searchParams?: URLSearchParam
     };
   }
 
-  // 2. Dynamic Student Routes (/students/[id], /students/[id]/passport, etc.)
+  // 2. Dynamic Student Routes (/students/[id])
   if (cleanPath.startsWith("/students/")) {
-    const segments = cleanPath.split("/").filter(Boolean); // e.g. ["students", "123", "passport"]
+    const segments = cleanPath.split("/").filter(Boolean);
     const items: BreadcrumbItem[] = [
       { label: "Workspace", href: "/dashboard" },
       { label: "Students", href: "/students" },
     ];
 
-    if (segments.length === 2 && segments[1] !== "add") {
-      // /students/[id]
+    if (segments.length >= 2 && segments[1] !== "add") {
       items.push({ label: "Student Details", isCurrent: true });
       return {
         section: "Workspace",
         pageTitle: "Student Details",
-        breadcrumbs: items,
-      };
-    } else if (segments.length >= 3) {
-      // /students/[id]/[docType] (passport, visa, efrro)
-      const studentId = segments[1];
-      const docType = segments[2];
-      const docLabel = humanizeSegment(docType);
-
-      items.push({ label: "Student Details", href: `/students/${studentId}` });
-      items.push({ label: `${docLabel} Document`, isCurrent: true });
-
-      return {
-        section: "Workspace",
-        pageTitle: `${docLabel} Document`,
         breadcrumbs: items,
       };
     }

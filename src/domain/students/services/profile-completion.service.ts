@@ -50,6 +50,8 @@ export interface StudentProfileEvaluationData {
   admissionCategory?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
+  iccrApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
 
   // Contact
   email?: string | null;
@@ -70,10 +72,13 @@ export interface StudentProfileEvaluationData {
   // Immigration & Compliance Metadata
   passportNumber?: string | null;
   passportExpiry?: string | Date | null;
+  passportStatus?: string | null;
   visaNumber?: string | null;
   visaExpiry?: string | Date | null;
+  visaStatus?: string | null;
   efrroNumber?: string | null;
   efrroExpiry?: string | Date | null;
+  efrroStatus?: string | null;
 }
 
 export class ProfileCompletionEngine {

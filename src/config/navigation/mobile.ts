@@ -23,23 +23,9 @@ export const mobileNavigation: NavigationConfig = {
       ],
     },
     {
-      title: "Documents",
-      href: "/students/:id/passport",
-      icon: "FileText",
-      items: [
-        {
-          title: "Passport",
-          href: "/students/:id/passport",
-        },
-        {
-          title: "Visa",
-          href: "/students/:id/visa",
-        },
-        {
-          title: "eFRRO",
-          href: "/students/:id/efrro",
-        },
-      ],
+      title: "Replacement Requests",
+      href: "/replacement-requests",
+      icon: "FileCheck2",
     },
     {
       title: "Reminders",

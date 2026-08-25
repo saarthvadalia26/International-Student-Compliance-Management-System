@@ -2,14 +2,18 @@ import {
   MaritalStatus,
   BloodGroup,
   RelationshipType,
-  AdmissionCategory
+  AdmissionCategory,
+  FeePaymentCategory,
+  FeeCurrency
 } from "@/domain/students/types/registration-expansion.types";
 
 export type {
   MaritalStatus,
   BloodGroup,
   RelationshipType,
-  AdmissionCategory
+  AdmissionCategory,
+  FeePaymentCategory,
+  FeeCurrency
 };
 
 export type StudentStatus = "active" | "suspended" | "graduated" | "withdrawn";
@@ -94,6 +98,12 @@ export interface StudentAcademic {
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   nfsuCampus?: string | null;
+  admissionAcademicYear?: string | null;
+  feePaymentCategory?: FeePaymentCategory | null;
+  tuitionFeeAmount?: number | null;
+  tuitionFeeCurrency?: FeeCurrency | null;
+  hostelFeeAmount?: number | null;
+  hostelFeeCurrency?: FeeCurrency | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -186,6 +196,12 @@ export interface RegisterStudentInput {
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   nfsuCampus?: string | null;
+  admissionAcademicYear?: string | null;
+  feePaymentCategory?: FeePaymentCategory | null;
+  tuitionFeeAmount?: number | null;
+  tuitionFeeCurrency?: FeeCurrency | null;
+  hostelFeeAmount?: number | null;
+  hostelFeeCurrency?: FeeCurrency | null;
   relationshipType?: RelationshipType | null;
   relationshipName?: string | null;
   relationshipPhone?: string | null;
@@ -258,6 +274,12 @@ export interface UpdateStudentInput {
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   nfsuCampus?: string | null;
+  admissionAcademicYear?: string | null;
+  feePaymentCategory?: FeePaymentCategory | null;
+  tuitionFeeAmount?: number | null;
+  tuitionFeeCurrency?: FeeCurrency | null;
+  hostelFeeAmount?: number | null;
+  hostelFeeCurrency?: FeeCurrency | null;
   relationshipType?: RelationshipType | null;
   relationshipName?: string | null;
   relationshipPhone?: string | null;
@@ -282,6 +304,7 @@ export interface StudentFilterOptions {
   programCode?: string;
   admissionCategory?: AdmissionCategory | "all";
   nfsuCampus?: string | "all";
+  feePaymentCategory?: FeePaymentCategory | "all" | "not_specified";
   limit?: number;
   offset?: number;
 }

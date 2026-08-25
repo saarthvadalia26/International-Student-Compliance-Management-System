@@ -14,6 +14,8 @@ import { getAcademicLevelLabel } from "@/domain/academic-programs/academic-level
 import { AcademicProgramService, LEGACY_PROGRAM_ALIASES } from "@/domain/academic-programs/academic-program.service";
 import { AcademicProgram } from "@/domain/academic-programs/types";
 import { SchoolService } from "@/domain/schools/school.service";
+import { StudentExcelExportService } from "@/domain/students/services/student-excel-export.service";
+import { StudentExportFilterCriteria } from "@/domain/students/utils/student-filter.util";
 
 const studentService = new StudentService();
 
@@ -36,6 +38,7 @@ export interface StudentListItem {
   iccrApplicationNumber?: string | null;
   siiApplicationNumber?: string | null;
   nfsuCampus?: string | null;
+  feePaymentCategory?: string | null;
   passport: { number: string };
   visa: { number: string };
   email: string;
@@ -118,6 +121,12 @@ export interface StudentDetailProfile {
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   nfsuCampus?: string | null;
+  admissionAcademicYear?: string | null;
+  feePaymentCategory?: string | null;
+  tuitionFeeAmount?: number | null;
+  tuitionFeeCurrency?: string | null;
+  hostelFeeAmount?: number | null;
+  hostelFeeCurrency?: string | null;
   totalSemesters?: number;
   semesterDuration?: number;
   semesterDurationUnit?: string;
@@ -531,7 +540,8 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         admissionCategory: academic?.admission_category || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
         siiApplicationNumber: academic?.sii_application_number || null,
-        nfsuCampus: academic?.nfsu_campus || null
+        nfsuCampus: academic?.nfsu_campus || null,
+        feePaymentCategory: academic?.fee_payment_category || null
       };
     });
 
@@ -744,6 +754,12 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       siiApplicationNumber: academic?.sii_application_number || null,
       iccrApplicationNumber: academic?.iccr_application_number || null,
       nfsuCampus: academic?.nfsu_campus || null,
+      admissionAcademicYear: academic?.admission_academic_year || null,
+      feePaymentCategory: academic?.fee_payment_category || null,
+      tuitionFeeAmount: academic?.tuition_fee_amount !== null && academic?.tuition_fee_amount !== undefined ? Number(academic.tuition_fee_amount) : null,
+      tuitionFeeCurrency: academic?.tuition_fee_currency || null,
+      hostelFeeAmount: academic?.hostel_fee_amount !== null && academic?.hostel_fee_amount !== undefined ? Number(academic.hostel_fee_amount) : null,
+      hostelFeeCurrency: academic?.hostel_fee_currency || null,
       totalSemesters: hasCourseConfig ? progression.totalSemesters : undefined,
       semesterDuration: hasCourseConfig ? progression.details.semesterDuration : undefined,
       semesterDurationUnit: hasCourseConfig ? progression.details.semesterDurationUnit : undefined,
@@ -2712,3 +2728,52 @@ export async function getStudentUploadAuthorizationsAction(
     return { success: false, error: sanitized.message, authorizations: [] };
   }
 }
+
+/**
+ * Server Action: Export student directory to official formatted Excel (.xlsx) workbook
+ */
+export async function exportStudentsExcelAction(criteria: StudentExportFilterCriteria = {}): Promise<{
+  success: boolean;
+  base64?: string;
+  fileName?: string;
+  mimeType?: string;
+  count?: number;
+  error?: string;
+}> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "You must be logged in as an authorized administrator or staff member to export student records."
+      };
+    }
+
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return {
+        success: false,
+        error: "Forbidden: Staff or Administrator privileges are required to export student data."
+      };
+    }
+
+    const { buffer, fileName, mimeType, count } = await StudentExcelExportService.exportStudents(criteria, user);
+
+    return {
+      success: true,
+      base64: buffer.toString("base64"),
+      fileName,
+      mimeType,
+      count
+    };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "exportStudentsExcelAction", route: "/students" });
+    return {
+      success: false,
+      error: sanitized.message || "Failed to generate Excel export."
+    };
+  }
+}
+

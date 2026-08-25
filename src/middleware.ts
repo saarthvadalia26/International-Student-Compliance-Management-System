@@ -133,11 +133,13 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/students") ||
-    pathname.startsWith("/compliance") ||
+    pathname.startsWith("/replacement-requests") ||
+    pathname.startsWith("/notifications") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/reminders") ||
     pathname.startsWith("/reports") ||
-    pathname.startsWith("/monitoring")
+    pathname.startsWith("/monitoring") ||
+    pathname.startsWith("/help")
   ) {
     if (!user) {
       url.pathname = "/login";
