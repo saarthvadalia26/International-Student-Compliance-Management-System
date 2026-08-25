@@ -131,14 +131,6 @@ export class ProfileCompletionEngine {
       { name: "Admission Category", present: this.isPresent(data.admissionCategory) }
     ];
 
-    // Conditional evaluation: If category is ICCR, require SII Application Number
-    if (data.admissionCategory === "iccr") {
-      academicFields.push({
-        name: "SII Application Number (Required for ICCR)",
-        present: this.isPresent(data.siiApplicationNumber)
-      });
-    }
-
     // Conditional evaluation: If category is Other, require Please Specify
     if (data.admissionCategory === "other") {
       academicFields.push({

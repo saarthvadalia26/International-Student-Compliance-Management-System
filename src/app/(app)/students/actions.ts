@@ -738,12 +738,8 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       expectedGraduation: hasCourseConfig ? (progression.expectedGraduationDateISO || academic?.expected_graduation || "") : (academic?.expected_graduation || ""),
       admissionCategory: academic?.admission_category || null,
       admissionCategoryOther: academic?.admission_category_other || null,
-      siiApplicationNumber: (academic?.admission_category === "iccr" || academic?.admission_category === "sii")
-        ? (academic?.sii_application_number || null)
-        : null,
-      iccrApplicationNumber: (academic?.admission_category === "iccr")
-        ? (academic?.iccr_application_number || null)
-        : null,
+      siiApplicationNumber: academic?.sii_application_number || null,
+      iccrApplicationNumber: academic?.iccr_application_number || null,
       totalSemesters: hasCourseConfig ? progression.totalSemesters : undefined,
       semesterDuration: hasCourseConfig ? progression.details.semesterDuration : undefined,
       semesterDurationUnit: hasCourseConfig ? progression.details.semesterDurationUnit : undefined,
