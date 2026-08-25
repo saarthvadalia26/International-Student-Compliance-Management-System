@@ -53,12 +53,11 @@ const SAMPLE_INTERPOLATION_DATA: Record<string, string> = {
   days_remaining: "30",
   days_left: "30",
   institution_name: "National Forensic Sciences University",
+  compliance_email: "support@nfsu.edu.in",
+  support_email: "support@nfsu.edu.in",
   current_date: "15 August 2026",
   program_name: "M.Sc. Forensic Cyber Security",
-  otp_code: "849201",
-  rejection_reason: "Document photo is blurry and government stamp is not clearly legible.",
-  upload_window_hours: "48",
-  secure_upload_link: "https://iscms.nfsu.edu/student/upload/auth-token-sample"
+  rejection_reason: "Document photo is blurry and government stamp is not clearly legible."
 };
 
 export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps) {
@@ -700,15 +699,12 @@ export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps)
                       setEditingTemplate(prev => prev ? {
                         ...prev,
                         eventType: evt,
-                        category: evt === "portal_otp" ? "authentication" : "utility"
+                        category: "utility"
                       } : null);
                     }}
                     className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="document_expiry">Document Expiry Reminder</option>
-                    <option value="portal_otp">Student Portal Login OTP</option>
-                    <option value="replacement_approved">Document Replacement Approved</option>
-                    <option value="replacement_rejected">Document Replacement Rejected</option>
                     <option value="document_verified">Document Verification Approved</option>
                     <option value="document_rejected">Document Verification Rejected</option>
                     <option value="general_alert">General System Alert</option>

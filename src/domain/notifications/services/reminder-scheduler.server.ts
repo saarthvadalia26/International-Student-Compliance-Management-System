@@ -182,6 +182,8 @@ export class ReminderSchedulerServer {
                   expiry_date: doc.expiryDate,
                   scheduled_date: item.scheduledDate,
                   institution_name: institutionName,
+                  compliance_email: process.env.NEXT_PUBLIC_COMPLIANCE_EMAIL || "support@nfsu.edu.in",
+                  support_email: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@nfsu.edu.in",
                   program_name: programName
                 }
               });

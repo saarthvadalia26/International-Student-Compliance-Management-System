@@ -150,6 +150,8 @@ export class ReminderEngine {
                 days_remaining: String(daysLeft),
                 expiry_date: cleanExpiry,
                 institution_name: institutionName,
+                compliance_email: process.env.NEXT_PUBLIC_COMPLIANCE_EMAIL || "support@nfsu.edu.in",
+                support_email: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@nfsu.edu.in",
                 program_name: programName
               }
             });

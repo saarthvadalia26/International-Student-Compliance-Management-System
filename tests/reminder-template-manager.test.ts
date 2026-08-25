@@ -13,13 +13,13 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
     assert.ok(GLOBAL_ALLOWED_TOKENS.has("expiry_date"));
     assert.ok(GLOBAL_ALLOWED_TOKENS.has("days_remaining"));
     assert.ok(GLOBAL_ALLOWED_TOKENS.has("institution_name"));
+    assert.ok(GLOBAL_ALLOWED_TOKENS.has("compliance_email"));
+    assert.ok(GLOBAL_ALLOWED_TOKENS.has("support_email"));
     assert.ok(GLOBAL_ALLOWED_TOKENS.has("current_date"));
-    assert.ok(GLOBAL_ALLOWED_TOKENS.has("otp_code"));
     assert.ok(GLOBAL_ALLOWED_TOKENS.has("rejection_reason"));
-    assert.ok(GLOBAL_ALLOWED_TOKENS.has("upload_window_hours"));
   });
 
-  it("2. Successfully validates a well-formed Passport Expiry template", () => {
+  it("2. Successfully validates a well-formed Passport Expiry template instructing student to email university", () => {
     const res = TemplateValidator.validateTemplate({
       title: "Passport Expiry — 30 Days",
       code: "PASSPORT_EXPIRY_30D",
@@ -29,7 +29,7 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
       category: "utility",
       status: "ACTIVE",
       subjectTemplate: "ISCMS Alert: Passport Expiry Notice for {{student_name}}",
-      bodyTemplate: "Dear {{student_name}},\n\nYour {{document_type}} will expire on {{expiry_date}}, which is {{days_remaining}} days away.\n\nRegards,\n{{institution_name}}"
+      bodyTemplate: "Dear {{student_name}},\n\nYour {{document_type}} will expire on {{expiry_date}}, which is {{days_remaining}} days away.\n\nPlease email your renewed copy to {{compliance_email}}.\n\nRegards,\n{{institution_name}}"
     });
 
     assert.equal(res.isValid, true, "Valid template must pass validation without errors");
@@ -37,6 +37,7 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
     assert.ok(res.extractedTokens.includes("student_name"));
     assert.ok(res.extractedTokens.includes("expiry_date"));
     assert.ok(res.extractedTokens.includes("days_remaining"));
+    assert.ok(res.extractedTokens.includes("compliance_email"));
   });
 
   it("3. Rejects unknown variable tokens (arbitrary database access prevention)", () => {
@@ -84,41 +85,10 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
     });
 
     assert.equal(res.isValid, false);
-    assert.ok(res.errors.some(e => e.includes("cannot be categorized as 'authentication'")));
+    assert.ok(res.errors.some(e => e.includes("Authentication category is reserved")));
   });
 
-  it("6. Strictly enforces WhatsApp Category Invariant: Student Portal OTP MUST be Authentication", () => {
-    const res = TemplateValidator.validateTemplate({
-      title: "Student Portal OTP",
-      code: "STUDENT_PORTAL_OTP",
-      eventType: "portal_otp",
-      documentType: "general",
-      channel: "whatsapp",
-      category: "utility", // ILLEGAL: OTP must be authentication
-      bodyTemplate: "Your login code is {{otp_code}}."
-    });
-
-    assert.equal(res.isValid, false);
-    assert.ok(res.errors.some(e => e.includes("Student Portal OTP templates must be categorized as 'authentication'")));
-  });
-
-  it("7. Successfully validates Student Portal OTP with Authentication category", () => {
-    const res = TemplateValidator.validateTemplate({
-      title: "Student Portal OTP",
-      code: "STUDENT_PORTAL_OTP",
-      eventType: "portal_otp",
-      documentType: "general",
-      channel: "whatsapp",
-      category: "authentication",
-      subjectTemplate: "Your ISCMS Portal Login Verification Code",
-      bodyTemplate: "Your login code is {{otp_code}}. It expires in 10 minutes. Office of Compliance, {{institution_name}}"
-    });
-
-    assert.equal(res.isValid, true);
-    assert.equal(res.errors.length, 0);
-  });
-
-  it("8. Strictly rejects template creation with disabled Email channel", () => {
+  it("6. Strictly rejects template creation with disabled Email channel", () => {
     const res = TemplateValidator.validateTemplate({
       title: "Disabled Email Test",
       code: "DISABLED_EMAIL_TEST",
@@ -134,7 +104,7 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
     assert.ok(res.errors.some(e => e.includes("Email notifications are currently disabled")));
   });
 
-  it("9. WhatsApp-only templates do not require an Email Subject line", () => {
+  it("7. WhatsApp-only templates do not require an Email Subject line", () => {
     const res = TemplateValidator.validateTemplate({
       title: "WhatsApp Only Notice",
       code: "WA_ONLY_NOTICE",
@@ -150,18 +120,18 @@ describe("ISCMS Reminder Template Manager Acceptance Tests", () => {
     assert.equal(res.errors.length, 0);
   });
 
-  it("10. Validates Document Replacement and Verification event templates", () => {
-    const repApproved = TemplateValidator.validateTemplate({
-      title: "Replacement Request Approved",
-      code: "REPLACEMENT_APPROVED",
-      eventType: "replacement_approved",
+  it("8. Validates Document Verification event templates", () => {
+    const docVerified = TemplateValidator.validateTemplate({
+      title: "Document Verified Notice",
+      code: "DOCUMENT_VERIFIED",
+      eventType: "document_verified",
       documentType: "all",
       channel: "whatsapp",
       category: "utility",
-      subjectTemplate: "Replacement Request Approved for {{document_type}}",
-      bodyTemplate: "Dear {{student_name}},\n\nYour request for {{document_type}} replacement was approved. You have {{upload_window_hours}} hours to upload at {{secure_upload_link}}."
+      subjectTemplate: "Your {{document_type}} has been verified",
+      bodyTemplate: "Dear {{student_name}},\n\nYour {{document_type}} has been reviewed and verified for institutional compliance.\n\nRegards,\n{{institution_name}}"
     });
-    assert.equal(repApproved.isValid, true);
+    assert.equal(docVerified.isValid, true);
 
     const docRejected = TemplateValidator.validateTemplate({
       title: "Document Verification Rejected",

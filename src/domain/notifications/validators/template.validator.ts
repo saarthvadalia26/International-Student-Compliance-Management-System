@@ -6,12 +6,11 @@ export const GLOBAL_ALLOWED_TOKENS = new Set([
   "days_remaining",
   "days_left",
   "institution_name",
+  "compliance_email",
+  "support_email",
   "current_date",
   "program_name",
-  "otp_code",
-  "rejection_reason",
-  "upload_window_hours",
-  "secure_upload_link"
+  "rejection_reason"
 ]);
 
 export interface TemplateValidationInput {
@@ -113,15 +112,10 @@ export class TemplateValidator {
     // WhatsApp Category invariant rules
     const isWhatsApp = input.channel === "whatsapp" || input.channel === "both";
     if (isWhatsApp) {
-      const eventType = input.eventType || "document_expiry";
       const category = input.category || "utility";
 
-      if (eventType === "portal_otp" && category !== "authentication") {
-        errors.push("Student Portal OTP templates must be categorized as 'authentication'.");
-      }
-
-      if (eventType !== "portal_otp" && category === "authentication") {
-        errors.push("Compliance expiry and operational alerts cannot be categorized as 'authentication'. They must be 'utility'.");
+      if (category === "authentication") {
+        errors.push("Authentication category is reserved. Compliance expiry and operational alerts must be categorized as 'utility'.");
       }
     }
 

@@ -53,6 +53,8 @@ export interface StudentDocumentDetail {
   placeOfIssue?: string;
   visaType?: string;
   versionNumber?: number | null;
+  versionLabel?: string | null;
+  renewalCount?: number;
   verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
   hasUploadedDocument: boolean;
   uploadedAt?: string | null;
@@ -60,6 +62,7 @@ export interface StudentDocumentDetail {
   verifiedBy?: string | null;
   rejectionReason?: string | null;
   filePath?: string | null;
+  fileDownloadUrl?: string | null;
   notes?: string | null;
   activeEarlyAuthorization?: {
     id: string;
@@ -706,6 +709,36 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       isFinalSemester: false
     };
 
+    const passportVersions = (record.passport_versions || []).filter((p: VersionDatabaseRow) => !p.deleted_at);
+    const visaVersions = (record.visa_versions || []).filter((v: VersionDatabaseRow) => !v.deleted_at);
+    const efrroVersions = (record.efrro_versions || []).filter((e: VersionDatabaseRow) => !e.deleted_at);
+
+    const passportRenewalCount = Math.max(0, passportVersions.length - 1);
+    const visaRenewalCount = Math.max(0, visaVersions.length - 1);
+    const efrroRenewalCount = Math.max(0, efrroVersions.length - 1);
+
+    const getVersionLabel = (verNum?: number | null) => {
+      if (!verNum || verNum <= 1) return "Original";
+      return `Renewal ${verNum - 1}`;
+    };
+
+    let passportFileUrl: string | null = null;
+    let visaFileUrl: string | null = null;
+    let efrroFileUrl: string | null = null;
+
+    try {
+      const storage = StorageProviderFactory.getProvider();
+      if (activePassport?.file_path && activePassport.file_path !== "pending_upload" && activePassport.file_path !== "null") {
+        passportFileUrl = await storage.generateSignedUrl("iscms-documents", activePassport.file_path, 900);
+      }
+      if (activeVisa?.file_path && activeVisa.file_path !== "pending_upload" && activeVisa.file_path !== "null") {
+        visaFileUrl = await storage.generateSignedUrl("iscms-documents", activeVisa.file_path, 900);
+      }
+      if (activeEfrro?.file_path && activeEfrro.file_path !== "pending_upload" && activeEfrro.file_path !== "null") {
+        efrroFileUrl = await storage.generateSignedUrl("iscms-documents", activeEfrro.file_path, 900);
+      }
+    } catch {}
+
     const studentProfile: StudentDetailProfile = {
       id: record.id,
       fullName: personal?.full_name || "Unknown Student",
@@ -780,71 +813,56 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         issueDate: activePassport?.issue_date || snapshot?.passport_issue_date || "",
         expiryDate: activePassport?.expiry_date || snapshot?.passport_expiry || "",
         placeOfIssue: activePassport?.place_of_issue || snapshot?.passport_place_of_issue || "",
-        versionNumber: isPassportUploaded ? (activePassport?.version_number ?? 1) : null,
-        verificationStatus: isPassportUploaded ? (activePassport?.verification_status || "pending") : "not_uploaded",
-        hasUploadedDocument: isPassportUploaded,
-        uploadedAt: isPassportUploaded ? (activePassport?.created_at || null) : null,
-        verifiedAt: isPassportUploaded ? (activePassport?.verified_at || null) : null,
-        verifiedBy: isPassportUploaded ? (activePassport?.verified_by || null) : null,
-        rejectionReason: isPassportUploaded ? (activePassport?.rejection_reason || null) : null,
-        notes: isPassportUploaded ? (activePassport?.notes || null) : null,
-        filePath: isPassportUploaded ? (activePassport?.file_path || null) : null,
-        activeEarlyAuthorization: activePassportAuth ? {
-          id: activePassportAuth.id,
-          reason: activePassportAuth.reason,
-          reasonDetails: activePassportAuth.reason_details,
-          validFrom: activePassportAuth.valid_from,
-          validUntil: activePassportAuth.valid_until,
-          status: activePassportAuth.status,
-          createdAt: activePassportAuth.created_at
-        } : null
+        versionNumber: activePassport?.version_number ?? (passportVersions.length > 0 ? 1 : null),
+        versionLabel: activePassport ? getVersionLabel(activePassport.version_number) : (passportVersions.length > 0 ? "Original" : null),
+        renewalCount: passportRenewalCount,
+        verificationStatus: activePassport ? (activePassport.verification_status || "verified") : "not_uploaded",
+        hasUploadedDocument: Boolean(activePassport?.file_path),
+        uploadedAt: activePassport?.created_at || null,
+        verifiedAt: activePassport?.verified_at || null,
+        verifiedBy: activePassport?.verified_by || null,
+        rejectionReason: activePassport?.rejection_reason || null,
+        notes: activePassport?.notes || null,
+        filePath: activePassport?.file_path || null,
+        fileDownloadUrl: passportFileUrl,
+        activeEarlyAuthorization: null
       },
       visa: {
         number: activeVisa?.document_number || snapshot?.visa_number || "Not provided",
         issueDate: activeVisa?.issue_date || snapshot?.visa_issue_date || "",
         expiryDate: activeVisa?.expiry_date || snapshot?.visa_expiry || "",
         visaType: activeVisa?.visa_type || snapshot?.visa_type || "Student (S-1)",
-        versionNumber: isVisaUploaded ? (activeVisa?.version_number ?? 1) : null,
-        verificationStatus: isVisaUploaded ? (activeVisa?.verification_status || "pending") : "not_uploaded",
-        hasUploadedDocument: isVisaUploaded,
-        uploadedAt: isVisaUploaded ? (activeVisa?.created_at || null) : null,
-        verifiedAt: isVisaUploaded ? (activeVisa?.verified_at || null) : null,
-        verifiedBy: isVisaUploaded ? (activeVisa?.verified_by || null) : null,
-        rejectionReason: isVisaUploaded ? (activeVisa?.rejection_reason || null) : null,
-        notes: isVisaUploaded ? (activeVisa?.notes || null) : null,
-        filePath: isVisaUploaded ? (activeVisa?.file_path || null) : null,
-        activeEarlyAuthorization: activeVisaAuth ? {
-          id: activeVisaAuth.id,
-          reason: activeVisaAuth.reason,
-          reasonDetails: activeVisaAuth.reason_details,
-          validFrom: activeVisaAuth.valid_from,
-          validUntil: activeVisaAuth.valid_until,
-          status: activeVisaAuth.status,
-          createdAt: activeVisaAuth.created_at
-        } : null
+        versionNumber: activeVisa?.version_number ?? (visaVersions.length > 0 ? 1 : null),
+        versionLabel: activeVisa ? getVersionLabel(activeVisa.version_number) : (visaVersions.length > 0 ? "Original" : null),
+        renewalCount: visaRenewalCount,
+        verificationStatus: activeVisa ? (activeVisa.verification_status || "verified") : "not_uploaded",
+        hasUploadedDocument: Boolean(activeVisa?.file_path),
+        uploadedAt: activeVisa?.created_at || null,
+        verifiedAt: activeVisa?.verified_at || null,
+        verifiedBy: activeVisa?.verified_by || null,
+        rejectionReason: activeVisa?.rejection_reason || null,
+        notes: activeVisa?.notes || null,
+        filePath: activeVisa?.file_path || null,
+        fileDownloadUrl: visaFileUrl,
+        activeEarlyAuthorization: null
       },
       efrro: {
         number: activeEfrro?.document_number || snapshot?.efrro_number || "Not provided",
         issueDate: activeEfrro?.issue_date || snapshot?.efrro_issue_date || "",
         expiryDate: activeEfrro?.expiry_date || snapshot?.efrro_expiry || "",
-        versionNumber: isEfrroUploaded ? (activeEfrro?.version_number ?? 1) : null,
-        verificationStatus: isEfrroUploaded ? (activeEfrro?.verification_status || "pending") : "not_uploaded",
-        hasUploadedDocument: isEfrroUploaded,
-        uploadedAt: isEfrroUploaded ? (activeEfrro?.created_at || null) : null,
-        verifiedAt: isEfrroUploaded ? (activeEfrro?.verified_at || null) : null,
-        verifiedBy: isEfrroUploaded ? (activeEfrro?.verified_by || null) : null,
-        rejectionReason: isEfrroUploaded ? (activeEfrro?.rejection_reason || null) : null,
-        notes: isEfrroUploaded ? (activeEfrro?.notes || null) : null,
-        filePath: isEfrroUploaded ? (activeEfrro?.file_path || null) : null,
-        activeEarlyAuthorization: activeEfrroAuth ? {
-          id: activeEfrroAuth.id,
-          reason: activeEfrroAuth.reason,
-          reasonDetails: activeEfrroAuth.reason_details,
-          validFrom: activeEfrroAuth.valid_from,
-          validUntil: activeEfrroAuth.valid_until,
-          status: activeEfrroAuth.status,
-          createdAt: activeEfrroAuth.created_at
-        } : null
+        versionNumber: activeEfrro?.version_number ?? (efrroVersions.length > 0 ? 1 : null),
+        versionLabel: activeEfrro ? getVersionLabel(activeEfrro.version_number) : (efrroVersions.length > 0 ? "Original" : null),
+        renewalCount: efrroRenewalCount,
+        verificationStatus: activeEfrro ? (activeEfrro.verification_status || "verified") : "not_uploaded",
+        hasUploadedDocument: Boolean(activeEfrro?.file_path),
+        uploadedAt: activeEfrro?.created_at || null,
+        verifiedAt: activeEfrro?.verified_at || null,
+        verifiedBy: activeEfrro?.verified_by || null,
+        rejectionReason: activeEfrro?.rejection_reason || null,
+        notes: activeEfrro?.notes || null,
+        filePath: activeEfrro?.file_path || null,
+        fileDownloadUrl: efrroFileUrl,
+        activeEarlyAuthorization: null
       },
       emergencyContact: {
         name: primaryContact.name || "Not Specified",
@@ -1281,10 +1299,6 @@ export async function updateDocumentVerificationAction(
         await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
       }
 
-      // Automatically consume/close any active early upload authorization for this document type
-      const { DocumentUploadEligibilityEngine } = await import("@/domain/compliance/services/upload-eligibility.service");
-      await DocumentUploadEligibilityEngine.consumeActiveAuthorization(studentId, documentType, targetVersionId).catch(() => null);
-
       // Audit log
       await adminSupabase.from("audit_log").insert({
         actor_id: user.id,
@@ -1340,20 +1354,57 @@ export async function updateDocumentVerificationAction(
  * 4. Preserves previous active version as active until approval
  * 5. Logs DOCUMENT_VERSION_UPLOADED audit trail
  */
-export async function uploadDocumentRenewalAction(
+export interface DocumentVersionHistoryItem {
+  id: string;
+  versionNumber: number;
+  versionLabel: string;
+  isActive: boolean;
+  documentNumber: string;
+  issueDate: string;
+  expiryDate: string;
+  placeOfIssue?: string | null;
+  visaType?: string | null;
+  verificationStatus: string;
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
+  recordedDate: string;
+  notes?: string | null;
+  filePath?: string | null;
+  fileDownloadUrl?: string | null;
+}
+
+/**
+ * Server Action: Renew Document (Passport, Visa, or eFRRO)
+ * 
+ * Core business workflow for university administrators:
+ * 1. Resolves all existing versions for the student and document type
+ * 2. Calculates atomic next version: Original (v1) -> Renewal 1 (v2) -> Renewal 2 (v3) -> Renewal N (vN+1)
+ * 3. If a file is uploaded, saves it securely to Cloudflare R2 object storage
+ * 4. Sets previous active versions to is_active: false
+ * 5. Creates new active version (is_active: true, verification_status: 'verified')
+ * 6. Synchronizes student_snapshot with new document metadata
+ * 7. Triggers reminder reconciliation for this student
+ * 8. Creates audit log DOCUMENT_RENEWED
+ */
+export async function renewDocumentAction(
   formData: FormData
-): Promise<{ success: boolean; versionNumber?: number; error?: string }> {
+): Promise<{ 
+  success: boolean; 
+  versionNumber?: number; 
+  versionLabel?: string; 
+  error?: string 
+}> {
   try {
     const supabase = await getServerSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return { success: false, error: "Authentication required to upload document." };
+      return { success: false, error: "Authentication required to renew document." };
     }
 
     const { isInternalUser } = await import("@/lib/auth/permissions");
     if (!isInternalUser(user)) {
-      return { success: false, error: "Forbidden: Only authorized staff may upload renewed document records." };
+      return { success: false, error: "Forbidden: Only authorized staff may record document renewals." };
     }
 
     const studentId = formData.get("studentId") as string;
@@ -1363,7 +1414,7 @@ export async function uploadDocumentRenewalAction(
     const expiryDate = formData.get("expiryDate") as string;
     const placeOfIssue = (formData.get("placeOfIssue") as string) || null;
     const visaType = (formData.get("visaType") as string) || "Student (S-1)";
-    const notes = (formData.get("notes") as string) || "New document renewal upload";
+    const notes = (formData.get("notes") as string) || "";
     const file = formData.get("file") as File | null;
 
     if (!studentId || !documentType) {
@@ -1382,18 +1433,6 @@ export async function uploadDocumentRenewalAction(
       return { success: false, error: "Expiration date is required." };
     }
 
-    if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
-      return { success: false, error: "A valid physical document file (PDF or Image) is required for version renewal." };
-    }
-
-    const { systemConfigService } = await import("@/lib/system-config");
-    const maxUploadSizeBytes = await systemConfigService.getMaxUploadSizeBytes();
-    const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
-
-    if (file.size > maxUploadSizeBytes) {
-      return { success: false, error: `File exceeds the maximum allowed size of ${maxUploadSizeMb} MB.` };
-    }
-
     const cleanDocNum = documentNumber.trim();
     const cleanIssue = issueDate.trim().split("T")[0];
     const cleanExpiry = expiryDate.trim().split("T")[0];
@@ -1405,7 +1444,7 @@ export async function uploadDocumentRenewalAction(
     }
 
     if (expiryD <= issueD) {
-      return { success: false, error: `The new expiration date (${cleanExpiry}) must be strictly after the document issue date (${cleanIssue}).` };
+      return { success: false, error: `The expiration date (${cleanExpiry}) must be strictly after the document issue date (${cleanIssue}).` };
     }
 
     const adminSupabase = getAdminSupabase();
@@ -1415,10 +1454,10 @@ export async function uploadDocumentRenewalAction(
       ? "visa_versions" 
       : "efrro_versions";
 
-    // Fetch existing genuine uploaded versions to resolve next version number
-    const { data: currentVersions, error: fetchErr } = await adminSupabase
+    // 1. Fetch all existing versions to determine next sequence number
+    const { data: existingVersions, error: fetchErr } = await adminSupabase
       .from(tableName)
-      .select("version_number, file_path")
+      .select("id, version_number, is_active, document_number")
       .eq("student_id", studentId)
       .is("deleted_at", null)
       .order("version_number", { ascending: false });
@@ -1427,44 +1466,61 @@ export async function uploadDocumentRenewalAction(
       return { success: false, error: `Failed to query existing versions: ${fetchErr.message}` };
     }
 
-    // Filter to only genuine uploaded versions
-    const validUploadedVersions = (currentVersions || []).filter(v => {
-      if (!v.file_path) return false;
-      const fp = v.file_path.trim().toLowerCase();
-      return fp !== "" && fp !== "pending_upload" && fp !== "null";
-    });
-
-    const highestVersionNum = validUploadedVersions.length > 0
-      ? Math.max(...validUploadedVersions.map(v => v.version_number || 0))
+    const highestVersionNum = (existingVersions || []).length > 0
+      ? Math.max(...(existingVersions || []).map(v => v.version_number || 0))
       : 0;
     const nextVersionNumber = highestVersionNum + 1;
+    const versionLabel = nextVersionNumber === 1 ? "Original" : `Renewal ${nextVersionNumber - 1}`;
+    const previousActive = (existingVersions || []).find(v => v.is_active);
+    const prevVersionNum = previousActive?.version_number || (highestVersionNum > 0 ? highestVersionNum : null);
+    const prevVersionLabel = prevVersionNum ? (prevVersionNum === 1 ? "Original" : `Renewal ${prevVersionNum - 1}`) : "None";
 
-    // Upload to storage provider with deterministic, collision-free canonical path
-    const safeExt = file.name.split(".").pop()?.toLowerCase() || "pdf";
-    const ext = ["pdf", "jpg", "jpeg", "png"].includes(safeExt) ? safeExt : "pdf";
-    const uniqueFileId = crypto.randomUUID();
-    const storagePath = `students/${studentId}/${documentType}/v${nextVersionNumber}/${uniqueFileId}.${ext}`;
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    // 2. Handle optional or attached physical file upload
+    let storagePath: string | null = null;
+    if (file && typeof file.arrayBuffer === "function" && file.size > 0) {
+      const { systemConfigService } = await import("@/lib/system-config");
+      const maxUploadSizeBytes = await systemConfigService.getMaxUploadSizeBytes();
+      const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
 
-    try {
-      const storage = StorageProviderFactory.getProvider();
-      await storage.upload("iscms-documents", storagePath, fileBuffer, file.type || "application/pdf");
-    } catch (uploadErr: unknown) {
-      console.error("[STORAGE_UPLOAD_ERROR]", uploadErr);
-      return { success: false, error: `Failed to upload document file to storage: ${uploadErr instanceof Error ? uploadErr.message : "Storage error"}` };
+      if (file.size > maxUploadSizeBytes) {
+        return { success: false, error: `File exceeds the maximum allowed size of ${maxUploadSizeMb} MB.` };
+      }
+
+      const safeExt = file.name.split(".").pop()?.toLowerCase() || "pdf";
+      const ext = ["pdf", "jpg", "jpeg", "png"].includes(safeExt) ? safeExt : "pdf";
+      const uniqueFileId = crypto.randomUUID();
+      storagePath = `students/${studentId}/${documentType}/v${nextVersionNumber}/${uniqueFileId}.${ext}`;
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+      try {
+        const storage = StorageProviderFactory.getProvider();
+        await storage.upload("iscms-documents", storagePath, fileBuffer, file.type || "application/pdf");
+      } catch (uploadErr: unknown) {
+        console.error("[STORAGE_UPLOAD_ERROR]", uploadErr);
+        return { success: false, error: `Failed to upload document file to storage: ${uploadErr instanceof Error ? uploadErr.message : "Storage error"}` };
+      }
     }
 
-    // Insert new version with verification_status: 'pending' and is_active: false
+    // 3. Deactivate existing active versions
+    await adminSupabase
+      .from(tableName)
+      .update({ is_active: false, updated_at: new Date().toISOString(), updated_by: user.id })
+      .eq("student_id", studentId)
+      .eq("is_active", true);
+
+    // 4. Insert new active verified version record
     const insertPayload: Record<string, unknown> = {
       student_id: studentId,
       version_number: nextVersionNumber,
-      is_active: false, // CRITICAL: remains inactive until approved!
+      is_active: true,
       document_number: cleanDocNum,
       issue_date: cleanIssue,
       expiry_date: cleanExpiry,
       file_path: storagePath,
-      verification_status: "pending",
-      notes: notes.trim(),
+      verification_status: "verified",
+      verified_by: user.id,
+      verified_at: new Date().toISOString(),
+      notes: notes.trim() || `Renewed to ${versionLabel} by administrator`,
       created_by: user.id,
       updated_by: user.id
     };
@@ -1482,49 +1538,176 @@ export async function uploadDocumentRenewalAction(
       .single();
 
     if (insertErr || !newVer) {
-      // Atomic Compensation: remove uploaded object from R2 if database persistence fails
-      try {
-        const storage = StorageProviderFactory.getProvider();
-        await storage.delete("iscms-documents", storagePath);
-        console.log(`[STORAGE_COMPENSATION] Cleaned up orphaned file ${storagePath} after database insert failure.`);
-      } catch (delErr) {
-        console.error("[STORAGE_COMPENSATION_ERROR] Failed to roll back orphaned storage file:", delErr);
-      }
-
-      if (insertErr?.code === "23514" || insertErr?.message?.includes("chk_")) {
-        return { success: false, error: "The new expiration date must be strictly after the document issue date." };
+      if (storagePath) {
+        try {
+          const storage = StorageProviderFactory.getProvider();
+          await storage.delete("iscms-documents", storagePath);
+        } catch {}
       }
       return { success: false, error: `Database insert failed: ${insertErr?.message}` };
     }
 
-    // Audit log
+    // 5. Update student_snapshot with new current document information
+    const now = new Date();
+    const diffDays = Math.round((expiryD.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
+
+    const snapshotUpdates: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (documentType === "passport") {
+      snapshotUpdates.passport_number = cleanDocNum;
+      snapshotUpdates.passport_issue_date = cleanIssue;
+      snapshotUpdates.passport_expiry = cleanExpiry;
+      snapshotUpdates.passport_place_of_issue = placeOfIssue?.trim() || null;
+      snapshotUpdates.passport_status = calculatedDocStatus;
+    } else if (documentType === "visa") {
+      snapshotUpdates.visa_number = cleanDocNum;
+      snapshotUpdates.visa_issue_date = cleanIssue;
+      snapshotUpdates.visa_expiry = cleanExpiry;
+      snapshotUpdates.visa_type = visaType?.trim() || "Student (S-1)";
+      snapshotUpdates.visa_status = calculatedDocStatus;
+    } else {
+      snapshotUpdates.efrro_number = cleanDocNum;
+      snapshotUpdates.efrro_issue_date = cleanIssue;
+      snapshotUpdates.efrro_expiry = cleanExpiry;
+      snapshotUpdates.efrro_status = calculatedDocStatus;
+    }
+
+    await adminSupabase
+      .from("student_snapshot")
+      .update(snapshotUpdates)
+      .eq("student_id", studentId);
+
+    // 6. Reconcile reminders
+    const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+    await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, "renew_document");
+
+    // 7. Audit log DOCUMENT_RENEWED
     await adminSupabase.from("audit_log").insert({
       actor_id: user.id,
-      action: "DOCUMENT_VERSION_UPLOADED",
+      action: "DOCUMENT_RENEWED",
       resource: `${tableName}/${newVer.id}`,
       filters_applied: {
         studentId,
         documentType,
-        versionNumber: nextVersionNumber,
-        storagePath,
+        previousVersionNumber: prevVersionNum,
+        previousVersionLabel: prevVersionLabel,
+        newVersionNumber: nextVersionNumber,
+        newVersionLabel: versionLabel,
         documentNumber: cleanDocNum,
         issueDate: cleanIssue,
         expiryDate: cleanExpiry,
-        fileName: file.name,
-        uploadedBy: user.email || user.id,
+        hasFile: Boolean(storagePath),
+        renewedBy: user.email || user.id,
         timestamp: new Date().toISOString()
       }
     });
 
     revalidatePath(`/students/${studentId}`);
-    revalidatePath(`/students/${studentId}/${documentType}`);
     revalidatePath("/students");
     revalidatePath("/dashboard");
+    revalidatePath("/reminders");
 
-    return { success: true, versionNumber: nextVersionNumber };
+    return { 
+      success: true, 
+      versionNumber: nextVersionNumber,
+      versionLabel
+    };
   } catch (err: unknown) {
-    const sanitized = sanitizeError(err, { action: "uploadDocumentRenewalAction" });
+    const sanitized = sanitizeError(err, { action: "renewDocumentAction" });
     return { success: false, error: sanitized.message };
+  }
+}
+
+export const uploadDocumentRenewalAction = renewDocumentAction;
+
+/**
+ * Server Action: Fetch Complete Document Version History for a Student
+ */
+export async function getDocumentHistoryAction(
+  studentId: string,
+  documentType: "passport" | "visa" | "efrro"
+): Promise<{
+  success: boolean;
+  versions: DocumentVersionHistoryItem[];
+  currentVersionLabel: string | null;
+  renewalCount: number;
+  error?: string;
+}> {
+  try {
+    const adminSupabase = getAdminSupabase();
+    const tableName = documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+    const { data: rows, error } = await adminSupabase
+      .from(tableName)
+      .select("*")
+      .eq("student_id", studentId)
+      .is("deleted_at", null)
+      .order("version_number", { ascending: false });
+
+    if (error) {
+      return { success: false, versions: [], currentVersionLabel: null, renewalCount: 0, error: error.message };
+    }
+
+    const storage = StorageProviderFactory.getProvider();
+
+    const versions: DocumentVersionHistoryItem[] = await Promise.all(
+      (rows || []).map(async (r) => {
+        const verNum = r.version_number || 1;
+        const verLabel = verNum === 1 ? "Original" : `Renewal ${verNum - 1}`;
+        let downloadUrl: string | null = null;
+
+        if (r.file_path && r.file_path.trim() && r.file_path !== "pending_upload" && r.file_path !== "null") {
+          try {
+            downloadUrl = await storage.generateSignedUrl("iscms-documents", r.file_path, 900);
+          } catch {}
+        }
+
+        return {
+          id: r.id,
+          versionNumber: verNum,
+          versionLabel: verLabel,
+          isActive: Boolean(r.is_active),
+          documentNumber: r.document_number,
+          issueDate: r.issue_date,
+          expiryDate: r.expiry_date,
+          placeOfIssue: r.place_of_issue || null,
+          visaType: r.visa_type || null,
+          verificationStatus: r.verification_status || "verified",
+          verifiedBy: r.verified_by || null,
+          verifiedAt: r.verified_at || null,
+          recordedDate: r.created_at,
+          notes: r.notes || null,
+          filePath: r.file_path || null,
+          fileDownloadUrl: downloadUrl
+        };
+      })
+    );
+
+    const activeItem = versions.find(v => v.isActive) || (versions.length > 0 ? versions[0] : null);
+    const currentVersionLabel = activeItem ? activeItem.versionLabel : null;
+    const renewalCount = Math.max(0, versions.length - 1);
+
+    return {
+      success: true,
+      versions,
+      currentVersionLabel,
+      renewalCount
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      versions: [],
+      currentVersionLabel: null,
+      renewalCount: 0,
+      error: err instanceof Error ? err.message : "Failed to load document history."
+    };
   }
 }
 
@@ -2599,135 +2782,6 @@ export async function getAcademicAdjustmentsAction(
   }
 }
 
-// ── Early Document Upload Exceptions (Staff Authorizations) ─────────────────
-
-export interface AuthorizeEarlyUploadInput {
-  documentType: "passport" | "visa" | "efrro";
-  reason: "document_lost" | "document_damaged" | "document_replaced" | "government_reissue" | "data_correction" | "other";
-  reasonDetails: string;
-  validFrom?: string;
-  validUntil?: string;
-}
-
-export async function authorizeEarlyDocumentUploadAction(
-  studentId: string,
-  input: AuthorizeEarlyUploadInput
-): Promise<{ success: boolean; authorizationId?: string; error?: string }> {
-  try {
-    const supabase = await getServerSupabase();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return { success: false, error: "Authentication required to authorize early uploads." };
-    }
-
-    const { isInternalUser } = await import("@/lib/auth/permissions");
-    if (!isInternalUser(user)) {
-      return { success: false, error: "Forbidden: Only compliance officers and staff may authorize early document uploads." };
-    }
-
-    if (!input.reasonDetails || !input.reasonDetails.trim()) {
-      return { success: false, error: "A detailed explanation/reason is mandatory for institutional audit compliance." };
-    }
-
-    const adminSupabase = getAdminSupabase();
-    const now = new Date();
-    const fromDate = input.validFrom ? new Date(input.validFrom) : now;
-    const untilDate = input.validUntil ? new Date(input.validUntil) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    if (untilDate <= fromDate) {
-      return { success: false, error: "Authorization expiration date must be strictly after the start date." };
-    }
-
-    // Revoke/supersede any existing active authorization for this student and document type
-    await adminSupabase
-      .from("student_document_upload_authorizations")
-      .update({ status: "revoked", updated_at: now.toISOString() })
-      .eq("student_id", studentId)
-      .eq("document_type", input.documentType)
-      .eq("status", "active");
-
-    // Insert new authorization
-    const { data: authRecord, error: insertError } = await adminSupabase
-      .from("student_document_upload_authorizations")
-      .insert({
-        student_id: studentId,
-        document_type: input.documentType,
-        reason: input.reason,
-        reason_details: input.reasonDetails.trim(),
-        valid_from: fromDate.toISOString(),
-        valid_until: untilDate.toISOString(),
-        status: "active",
-        authorized_by: user.id
-      })
-      .select("id")
-      .single();
-
-    if (insertError || !authRecord) {
-      return { success: false, error: `Failed to create authorization: ${insertError?.message}` };
-    }
-
-    // Audit log
-    await adminSupabase.from("audit_log").insert({
-      actor_id: user.id,
-      action: "EARLY_UPLOAD_AUTHORIZED",
-      resource: `student_document_upload_authorizations/${authRecord.id}`,
-      filters_applied: {
-        studentId,
-        documentType: input.documentType,
-        reason: input.reason,
-        reasonDetails: input.reasonDetails.trim(),
-        validFrom: fromDate.toISOString(),
-        validUntil: untilDate.toISOString(),
-        authorizedBy: user.email || user.id
-      }
-    });
-
-    revalidatePath(`/students/${studentId}`);
-    revalidatePath(`/students/${studentId}/${input.documentType}`);
-    revalidatePath("/students");
-
-    return { success: true, authorizationId: authRecord.id };
-  } catch (err: unknown) {
-    const sanitized = sanitizeError(err, { action: "authorizeEarlyDocumentUploadAction", route: `/students/${studentId}` });
-    return { success: false, error: sanitized.message };
-  }
-}
-
-export async function getStudentUploadAuthorizationsAction(
-  studentId: string
-): Promise<{ success: boolean; authorizations?: import("@/domain/compliance/services/upload-eligibility.service").StudentUploadAuthorization[]; error?: string }> {
-  try {
-    const adminSupabase = getAdminSupabase();
-    const { data, error } = await adminSupabase
-      .from("student_document_upload_authorizations")
-      .select("*")
-      .eq("student_id", studentId)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-
-    const authorizations = (data || []).map((row) => ({
-      id: row.id,
-      studentId: row.student_id,
-      documentType: row.document_type as "passport" | "visa" | "efrro",
-      reason: row.reason,
-      reasonDetails: row.reason_details,
-      validFrom: row.valid_from,
-      validUntil: row.valid_until,
-      status: row.status,
-      authorizedBy: row.authorized_by,
-      consumedAt: row.consumed_at,
-      consumedVersionId: row.consumed_version_id,
-      createdAt: row.created_at
-    }));
-
-    return { success: true, authorizations };
-  } catch (err: unknown) {
-    const sanitized = sanitizeError(err, { action: "getStudentUploadAuthorizationsAction", route: `/students/${studentId}` });
-    return { success: false, error: sanitized.message, authorizations: [] };
-  }
-}
 
 /**
  * Server Action: Export student directory to official formatted Excel (.xlsx) workbook

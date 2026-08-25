@@ -52,7 +52,7 @@ export interface INotificationTemplateDbRow {
   status?: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
   title: string;
   document_type?: "passport" | "visa" | "efrro" | "general" | "all";
-  event_type?: "document_expiry" | "portal_otp" | "replacement_approved" | "replacement_rejected" | "document_verified" | "document_rejected" | "general_alert";
+  event_type?: "document_expiry" | "document_verified" | "document_rejected" | "general_alert";
   channel?: "email" | "whatsapp" | "both" | "sms";
   category?: "utility" | "authentication" | "marketing" | "alert";
   provider_template_name?: string | null;

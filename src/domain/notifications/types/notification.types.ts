@@ -25,7 +25,7 @@ export interface NotificationTemplate {
   isActive: boolean;
   title: string;
   documentType?: "passport" | "visa" | "efrro" | "general" | "all";
-  eventType?: "document_expiry" | "portal_otp" | "replacement_approved" | "replacement_rejected" | "document_verified" | "document_rejected" | "general_alert";
+  eventType?: "document_expiry" | "document_verified" | "document_rejected" | "general_alert";
   channel?: "email" | "whatsapp" | "both" | "sms";
   category?: "utility" | "authentication" | "marketing" | "alert";
   status?: "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";

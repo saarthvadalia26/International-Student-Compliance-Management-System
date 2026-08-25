@@ -21,26 +21,32 @@ import {
   Layers,
   GraduationCap,
   User,
-  Users
+  Users,
+  FileText,
+  RefreshCw,
+  FileCheck2
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
   updateStudentAction, 
   getStudentReminderScheduleAction,
-  recordAcademicAdjustmentAction
+  recordAcademicAdjustmentAction,
+  renewDocumentAction,
+  getDocumentHistoryAction,
+  type DocumentVersionHistoryItem
 } from "@/app/(app)/students/actions";
 import { getActiveSchoolsAction } from "@/app/(app)/settings/schools-actions";
 import { School } from "@/domain/schools/types";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -79,6 +85,8 @@ export interface StudentDocument {
   placeOfIssue?: string;
   visaType?: string;
   versionNumber?: number | null;
+  versionLabel?: string | null;
+  renewalCount?: number;
   verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
   hasUploadedDocument: boolean;
   uploadedAt?: string | null;
@@ -87,6 +95,7 @@ export interface StudentDocument {
   rejectionReason?: string | null;
   notes?: string | null;
   filePath?: string | null;
+  fileDownloadUrl?: string | null;
   activeEarlyAuthorization?: {
     id: string;
     reason: string;
@@ -200,7 +209,113 @@ export default function StudentDetailsPage({ params }: PageProps) {
   
   const [student, setStudent] = React.useState<StudentProfile | undefined>(undefined);
   const [isLoadingStudent, setIsLoadingStudent] = React.useState(true);
-  const [activeSubTab, setActiveSubTab] = React.useState<"personal" | "academic" | "contact">("personal");
+  const [activeSubTab, setActiveSubTab] = React.useState<"personal" | "academic" | "contact" | "documents">("personal");
+
+  // Renew Document Dialog State
+  const [renewDialogOpen, setRenewDialogOpen] = React.useState(false);
+  const [renewDocType, setRenewDocType] = React.useState<"passport" | "visa" | "efrro">("passport");
+  const [renewForm, setRenewForm] = React.useState({
+    documentNumber: "",
+    issueDate: "",
+    expiryDate: "",
+    placeOfIssue: "",
+    visaType: "Student (S-1)",
+    notes: "",
+    file: null as File | null
+  });
+  const [isRenewing, setIsRenewing] = React.useState(false);
+  const [renewErrors, setRenewErrors] = React.useState<Record<string, string>>({});
+
+  // Version History Dialog State
+  const [historyDialogOpen, setHistoryDialogOpen] = React.useState(false);
+  const [historyDocType, setHistoryDocType] = React.useState<"passport" | "visa" | "efrro">("passport");
+  const [historyVersions, setHistoryVersions] = React.useState<DocumentVersionHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = React.useState(false);
+
+  const handleOpenRenewDialog = (docType: "passport" | "visa" | "efrro") => {
+    if (!student) return;
+    const currentDoc = docType === "passport" ? student.passport : docType === "visa" ? student.visa : student.efrro;
+    setRenewDocType(docType);
+    setRenewForm({
+      documentNumber: currentDoc?.number && currentDoc.number !== "Not provided" && currentDoc.number !== "Pending" ? currentDoc.number : "",
+      issueDate: currentDoc?.issueDate ? currentDoc.issueDate.split("T")[0] : "",
+      expiryDate: "",
+      placeOfIssue: currentDoc?.placeOfIssue || "",
+      visaType: currentDoc?.visaType || "Student (S-1)",
+      notes: "",
+      file: null
+    });
+    setRenewErrors({});
+    setRenewDialogOpen(true);
+  };
+
+  const handleOpenHistoryDialog = async (docType: "passport" | "visa" | "efrro") => {
+    setHistoryDocType(docType);
+    setHistoryDialogOpen(true);
+    setIsLoadingHistory(true);
+    try {
+      const res = await getDocumentHistoryAction(studentId, docType);
+      if (res.success) {
+        setHistoryVersions(res.versions || []);
+      } else {
+        toast.error("Failed to load document version history");
+        setHistoryVersions([]);
+      }
+    } catch {
+      toast.error("Error loading version history");
+      setHistoryVersions([]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleSubmitRenew = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student) return;
+
+    const errors: Record<string, string> = {};
+    if (!renewForm.documentNumber.trim()) errors.documentNumber = "Document number is required.";
+    if (!renewForm.issueDate.trim()) errors.issueDate = "Issue date is required.";
+    if (!renewForm.expiryDate.trim()) errors.expiryDate = "Expiration date is required.";
+    if (renewForm.issueDate && renewForm.expiryDate && renewForm.expiryDate <= renewForm.issueDate) {
+      errors.expiryDate = "Expiration date must be strictly after the issue date.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setRenewErrors(errors);
+      return;
+    }
+
+    setIsRenewing(true);
+    try {
+      const formData = new FormData();
+      formData.append("studentId", studentId);
+      formData.append("documentType", renewDocType);
+      formData.append("documentNumber", renewForm.documentNumber.trim());
+      formData.append("issueDate", renewForm.issueDate.trim());
+      formData.append("expiryDate", renewForm.expiryDate.trim());
+      if (renewForm.placeOfIssue.trim()) formData.append("placeOfIssue", renewForm.placeOfIssue.trim());
+      if (renewForm.visaType.trim()) formData.append("visaType", renewForm.visaType.trim());
+      if (renewForm.notes.trim()) formData.append("notes", renewForm.notes.trim());
+      if (renewForm.file) formData.append("file", renewForm.file);
+
+      const res = await renewDocumentAction(formData);
+      if (res.success) {
+        toast.success(`Document Renewed (${res.versionLabel || "New Version"})`, {
+          description: "New document version is now current and active in compliance schedules."
+        });
+        setRenewDialogOpen(false);
+        await loadStudentData();
+        await loadReminderSchedule();
+      } else {
+        toast.error(res.error || "Failed to renew document.");
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Unexpected error renewing document.");
+    } finally {
+      setIsRenewing(false);
+    }
+  };
 
   // Academic Programs & Schools Reference State
   const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
@@ -882,6 +997,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
               variant="segmented"
               size="sm"
             />
+            <SectionNavCard
+              icon={FileText}
+              title="Compliance Documents"
+              isActive={activeSubTab === "documents"}
+              onClick={() => setActiveSubTab("documents")}
+              variant="segmented"
+              size="sm"
+            />
           </SectionNavGroup>
 
           {/* Tab 1: Personal & Demographic Info */}
@@ -1315,6 +1438,378 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+          )}
+
+          {/* Tab 4: Compliance Documents & Version Renewal History */}
+          {activeSubTab === "documents" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between flex-wrap gap-3 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    Compliance Documents & Version History
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Record and track document renewals (Original → Renewal 1 → Renewal 2...). All versions are preserved in permanent history.
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-xs font-semibold px-3 py-1 bg-background/80">
+                  Administrator Authority
+                </Badge>
+              </div>
+
+              <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-3">
+                {/* 1. Passport Card */}
+                {(() => {
+                  const doc = student.passport;
+                  const hasDoc = doc && doc.number && doc.number !== "Not provided" && doc.number !== "Pending";
+                  const verLabel = doc?.versionLabel || (hasDoc ? (doc?.versionNumber ? (doc.versionNumber === 1 ? "Original" : `Renewal ${doc.versionNumber - 1}`) : "Original") : null);
+                  const renewalCount = doc?.renewalCount ?? 0;
+
+                  let statusText = "Not Recorded";
+                  let statusClass = "text-muted-foreground";
+
+                  if (hasDoc && doc?.expiryDate) {
+                    const expDate = new Date(doc.expiryDate);
+                    const now = new Date();
+                    const diffDays = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) {
+                      statusText = "Expired";
+                      statusClass = "text-destructive font-bold";
+                    } else if (diffDays <= 30) {
+                      statusText = `Expires in ${diffDays}d`;
+                      statusClass = "text-amber-600 dark:text-amber-400 font-semibold";
+                    } else {
+                      statusText = "Compliant";
+                      statusClass = "text-emerald-600 dark:text-emerald-400 font-semibold";
+                    }
+                  }
+
+                  return (
+                    <Card className="border border-border/60 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between">
+                      <CardHeader className="pb-3 border-b border-border/40 bg-muted/10">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-primary" />
+                            Passport
+                          </CardTitle>
+                          {verLabel ? (
+                            <Badge variant="outline" className="text-[10px] font-bold bg-primary/10 text-primary border-primary/30">
+                              {verLabel}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                              Not Recorded
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription className="text-[11px] text-muted-foreground">Passport & Travel Identification</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-3.5 text-xs flex-1">
+                        <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
+                          <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">Passport Number</span>
+                          <span className="font-semibold text-foreground block font-mono text-sm">
+                            {hasDoc ? doc.number : "Pending Recording"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block text-[10px]">Issue Date</span>
+                            <span className="font-medium text-foreground block">
+                              {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                            </span>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
+                            <span className={statusClass}>
+                              {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {doc?.placeOfIssue && (
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block text-[10px]">Place of Issue</span>
+                            <span className="font-medium text-foreground block">{doc.placeOfIssue}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
+                          <span className="text-muted-foreground">Total Renewals:</span>
+                          <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
+                        </div>
+
+                        {doc?.fileDownloadUrl && (
+                          <div className="pt-1">
+                            <a
+                              href={doc.fileDownloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              View Current Document
+                            </a>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenHistoryDialog("passport")}
+                          className="h-8 text-xs flex-1 gap-1.5"
+                        >
+                          <History className="h-3.5 w-3.5 text-muted-foreground" />
+                          History
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleOpenRenewDialog("passport")}
+                          className="h-8 text-xs flex-1 gap-1.5 font-semibold"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          Renew
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })()}
+
+                {/* 2. Visa Card */}
+                {(() => {
+                  const doc = student.visa;
+                  const hasDoc = doc && doc.number && doc.number !== "Not provided" && doc.number !== "Pending";
+                  const verLabel = doc?.versionLabel || (hasDoc ? (doc?.versionNumber ? (doc.versionNumber === 1 ? "Original" : `Renewal ${doc.versionNumber - 1}`) : "Original") : null);
+                  const renewalCount = doc?.renewalCount ?? 0;
+
+                  let statusText = "Not Recorded";
+                  let statusClass = "text-muted-foreground";
+
+                  if (hasDoc && doc?.expiryDate) {
+                    const expDate = new Date(doc.expiryDate);
+                    const now = new Date();
+                    const diffDays = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) {
+                      statusText = "Expired";
+                      statusClass = "text-destructive font-bold";
+                    } else if (diffDays <= 30) {
+                      statusText = `Expires in ${diffDays}d`;
+                      statusClass = "text-amber-600 dark:text-amber-400 font-semibold";
+                    } else {
+                      statusText = "Compliant";
+                      statusClass = "text-emerald-600 dark:text-emerald-400 font-semibold";
+                    }
+                  }
+
+                  return (
+                    <Card className="border border-border/60 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between">
+                      <CardHeader className="pb-3 border-b border-border/40 bg-muted/10">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <FileCheck2 className="h-4 w-4 text-primary" />
+                            Student Visa
+                          </CardTitle>
+                          {verLabel ? (
+                            <Badge variant="outline" className="text-[10px] font-bold bg-primary/10 text-primary border-primary/30">
+                              {verLabel}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                              Not Recorded
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription className="text-[11px] text-muted-foreground">Visa & Entry Clearance</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-3.5 text-xs flex-1">
+                        <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
+                          <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">Visa Number</span>
+                          <span className="font-semibold text-foreground block font-mono text-sm">
+                            {hasDoc ? doc.number : "Pending Recording"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block text-[10px]">Issue Date</span>
+                            <span className="font-medium text-foreground block">
+                              {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                            </span>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
+                            <span className={statusClass}>
+                              {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {doc?.visaType && (
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block text-[10px]">Visa Category</span>
+                            <span className="font-medium text-foreground block">{doc.visaType}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
+                          <span className="text-muted-foreground">Total Renewals:</span>
+                          <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
+                        </div>
+
+                        {doc?.fileDownloadUrl && (
+                          <div className="pt-1">
+                            <a
+                              href={doc.fileDownloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              View Current Document
+                            </a>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenHistoryDialog("visa")}
+                          className="h-8 text-xs flex-1 gap-1.5"
+                        >
+                          <History className="h-3.5 w-3.5 text-muted-foreground" />
+                          History
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleOpenRenewDialog("visa")}
+                          className="h-8 text-xs flex-1 gap-1.5 font-semibold"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          Renew
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })()}
+
+                {/* 3. eFRRO Card */}
+                {(() => {
+                  const doc = student.efrro;
+                  const hasDoc = doc && doc.number && doc.number !== "Not provided" && doc.number !== "Pending";
+                  const verLabel = doc?.versionLabel || (hasDoc ? (doc?.versionNumber ? (doc.versionNumber === 1 ? "Original" : `Renewal ${doc.versionNumber - 1}`) : "Original") : null);
+                  const renewalCount = doc?.renewalCount ?? 0;
+
+                  let statusText = "Not Recorded";
+                  let statusClass = "text-muted-foreground";
+
+                  if (hasDoc && doc?.expiryDate) {
+                    const expDate = new Date(doc.expiryDate);
+                    const now = new Date();
+                    const diffDays = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) {
+                      statusText = "Expired";
+                      statusClass = "text-destructive font-bold";
+                    } else if (diffDays <= 30) {
+                      statusText = `Expires in ${diffDays}d`;
+                      statusClass = "text-amber-600 dark:text-amber-400 font-semibold";
+                    } else {
+                      statusText = "Compliant";
+                      statusClass = "text-emerald-600 dark:text-emerald-400 font-semibold";
+                    }
+                  }
+
+                  return (
+                    <Card className="border border-border/60 shadow-sm rounded-2xl overflow-hidden flex flex-col justify-between">
+                      <CardHeader className="pb-3 border-b border-border/40 bg-muted/10">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                            eFRRO / Permit
+                          </CardTitle>
+                          {verLabel ? (
+                            <Badge variant="outline" className="text-[10px] font-bold bg-primary/10 text-primary border-primary/30">
+                              {verLabel}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                              Not Recorded
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription className="text-[11px] text-muted-foreground">Residential Permit & Compliance</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-3.5 text-xs flex-1">
+                        <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
+                          <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">eFRRO Number</span>
+                          <span className="font-semibold text-foreground block font-mono text-sm">
+                            {hasDoc ? doc.number : "Pending Recording"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block text-[10px]">Issue Date</span>
+                            <span className="font-medium text-foreground block">
+                              {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                            </span>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
+                            <span className={statusClass}>
+                              {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
+                          <span className="text-muted-foreground">Total Renewals:</span>
+                          <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
+                        </div>
+
+                        {doc?.fileDownloadUrl && (
+                          <div className="pt-1">
+                            <a
+                              href={doc.fileDownloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              View Current Document
+                            </a>
+                          </div>
+                        )}
+                      </CardContent>
+                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenHistoryDialog("efrro")}
+                          className="h-8 text-xs flex-1 gap-1.5"
+                        >
+                          <History className="h-3.5 w-3.5 text-muted-foreground" />
+                          History
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleOpenRenewDialog("efrro")}
+                          className="h-8 text-xs flex-1 gap-1.5 font-semibold"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          Renew
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })()}
+              </div>
             </div>
           )}
         </div>
@@ -2271,6 +2766,266 @@ export default function StudentDetailsPage({ params }: PageProps) {
         onClose={handleCancelDiscard}
         onConfirm={handleConfirmDiscard}
       />
+
+      {/* Renew Document Dialog Modal */}
+      <Dialog open={renewDialogOpen} onOpenChange={setRenewDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-primary" />
+              Renew {renewDocType === "passport" ? "Passport" : renewDocType === "visa" ? "Student Visa" : "eFRRO / Permit"}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Record a renewed document version. The previous version will be preserved in history and this new version will become active immediately.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmitRenew} className="space-y-4 pt-2">
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  Document Number <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  value={renewForm.documentNumber}
+                  onChange={(e) => setRenewForm(prev => ({ ...prev, documentNumber: e.target.value }))}
+                  placeholder="e.g. A12345678"
+                  className="h-9 text-xs"
+                />
+                {renewErrors.documentNumber && (
+                  <p className="text-[11px] text-destructive">{renewErrors.documentNumber}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">
+                    Issue Date <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    type="date"
+                    value={renewForm.issueDate}
+                    onChange={(e) => setRenewForm(prev => ({ ...prev, issueDate: e.target.value }))}
+                    className="h-9 text-xs"
+                  />
+                  {renewErrors.issueDate && (
+                    <p className="text-[11px] text-destructive">{renewErrors.issueDate}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">
+                    Expiration Date <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    type="date"
+                    value={renewForm.expiryDate}
+                    onChange={(e) => setRenewForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                    className="h-9 text-xs"
+                  />
+                  {renewErrors.expiryDate && (
+                    <p className="text-[11px] text-destructive">{renewErrors.expiryDate}</p>
+                  )}
+                </div>
+              </div>
+
+              {renewDocType === "passport" && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">Place of Issue (Optional)</label>
+                  <Input
+                    value={renewForm.placeOfIssue}
+                    onChange={(e) => setRenewForm(prev => ({ ...prev, placeOfIssue: e.target.value }))}
+                    placeholder="e.g. London, United Kingdom"
+                    className="h-9 text-xs"
+                  />
+                </div>
+              )}
+
+              {renewDocType === "visa" && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">Visa Category / Type (Optional)</label>
+                  <Input
+                    value={renewForm.visaType}
+                    onChange={(e) => setRenewForm(prev => ({ ...prev, visaType: e.target.value }))}
+                    placeholder="e.g. Student (S-1)"
+                    className="h-9 text-xs"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Attach Document File (Optional - PDF or Image)</label>
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setRenewForm(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                  className="h-9 text-xs file:text-xs file:font-semibold file:text-primary cursor-pointer"
+                />
+                <p className="text-[10px] text-muted-foreground">Stored securely in Cloudflare R2 object storage with encrypted administrator access.</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Administrative Notes / Remarks (Optional)</label>
+                <Textarea
+                  value={renewForm.notes}
+                  onChange={(e) => setRenewForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="e.g. Received renewed document copy via university compliance email."
+                  rows={2}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3 border-t border-border/40">
+              <Button type="button" variant="outline" size="sm" onClick={() => setRenewDialogOpen(false)} disabled={isRenewing} className="text-xs rounded-xl">
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={isRenewing} className="text-xs rounded-xl font-semibold gap-1.5">
+                {isRenewing ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Recording Renewal...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Record Renewal
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Version History Modal */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="sm:max-w-2xl rounded-2xl p-6 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              {historyDocType === "passport" ? "Passport" : historyDocType === "visa" ? "Student Visa" : "eFRRO / Permit"} Version History
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Complete chronological audit trail of all recorded document versions.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-3">
+            {isLoadingHistory ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span>Loading version history...</span>
+              </div>
+            ) : historyVersions.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground text-xs">
+                No recorded version history for this document yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {historyVersions.map((ver) => (
+                  <div
+                    key={ver.id}
+                    className={`p-4 rounded-xl border text-xs transition-colors ${
+                      ver.isActive
+                        ? "bg-primary/5 border-primary/30 shadow-xs"
+                        : "bg-muted/10 border-border/40 opacity-90"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-border/30">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={ver.isActive ? "default" : "outline"}
+                          className={`text-xs font-bold ${
+                            ver.isActive
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {ver.versionLabel}
+                        </Badge>
+                        {ver.isActive && (
+                          <Badge variant="outline" className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                            Current Active
+                          </Badge>
+                        )}
+                        {!ver.isActive && (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            Historical / Superseded
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        Recorded: {AcademicProgressionEngine.formatDisplayDate(ver.recordedDate)}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+                      <div>
+                        <span className="text-muted-foreground block text-[10px]">Document Number</span>
+                        <span className="font-semibold text-foreground font-mono">{ver.documentNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[10px]">Issue Date</span>
+                        <span className="font-medium text-foreground">{AcademicProgressionEngine.formatDisplayDate(ver.issueDate)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
+                        <span className="font-medium text-foreground">{AcademicProgressionEngine.formatDisplayDate(ver.expiryDate)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block text-[10px]">Attachment</span>
+                        {ver.fileDownloadUrl ? (
+                          <a
+                            href={ver.fileDownloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline font-medium text-[11px]"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View File
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-[11px]">No file attached</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {(ver.placeOfIssue || ver.visaType || ver.notes) && (
+                      <div className="mt-2.5 pt-2 border-t border-border/20 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                        {ver.placeOfIssue && (
+                          <div>
+                            <span className="text-muted-foreground">Place of Issue: </span>
+                            <span className="text-foreground">{ver.placeOfIssue}</span>
+                          </div>
+                        )}
+                        {ver.visaType && (
+                          <div>
+                            <span className="text-muted-foreground">Visa Category: </span>
+                            <span className="text-foreground">{ver.visaType}</span>
+                          </div>
+                        )}
+                        {ver.notes && (
+                          <div className="sm:col-span-2">
+                            <span className="text-muted-foreground">Notes: </span>
+                            <span className="text-foreground italic">{ver.notes}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-2 border-t border-border/40">
+            <Button type="button" variant="outline" size="sm" onClick={() => setHistoryDialogOpen(false)} className="text-xs rounded-xl">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* WhatsApp Reminder Dispatch Preview & Confirmation Modal */}
       <DispatchReminderDialog

@@ -19,6 +19,8 @@ import {
 import type { User } from "@supabase/supabase-js";
 
 interface DatabaseVersionRow {
+  id?: string;
+  version_number?: number;
   document_number?: string;
   issue_date?: string;
   expiry_date?: string;
@@ -26,6 +28,8 @@ interface DatabaseVersionRow {
   visa_type?: string | null;
   verification_status?: string;
   is_active?: boolean;
+  notes?: string | null;
+  created_at?: string;
   deleted_at?: string | null;
 }
 
@@ -324,15 +328,21 @@ export class StudentExcelExportService {
         passportIssueDate: activePassport?.issue_date || snapshot?.passport_issue_date || null,
         passportExpiry: activePassport?.expiry_date || snapshot?.passport_expiry || null,
         passportPlaceOfIssue: activePassport?.place_of_issue || snapshot?.passport_place_of_issue || "N/A",
+        passportRenewalCount: Math.max(0, (r.passport_versions || []).filter((p: DatabaseVersionRow) => !p.deleted_at).length - 1),
         visaNumber,
         visaType: activeVisa?.visa_type || snapshot?.visa_type || "Student (S-1)",
         visaIssueDate: activeVisa?.issue_date || snapshot?.visa_issue_date || null,
         visaExpiry: activeVisa?.expiry_date || snapshot?.visa_expiry || null,
         visaStatus: snapshot?.visa_status || "MISSING",
+        visaRenewalCount: Math.max(0, (r.visa_versions || []).filter((v: DatabaseVersionRow) => !v.deleted_at).length - 1),
         efrroNumber: activeEfrro?.document_number || snapshot?.efrro_number || "N/A",
         efrroIssueDate: activeEfrro?.issue_date || snapshot?.efrro_issue_date || null,
         efrroExpiry: activeEfrro?.expiry_date || snapshot?.efrro_expiry || null,
         efrroStatus: snapshot?.efrro_status || "MISSING",
+        efrroRenewalCount: Math.max(0, (r.efrro_versions || []).filter((e: DatabaseVersionRow) => !e.deleted_at).length - 1),
+        rawPassportVersions: r.passport_versions || [],
+        rawVisaVersions: r.visa_versions || [],
+        rawEfrroVersions: r.efrro_versions || [],
         email: contact?.email || "",
         phoneLocal: contact?.phone_local || contact?.phone_local_number || "N/A",
         phoneHome: contact?.phone_home || contact?.phone_home_number || "N/A",
@@ -377,15 +387,18 @@ export class StudentExcelExportService {
       "Passport Issue Date",
       "Passport Expiry Date",
       "Passport Place of Issue",
+      "Passport Renewal Count",
       "Visa Number",
       "Visa Type",
       "Visa Issue Date",
       "Visa Expiry Date",
       "Visa Status",
+      "Visa Renewal Count",
       "eFRRO Number",
       "eFRRO Issue Date",
       "eFRRO Expiry Date",
       "eFRRO Status",
+      "eFRRO Renewal Count",
       "Compliance Status",
       "Email Address",
       "Mobile (Local)",
@@ -425,15 +438,18 @@ export class StudentExcelExportService {
       StudentExcelExportService.formatDate(s.passportIssueDate),
       StudentExcelExportService.formatDate(s.passportExpiry),
       s.passportPlaceOfIssue || "N/A",
+      s.passportRenewalCount,
       s.visaNumber || "Not Provided",
       s.visaType || "Student (S-1)",
       StudentExcelExportService.formatDate(s.visaIssueDate),
       StudentExcelExportService.formatDate(s.visaExpiry),
       StudentExcelExportService.formatComplianceStatus(s.visaStatus),
+      s.visaRenewalCount,
       s.efrroNumber || "N/A",
       StudentExcelExportService.formatDate(s.efrroIssueDate),
       StudentExcelExportService.formatDate(s.efrroExpiry),
       StudentExcelExportService.formatComplianceStatus(s.efrroStatus),
+      s.efrroRenewalCount,
       StudentExcelExportService.formatComplianceStatus(s.rawComplianceStatus),
       s.email || "Not Provided",
       s.phoneLocal || "N/A",
@@ -442,14 +458,14 @@ export class StudentExcelExportService {
       s.emergencyContactPhone || "N/A"
     ]);
 
-    // 7. Generate Excel workbook
+    // 7. Generate Excel workbook with multi-sheet structure
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
     // Apply frozen header row
     ws["!views"] = [{ state: "frozen", ySplit: 1, xSplit: 0 }];
 
     // Enable Excel autofilter across full table range
-    const range = XLSX.utils.decode_range(ws["!ref"] || `A1:AL${rows.length + 1}`);
+    const range = XLSX.utils.decode_range(ws["!ref"] || `A1:AU${rows.length + 1}`);
     ws["!autofilter"] = { ref: XLSX.utils.encode_range(range) };
 
     // Set professional column widths
@@ -483,15 +499,18 @@ export class StudentExcelExportService {
       { wch: 18 }, // Passport Issue Date
       { wch: 18 }, // Passport Expiry Date
       { wch: 22 }, // Passport Place of Issue
+      { wch: 22 }, // Passport Renewal Count
       { wch: 18 }, // Visa Number
       { wch: 18 }, // Visa Type
       { wch: 16 }, // Visa Issue Date
       { wch: 16 }, // Visa Expiry Date
       { wch: 16 }, // Visa Status
+      { wch: 18 }, // Visa Renewal Count
       { wch: 18 }, // eFRRO Number
       { wch: 16 }, // eFRRO Issue Date
       { wch: 16 }, // eFRRO Expiry Date
       { wch: 16 }, // eFRRO Status
+      { wch: 20 }, // eFRRO Renewal Count
       { wch: 18 }, // Compliance Status
       { wch: 28 }, // Email Address
       { wch: 18 }, // Mobile (Local)
@@ -502,6 +521,124 @@ export class StudentExcelExportService {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Students");
+
+    // Secondary Worksheet: Document Renewal History
+    const historyHeaders = [
+      "S.No.",
+      "Registration / Enrolment Number",
+      "Student Legal Name",
+      "Nationality",
+      "Document Type",
+      "Version Number",
+      "Version Label",
+      "Active Status",
+      "Document Number",
+      "Issue Date",
+      "Expiry Date",
+      "Place of Issue / Visa Type",
+      "Recorded Date",
+      "Administrative Remarks / Notes"
+    ];
+
+    const historyRows: any[] = [];
+    let historyIdx = 1;
+
+    filteredDataset.forEach(s => {
+      // Passport versions
+      (s.rawPassportVersions || [])
+        .filter((v: DatabaseVersionRow) => !v.deleted_at)
+        .sort((a: DatabaseVersionRow, b: DatabaseVersionRow) => (a.version_number || 1) - (b.version_number || 1))
+        .forEach((v: DatabaseVersionRow) => {
+          const verNum = v.version_number || 1;
+          historyRows.push([
+            historyIdx++,
+            s.registrationNumber || "Not Provided",
+            s.fullName || "N/A",
+            s.nationalityName || "Not Specified",
+            "Passport",
+            verNum,
+            verNum === 1 ? "Original" : `Renewal ${verNum - 1}`,
+            v.is_active ? "Current Active" : "Historical / Superseded",
+            v.document_number || "N/A",
+            StudentExcelExportService.formatDate(v.issue_date),
+            StudentExcelExportService.formatDate(v.expiry_date),
+            v.place_of_issue || "N/A",
+            StudentExcelExportService.formatDate(v.created_at),
+            v.notes || ""
+          ]);
+        });
+
+      // Visa versions
+      (s.rawVisaVersions || [])
+        .filter((v: DatabaseVersionRow) => !v.deleted_at)
+        .sort((a: DatabaseVersionRow, b: DatabaseVersionRow) => (a.version_number || 1) - (b.version_number || 1))
+        .forEach((v: DatabaseVersionRow) => {
+          const verNum = v.version_number || 1;
+          historyRows.push([
+            historyIdx++,
+            s.registrationNumber || "Not Provided",
+            s.fullName || "N/A",
+            s.nationalityName || "Not Specified",
+            "Student Visa",
+            verNum,
+            verNum === 1 ? "Original" : `Renewal ${verNum - 1}`,
+            v.is_active ? "Current Active" : "Historical / Superseded",
+            v.document_number || "N/A",
+            StudentExcelExportService.formatDate(v.issue_date),
+            StudentExcelExportService.formatDate(v.expiry_date),
+            v.visa_type || "Student (S-1)",
+            StudentExcelExportService.formatDate(v.created_at),
+            v.notes || ""
+          ]);
+        });
+
+      // eFRRO versions
+      (s.rawEfrroVersions || [])
+        .filter((v: DatabaseVersionRow) => !v.deleted_at)
+        .sort((a: DatabaseVersionRow, b: DatabaseVersionRow) => (a.version_number || 1) - (b.version_number || 1))
+        .forEach((v: DatabaseVersionRow) => {
+          const verNum = v.version_number || 1;
+          historyRows.push([
+            historyIdx++,
+            s.registrationNumber || "Not Provided",
+            s.fullName || "N/A",
+            s.nationalityName || "Not Specified",
+            "eFRRO / Permit",
+            verNum,
+            verNum === 1 ? "Original" : `Renewal ${verNum - 1}`,
+            v.is_active ? "Current Active" : "Historical / Superseded",
+            v.document_number || "N/A",
+            StudentExcelExportService.formatDate(v.issue_date),
+            StudentExcelExportService.formatDate(v.expiry_date),
+            "Residential Permit",
+            StudentExcelExportService.formatDate(v.created_at),
+            v.notes || ""
+          ]);
+        });
+    });
+
+    const historyWs = XLSX.utils.aoa_to_sheet([historyHeaders, ...historyRows]);
+    historyWs["!views"] = [{ state: "frozen", ySplit: 1, xSplit: 0 }];
+    const historyRange = XLSX.utils.decode_range(historyWs["!ref"] || `A1:N${historyRows.length + 1}`);
+    historyWs["!autofilter"] = { ref: XLSX.utils.encode_range(historyRange) };
+    historyWs["!cols"] = [
+      { wch: 7 },  // S.No.
+      { wch: 24 }, // Enrolment Number
+      { wch: 26 }, // Student Name
+      { wch: 20 }, // Nationality
+      { wch: 16 }, // Document Type
+      { wch: 14 }, // Version Number
+      { wch: 16 }, // Version Label
+      { wch: 22 }, // Active Status
+      { wch: 20 }, // Document Number
+      { wch: 16 }, // Issue Date
+      { wch: 16 }, // Expiry Date
+      { wch: 24 }, // Place / Visa Type
+      { wch: 16 }, // Recorded Date
+      { wch: 30 }  // Notes
+    ];
+
+    XLSX.utils.book_append_sheet(wb, historyWs, "Document Renewal History");
 
     const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx", compression: true });
     const fileName = generateStudentExportFilename(criteria);

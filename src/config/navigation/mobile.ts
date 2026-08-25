@@ -23,11 +23,6 @@ export const mobileNavigation: NavigationConfig = {
       ],
     },
     {
-      title: "Replacement Requests",
-      href: "/replacement-requests",
-      icon: "FileCheck2",
-    },
-    {
       title: "Reminders",
       href: "/reminders",
       icon: "Bell",

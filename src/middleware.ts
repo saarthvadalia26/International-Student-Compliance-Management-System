@@ -1,7 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { administratorDetectionService } from "@/services/auth/administrator-detection.service";
-import { isStudentPortalTestMode } from "@/config/feature-flags";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -65,25 +64,7 @@ export async function middleware(request: NextRequest) {
 
   // Extract and normalize user role
   const rawRole = (user?.user_metadata?.role as string | undefined)?.toLowerCase().trim();
-  const isStudent = rawRole === "student";
   const isAdministrator = rawRole === "administrator" || rawRole === "admin";
-
-  // ── Student Portal Test Mode Bypass ────────────────────────────────────────
-  if (isStudentPortalTestMode()) {
-    // Redirect root /student or /student/login directly to /student/dashboard
-    if (pathname === "/student" || pathname === "/student/" || pathname === "/student/login") {
-      url.pathname = "/student/dashboard";
-      return NextResponse.redirect(url);
-    }
-    // Allow all other /student/* subroutes to render cleanly without authentication redirects
-    if (pathname.startsWith("/student/")) {
-      response.headers.set("X-Frame-Options", "DENY");
-      response.headers.set("X-Content-Type-Options", "nosniff");
-      response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-      response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
-      return response;
-    }
-  }
 
   // ── Single Authoritative Setup & Auth Routing Authority for Non-API Requests ──
   if (!pathname.startsWith("/api")) {
@@ -100,17 +81,13 @@ export async function middleware(request: NextRequest) {
 
     // Case 1: Administrator Exists & System Initialized
     if (pathname === "/setup") {
-      url.pathname = user ? (isStudent ? "/student/dashboard" : "/dashboard") : "/login";
+      url.pathname = user ? "/dashboard" : "/login";
       return NextResponse.redirect(url);
     }
 
     // Authoritative Root "/" Request Handling
     if (pathname === "/") {
-      if (user) {
-        url.pathname = isStudent ? "/student/dashboard" : "/dashboard";
-      } else {
-        url.pathname = "/login";
-      }
+      url.pathname = user ? "/dashboard" : "/login";
       return NextResponse.redirect(url);
     }
   }
@@ -133,7 +110,6 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/students") ||
-    pathname.startsWith("/replacement-requests") ||
     pathname.startsWith("/notifications") ||
     pathname.startsWith("/profile") ||
     pathname.startsWith("/reminders") ||
@@ -144,34 +120,12 @@ export async function middleware(request: NextRequest) {
     if (!user) {
       url.pathname = "/login";
       return NextResponse.redirect(url);
-    } else if (isStudent) {
-      url.pathname = "/student/dashboard";
-      return NextResponse.redirect(url);
     }
   }
 
-  // ── Student Portal Routes (Production Mode) ─────────────────────────────────
-  if (
-    pathname.startsWith("/student/dashboard") ||
-    pathname.startsWith("/student/profile") ||
-    pathname.startsWith("/student/settings") ||
-    pathname.startsWith("/student/history") ||
-    pathname.startsWith("/student/notifications") ||
-    pathname.startsWith("/student/efrro") ||
-    pathname.startsWith("/student/upload")
-  ) {
-    if (!user) {
-      url.pathname = "/student/login";
-      return NextResponse.redirect(url);
-    } else if (!isStudent) {
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
-  }
-
-  // ── Prevent Authenticated Users from Visiting Login Pages ──────────────────
-  if (user && (pathname === "/login" || pathname === "/student/login")) {
-    url.pathname = isStudent ? "/student/dashboard" : "/dashboard";
+  // ── Prevent Authenticated Users from Visiting Login Page ──────────────────
+  if (user && pathname === "/login") {
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
