@@ -23,7 +23,7 @@ export interface IDocumentDbRow {
   deleted_by_system?: boolean;
   storage_provider?: string;
   storage_object_key?: string | null;
-  storage_status?: "ACTIVE" | "REJECTED_PENDING_DELETE" | "APPROVED_PENDING_RETENTION" | "DELETED";
+  storage_status?: "ACTIVE" | "REJECTED_PENDING_DELETE" | "ARCHIVED_SUPERSEDED" | "DELETED";
 }
 
 export interface ISnapshotDbRow {

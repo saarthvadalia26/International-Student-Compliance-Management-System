@@ -26,7 +26,7 @@ export interface ComplianceDocument {
   deletedBySystem?: boolean;
   storageProvider?: string;
   storageObjectKey?: string | null;
-  storageStatus?: "ACTIVE" | "REJECTED_PENDING_DELETE" | "APPROVED_PENDING_RETENTION" | "DELETED";
+  storageStatus?: "ACTIVE" | "REJECTED_PENDING_DELETE" | "ARCHIVED_SUPERSEDED" | "DELETED";
 }
 
 export interface StudentSnapshot {

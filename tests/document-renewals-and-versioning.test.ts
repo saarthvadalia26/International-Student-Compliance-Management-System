@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert";
 import { TemplateValidator, GLOBAL_ALLOWED_TOKENS } from "../src/domain/notifications/validators/template.validator";
 
 describe("Document Versioning & Renewal Architecture", () => {
@@ -14,27 +15,27 @@ describe("Document Versioning & Renewal Architecture", () => {
     }
 
     it("assigns 'Original' to version 1", () => {
-      expect(getVersionLabel(1)).toBe("Original");
+      assert.strictEqual(getVersionLabel(1), "Original");
     });
 
     it("assigns 'Renewal 1' to version 2", () => {
-      expect(getVersionLabel(2)).toBe("Renewal 1");
+      assert.strictEqual(getVersionLabel(2), "Renewal 1");
     });
 
     it("assigns 'Renewal 2' to version 3", () => {
-      expect(getVersionLabel(3)).toBe("Renewal 2");
+      assert.strictEqual(getVersionLabel(3), "Renewal 2");
     });
 
     it("assigns 'Renewal 5' to version 6", () => {
-      expect(getVersionLabel(6)).toBe("Renewal 5");
+      assert.strictEqual(getVersionLabel(6), "Renewal 5");
     });
 
     it("computes renewal counts accurately across lifecycle", () => {
-      expect(calculateRenewalCount(0)).toBe(0);
-      expect(calculateRenewalCount(1)).toBe(0);
-      expect(calculateRenewalCount(2)).toBe(1);
-      expect(calculateRenewalCount(3)).toBe(2);
-      expect(calculateRenewalCount(10)).toBe(9);
+      assert.strictEqual(calculateRenewalCount(0), 0);
+      assert.strictEqual(calculateRenewalCount(1), 0);
+      assert.strictEqual(calculateRenewalCount(2), 1);
+      assert.strictEqual(calculateRenewalCount(3), 2);
+      assert.strictEqual(calculateRenewalCount(10), 9);
     });
   });
 
@@ -59,29 +60,29 @@ describe("Document Versioning & Renewal Architecture", () => {
 
     it("accepts valid issue and expiry date ranges", () => {
       const result = validateDocumentDates("2026-01-01", "2031-01-01");
-      expect(result.valid).toBe(true);
+      assert.strictEqual(result.valid, true);
     });
 
     it("rejects expiry date equal to issue date", () => {
       const result = validateDocumentDates("2026-05-10", "2026-05-10");
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain("must be strictly after");
+      assert.strictEqual(result.valid, false);
+      assert.ok(result.error?.includes("must be strictly after"));
     });
 
     it("rejects expiry date before issue date", () => {
       const result = validateDocumentDates("2026-05-10", "2025-05-10");
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain("must be strictly after");
+      assert.strictEqual(result.valid, false);
+      assert.ok(result.error?.includes("must be strictly after"));
     });
   });
 
   // ── 3. Notification Template Token Invariants ─────────────────────────────
   describe("Notification Template Tokens & Compliance Email Invariants", () => {
     it("supports compliance_email and support_email tokens in template validator", () => {
-      expect(GLOBAL_ALLOWED_TOKENS.has("compliance_email")).toBe(true);
-      expect(GLOBAL_ALLOWED_TOKENS.has("support_email")).toBe(true);
-      expect(GLOBAL_ALLOWED_TOKENS.has("student_name")).toBe(true);
-      expect(GLOBAL_ALLOWED_TOKENS.has("expiry_date")).toBe(true);
+      assert.strictEqual(GLOBAL_ALLOWED_TOKENS.has("compliance_email"), true);
+      assert.strictEqual(GLOBAL_ALLOWED_TOKENS.has("support_email"), true);
+      assert.strictEqual(GLOBAL_ALLOWED_TOKENS.has("student_name"), true);
+      assert.strictEqual(GLOBAL_ALLOWED_TOKENS.has("expiry_date"), true);
     });
 
     it("validates template instructing student to email renewed documents to university", () => {
@@ -94,9 +95,9 @@ describe("Document Versioning & Renewal Architecture", () => {
         bodyTemplate: body
       });
 
-      expect(result.isValid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-      expect(result.extractedTokens).toContain("compliance_email");
+      assert.strictEqual(result.isValid, true);
+      assert.strictEqual(result.errors.length, 0);
+      assert.ok(result.extractedTokens.includes("compliance_email"));
     });
 
     it("detects malformed single braces in notification templates", () => {
@@ -109,8 +110,8 @@ describe("Document Versioning & Renewal Architecture", () => {
         bodyTemplate: body
       });
 
-      expect(result.isValid).toBe(false);
-      expect(result.malformedSyntax.length).toBeGreaterThan(0);
+      assert.strictEqual(result.isValid, false);
+      assert.ok(result.malformedSyntax.length > 0);
     });
   });
 });

@@ -32,12 +32,6 @@ const staticRouteMap: Record<string, { section: string; title: string; parentLab
   "/settings": { section: "Workspace", title: "Settings" },
   "/help": { section: "Workspace", title: "Help & Support" },
   "/setup": { section: "System", title: "Initial Setup Wizard" },
-  "/student/dashboard": { section: "Student Portal", title: "Dashboard" },
-  "/student/profile": { section: "Student Portal", title: "Profile" },
-  "/student/efrro": { section: "Student Portal", title: "Document Centre" },
-  "/student/history": { section: "Student Portal", title: "Activity History" },
-  "/student/settings": { section: "Student Portal", title: "Preferences" },
-  "/student/notifications": { section: "Student Portal", title: "Notifications" },
 };
 
 /**
@@ -94,16 +88,6 @@ export function getRouteMetadata(pathname: string, searchParams?: URLSearchParam
           { label: "Workspace", href: "/dashboard" },
           { label: "Settings", href: "/settings" },
           { label: "Academic Programs", isCurrent: true },
-        ],
-      };
-    } else if (tab === "retention") {
-      return {
-        section: "Workspace",
-        pageTitle: "Document Retention",
-        breadcrumbs: [
-          { label: "Workspace", href: "/dashboard" },
-          { label: "Settings", href: "/settings" },
-          { label: "Document Retention", isCurrent: true },
         ],
       };
     }

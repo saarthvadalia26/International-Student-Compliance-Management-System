@@ -17,8 +17,6 @@ export interface SystemHealthMetrics {
   queueLength: number;
   storageUsageFiles: number;
   storageUsageBytes: number;
-  lastCleanupStatus: string;
-  lastCleanupTime: string;
 
   // Real production infrastructure diagnostics
   diagnostics: SystemInfrastructureDiagnostics;
@@ -81,7 +79,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     passportCountRes,
     visaCountRes,
     efrroCountRes,
-    cleanupRes,
     latestJobRes,
     diagnostics
   ] = await Promise.all([
@@ -117,9 +114,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     supabase.from("visa_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("efrro_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
 
-    // Cleanup logs status
-    supabase.from("retention_audit_log").select("completed_at, action, dry_run").order("completed_at", { ascending: false }).limit(1),
-
     // Latest scheduled job execution
     supabase.from("scheduled_jobs").select("*").order("created_at", { ascending: false }).limit(5),
 
@@ -138,15 +132,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
   const storageUsageFiles = (passportCountRes.count || 0) + (visaCountRes.count || 0) + (efrroCountRes.count || 0);
   // Estimate average document size = 450 KB (460,800 bytes) per document
   const storageUsageBytes = storageUsageFiles * 460800;
-
-  let lastCleanupStatus = "Idle / Scheduled Daily";
-  let lastCleanupTime = "No cleanups executed yet";
-
-  if (cleanupRes.data && cleanupRes.data.length > 0) {
-    const log = cleanupRes.data[0];
-    lastCleanupTime = new Date(log.completed_at).toLocaleString();
-    lastCleanupStatus = log.dry_run ? `Completed (Dry-Run: ${log.action})` : `Completed (Live: ${log.action})`;
-  }
 
   // Load scheduler logs
   let lastSchedulerRun = "No executions logged";
@@ -182,8 +167,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     queueLength,
     storageUsageFiles,
     storageUsageBytes,
-    lastCleanupStatus,
-    lastCleanupTime,
 
     diagnostics,
 

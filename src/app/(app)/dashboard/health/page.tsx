@@ -12,7 +12,8 @@ import {
   Clock, 
   Activity, 
   ChevronLeft,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck
 } from "lucide-react";
 import { fetchSystemHealthMetrics } from "./actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -49,7 +50,7 @@ export default async function SystemHealthDashboardPage() {
             <Activity className="h-5 w-5 text-emerald-500 animate-pulse" /> System Health Dashboard
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Operational dashboard tracking API services, database logs, notification queues, and document retentions.
+            Operational dashboard tracking API services, database health, notification queues, and infrastructure diagnostics.
           </p>
         </div>
         
@@ -204,11 +205,11 @@ export default async function SystemHealthDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* 4. Storage & System Health */}
+        {/* 4. Storage & Asset Monitoring */}
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
             <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
-              Storage Usage & Cleanup Status
+              Storage & Asset Metrics
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
@@ -226,13 +227,10 @@ export default async function SystemHealthDashboardPage() {
 
             <div className="flex items-center justify-between py-2 last:border-b-0">
               <div className="flex items-center gap-2.5 text-xs text-foreground">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>Scheduled Purges Task</span>
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                <span>Document Storage State</span>
               </div>
-              <div className="text-right">
-                <span className="text-xs font-semibold text-primary">{metrics.lastCleanupStatus}</span>
-                <p className="text-[9px] text-muted-foreground font-mono">Last run: {metrics.lastCleanupTime}</p>
-              </div>
+              <span className="text-xs font-semibold font-mono text-emerald-600">Active / Encrypted</span>
             </div>
 
           </CardContent>

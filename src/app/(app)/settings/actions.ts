@@ -5,8 +5,6 @@ import { getServerSupabase } from "@/lib/supabase/server";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdministrator, requireInternalUser } from "@/lib/auth/permissions";
 import { auditService } from "@/lib/audit/audit.service";
-import { retentionService } from "@/domain/retention/services/retention.service";
-import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
 import { systemStateService } from "@/services/auth/system-state.service";
 import { administratorDetectionService } from "@/services/auth/administrator-detection.service";
 
@@ -37,28 +35,6 @@ async function getRequestMeta() {
     ipAddress: h.get("x-forwarded-for") ?? h.get("x-real-ip") ?? "unknown",
     userAgent: h.get("user-agent") ?? "unknown",
   };
-}
-
-// ── Retention Policy Actions (Administrator only) ──────────────────────────
-
-export async function fetchRetentionPolicies(): Promise<RetentionPolicy[]> {
-  await getAdminUser();
-  return retentionService.getPolicies();
-}
-
-export async function updateRetentionPolicyAction(
-  policy: Partial<RetentionPolicy> & { id: string }
-): Promise<void> {
-  await getAdminUser();
-  return retentionService.updatePolicy(policy);
-}
-
-export async function runDocumentCleanupAction(
-  dryRun: boolean,
-  performedBy: string
-): Promise<CleanupExecutionReport> {
-  await getAdminUser();
-  return retentionService.executeCleanupLifecycle(dryRun, performedBy);
 }
 
 // ── Global Sign Out (any internal user — signs out their own sessions) ─────

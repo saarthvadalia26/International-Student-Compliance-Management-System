@@ -184,7 +184,7 @@ export class VerificationService {
         console.error("[STORAGE_LIFECYCLE_ERROR] Failed to record rejection storage lifecycle:", err);
       }
     } else if (status === "verified") {
-      await this.repository.updateStorageLifecycle(id, type, "APPROVED_PENDING_RETENTION");
+      await this.repository.updateStorageLifecycle(id, type, "ACTIVE");
       await this.repository.logStorageAudit(updated.studentId, updated.id, type, "Approval", actorId || "System");
     }
 
@@ -296,13 +296,13 @@ export class ComplianceDocumentService {
       updatedBy: actorId
     }, type);
 
-    // 5. Deactivate old records & handle retention of superseded version
+    // 5. Deactivate old records & mark superseded version
     if (currentActive) {
       await this.repository.deactivatePreviousVersions(studentId, type, newDoc.id);
       
-      const newStatus = currentActive.verificationStatus === "verified" ? "APPROVED_PENDING_RETENTION" : "REJECTED_PENDING_DELETE";
+      const newStatus = currentActive.verificationStatus === "verified" ? "ARCHIVED_SUPERSEDED" : "REJECTED_SUPERSEDED";
       await this.repository.updateStorageLifecycle(currentActive.id, type, newStatus, "Superseded by newer version", true);
-      await this.repository.logStorageAudit(studentId, currentActive.id, type, "Retention scheduling", "System", undefined, { reason: "Superseded" });
+      await this.repository.logStorageAudit(studentId, currentActive.id, type, "Superseded", "System", undefined, { reason: "Superseded" });
     }
 
     // 6. Refresh score snapshot

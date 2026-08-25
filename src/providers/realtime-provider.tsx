@@ -62,12 +62,8 @@ const MONITORED_TABLES = [
   "audit_log",
   "student_contact_audit",
   "upload_audit_log",
-  "retention_policies",
-  "retention_audit_log",
   "document_lifecycle_audit_log",
-  "student_activity_log",
-  "student_upload_tokens",
-  "student_otp_verifications"
+  "student_activity_log"
 ];
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {

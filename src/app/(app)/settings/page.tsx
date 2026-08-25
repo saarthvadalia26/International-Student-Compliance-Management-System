@@ -39,9 +39,6 @@ import { useRealtime } from "@/providers/realtime-provider";
 import { useUserRole } from "@/hooks/use-user-role";
 import { toast } from "sonner";
 import { 
-  fetchRetentionPolicies, 
-  updateRetentionPolicyAction, 
-  runDocumentCleanupAction,
   globalSignOutAction,
   factoryResetAction,
   fetchDocumentUploadPoliciesAction, 
@@ -50,7 +47,6 @@ import {
   fetchSystemPreferencesAction,
   updateSystemPreferencesAction
 } from "./actions";
-import { RetentionPolicy, CleanupExecutionReport } from "@/domain/retention/types";
 import { EmergencyLogoutDialog } from "@/components/settings/emergency-logout-dialog";
 import { Branding } from "@/config/branding";
 import { ShieldCheck, FileCheck2, Globe2, Award } from "lucide-react";
@@ -76,14 +72,14 @@ function SettingsPageContent() {
   const [isEmergencyLogoutOpen, setIsEmergencyLogoutOpen] = React.useState(false);
 
   // Active Tab navigation state
-  const [activeTab, setActiveTab] = React.useState<"general" | "programs" | "countries" | "notifications" | "retention" | "system" | "security" | "users">("general");
+  const [activeTab, setActiveTab] = React.useState<"general" | "programs" | "countries" | "notifications" | "system" | "security" | "users">("general");
 
   const tabParam = searchParams ? searchParams.get("tab") : null;
 
   React.useEffect(() => {
-    if (tabParam && ["general", "programs", "countries", "notifications", "retention", "system", "security", "users"].includes(tabParam)) {
+    if (tabParam && ["general", "programs", "countries", "notifications", "system", "security", "users"].includes(tabParam)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setActiveTab(tabParam as "general" | "programs" | "countries" | "notifications" | "retention" | "system" | "security" | "users");
+      setActiveTab(tabParam as "general" | "programs" | "countries" | "notifications" | "system" | "security" | "users");
     }
   }, [tabParam]);
 
@@ -103,11 +99,6 @@ function SettingsPageContent() {
   const [notifsError, setNotifsError] = React.useState(false);
   const [previewLanguage, setPreviewLanguage] = React.useState("en");
   const [previewBody, setPreviewBody] = React.useState("");
-
-  // Document Retention Policies State
-  const [policies, setPolicies] = React.useState<RetentionPolicy[]>([]);
-  const [isLoadingPolicies, setIsLoadingPolicies] = React.useState(true);
-  const [isUpdatingPolicyId, setIsUpdatingPolicyId] = React.useState<string | null>(null);
   
   // Document Upload Window Policies State
   const [uploadPolicies, setUploadPolicies] = React.useState<DocumentUploadPolicyConfig[]>([
@@ -125,10 +116,6 @@ function SettingsPageContent() {
   const [preferencesSuccess, setPreferencesSuccess] = React.useState(false);
   const [preferencesError, setPreferencesError] = React.useState(false);
 
-  // Manual Cleanup overrides state
-  const [cleanupReport, setCleanupReport] = React.useState<CleanupExecutionReport | null>(null);
-  const [isRunningCleanup, setIsRunningCleanup] = React.useState(false);
-
   // Security password state
   const [newPassword, setNewPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
@@ -144,19 +131,6 @@ function SettingsPageContent() {
   const [resetConfirmText, setResetConfirmText] = React.useState("");
   const [isResettingFactory, setIsResettingFactory] = React.useState(false);
   const [resetStep, setResetStep] = React.useState<1 | 2 | 3>(1);
-
-  const loadPolicies = async () => {
-    try {
-      setIsLoadingPolicies(true);
-      const data = await fetchRetentionPolicies();
-      setPolicies(data);
-    } catch (err: unknown) {
-      console.error(err);
-      toast.error("Failed loading document retention policies");
-    } finally {
-      setIsLoadingPolicies(false);
-    }
-  };
 
   const loadUploadPolicies = async () => {
     try {
@@ -241,9 +215,6 @@ function SettingsPageContent() {
       if (savedWhatsapp !== null) setWhatsappAlerts(savedWhatsapp === "true");
     });
 
-    // Fetch retention policies
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadPolicies();
     loadUploadPolicies();
     loadSystemPreferences();
   }, []);
@@ -292,40 +263,6 @@ function SettingsPageContent() {
         toast.error("Unable to save changes. Please try again.");
       }
     }, 600);
-  };
-
-  const handleUpdatePolicy = async (policyId: string, updates: Partial<RetentionPolicy>) => {
-    setIsUpdatingPolicyId(policyId);
-    try {
-      await updateRetentionPolicyAction({ id: policyId, ...updates });
-      setPolicies(prev => prev.map(p => p.id === policyId ? { ...p, ...updates } : p));
-      toast.success("Retention lifecycle rule updated");
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      toast.error(errMsg || "Failed updating rule configuration");
-    } finally {
-      setIsUpdatingPolicyId(null);
-    }
-  };
-
-  const triggerCleanupRun = async (dryRun: boolean) => {
-    setIsRunningCleanup(true);
-    setCleanupReport(null);
-    try {
-      const report = await runDocumentCleanupAction(dryRun, "Administrative Interface");
-      setCleanupReport(report);
-      if (dryRun) {
-        toast.success(`Dry-run scan completed. Scanned ${report.totalScanned} documents.`);
-      } else {
-        toast.success(`Live purge completed successfully.`);
-        loadPolicies(); // Reload to refresh list
-      }
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      toast.error(errMsg || "Failed running cleanup scheduler task");
-    } finally {
-      setIsRunningCleanup(false);
-    }
   };
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -408,7 +345,6 @@ function SettingsPageContent() {
           { id: "countries", label: "Country Management", icon: Globe2 },
           { id: "notifications", label: "Notifications", icon: Bell },
           { id: "users", label: "User Management", icon: Users },
-          { id: "retention", label: "Retention Policies", icon: Clock },
           { id: "system", label: "System Health", icon: Database },
           { id: "security", label: "Security", icon: Lock }
         ].map(tab => (
@@ -417,7 +353,7 @@ function SettingsPageContent() {
             icon={tab.icon}
             title={tab.label}
             isActive={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id as "general" | "programs" | "countries" | "notifications" | "retention" | "system" | "security" | "users")}
+            onClick={() => setActiveTab(tab.id as "general" | "programs" | "countries" | "notifications" | "system" | "security" | "users")}
             variant="segmented"
             size="sm"
           />
@@ -718,144 +654,7 @@ function SettingsPageContent() {
           </div>
         )}
 
-        {/* Tab 3: Retention Policies */}
-        {activeTab === "retention" && (
-          <div className="grid gap-6">
-            <Card className="border border-border/60 shadow-sm">
-              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
-                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                  <Archive className="h-4 w-4 text-muted-foreground" /> Document Retention Lifecycles
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                {isLoadingPolicies ? (
-                  <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading policy configurations...
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {policies.map(policy => (
-                      <div key={policy.id} className="p-4 rounded-lg border border-border/60 bg-muted/10 space-y-4">
-                        <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                          <span className="text-xs font-bold uppercase tracking-wider text-primary">{policy.documentType} rules</span>
-                          <span className="text-[10px] text-muted-foreground font-mono">ID: {policy.id}</span>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase font-semibold text-muted-foreground">Retention Period (Days)</label>
-                            <Input
-                              type="number"
-                              defaultValue={policy.retentionPeriodDays}
-                              onBlur={e => handleUpdatePolicy(policy.id, { retentionPeriodDays: parseInt(e.target.value) || 0 })}
-                              disabled={isUpdatingPolicyId === policy.id}
-                              className="h-8 text-xs font-mono"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] uppercase font-semibold text-muted-foreground">Grace Period (Days)</label>
-                            <Input
-                              type="number"
-                              defaultValue={policy.gracePeriodDays}
-                              onBlur={e => handleUpdatePolicy(policy.id, { gracePeriodDays: parseInt(e.target.value) || 0 })}
-                              disabled={isUpdatingPolicyId === policy.id}
-                              className="h-8 text-xs font-mono"
-                            />
-                          </div>
-                          <div className="flex items-center gap-2 pt-5">
-                            <input
-                              type="checkbox"
-                              defaultChecked={policy.archiveBeforeDelete}
-                              onChange={e => handleUpdatePolicy(policy.id, { archiveBeforeDelete: e.target.checked })}
-                              disabled={isUpdatingPolicyId === policy.id}
-                              className="h-4 w-4 rounded accent-primary cursor-pointer"
-                            />
-                            <span className="text-xs text-foreground font-medium">Archive before permanent purge</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border border-border/60 shadow-sm">
-              <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
-                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
-                  <Play className="h-4 w-4 text-muted-foreground" /> Manual Retention Purges
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="p-4 rounded border border-yellow-200 bg-yellow-50/50 flex gap-3 text-xs text-yellow-800">
-                  <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold">Cautionary Action Workspace:</span> Triggering cleanups purges unneeded student records exceeding compliance periods from remote storage assets. Use dry-run first to verify scanned files.
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => triggerCleanupRun(true)}
-                    disabled={isRunningCleanup}
-                  >
-                    Run Dry-Run Scan
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => triggerCleanupRun(false)}
-                    disabled={isRunningCleanup}
-                  >
-                    Execute Permanent Purge (Live)
-                  </Button>
-                </div>
-
-                {isRunningCleanup && (
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing files audit calculations...
-                  </div>
-                )}
-
-                {cleanupReport && (
-                  <div className="space-y-4 mt-4 border-t border-border/40 pt-4">
-                    <div className="flex justify-between items-center text-xs font-semibold">
-                      <span>Purge Execution Report: {cleanupReport.dryRun ? "(DRY-RUN SCAN)" : "(LIVE EXECUTION)"}</span>
-                      <span className="font-mono text-muted-foreground">Scanned count: {cleanupReport.totalScanned}</span>
-                    </div>
-
-                    {cleanupReport.actionsPerformed.length === 0 ? (
-                      <div className="p-3 bg-muted/20 border rounded text-xs text-muted-foreground">
-                        No files matching expired retention categories. No changes made.
-                      </div>
-                    ) : (
-                      <div className="max-h-56 overflow-y-auto border border-border/40 rounded p-1 space-y-1">
-                        {cleanupReport.actionsPerformed.map((item, idx) => (
-                          <div key={idx} className="p-2 text-[11px] font-mono border-b border-border/20 last:border-0 flex justify-between gap-4">
-                            <div>
-                              <span className="font-semibold uppercase text-primary">[{item.documentType}]</span> {item.filePath}
-                            </div>
-                            <div className="shrink-0 flex items-center gap-1.5">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] ${
-                                item.action === "deleted" ? "bg-rose-100 text-rose-800" : "bg-blue-100 text-blue-800"
-                              }`}>{item.action}</span>
-                              <span className="text-[10px] text-muted-foreground">{item.details}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Tab 4: System Health */}
+        {/* Tab: System Health */}
         {activeTab === "system" && (
           <div className="grid gap-6">
             <PlatformInfrastructureTab />
