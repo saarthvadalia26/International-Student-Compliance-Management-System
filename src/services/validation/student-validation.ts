@@ -59,6 +59,7 @@ export const RegisterStudentValidationSchema = z.object({
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
+  nfsuCampus: z.string().max(255).optional().nullable(),
   relationshipType: z.enum([
     "father", 
     "mother", 

@@ -93,6 +93,7 @@ export interface StudentAcademic {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -184,6 +185,7 @@ export interface RegisterStudentInput {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
   relationshipType?: RelationshipType | null;
   relationshipName?: string | null;
   relationshipPhone?: string | null;
@@ -255,6 +257,7 @@ export interface UpdateStudentInput {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
   relationshipType?: RelationshipType | null;
   relationshipName?: string | null;
   relationshipPhone?: string | null;
@@ -278,6 +281,7 @@ export interface StudentFilterOptions {
   nationalityCode?: string;
   programCode?: string;
   admissionCategory?: AdmissionCategory | "all";
+  nfsuCampus?: string | "all";
   limit?: number;
   offset?: number;
 }

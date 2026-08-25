@@ -35,6 +35,7 @@ export interface StudentListItem {
   admissionCategory?: string | null;
   iccrApplicationNumber?: string | null;
   siiApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
   passport: { number: string };
   visa: { number: string };
   email: string;
@@ -116,6 +117,7 @@ export interface StudentDetailProfile {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
   totalSemesters?: number;
   semesterDuration?: number;
   semesterDurationUnit?: string;
@@ -361,7 +363,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
           created_at,
           student_personal(full_name, nationality_code),
           student_contact(email, phone_home),
-          student_academic(program_id, program_code, academic_status, admission_category, sii_application_number, iccr_application_number),
+          student_academic(program_id, program_code, academic_status, admission_category, sii_application_number, iccr_application_number, nfsu_campus),
           student_snapshot(compliance_status, passport_number, visa_number)
         `)
         .is("deleted_at", null)
@@ -528,7 +530,8 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing",
         admissionCategory: academic?.admission_category || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
-        siiApplicationNumber: academic?.sii_application_number || null
+        siiApplicationNumber: academic?.sii_application_number || null,
+        nfsuCampus: academic?.nfsu_campus || null
       };
     });
 
@@ -740,6 +743,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       admissionCategoryOther: academic?.admission_category_other || null,
       siiApplicationNumber: academic?.sii_application_number || null,
       iccrApplicationNumber: academic?.iccr_application_number || null,
+      nfsuCampus: academic?.nfsu_campus || null,
       totalSemesters: hasCourseConfig ? progression.totalSemesters : undefined,
       semesterDuration: hasCourseConfig ? progression.details.semesterDuration : undefined,
       semesterDurationUnit: hasCourseConfig ? progression.details.semesterDurationUnit : undefined,

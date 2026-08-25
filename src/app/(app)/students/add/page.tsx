@@ -76,6 +76,7 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   admissionCategoryOther: { tab: "academic", elementId: "admissionCategoryOther", label: "Custom Admission Track" },
   siiApplicationNumber: { tab: "academic", elementId: "siiApplicationNumber", label: "SII Application Number" },
   iccrApplicationNumber: { tab: "academic", elementId: "iccrApplicationNumber", label: "ICCR Application Number" },
+  nfsuCampus: { tab: "academic", elementId: "nfsuCampus", label: "NFSU Campus" },
   
   phoneHome: { tab: "contact", elementId: "phoneHome", label: "Home Country Phone" },
   email: { tab: "contact", elementId: "email", label: "Student Email" },
@@ -191,6 +192,7 @@ export default function StudentRegistrationPage() {
     admissionCategoryOther: "",
     siiApplicationNumber: "",
     iccrApplicationNumber: "",
+    nfsuCampus: "",
 
     // Contact Coordinates
     email: "",
@@ -448,6 +450,7 @@ export default function StudentRegistrationPage() {
       admissionCategoryOther: formData.admissionCategory === "other" ? (formData.admissionCategoryOther.trim() || undefined) : undefined,
       siiApplicationNumber: formData.siiApplicationNumber?.trim() || undefined,
       iccrApplicationNumber: formData.iccrApplicationNumber?.trim() || undefined,
+      nfsuCampus: formData.nfsuCampus?.trim() || undefined,
 
       // Emergency relationship
       relationshipType: formData.emergencyContactName.trim() ? (formData.emergencyContactRelation as RelationshipType) : undefined,
@@ -947,6 +950,26 @@ export default function StudentRegistrationPage() {
                     {validationErrors.siiApplicationNumber && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                         {validationErrors.siiApplicationNumber}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* NFSU Campus - Always visible, optional */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="nfsuCampus">
+                      NFSU Campus <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Input
+                      id="nfsuCampus"
+                      placeholder="e.g. Delhi Campus, Gandhinagar Campus, Mumbai Campus"
+                      value={formData.nfsuCampus}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className={`h-10 text-sm ${validationErrors.nfsuCampus ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                    />
+                    {validationErrors.nfsuCampus && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.nfsuCampus}
                       </p>
                     )}
                   </div>

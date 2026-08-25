@@ -220,6 +220,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
       const resolvedIccrNo = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
       const resolvedSiiNo = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
+      const resolvedNfsuCampus = input.nfsuCampus ? input.nfsuCampus.trim() : null;
 
       let { data: academicData, error: academicError } = await supabase
         .from("student_academic")
@@ -237,6 +238,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
           sii_application_number: resolvedSiiNo,
           iccr_application_number: resolvedIccrNo,
+          nfsu_campus: resolvedNfsuCampus,
           created_by: actorId,
           updated_by: actorId
         })
@@ -441,6 +443,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           admissionCategoryOther: academicData.admission_category_other || null,
           siiApplicationNumber: academicData.sii_application_number || null,
           iccrApplicationNumber: academicData.iccr_application_number || null,
+          nfsuCampus: academicData.nfsu_campus || null,
           createdAt: new Date(academicData.created_at),
           updatedAt: new Date(academicData.updated_at),
           deletedAt: academicData.deleted_at ? new Date(academicData.deleted_at) : null,
@@ -588,6 +591,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         admissionCategoryOther: academic?.admission_category_other || null,
         siiApplicationNumber: academic?.sii_application_number || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
+        nfsuCampus: academic?.nfsu_campus || null,
         createdAt: academic?.created_at ? new Date(academic.created_at) : new Date(student.created_at),
         updatedAt: academic?.updated_at ? new Date(academic.updated_at) : new Date(student.updated_at),
         deletedAt: academic?.deleted_at ? new Date(academic.deleted_at) : null,
@@ -775,6 +779,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
     }
     if (input.siiApplicationNumber !== undefined) {
       academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
+    }
+    if (input.nfsuCampus !== undefined) {
+      academicUpdates.nfsu_campus = input.nfsuCampus ? input.nfsuCampus.trim() : null;
     }
     if (input.admissionCategoryOther !== undefined) academicUpdates.admission_category_other = input.admissionCategoryOther ? input.admissionCategoryOther.trim() : null;
     if (input.overrideSchoolId !== undefined) academicUpdates.override_school_id = input.overrideSchoolId ? input.overrideSchoolId.trim() : null;

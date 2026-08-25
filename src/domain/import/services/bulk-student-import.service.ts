@@ -1292,6 +1292,7 @@ export class BulkStudentImportService {
             admission_category_other: data.admission_category === "other" ? (data.admission_category_other?.trim() || null) : null,
             sii_application_number: resolvedSiiNo,
             iccr_application_number: resolvedIccrAppNo,
+            nfsu_campus: data.nfsu_campus ? data.nfsu_campus.trim() : null,
             academic_status: "good_standing",
             created_by: params.actorId,
             updated_by: params.actorId

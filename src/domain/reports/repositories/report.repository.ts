@@ -414,7 +414,8 @@ export class SupabaseReportRepository implements IReportRepository {
         compliance_status: snapshot?.compliance_status,
         admission_category: academic?.admission_category || null,
         iccr_application_number: academic?.iccr_application_number || null,
-        sii_application_number: academic?.sii_application_number || null
+        sii_application_number: academic?.sii_application_number || null,
+        nfsu_campus: academic?.nfsu_campus || null
       });
     });
 

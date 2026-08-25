@@ -41,6 +41,7 @@ export type ISCMSImportField =
   | "admission_category_other"
   | "sii_application_number"
   | "iccr_application_number"
+  | "nfsu_campus"
   | "current_semester"
   | "expected_graduation"
   // Emergency Contact
@@ -357,6 +358,23 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "Study in India application number.",
     sample: "SII-2026-98124",
     aliases: ["sii_application_number", "sii application number", "sii app no", "sii_no", "sii id", "sii_id", "sii application id"]
+  },
+  {
+    field: "nfsu_campus",
+    label: "NFSU Campus",
+    category: "Academic",
+    required: false,
+    description: "National Forensic Sciences University campus where the student is studying (e.g. Delhi Campus, Gandhinagar Campus).",
+    sample: "Gandhinagar Campus",
+    aliases: [
+      "nfsu_campus",
+      "nfsu campus",
+      "campus",
+      "campus name",
+      "campus_name",
+      "university campus",
+      "nfsu branch"
+    ]
   },
   {
     field: "academic_level",

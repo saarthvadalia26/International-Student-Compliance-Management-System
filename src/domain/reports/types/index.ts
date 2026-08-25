@@ -27,6 +27,7 @@ export interface StudentReportRow {
   admissionCategory?: string | null;
   iccrApplicationNumber?: string | null;
   siiApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
 }
 
 export interface EfrroReportRow {
@@ -96,6 +97,7 @@ export interface ReportFilters {
   country?: string;
   gender?: string;
   admissionCategory?: string;
+  nfsuCampus?: string;
   complianceStatus?: string;
   efrroStatus?: string;
   expiringWithinDays?: number;

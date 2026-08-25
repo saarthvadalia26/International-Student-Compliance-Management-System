@@ -177,6 +177,7 @@ export interface StudentProfile {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
   complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
   daysToPassportExpiry?: number;
   daysToVisaExpiry?: number;
@@ -510,6 +511,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     admissionCategoryOther: "",
     siiApplicationNumber: "",
     iccrApplicationNumber: "",
+    nfsuCampus: "",
     phoneHome: "",
     phoneLocal: "",
     permanentAddress: "",
@@ -562,6 +564,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         admissionCategoryOther: student.admissionCategoryOther || "",
         siiApplicationNumber: student.siiApplicationNumber || "",
         iccrApplicationNumber: student.iccrApplicationNumber || "",
+        nfsuCampus: student.nfsuCampus || "",
         phoneHome: student.phoneHome,
         phoneLocal: student.phoneLocal || "",
         permanentAddress: student.permanentAddress,
@@ -713,6 +716,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         admissionCategoryOther: editForm.admissionCategory === "other" ? (editForm.admissionCategoryOther?.trim() || undefined) : undefined,
         siiApplicationNumber: editForm.siiApplicationNumber ? editForm.siiApplicationNumber.trim() : null,
         iccrApplicationNumber: editForm.iccrApplicationNumber ? editForm.iccrApplicationNumber.trim() : null,
+        nfsuCampus: editForm.nfsuCampus ? editForm.nfsuCampus.trim() : null,
         currentSemester: Number(editForm.currentSemester) || 1,
         academicStatus: editForm.academicStatus,
         status: editForm.status,
@@ -1550,6 +1554,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <span className="text-muted-foreground block text-[11px] font-medium">Study in India (SII) Number</span>
                     <span className="font-semibold text-foreground block font-mono">
                       {student.siiApplicationNumber || "Not provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">NFSU Campus</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.nfsuCampus || "Not specified"}
                     </span>
                   </div>
 
@@ -2438,6 +2449,19 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     value={editForm.siiApplicationNumber} 
                     onChange={handleFormChange} 
                     className="h-9 text-sm font-mono" 
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-foreground" htmlFor="nfsuCampus">
+                    NFSU Campus
+                  </label>
+                  <Input 
+                    id="nfsuCampus" 
+                    placeholder="e.g. Delhi Campus, Gandhinagar Campus, Mumbai Campus" 
+                    value={editForm.nfsuCampus} 
+                    onChange={handleFormChange} 
+                    className="h-9 text-sm" 
                   />
                 </div>
 

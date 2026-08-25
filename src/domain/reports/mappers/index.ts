@@ -40,6 +40,7 @@ export class ReportMapper {
       admissionCategory: row.admission_category || null,
       iccrApplicationNumber: row.iccr_application_number || null,
       siiApplicationNumber: row.sii_application_number || null,
+      nfsuCampus: row.nfsu_campus || null,
     };
   }
 

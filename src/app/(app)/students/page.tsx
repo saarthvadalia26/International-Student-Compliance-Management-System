@@ -52,6 +52,7 @@ export interface Student {
   admissionCategory?: string | null;
   iccrApplicationNumber?: string | null;
   siiApplicationNumber?: string | null;
+  nfsuCampus?: string | null;
   passport: { number: string };
   visa: { number: string };
   email: string;
@@ -69,6 +70,7 @@ export default function StudentListPage() {
   const [complianceFilter, setComplianceFilter] = React.useState<string>("all");
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
   const [academicLevelFilter, setAcademicLevelFilter] = React.useState<string>("all");
+  const [campusFilter, setCampusFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
   const [students, setStudents] = React.useState<Student[]>([]);
@@ -123,6 +125,24 @@ export default function StudentListPage() {
     } 
   });
 
+  // Dynamically derive available campuses and counts from student records
+  const availableCampuses = React.useMemo(() => {
+    const campusCounts = new Map<string, number>();
+    let notSpecifiedCount = 0;
+    students.forEach((s) => {
+      const c = s.nfsuCampus?.trim();
+      if (c) {
+        campusCounts.set(c, (campusCounts.get(c) || 0) + 1);
+      } else {
+        notSpecifiedCount++;
+      }
+    });
+    const sortedCampuses = Array.from(campusCounts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count }));
+    return { list: sortedCampuses, notSpecifiedCount };
+  }, [students]);
+
   // Filter logic
   const filteredStudents = React.useMemo(() => {
     return students.filter((student) => {
@@ -139,6 +159,7 @@ export default function StudentListPage() {
         student.school.toLowerCase().includes(query) ||
         (student.iccrApplicationNumber || "").toLowerCase().includes(query) ||
         (student.siiApplicationNumber || "").toLowerCase().includes(query) ||
+        (student.nfsuCampus || "").toLowerCase().includes(query) ||
         student.passport.number.toLowerCase().includes(query) ||
         student.visa.number.toLowerCase().includes(query) ||
         student.email.toLowerCase().includes(query);
@@ -160,9 +181,15 @@ export default function StudentListPage() {
         academicLevelFilter === "all" ||
         studentNormLevel === academicLevelFilter;
 
-      return matchesSearch && matchesCompliance && matchesAcademic && matchesLevel;
+      // 5. NFSU Campus Filter
+      const matchesCampus = 
+        campusFilter === "all" ||
+        (campusFilter === "not_specified" && !student.nfsuCampus?.trim()) ||
+        (student.nfsuCampus?.trim().toLowerCase() === campusFilter.trim().toLowerCase());
+
+      return matchesSearch && matchesCompliance && matchesAcademic && matchesLevel && matchesCampus;
     });
-  }, [students, searchQuery, complianceFilter, academicFilter, academicLevelFilter]);
+  }, [students, searchQuery, complianceFilter, academicFilter, academicLevelFilter, campusFilter]);
 
   // Reset all filters
   const resetFilters = () => {
@@ -170,6 +197,7 @@ export default function StudentListPage() {
     setComplianceFilter("all");
     setAcademicFilter("all");
     setAcademicLevelFilter("all");
+    setCampusFilter("all");
     setCurrentPage(1);
   };
 
@@ -325,8 +353,36 @@ export default function StudentListPage() {
             </Select>
           </div>
 
+          {/* NFSU Campus filter */}
+          <div className="w-full md:w-[200px]">
+            <Select 
+              value={campusFilter} 
+              onValueChange={(val) => {
+                setCampusFilter(val || "all");
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="NFSU Campus" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All NFSU Campuses ({students.length})</SelectItem>
+                {availableCampuses.list.map((c) => (
+                  <SelectItem key={c.name} value={c.name}>
+                    {c.name} ({c.count})
+                  </SelectItem>
+                ))}
+                {availableCampuses.notSpecifiedCount > 0 && (
+                  <SelectItem value="not_specified">
+                    Not Specified ({availableCampuses.notSpecifiedCount})
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Clear filters trigger */}
-          {(searchQuery || complianceFilter !== "all" || academicFilter !== "all" || academicLevelFilter !== "all") && (
+          {(searchQuery || complianceFilter !== "all" || academicFilter !== "all" || academicLevelFilter !== "all" || campusFilter !== "all") && (
             <Button 
               variant="ghost" 
               size="sm" 
@@ -409,7 +465,7 @@ export default function StudentListPage() {
                       </div>
                     </TableCell>
 
-                    {/* Academic Program */}
+                    {/* Academic Program & Campus */}
                     <TableCell className="py-3.5 text-xs">
                       <div className="space-y-1">
                         <span className="font-medium text-foreground block">{student.programName}</span>
@@ -418,6 +474,11 @@ export default function StudentListPage() {
                           {student.academicLevelLabel && (
                             <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium">
                               {student.academicLevelLabel}
+                            </Badge>
+                          )}
+                          {student.nfsuCampus && (
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 font-medium">
+                              {student.nfsuCampus}
                             </Badge>
                           )}
                         </div>
