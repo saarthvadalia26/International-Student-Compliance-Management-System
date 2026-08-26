@@ -204,7 +204,6 @@ export default function EfrroReportPage() {
                 </th>
                 <th className="p-3 font-semibold text-muted-foreground">Reminder Sent</th>
                 <th className="p-3 font-semibold text-muted-foreground">Last Alert Sent</th>
-                <th className="p-3 font-semibold text-muted-foreground">Upload</th>
                 <th className="p-3 font-semibold text-muted-foreground">Verification</th>
                 <th className="p-3 font-semibold text-muted-foreground">Audited By</th>
               </tr>
@@ -212,7 +211,7 @@ export default function EfrroReportPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="p-8 text-center">
+                  <td colSpan={9} className="p-8 text-center">
                     <div className="flex justify-center items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading eFRRO tracking data...
@@ -221,7 +220,7 @@ export default function EfrroReportPage() {
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="p-8 text-center text-muted-foreground">
                     No eFRRO records matched filters.
                   </td>
                 </tr>
@@ -289,15 +288,6 @@ export default function EfrroReportPage() {
                       </td>
                       <td className="p-3 text-muted-foreground">
                         {row.lastReminderSentAt ? row.lastReminderSentAt.toLocaleDateString() : "N/A"}
-                      </td>
-                      <td className="p-3">
-                        <span className={`capitalize px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                          row.uploadStatus === "uploaded"
-                            ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400"
-                            : "bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400"
-                        }`}>
-                          {row.uploadStatus}
-                        </span>
                       </td>
                       <td className="p-3">
                         <span className={`capitalize px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${

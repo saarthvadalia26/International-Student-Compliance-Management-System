@@ -550,7 +550,6 @@ export class SupabaseReportRepository implements IReportRepository {
         reminder_rule: lastNotif ? lastNotif.trigger_source : null,
         reminder_sent: studentNotifs.length > 0,
         last_reminder_sent_at: lastNotif ? lastNotif.created_at : null,
-        upload_status: snapshot?.efrro_number ? "uploaded" : "missing",
         verification_status: activeVer ? activeVer.verification_status : null,
         reviewer_name: activeVer && activeVer.verified_by ? "Compliance Officer" : null,
         reviewed_at: activeVer ? activeVer.verified_at : null,

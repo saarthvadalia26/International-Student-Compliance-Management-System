@@ -566,96 +566,82 @@ export default function InitialSetupWizardPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Max Document Upload Size (MB)
+                {/* Date Format Preset Selector & Dynamic Builder */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5 text-primary" /> Date Format
                     </label>
-                    <Input
-                      type="number"
-                      value={Math.round(maxUploadSizeBytes / 1048576)}
-                      onChange={(e) => setMaxUploadSizeBytes(Number(e.target.value) * 1048576)}
-                      required
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setCustomBuilderActive(!customBuilderActive)}
+                      className="text-[10px] text-primary hover:underline font-semibold"
+                    >
+                      {customBuilderActive ? "Use Presets" : "Build Custom Order"}
+                    </button>
                   </div>
 
-                  {/* Date Format Preset Selector & Dynamic Builder */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5 text-primary" /> Date Format
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setCustomBuilderActive(!customBuilderActive)}
-                        className="text-[10px] text-primary hover:underline font-semibold"
-                      >
-                        {customBuilderActive ? "Use Presets" : "Build Custom Order"}
-                      </button>
-                    </div>
-
-                    {!customBuilderActive ? (
+                  {!customBuilderActive ? (
+                    <select
+                      value={dateFormatPreset}
+                      onChange={(e) => setDateFormatPreset(e.target.value)}
+                      className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-card px-3 py-2 text-xs font-medium text-foreground ring-offset-background transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      {DATE_FORMAT_PRESETS.map((fmt) => (
+                        <option key={fmt.format} value={fmt.format}>
+                          {fmt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-1.5">
                       <select
-                        value={dateFormatPreset}
-                        onChange={(e) => setDateFormatPreset(e.target.value)}
-                        className="flex h-10 w-full items-center justify-between rounded-lg border border-input bg-card px-3 py-2 text-xs font-medium text-foreground ring-offset-background transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        value={dateFormatPart1}
+                        onChange={(e) => setDateFormatPart1(e.target.value)}
+                        className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
                       >
-                        {DATE_FORMAT_PRESETS.map((fmt) => (
-                          <option key={fmt.format} value={fmt.format}>
-                            {fmt.label}
-                          </option>
-                        ))}
+                        <option value="DD">DD (Day)</option>
+                        <option value="MM">MM (Month)</option>
+                        <option value="YYYY">YYYY (Year)</option>
                       </select>
-                    ) : (
-                      <div className="grid grid-cols-4 gap-1.5">
-                        <select
-                          value={dateFormatPart1}
-                          onChange={(e) => setDateFormatPart1(e.target.value)}
-                          className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
-                        >
-                          <option value="DD">DD (Day)</option>
-                          <option value="MM">MM (Month)</option>
-                          <option value="YYYY">YYYY (Year)</option>
-                        </select>
-                        
-                        <select
-                          value={dateSeparator}
-                          onChange={(e) => setDateSeparator(e.target.value)}
-                          className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
-                        >
-                          <option value="/">/ (Slash)</option>
-                          <option value="-">- (Hyphen)</option>
-                          <option value=".">. (Dot)</option>
-                        </select>
+                      
+                      <select
+                        value={dateSeparator}
+                        onChange={(e) => setDateSeparator(e.target.value)}
+                        className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
+                      >
+                        <option value="/">/ (Slash)</option>
+                        <option value="-">- (Hyphen)</option>
+                        <option value=".">. (Dot)</option>
+                      </select>
 
-                        <select
-                          value={dateFormatPart2}
-                          onChange={(e) => setDateFormatPart2(e.target.value)}
-                          className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
-                        >
-                          <option value="MM">MM (Month)</option>
-                          <option value="DD">DD (Day)</option>
-                          <option value="YYYY">YYYY (Year)</option>
-                        </select>
+                      <select
+                        value={dateFormatPart2}
+                        onChange={(e) => setDateFormatPart2(e.target.value)}
+                        className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
+                      >
+                        <option value="MM">MM (Month)</option>
+                        <option value="DD">DD (Day)</option>
+                        <option value="YYYY">YYYY (Year)</option>
+                      </select>
 
-                        <select
-                          value={dateFormatPart3}
-                          onChange={(e) => setDateFormatPart3(e.target.value)}
-                          className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
-                        >
-                          <option value="YYYY">YYYY (Year)</option>
-                          <option value="MM">MM (Month)</option>
-                          <option value="DD">DD (Day)</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5 px-1">
-                      <span>Generated Format:</span>
-                      <code className="font-mono text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
-                        {computedDateFormat}
-                      </code>
+                      <select
+                        value={dateFormatPart3}
+                        onChange={(e) => setDateFormatPart3(e.target.value)}
+                        className="h-10 rounded-lg border border-input bg-card px-2 text-xs font-medium text-foreground"
+                      >
+                        <option value="YYYY">YYYY (Year)</option>
+                        <option value="MM">MM (Month)</option>
+                        <option value="DD">DD (Day)</option>
+                      </select>
                     </div>
+                  )}
+
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5 px-1">
+                    <span>Generated Format:</span>
+                    <code className="font-mono text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
+                      {computedDateFormat}
+                    </code>
                   </div>
                 </div>
 
@@ -723,7 +709,6 @@ export default function InitialSetupWizardPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div><span className="text-muted-foreground">Reminders:</span> <strong className="text-foreground">{reminderSchedule} days</strong></div>
                     <div><span className="text-muted-foreground">Timeout:</span> <strong className="text-foreground">{sessionTimeoutMinutes} mins</strong></div>
-                    <div><span className="text-muted-foreground">Upload Size:</span> <strong className="text-foreground">{Math.round(maxUploadSizeBytes / 1048576)} MB</strong></div>
                     <div><span className="text-muted-foreground">Date Format:</span> <strong className="text-primary font-mono font-bold">{computedDateFormat}</strong></div>
                     <div><span className="text-muted-foreground">Audit Trail:</span> <strong className="text-emerald-600">{enableAuditLogging ? "Enabled" : "Disabled"}</strong></div>
                   </div>

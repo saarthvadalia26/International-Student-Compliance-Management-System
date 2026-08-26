@@ -41,7 +41,6 @@ export interface EfrroReportRow {
   reminderRule: string | null;
   reminderSent: boolean;
   lastReminderSentAt: Date | null;
-  uploadStatus: "uploaded" | "missing";
   verificationStatus: "pending" | "verified" | "rejected" | null;
   reviewerName: string | null;
   reviewedAt: Date | null;
