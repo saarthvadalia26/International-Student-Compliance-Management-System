@@ -3483,7 +3483,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   onChange={(e) => setRenewForm(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
                   className="h-9 text-xs file:text-xs file:font-semibold file:text-primary cursor-pointer"
                 />
-                <p className="text-[10px] text-muted-foreground">Stored securely in Cloudflare R2 object storage with encrypted administrator access.</p>
+                <p className="text-[10px] text-muted-foreground">Stored securely in document storage with encrypted administrator access.</p>
               </div>
 
               <div className="space-y-1">

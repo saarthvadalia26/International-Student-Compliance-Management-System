@@ -2,7 +2,6 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { SystemDiagnosticsService } from "../src/domain/system/services/system-diagnostics.service";
 import { WhatsAppIntegrationService } from "../src/domain/notifications/services/whatsapp-integration.service";
-import { CloudflareR2StorageProvider } from "../src/domain/storage/providers/cloudflare-r2-storage.provider";
 import pkg from "../package.json";
 
 describe("ISCMS Real Live Production Diagnostics Acceptance Tests", () => {
@@ -125,26 +124,9 @@ describe("ISCMS Real Live Production Diagnostics Acceptance Tests", () => {
     assert.equal(configured.providerName, "Cloudflare Turnstile");
   });
 
-  // 7. Cloudflare R2 Storage Health Check: Unconfigured state
-  it("Test 7: Cloudflare R2 reports 'not_configured' with single bucket 'iscms-documents' when credentials are missing", async () => {
-    delete process.env.R2_ACCOUNT_ID;
-    delete process.env.R2_ACCESS_KEY_ID;
-    delete process.env.R2_SECRET_ACCESS_KEY;
-    delete process.env.R2_BUCKET_NAME;
-
-    const r2Provider = new CloudflareR2StorageProvider();
-    const result = await r2Provider.healthCheck();
-
-    assert.equal(result.status, "not_configured");
-    assert.equal(result.providerName, "Cloudflare R2");
-    assert.equal(result.bucket, "iscms-documents");
-    assert.equal(result.latencyMs, null);
-  });
-
-  // 8. Security Allowlist: No Secrets Leaked
-  it("Test 8: System diagnostics payload strictly enforces allowlist and never leaks secrets", async () => {
+  // 7. Security Allowlist: No Secrets Leaked
+  it("Test 7: System diagnostics payload strictly enforces allowlist and never leaks secrets", async () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = "super-secret-service-role-key-1234567890";
-    process.env.R2_SECRET_ACCESS_KEY = "super-secret-r2-key-abcdefghijklmnopqrst";
     process.env.META_ACCESS_TOKEN = "super-secret-meta-access-token-987654321";
     process.env.TURNSTILE_SECRET_KEY = "super-secret-turnstile-secret-key-112233";
 
@@ -156,20 +138,18 @@ describe("ISCMS Real Live Production Diagnostics Acceptance Tests", () => {
     const partialPayload = JSON.stringify({ runtime, deployment, email, bot });
 
     assert.ok(!partialPayload.includes("super-secret-service-role-key-1234567890"), "Service role key must NEVER appear in diagnostics");
-    assert.ok(!partialPayload.includes("super-secret-r2-key-abcdefghijklmnopqrst"), "R2 secret key must NEVER appear in diagnostics");
     assert.ok(!partialPayload.includes("super-secret-meta-access-token-987654321"), "Meta access token must NEVER appear in diagnostics");
     assert.ok(!partialPayload.includes("super-secret-turnstile-secret-key-112233"), "Turnstile secret key must NEVER appear in diagnostics");
   });
 
-  // 9. Distinction between Deployed Time and Request Time
-  it("Test 9: Distinguishes between Deployment Timestamp and Last Checked (Request) Timestamp", () => {
+  // 8. Distinction between Deployed Time and Request Time
+  it("Test 8: Distinguishes between Deployment Timestamp and Last Checked (Request) Timestamp", () => {
     process.env.NEXT_PUBLIC_BUILD_TIME = "2026-08-16T06:07:06.000Z";
 
     const deployment = SystemDiagnosticsService.getDeploymentDiagnostics();
     const checkedAt = new Date().toISOString();
 
-    assert.equal(deployment.deployedAt, "2026-08-16T06:07:06.000Z", "Deployed timestamp must be static from build time");
-    assert.ok(checkedAt, "checkedAt timestamp must be present");
-    assert.notEqual(deployment.deployedAt, checkedAt, "Deployment time and request checkedAt must not be confused");
+    assert.equal(deployment.deployedAt, "2026-08-16T06:07:06.000Z");
+    assert.notEqual(deployment.deployedAt, checkedAt, "Deployed timestamp must remain static while request checkedAt changes");
   });
 });

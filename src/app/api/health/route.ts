@@ -23,7 +23,6 @@ export async function GET() {
       region: diagnostics.runtime.region,
       services: {
         database: diagnostics.services.database.status,
-        storage: diagnostics.services.storage.status,
         whatsappProvider: diagnostics.services.whatsapp.status,
         emailProvider: diagnostics.services.email.status,
         botProtection: diagnostics.services.botProtection.status

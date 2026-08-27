@@ -19,16 +19,7 @@ export interface ServiceHealth {
   latencyMs: number | null;
   message?: string;
   error?: string;
-  bucket?: string;
-  objectCount?: number;
-  approximateStorageBytes?: number;
   checkedAt?: string;
-}
-
-export interface StorageServiceHealth extends ServiceHealth {
-  bucket: string;
-  objectCount: number;
-  approximateStorageBytes: number;
 }
 
 export interface RuntimeDiagnostics {
@@ -51,7 +42,6 @@ export interface DeploymentDiagnostics {
 
 export interface ServicesDiagnostics {
   database: ServiceHealth;
-  storage: StorageServiceHealth;
   whatsapp: ServiceHealth;
   email: ServiceHealth;
   botProtection: ServiceHealth;
@@ -78,15 +68,6 @@ export interface SystemHealthApiResponse {
     status: "connected" | "unhealthy" | "not_configured";
     latencyMs?: number | null;
     checkedAt: string;
-    error?: string;
-  };
-  storage: {
-    provider: string;
-    status: "connected" | "unhealthy" | "not_configured";
-    bucket: string;
-    checkedAt: string;
-    objectCount?: number;
-    approximateStorageBytes?: number;
     error?: string;
   };
   whatsapp: {

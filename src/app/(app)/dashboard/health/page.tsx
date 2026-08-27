@@ -8,12 +8,12 @@ import {
   MessageSquare, 
   XCircle, 
   Layers, 
-  HardDrive, 
   Clock, 
   Activity, 
   ChevronLeft,
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  Server
 } from "lucide-react";
 import { fetchSystemHealthMetrics } from "./actions";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -24,16 +24,6 @@ export const revalidate = 0; // Disable server component static caching
 
 export default async function SystemHealthDashboardPage() {
   const metrics = await fetchSystemHealthMetrics();
-
-  // Helper to format bytes into readable scale
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const dm = 2;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
-  };
 
   return (
     <div className="space-y-6 animate-fade-in p-4 md:p-6 font-sans">
@@ -205,32 +195,37 @@ export default async function SystemHealthDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* 4. Storage & Asset Monitoring */}
+        {/* 4. Security & Compliance Subsystem Health */}
         <Card className="border border-border/60 shadow-sm">
           <CardHeader className="bg-muted/10 border-b border-border/40 py-4">
             <CardTitle className="text-xs font-bold uppercase tracking-wider text-foreground">
-              Storage & Asset Metrics
+              Security & Compliance Subsystem Health
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
             
             <div className="flex items-center justify-between py-2 border-b border-border/20">
               <div className="flex items-center gap-2.5 text-xs text-foreground">
-                <HardDrive className="h-4 w-4 text-muted-foreground" />
-                <span>Disk Assets Uploaded</span>
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                <span>Database Connectivity</span>
               </div>
-              <div className="text-right">
-                <span className="text-sm font-semibold font-mono text-foreground">{metrics.storageUsageFiles} files</span>
-                <p className="text-[9px] text-muted-foreground font-mono">Total size: {formatBytes(metrics.storageUsageBytes)}</p>
+              <span className="text-xs font-semibold font-mono text-emerald-600">{metrics.databaseStatus}</span>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-border/20">
+              <div className="flex items-center gap-2.5 text-xs text-foreground">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                <span>Bot Protection (Turnstile)</span>
               </div>
+              <span className="text-xs font-semibold font-mono text-foreground">{metrics.botProtectionStatus}</span>
             </div>
 
             <div className="flex items-center justify-between py-2 last:border-b-0">
               <div className="flex items-center gap-2.5 text-xs text-foreground">
-                <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                <span>Document Storage State</span>
+                <Server className="h-4 w-4 text-primary" />
+                <span>Runtime Platform</span>
               </div>
-              <span className="text-xs font-semibold font-mono text-emerald-600">Active / Encrypted</span>
+              <span className="text-xs font-semibold font-mono text-foreground">{metrics.deploymentPlatform} ({metrics.environment})</span>
             </div>
 
           </CardContent>

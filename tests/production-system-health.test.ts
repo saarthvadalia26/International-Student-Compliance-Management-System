@@ -2,7 +2,6 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { SystemDiagnosticsService } from "../src/domain/system/services/system-diagnostics.service";
 import { WhatsAppIntegrationService } from "../src/domain/notifications/services/whatsapp-integration.service";
-import { CloudflareR2StorageProvider } from "../src/domain/storage/providers/cloudflare-r2-storage.provider";
 import pkg from "../package.json";
 
 describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", () => {
@@ -17,52 +16,7 @@ describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", (
   });
 
   // --------------------------------------------------------------------------
-  // 1. CLOUDFLARE R2 SINGLE BUCKET 'iscms-documents' & HEALTH STATES
-  // --------------------------------------------------------------------------
-  describe("Cloudflare R2 Storage Health", () => {
-    it("reports 'not_configured' with bucket 'iscms-documents' when credentials are missing", async () => {
-      delete process.env.R2_ACCOUNT_ID;
-      delete process.env.R2_ACCESS_KEY_ID;
-      delete process.env.R2_SECRET_ACCESS_KEY;
-      delete process.env.R2_BUCKET_NAME;
-
-      const r2 = new CloudflareR2StorageProvider();
-      const res = await r2.healthCheck();
-
-      assert.equal(res.status, "not_configured");
-      assert.equal(res.providerName, "Cloudflare R2");
-      assert.equal(res.bucket, "iscms-documents", "Must target iscms-documents by default");
-      assert.equal(res.latencyMs, null);
-    });
-
-    it("reports 'unhealthy' when credentials are invalid or bucket is unreachable", async () => {
-      process.env.R2_ACCOUNT_ID = "invalid_acc_123";
-      process.env.R2_ACCESS_KEY_ID = "invalid_key_456";
-      process.env.R2_SECRET_ACCESS_KEY = "invalid_secret_789";
-      process.env.R2_ENDPOINT = "https://invalid_acc_123.r2.cloudflarestorage.com";
-      process.env.R2_BUCKET_NAME = "iscms-documents";
-
-      const r2 = new CloudflareR2StorageProvider();
-      const res = await r2.healthCheck();
-
-      assert.equal(res.status, "unhealthy");
-      assert.equal(res.providerName, "Cloudflare R2");
-      assert.equal(res.bucket, "iscms-documents");
-      assert.ok(res.error, "Must include error message on connectivity failure");
-    });
-
-    it("verifies single bucket 'iscms-documents' and contains zero references to 3 buckets", async () => {
-      const storageHealth = await SystemDiagnosticsService.checkStorageHealth();
-      assert.equal(storageHealth.bucket, "iscms-documents", "Must use single bucket 'iscms-documents'");
-      assert.ok(!JSON.stringify(storageHealth).includes("3 Buckets"), "Must never contain 3 Buckets");
-      assert.ok(!JSON.stringify(storageHealth).includes("passport-documents"), "Must never contain passport-documents bucket");
-      assert.ok(!JSON.stringify(storageHealth).includes("visa-documents"), "Must never contain visa-documents bucket");
-      assert.ok(!JSON.stringify(storageHealth).includes("efrro-documents"), "Must never contain efrro-documents bucket");
-    });
-  });
-
-  // --------------------------------------------------------------------------
-  // 2. WHATSAPP BUSINESS API: REAL STATUS ONLY
+  // 1. WHATSAPP BUSINESS API: REAL STATUS ONLY
   // --------------------------------------------------------------------------
   describe("WhatsApp Business API Health", () => {
     it("reports 'not_configured' with clear explanatory message when credentials are not present", async () => {
@@ -102,7 +56,7 @@ describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", (
   });
 
   // --------------------------------------------------------------------------
-  // 3. EMAIL: STRICTLY NOT CONFIGURED
+  // 2. EMAIL: STRICTLY NOT CONFIGURED
   // --------------------------------------------------------------------------
   describe("Email Health", () => {
     it("strictly reports 'not_configured' with supportive message without pretending to be connected", () => {
@@ -116,7 +70,7 @@ describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", (
   });
 
   // --------------------------------------------------------------------------
-  // 4. DATABASE: REAL HEALTH CHECK
+  // 3. DATABASE: REAL HEALTH CHECK
   // --------------------------------------------------------------------------
   describe("Database Health", () => {
     it("reports 'not_configured' when Supabase connection secrets are missing", async () => {
@@ -139,7 +93,7 @@ describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", (
   });
 
   // --------------------------------------------------------------------------
-  // 5. DEPLOYMENT RUNTIME METADATA
+  // 4. DEPLOYMENT RUNTIME METADATA
   // --------------------------------------------------------------------------
   describe("Deployment & Runtime Diagnostics", () => {
     it("resolves real Vercel production metadata without inventing values", () => {
@@ -187,7 +141,7 @@ describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", (
   });
 
   // --------------------------------------------------------------------------
-  // 6. AUTHORITATIVE API PAYLOAD (/api/admin/system-health)
+  // 5. AUTHORITATIVE API PAYLOAD (/api/admin/system-health)
   // --------------------------------------------------------------------------
   describe("Authoritative API Payload Structure", () => {
     it("generates structured JSON matching the exact ISCMS production specification", async () => {
@@ -208,11 +162,6 @@ describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", (
       assert.ok(payload.database.status);
       assert.ok(payload.database.checkedAt);
 
-      assert.ok(payload.storage, "Must have storage object");
-      assert.equal(payload.storage.provider, "cloudflare-r2");
-      assert.equal(payload.storage.bucket, "iscms-documents");
-      assert.ok(payload.storage.checkedAt);
-
       assert.ok(payload.whatsapp, "Must have whatsapp object");
       assert.equal(payload.whatsapp.provider, "meta-whatsapp-business-platform");
       assert.equal(payload.whatsapp.status, "not_configured");
@@ -225,12 +174,11 @@ describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", (
   });
 
   // --------------------------------------------------------------------------
-  // 7. SECURITY & SECRETS ISOLATION
+  // 6. SECURITY & SECRETS ISOLATION
   // --------------------------------------------------------------------------
   describe("Security & Zero Secret Leakage", () => {
     it("never includes API keys, secret keys, or service role tokens in diagnostics payload", async () => {
       process.env.SUPABASE_SERVICE_ROLE_KEY = "secret_service_role_key_abcdef123456";
-      process.env.R2_SECRET_ACCESS_KEY = "secret_r2_access_key_987654321";
       process.env.META_ACCESS_TOKEN = "secret_meta_access_token_token_token";
       process.env.TURNSTILE_SECRET_KEY = "secret_turnstile_key_999888";
 
@@ -238,14 +186,13 @@ describe("ISCMS Live Production System Health & Diagnostics Acceptance Tests", (
       const jsonStr = JSON.stringify(apiPayload);
 
       assert.ok(!jsonStr.includes("secret_service_role_key_abcdef123456"), "Service role key must NEVER leak");
-      assert.ok(!jsonStr.includes("secret_r2_access_key_987654321"), "R2 secret key must NEVER leak");
       assert.ok(!jsonStr.includes("secret_meta_access_token_token_token"), "Meta access token must NEVER leak");
       assert.ok(!jsonStr.includes("secret_turnstile_key_999888"), "Turnstile secret key must NEVER leak");
     });
   });
 
   // --------------------------------------------------------------------------
-  // 8. SERVER CACHE & FORCE REFRESH
+  // 7. SERVER CACHE & FORCE REFRESH
   // --------------------------------------------------------------------------
   describe("Server Caching & Force Refresh", () => {
     it("reuses cached diagnostics within TTL and provides fresh data when forceRefresh is true", async () => {

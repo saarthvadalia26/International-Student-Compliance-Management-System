@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Activity, Server, Database, Mail, HardDrive, Clock, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Activity, Server, Database, Mail, Clock, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -13,10 +13,9 @@ interface HealthData {
   commit: string;
   services: {
     database: string;
-    storage: string;
-    emailProvider: string;
-    whatsappProvider: string;
-    scheduler: string;
+    emailProvider?: string;
+    whatsappProvider?: string;
+    botProtection?: string;
   };
   system: {
     memoryUsage: number;
@@ -135,9 +134,9 @@ export default function MonitoringDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-xl font-bold flex items-center gap-2 ${health.services.database === 'healthy' ? 'text-green-500' : 'text-destructive'}`}>
-                {health.services.database === 'healthy' ? <ShieldCheck className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
-                {health.services.database.toUpperCase()}
+              <div className={`text-xl font-bold flex items-center gap-2 ${health.services.database === 'healthy' || health.services.database === 'connected' ? 'text-green-500' : 'text-destructive'}`}>
+                {health.services.database === 'healthy' || health.services.database === 'connected' ? <ShieldCheck className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+                {(health.services.database || "CONNECTED").toUpperCase()}
               </div>
               <p className="text-[10px] text-muted-foreground mt-1 text-right">Supabase PostgreSQL</p>
             </CardContent>
@@ -146,7 +145,7 @@ export default function MonitoringDashboard() {
           <Card className="border-border/60 shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1.5">
-                <HardDrive className="h-3.5 w-3.5" /> Memory Usage
+                <Server className="h-3.5 w-3.5" /> Memory Usage
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -173,40 +172,32 @@ export default function MonitoringDashboard() {
         <Card className="border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm">External Provider Dependencies</CardTitle>
-            <CardDescription className="text-xs">Current status of third-party APIs and queues.</CardDescription>
+            <CardDescription className="text-xs">Current status of third-party APIs and integrations.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-semibold text-muted-foreground flex items-center gap-1">
-                  <HardDrive className="h-3 w-3" /> Object Storage
+                  <Activity className="h-3 w-3" /> WhatsApp Business API
                 </span>
-                <p className={`text-xs font-bold ${health.services.storage === 'healthy' ? 'text-green-500' : 'text-amber-500'}`}>
-                  {health.services.storage.toUpperCase()}
+                <p className={`text-xs font-bold ${health.services.whatsappProvider === 'connected' || health.services.whatsappProvider === 'healthy' ? 'text-green-500' : 'text-amber-500'}`}>
+                  {(health.services.whatsappProvider || "NOT_CONFIGURED").toUpperCase()}
                 </p>
               </div>
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-semibold text-muted-foreground flex items-center gap-1">
                   <Mail className="h-3 w-3" /> Email Gateway
                 </span>
-                <p className={`text-xs font-bold ${health.services.emailProvider === 'healthy' ? 'text-green-500' : 'text-amber-500'}`}>
-                  {health.services.emailProvider.toUpperCase()}
+                <p className={`text-xs font-bold ${health.services.emailProvider === 'connected' || health.services.emailProvider === 'healthy' ? 'text-green-500' : 'text-muted-foreground'}`}>
+                  {(health.services.emailProvider || "NOT_CONFIGURED").toUpperCase()}
                 </p>
               </div>
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-semibold text-muted-foreground flex items-center gap-1">
-                  <Activity className="h-3 w-3" /> WhatsApp API
+                  <ShieldCheck className="h-3 w-3" /> Bot Protection
                 </span>
-                <p className={`text-xs font-bold ${health.services.whatsappProvider === 'healthy' ? 'text-green-500' : 'text-amber-500'}`}>
-                  {health.services.whatsappProvider.toUpperCase()}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-[10px] uppercase font-semibold text-muted-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3" /> Scheduler Queue
-                </span>
-                <p className={`text-xs font-bold ${health.services.scheduler === 'healthy' ? 'text-green-500' : 'text-amber-500'}`}>
-                  {health.services.scheduler.toUpperCase()}
+                <p className={`text-xs font-bold ${health.services.botProtection === 'configured' ? 'text-green-500' : 'text-muted-foreground'}`}>
+                  {(health.services.botProtection || "NOT_CONFIGURED").toUpperCase()}
                 </p>
               </div>
             </div>
@@ -219,7 +210,7 @@ export default function MonitoringDashboard() {
           Monitoring payload refreshed at: {health?.timestamp ? new Date(health.timestamp).toLocaleTimeString() : '...'}
         </p>
         <p className="text-[10px] text-muted-foreground">
-          ISCMS SRE Telemetry • Powered by Sentry & Playwright
+          ISCMS SRE Telemetry • Production Diagnostics Subsystem
         </p>
       </div>
     </div>

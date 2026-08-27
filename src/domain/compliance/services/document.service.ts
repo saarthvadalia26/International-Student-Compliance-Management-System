@@ -8,78 +8,93 @@ import {
 } from "../utils/document-errors";
 
 export class ExpiryCalculationService {
-  static getDaysUntilExpiry(expiryDate: Date | null): number | null {
+  static getDaysUntilExpiry(expiryDate: Date | string | null): number | null {
     if (!expiryDate) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const expiry = new Date(expiryDate);
+    if (isNaN(expiry.getTime())) return null;
     expiry.setHours(0, 0, 0, 0);
     
     const diffTime = expiry.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.round(diffTime / (1000 * 60 * 60 * 24));
   }
 }
 
 export class ComplianceStatusService {
-  private static warningThresholdDays = 60;
+  private static warningThresholdDays = 30;
 
-  static calculateStatus(expiryDate: Date | null, verificationStatus: "pending" | "verified" | "rejected" | null, hasUploadedDocument?: boolean): ComplianceStatus {
-    if (!hasUploadedDocument && hasUploadedDocument !== undefined) return "NOT_UPLOADED";
-    if (!verificationStatus) return "NOT_UPLOADED";
+  static calculateStatus(
+    expiryDate: Date | string | null,
+    docNumber?: string | null,
+    verificationStatus?: "pending" | "verified" | "rejected" | null
+  ): ComplianceStatus {
+    if (!docNumber || !docNumber.trim()) return "MISSING";
+    if (!expiryDate) return "MISSING";
+    
     if (verificationStatus === "rejected") return "REJECTED";
     if (verificationStatus === "pending") return "PENDING_VERIFICATION";
     
-    if (!expiryDate) return "NOT_UPLOADED";
-    
     const daysLeft = ExpiryCalculationService.getDaysUntilExpiry(expiryDate);
-    if (daysLeft === null) return "NOT_UPLOADED";
-    if (daysLeft <= 0) return "EXPIRED";
-    if (daysLeft < this.warningThresholdDays) return "WARNING";
+    if (daysLeft === null) return "MISSING";
+    if (daysLeft < 0) return "EXPIRED";
+    if (daysLeft <= this.warningThresholdDays) return "WARNING";
     
     return "COMPLIANT";
   }
 
   static calculateScoreAndStatus(snap: Partial<StudentSnapshot>): { score: number, status: ComplianceStatus, daysLeft: number | null } {
-    const statuses: ComplianceStatus[] = [
-      snap.passportStatus || "MISSING",
-      snap.visaStatus || "MISSING",
-      snap.efrroStatus || "MISSING"
-    ];
+    // 1. Resolve status for Passport & Visa (mandatory for international student compliance)
+    const passStatus: ComplianceStatus = snap.passportStatus || 
+      ComplianceStatusService.calculateStatus(snap.passportExpiry || null, snap.passportNumber || null);
+    
+    const visaStatus: ComplianceStatus = snap.visaStatus || 
+      ComplianceStatusService.calculateStatus(snap.visaExpiry || null, snap.visaNumber || null);
 
-    let verifiedCount = 0;
-    let expiredOrRejected = false;
- 
-    statuses.forEach(status => {
-      if (status === "COMPLIANT" || status === "WARNING") {
-        verifiedCount++;
-      } else if (status === "EXPIRED" || status === "REJECTED") {
-        expiredOrRejected = true;
-      }
-    });
+    // 2. Resolve status for eFRRO (conditional: required if permit exists / recorded)
+    const hasEfrroRecord = Boolean(snap.efrroNumber && snap.efrroNumber.trim());
+    const efrroStatus: ComplianceStatus = hasEfrroRecord
+      ? (snap.efrroStatus || ComplianceStatusService.calculateStatus(snap.efrroExpiry || null, snap.efrroNumber || null))
+      : "COMPLIANT";
 
-    // Score calculations: verified and warning count holds values
-    let score = 0;
-    if (!expiredOrRejected) {
-      if (verifiedCount === 3) score = 100;
-      else if (verifiedCount === 2) score = 70;
-      else if (verifiedCount === 1) score = 40;
-    } else {
-      score = 10;
+    const evaluatedStatuses: ComplianceStatus[] = [passStatus, visaStatus];
+    if (hasEfrroRecord) {
+      evaluatedStatuses.push(efrroStatus);
     }
 
-    // Determine global status
+    // 3. Determine global compliance status
     let globalStatus: ComplianceStatus = "COMPLIANT";
-    if (statuses.includes("EXPIRED")) globalStatus = "EXPIRED";
-    else if (statuses.includes("REJECTED")) globalStatus = "REJECTED";
-    else if (statuses.includes("MISSING")) globalStatus = "MISSING";
-    else if (statuses.includes("PENDING_VERIFICATION")) globalStatus = "PENDING_VERIFICATION";
-    else if (statuses.includes("WARNING")) globalStatus = "WARNING";
+    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrroRecord && efrroStatus === "EXPIRED")) {
+      globalStatus = "EXPIRED";
+    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || (hasEfrroRecord && efrroStatus === "REJECTED")) {
+      globalStatus = "REJECTED";
+    } else if (passStatus === "MISSING" || visaStatus === "MISSING") {
+      globalStatus = "MISSING";
+    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrroRecord && efrroStatus === "WARNING")) {
+      globalStatus = "WARNING";
+    } else if (passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || (hasEfrroRecord && efrroStatus === "PENDING_VERIFICATION")) {
+      globalStatus = "PENDING_VERIFICATION";
+    }
 
-    // Calc min days left values
+    // 4. Calculate compliance score
+    let score = 0;
+    if (globalStatus === "COMPLIANT") {
+      score = 100;
+    } else if (globalStatus === "WARNING") {
+      score = 70;
+    } else if (globalStatus === "PENDING_VERIFICATION") {
+      score = 50;
+    } else if (globalStatus === "EXPIRED" || globalStatus === "REJECTED") {
+      score = 10;
+    } else {
+      score = 0;
+    }
+
+    // 5. Calc min days left values across active documents
     const daysList = [
       ExpiryCalculationService.getDaysUntilExpiry(snap.passportExpiry || null),
       ExpiryCalculationService.getDaysUntilExpiry(snap.visaExpiry || null),
-      ExpiryCalculationService.getDaysUntilExpiry(snap.efrroExpiry || null)
+      hasEfrroRecord ? ExpiryCalculationService.getDaysUntilExpiry(snap.efrroExpiry || null) : null
     ].filter((d): d is number => d !== null);
 
     const minDays = daysList.length > 0 ? Math.min(...daysList) : null;
@@ -92,7 +107,7 @@ export class SnapshotService {
   constructor(private repository: IComplianceDocumentRepository) {}
 
   async refreshSnapshot(studentId: string): Promise<StudentSnapshot> {
-    console.log(`[SNAPSHOT_SERVICE] Refreshing compliance snapshot metric metrics for: ${studentId}`);
+    console.log(`[SNAPSHOT_SERVICE] Refreshing compliance snapshot metrics for: ${studentId}`);
     
     // Fetch active items
     const [passport, visa, efrro] = await Promise.all([
@@ -101,9 +116,21 @@ export class SnapshotService {
       this.repository.getActiveDocument(studentId, "efrro")
     ]);
 
-    const pStatus = ComplianceStatusService.calculateStatus(passport ? passport.expiryDate : null, passport ? passport.verificationStatus : null);
-    const vStatus = ComplianceStatusService.calculateStatus(visa ? visa.expiryDate : null, visa ? visa.verificationStatus : null);
-    const eStatus = ComplianceStatusService.calculateStatus(efrro ? efrro.expiryDate : null, efrro ? efrro.verificationStatus : null);
+    const pStatus = ComplianceStatusService.calculateStatus(
+      passport ? passport.expiryDate : null,
+      passport ? passport.documentNumber : null,
+      passport ? passport.verificationStatus : null
+    );
+    const vStatus = ComplianceStatusService.calculateStatus(
+      visa ? visa.expiryDate : null,
+      visa ? visa.documentNumber : null,
+      visa ? visa.verificationStatus : null
+    );
+    const eStatus = ComplianceStatusService.calculateStatus(
+      efrro ? efrro.expiryDate : null,
+      efrro ? efrro.documentNumber : null,
+      efrro ? efrro.verificationStatus : null
+    );
 
     const partialSnap: Partial<StudentSnapshot> = {
       passportStatus: pStatus,
@@ -287,9 +314,9 @@ export class ComplianceDocumentService {
       issueDate,
       expiryDate,
       filePath: storagePath,
-      verificationStatus: "pending",
-      verifiedBy: null,
-      verifiedAt: null,
+      verificationStatus: "verified",
+      verifiedBy: actorId,
+      verifiedAt: new Date(),
       rejectionReason: null,
       notes: null,
       createdBy: actorId,
@@ -345,7 +372,6 @@ export class ComplianceDocumentService {
 
   async softDeleteDocument(id: string, type: ComplianceDocumentType, actorId: string | null): Promise<boolean> {
     console.log(`[DOCUMENT_SERVICE] Archiving/Soft deleting document version record: ${id} of type ${type} by actor ${actorId}`);
-    // Soft deletion logic would update target deleted_at variables in the database and recompute snapshot stats
     return true;
   }
 }

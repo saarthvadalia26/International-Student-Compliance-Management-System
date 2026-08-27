@@ -339,7 +339,7 @@ function getFallbackNotifications(portal: "staff" | "student"): InAppNotificatio
     {
       id: "f-6",
       title: "System Health Metrics Verified",
-      description: "Cloudflare R2 Object Storage and PostgreSQL health status green.",
+      description: "PostgreSQL Database and service integrations health status operational.",
       category: "system",
       priority: "low",
       eventType: "system_health",

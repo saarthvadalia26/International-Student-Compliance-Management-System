@@ -350,26 +350,57 @@ export class SupabaseStudentRepository implements IStudentRepository {
         daysUntilEfrro = Math.round((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       }
 
-      // 8. Insert student_snapshot row for instant compliance and directory queries
+      // 8. Calculate initial document and compliance statuses based on supplied metadata
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const calcStatus = (num: string | null, exp: string | null): string => {
+        if (!num || !num.trim() || !exp || !exp.trim()) return "MISSING";
+        const expDate = new Date(exp);
+        expDate.setHours(0, 0, 0, 0);
+        if (isNaN(expDate.getTime())) return "MISSING";
+        const diff = Math.round((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diff < 0) return "EXPIRED";
+        if (diff <= 30) return "WARNING";
+        return "COMPLIANT";
+      };
+
+      const passportStatus = calcStatus(passportNum, passportExp);
+      const visaStatus = calcStatus(visaNum, visaExp);
+      const hasEfrro = Boolean(efrroNum && efrroNum.trim() && efrroExp);
+      const efrroStatus = hasEfrro ? calcStatus(efrroNum, efrroExp) : "COMPLIANT";
+
+      let overallCompliance = "COMPLIANT";
+      if (passportStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrro && efrroStatus === "EXPIRED")) {
+        overallCompliance = "EXPIRED";
+      } else if (passportStatus === "MISSING" || visaStatus === "MISSING") {
+        overallCompliance = "MISSING";
+      } else if (passportStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrro && efrroStatus === "WARNING")) {
+        overallCompliance = "WARNING";
+      }
+
+      const complianceScore = overallCompliance === "COMPLIANT" ? 100 : overallCompliance === "WARNING" ? 70 : overallCompliance === "EXPIRED" ? 10 : 0;
+
+      // Insert student_snapshot row for instant compliance and directory queries
       await supabase.from("student_snapshot").insert({
         student_id: studentId,
-        passport_status: "MISSING",
+        passport_status: passportStatus,
         passport_number: passportNum,
         passport_issue_date: passportIssue,
         passport_expiry: passportExp,
         passport_place_of_issue: passportPlace,
-        visa_status: "MISSING",
+        visa_status: visaStatus,
         visa_number: visaNum,
         visa_issue_date: visaIssue,
         visa_expiry: visaExp,
         visa_type: visaType,
-        efrro_status: "MISSING",
+        efrro_status: hasEfrro ? efrroStatus : "MISSING",
         efrro_number: efrroNum,
         efrro_issue_date: efrroIssue,
         efrro_expiry: efrroExp,
         days_until_efrro_expiry: daysUntilEfrro,
-        compliance_score: 0,
-        compliance_status: "MISSING"
+        compliance_score: complianceScore,
+        compliance_status: overallCompliance
       });
 
       // 9. Record entry in audit_log

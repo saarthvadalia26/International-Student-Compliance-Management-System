@@ -4,9 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { 
   Database, 
-  HardDrive, 
   MessageSquare, 
   Mail, 
+  ShieldCheck,
   RefreshCw, 
   Activity, 
   Clock, 
@@ -54,14 +54,6 @@ export function PlatformInfrastructureTab() {
   React.useEffect(() => {
     loadDiagnostics(false);
   }, [loadDiagnostics]);
-
-  const formatBytes = (bytes?: number) => {
-    if (!bytes || bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
 
   const renderStatusBadge = (service: ServiceHealth) => {
     switch (service.status) {
@@ -172,23 +164,6 @@ export function PlatformInfrastructureTab() {
               </p>
             </div>
 
-            {/* Cloudflare R2 Storage */}
-            <div className="p-4 rounded-xl border border-border/60 bg-muted/10 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
-                  <HardDrive className="h-3.5 w-3.5" /> Storage
-                </span>
-                {renderStatusBadge(services.storage)}
-              </div>
-              <div className="text-xs font-semibold text-foreground">Cloudflare R2</div>
-              <div className="text-[11px] text-muted-foreground font-mono space-y-0.5">
-                <div>Bucket: <strong className="text-foreground">{services.storage.bucket || "iscms-documents"}</strong></div>
-                {services.storage.objectCount !== undefined && (
-                  <div>{services.storage.objectCount} docs • {formatBytes(services.storage.approximateStorageBytes)}</div>
-                )}
-              </div>
-            </div>
-
             {/* WhatsApp Business API */}
             <div className="p-4 rounded-xl border border-border/60 bg-muted/10 space-y-2">
               <div className="flex items-center justify-between">
@@ -219,6 +194,22 @@ export function PlatformInfrastructureTab() {
               </p>
             </div>
 
+            {/* Bot Protection */}
+            <div className="p-4 rounded-xl border border-border/60 bg-muted/10 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Bot Protection
+                </span>
+                {renderStatusBadge(services.botProtection)}
+              </div>
+              <div className="text-xs font-semibold text-foreground">Cloudflare Turnstile</div>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                {services.botProtection.status === "configured"
+                  ? "Active and protecting authentication forms."
+                  : "Turnstile keys not configured."}
+              </p>
+            </div>
+
           </div>
 
           {/* Technical Environment Details */}
@@ -239,15 +230,14 @@ export function PlatformInfrastructureTab() {
             </div>
           </div>
 
-          {/* Action Links & Footer */}
-          <div className="pt-2 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {/* SRE Observability Navigation Link */}
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs border-t border-border/30">
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="h-3.5 w-3.5" />
-              <span>Last checked: <strong className="font-mono text-foreground">{lastCheckedDisplay || "Live"}</strong></span>
+              <span>Diagnostics checked: <strong className="font-mono text-foreground">{lastCheckedDisplay || "Live"}</strong></span>
             </div>
-
             <Link href="/dashboard/health">
-              <Button size="sm" className="h-8 text-xs flex items-center gap-1.5">
+              <Button variant="ghost" size="sm" className="h-8 text-xs text-primary hover:text-primary hover:bg-primary/5 flex items-center gap-1.5 p-0">
                 <Activity className="h-3.5 w-3.5" />
                 <span>Launch System Health Monitoring Dashboard</span>
               </Button>

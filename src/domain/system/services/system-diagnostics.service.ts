@@ -4,7 +4,6 @@ import {
   DeploymentDiagnostics, 
   ServicesDiagnostics,
   ServiceHealth,
-  StorageServiceHealth,
   SystemHealthApiResponse
 } from "../types/diagnostics.types";
 import { APP_VERSION } from "@/config/version";
@@ -153,67 +152,6 @@ export class SystemDiagnosticsService {
   }
 
   /**
-   * Performs real Cloudflare R2 / storage health check against the single production bucket 'iscms-documents'.
-   */
-  static async checkStorageHealth(): Promise<StorageServiceHealth> {
-    const checkedAt = new Date().toISOString();
-    const targetBucket = "iscms-documents";
-
-    // Query safe document counts from DB for reliable metrics
-    let objectCount = 0;
-    let approximateStorageBytes = 0;
-
-    try {
-      const { getAdminSupabase } = await import("@/lib/supabase/admin");
-      const supabase = getAdminSupabase();
-      const [passports, visas, efrros] = await Promise.all([
-        supabase.from("passport_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
-        supabase.from("visa_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
-        supabase.from("efrro_versions").select("id", { count: "exact", head: true }).is("deleted_at", null)
-      ]);
-      objectCount = (passports.count || 0) + (visas.count || 0) + (efrros.count || 0);
-      approximateStorageBytes = objectCount * 460800; // ~450 KB average document size
-    } catch {
-      // Non-blocking for health check
-    }
-
-    try {
-      const { StorageProviderFactory } = await import("@/domain/storage/factory");
-      const provider = StorageProviderFactory.getProvider();
-      const res = await provider.healthCheck();
-
-      const status = res.status === "connected" || res.status === "healthy" 
-        ? "connected" 
-        : res.status;
-
-      return {
-        name: "Storage",
-        providerName: res.providerName || "Cloudflare R2",
-        status,
-        bucket: res.bucket || targetBucket,
-        objectCount,
-        approximateStorageBytes,
-        latencyMs: res.latencyMs,
-        checkedAt: res.checkedAt || checkedAt,
-        error: res.error
-      };
-    } catch (err: unknown) {
-      console.error(`[DIAGNOSTICS] Storage health check error:`, err);
-      return {
-        name: "Storage",
-        providerName: "Cloudflare R2",
-        status: "unhealthy",
-        bucket: targetBucket,
-        objectCount,
-        approximateStorageBytes,
-        latencyMs: null,
-        checkedAt,
-        error: "Storage connectivity check failed"
-      };
-    }
-  }
-
-  /**
    * Performs WhatsApp Business API configuration check and safe reachability check if configured.
    */
   static async checkWhatsAppHealth(): Promise<ServiceHealth> {
@@ -313,7 +251,7 @@ export class SystemDiagnosticsService {
   }
 
   /**
-   * Compiles live production diagnostics across runtime, deployment, and all infrastructure services.
+   * Compiles live production diagnostics across runtime, deployment, and active infrastructure services.
    * All responses are sanitized and allowlisted. Secrets are strictly prohibited.
    */
   static async getDiagnostics(forceRefresh: boolean = false): Promise<SystemInfrastructureDiagnostics> {
@@ -325,9 +263,8 @@ export class SystemDiagnosticsService {
     const runtime = this.getRuntimeDiagnostics();
     const deployment = this.getDeploymentDiagnostics();
 
-    const [database, storage, whatsapp] = await Promise.all([
+    const [database, whatsapp] = await Promise.all([
       this.checkDatabaseHealth(),
-      this.checkStorageHealth(),
       this.checkWhatsAppHealth()
     ]);
 
@@ -336,7 +273,6 @@ export class SystemDiagnosticsService {
 
     const services: ServicesDiagnostics = {
       database,
-      storage,
       whatsapp,
       email,
       botProtection
@@ -369,12 +305,6 @@ export class SystemDiagnosticsService {
         ? "not_configured"
         : "unhealthy";
 
-    const storageStatus = diag.services.storage.status === "connected" || diag.services.storage.status === "healthy"
-      ? "connected"
-      : diag.services.storage.status === "not_configured"
-        ? "not_configured"
-        : "unhealthy";
-
     const waStatus = diag.services.whatsapp.status === "connected" || diag.services.whatsapp.status === "healthy" || diag.services.whatsapp.status === "configured"
       ? "connected"
       : diag.services.whatsapp.status === "not_configured"
@@ -399,15 +329,6 @@ export class SystemDiagnosticsService {
         checkedAt: diag.services.database.checkedAt || diag.checkedAt,
         error: diag.services.database.error
       },
-      storage: {
-        provider: "cloudflare-r2",
-        status: storageStatus,
-        bucket: diag.services.storage.bucket || "iscms-documents",
-        checkedAt: diag.services.storage.checkedAt || diag.checkedAt,
-        objectCount: diag.services.storage.objectCount,
-        approximateStorageBytes: diag.services.storage.approximateStorageBytes,
-        error: diag.services.storage.error
-      },
       whatsapp: {
         provider: "meta-whatsapp-business-platform",
         status: waStatus,
@@ -422,8 +343,8 @@ export class SystemDiagnosticsService {
       },
       botProtection: {
         provider: "cloudflare-turnstile",
-        status: diag.services.botProtection.status === "configured" ? "configured" : "not_configured",
-        checkedAt: diag.services.botProtection.checkedAt || diag.checkedAt
+        status: diag.services.botProtection?.status === "configured" ? "configured" : "not_configured",
+        checkedAt: diag.services.botProtection?.checkedAt || diag.checkedAt
       }
     };
   }

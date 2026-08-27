@@ -1994,7 +1994,7 @@ export async function renewDocumentAction(
         .order("version_number", { ascending: false }),
       adminSupabase
         .from("student_snapshot")
-        .select("passport_number, visa_number, efrro_number")
+        .select("passport_number, passport_expiry, passport_status, visa_number, visa_expiry, visa_status, efrro_number, efrro_expiry, efrro_status")
         .eq("student_id", studentId)
         .maybeSingle()
     ]);
@@ -2127,6 +2127,26 @@ export async function renewDocumentAction(
       snapshotUpdates.efrro_status = calculatedDocStatus;
       snapshotUpdates.days_until_efrro_expiry = diffDays;
     }
+
+    const passStatus = documentType === "passport" ? calculatedDocStatus : (snapshot?.passport_status || "MISSING");
+    const visaStatus = documentType === "visa" ? calculatedDocStatus : (snapshot?.visa_status || "MISSING");
+    const hasEfrro = documentType === "efrro" ? true : Boolean(snapshot?.efrro_number && snapshot?.efrro_number.trim());
+    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (hasEfrro ? (snapshot?.efrro_status || "COMPLIANT") : "COMPLIANT");
+
+    let overallCompliance = "COMPLIANT";
+    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrro && efrroStatus === "EXPIRED")) {
+      overallCompliance = "EXPIRED";
+    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || (hasEfrro && efrroStatus === "REJECTED")) {
+      overallCompliance = "REJECTED";
+    } else if (passStatus === "MISSING" || visaStatus === "MISSING") {
+      overallCompliance = "MISSING";
+    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrro && efrroStatus === "WARNING") || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION") {
+      overallCompliance = "WARNING";
+    }
+
+    const complianceScore = overallCompliance === "COMPLIANT" ? 100 : overallCompliance === "WARNING" ? 70 : overallCompliance === "EXPIRED" ? 10 : 0;
+    snapshotUpdates.compliance_status = overallCompliance;
+    snapshotUpdates.compliance_score = complianceScore;
 
     await adminSupabase
       .from("student_snapshot")
@@ -2439,17 +2459,23 @@ export async function correctDocumentMetadataAction(
 
     const passStatus = documentType === "passport" ? calculatedDocStatus : (currentSnapshot?.passport_status || "MISSING");
     const visaStatus = documentType === "visa" ? calculatedDocStatus : (currentSnapshot?.visa_status || "MISSING");
-    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (currentSnapshot?.efrro_status || "COMPLIANT");
+    const hasEfrro = documentType === "efrro" ? true : Boolean(currentSnapshot?.efrro_number && currentSnapshot?.efrro_number.trim());
+    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (hasEfrro ? (currentSnapshot?.efrro_status || "COMPLIANT") : "COMPLIANT");
 
     let overallCompliance = "COMPLIANT";
-    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
+    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrro && efrroStatus === "EXPIRED")) {
       overallCompliance = "EXPIRED";
-    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING" || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION") {
-      overallCompliance = "WARNING";
-    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || passStatus === "MISSING" || visaStatus === "MISSING") {
+    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || (hasEfrro && efrroStatus === "REJECTED")) {
+      overallCompliance = "REJECTED";
+    } else if (passStatus === "MISSING" || visaStatus === "MISSING") {
       overallCompliance = "MISSING";
+    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrro && efrroStatus === "WARNING") || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION") {
+      overallCompliance = "WARNING";
     }
+
+    const complianceScore = overallCompliance === "COMPLIANT" ? 100 : overallCompliance === "WARNING" ? 70 : overallCompliance === "EXPIRED" ? 10 : 0;
     snapshotUpdates.compliance_status = overallCompliance;
+    snapshotUpdates.compliance_score = complianceScore;
 
     await adminSupabase
       .from("student_snapshot")

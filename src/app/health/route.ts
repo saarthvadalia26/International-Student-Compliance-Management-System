@@ -8,9 +8,8 @@ export async function GET() {
   try {
     const diagnostics = await SystemDiagnosticsService.getDiagnostics();
     const isDbConnected = diagnostics.services.database.status === "connected" || diagnostics.services.database.status === "healthy";
-    const isStorageConnected = diagnostics.services.storage.status === "connected" || diagnostics.services.storage.status === "healthy";
 
-    const isHealthy = isDbConnected && (isStorageConnected || diagnostics.services.storage.status === "not_configured");
+    const isHealthy = isDbConnected;
 
     return NextResponse.json(
       {
@@ -21,11 +20,6 @@ export async function GET() {
           database: {
             status: diagnostics.services.database.status,
             latencyMs: diagnostics.services.database.latencyMs
-          },
-          storage: {
-            provider: diagnostics.services.storage.providerName,
-            status: diagnostics.services.storage.status,
-            bucket: diagnostics.services.storage.bucket
           },
           whatsappProvider: {
             status: diagnostics.services.whatsapp.status,

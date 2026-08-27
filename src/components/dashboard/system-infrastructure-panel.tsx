@@ -5,7 +5,6 @@ import {
   Server, 
   RefreshCw, 
   Database, 
-  HardDrive, 
   MessageSquare, 
   Mail, 
   ShieldCheck, 
@@ -16,8 +15,7 @@ import {
   Cpu, 
   Layers, 
   Copy, 
-  Check,
-  FolderArchive
+  Check
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -80,14 +78,6 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
     } catch {
       return isoString;
     }
-  };
-
-  const formatBytes = (bytes?: number) => {
-    if (!bytes || bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const renderServiceBadge = (service: ServiceHealth) => {
@@ -310,23 +300,6 @@ export function SystemInfrastructurePanel({ initialData }: SystemInfrastructureP
                 <span className="font-medium text-foreground">Database (PostgreSQL / Supabase)</span>
               </div>
               {renderServiceBadge(services.database)}
-            </div>
-
-            {/* Cloudflare R2 Storage */}
-            <div className="py-2.5 space-y-1">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <HardDrive className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-medium text-foreground">Storage (Cloudflare R2)</span>
-                </div>
-                {renderServiceBadge(services.storage)}
-              </div>
-              <div className="flex items-center justify-between pl-5 text-[11px] text-muted-foreground font-mono">
-                <span>Bucket: <strong className="text-foreground">{services.storage.bucket || "iscms-documents"}</strong></span>
-                {services.storage.objectCount !== undefined && (
-                  <span>{services.storage.objectCount} documents • {formatBytes(services.storage.approximateStorageBytes)}</span>
-                )}
-              </div>
             </div>
 
             {/* WhatsApp Business API */}

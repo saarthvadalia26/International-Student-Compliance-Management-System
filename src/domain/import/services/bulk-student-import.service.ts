@@ -1354,35 +1354,71 @@ export class BulkStudentImportService {
           });
         }
 
-        // G. Insert student_snapshot (Metadata only; NO fake document versions; NO R2 files)
+        // G. Insert student_snapshot (Metadata only; NO fake document versions; NO external storage files)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         let daysUntilEfrro: number | null = null;
         if (data.efrro_expiry) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
           const exp = new Date(data.efrro_expiry);
           exp.setHours(0, 0, 0, 0);
           daysUntilEfrro = Math.round((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         }
 
+        const calcDocStatus = (num: string | null | undefined, exp: string | null | undefined): string => {
+          if (!num || !num.trim() || !exp || !exp.trim()) return "MISSING";
+          const expDate = new Date(exp);
+          expDate.setHours(0, 0, 0, 0);
+          if (isNaN(expDate.getTime())) return "MISSING";
+          const diff = Math.round((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          if (diff < 0) return "EXPIRED";
+          if (diff <= 30) return "WARNING";
+          return "COMPLIANT";
+        };
+
+        const passNumber = data.passport_number?.trim() || null;
+        const passExpiry = data.passport_expiry || null;
+        const passStatus = calcDocStatus(passNumber, passExpiry);
+
+        const visaNumber = data.visa_number?.trim() || null;
+        const visaExpiry = data.visa_expiry || null;
+        const visaStatus = calcDocStatus(visaNumber, visaExpiry);
+
+        const efrroNumber = data.efrro_number?.trim() || null;
+        const efrroExpiry = data.efrro_expiry || null;
+        const hasEfrro = Boolean(efrroNumber && efrroExpiry);
+        const efrroStatus = hasEfrro ? calcDocStatus(efrroNumber, efrroExpiry) : "COMPLIANT";
+
+        let overallCompliance = "COMPLIANT";
+        if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrro && efrroStatus === "EXPIRED")) {
+          overallCompliance = "EXPIRED";
+        } else if (passStatus === "MISSING" || visaStatus === "MISSING") {
+          overallCompliance = "MISSING";
+        } else if (passStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrro && efrroStatus === "WARNING")) {
+          overallCompliance = "WARNING";
+        }
+
+        const complianceScore = overallCompliance === "COMPLIANT" ? 100 : overallCompliance === "WARNING" ? 70 : overallCompliance === "EXPIRED" ? 10 : 0;
+
         await supabase.from("student_snapshot").insert({
           student_id: studentId,
-          passport_status: "MISSING",
-          passport_number: data.passport_number?.trim() || null,
+          passport_status: passStatus,
+          passport_number: passNumber,
           passport_issue_date: data.passport_issue_date || null,
-          passport_expiry: data.passport_expiry || null,
+          passport_expiry: passExpiry,
           passport_place_of_issue: data.passport_place_of_issue?.trim() || null,
-          visa_status: "MISSING",
-          visa_number: data.visa_number?.trim() || null,
+          visa_status: visaStatus,
+          visa_number: visaNumber,
           visa_issue_date: data.visa_issue_date || null,
-          visa_expiry: data.visa_expiry || null,
+          visa_expiry: visaExpiry,
           visa_type: data.visa_type?.trim() || "Student (S-1)",
-          efrro_status: "MISSING",
-          efrro_number: data.efrro_number?.trim() || null,
+          efrro_status: hasEfrro ? efrroStatus : "MISSING",
+          efrro_number: efrroNumber,
           efrro_issue_date: data.efrro_issue_date || null,
-          efrro_expiry: data.efrro_expiry || null,
+          efrro_expiry: efrroExpiry,
           days_until_efrro_expiry: daysUntilEfrro,
-          compliance_score: 0,
-          compliance_status: "MISSING"
+          compliance_score: complianceScore,
+          compliance_status: overallCompliance
         });
 
         importedCount++;

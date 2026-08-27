@@ -15,8 +15,6 @@ export interface SystemHealthMetrics {
   whatsAppDeliveredToday: number;
   failedNotificationsToday: number;
   queueLength: number;
-  storageUsageFiles: number;
-  storageUsageBytes: number;
 
   // Real production infrastructure diagnostics
   diagnostics: SystemInfrastructureDiagnostics;
@@ -31,7 +29,6 @@ export interface SystemHealthMetrics {
   nodeVersion: string;
   nextVersion: string;
   databaseStatus: string;
-  storageStatus: string;
   emailProviderName: string;
   emailProviderStatus: string;
   whatsappProviderName: string;
@@ -76,9 +73,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     whatsAppSentRes,
     failedRes,
     queueRes,
-    passportCountRes,
-    visaCountRes,
-    efrroCountRes,
     latestJobRes,
     diagnostics
   ] = await Promise.all([
@@ -109,11 +103,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     supabase.from(NOTIFICATION_TABLE_NAME).select("id", { count: "exact", head: true })
       .eq("status", "queued"),
 
-    // Storage object files counts
-    supabase.from("passport_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("visa_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
-    supabase.from("efrro_versions").select("id", { count: "exact", head: true }).is("deleted_at", null),
-
     // Latest scheduled job execution
     supabase.from("scheduled_jobs").select("*").order("created_at", { ascending: false }).limit(5),
 
@@ -128,10 +117,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
   const whatsAppDeliveredToday = whatsAppSentRes.count || 0;
   const failedNotificationsToday = failedRes.count || 0;
   const queueLength = queueRes.count || 0;
-
-  const storageUsageFiles = (passportCountRes.count || 0) + (visaCountRes.count || 0) + (efrroCountRes.count || 0);
-  // Estimate average document size = 450 KB (460,800 bytes) per document
-  const storageUsageBytes = storageUsageFiles * 460800;
 
   // Load scheduler logs
   let lastSchedulerRun = "No executions logged";
@@ -155,7 +140,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
   }
 
   const isDbConnected = diagnostics.services.database.status === "connected" || diagnostics.services.database.status === "healthy";
-  const isStorageConnected = diagnostics.services.storage.status === "connected" || diagnostics.services.storage.status === "healthy";
 
   return {
     totalStudents,
@@ -165,8 +149,6 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     whatsAppDeliveredToday,
     failedNotificationsToday,
     queueLength,
-    storageUsageFiles,
-    storageUsageBytes,
 
     diagnostics,
 
@@ -183,16 +165,11 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     nextVersion: diagnostics.runtime.nextVersion,
     
     databaseStatus: isDbConnected ? "Connected" : diagnostics.services.database.status === "not_configured" ? "Not configured" : "Unhealthy",
-    storageStatus: isStorageConnected 
-      ? "Connected" 
-      : diagnostics.services.storage.status === "not_configured" 
-        ? "Not configured" 
-        : "Unhealthy",
     emailProviderName: diagnostics.services.email.providerName,
     emailProviderStatus: diagnostics.services.email.status,
     whatsappProviderName: diagnostics.services.whatsapp.providerName,
     whatsappProviderStatus: diagnostics.services.whatsapp.status,
-    botProtectionStatus: diagnostics.services.botProtection.status === "configured" 
+    botProtectionStatus: diagnostics.services.botProtection?.status === "configured" 
       ? "Cloudflare Turnstile Active" 
       : "Not configured",
     
