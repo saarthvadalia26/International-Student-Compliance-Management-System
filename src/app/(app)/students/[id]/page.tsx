@@ -24,7 +24,8 @@ import {
   Users,
   FileText,
   RefreshCw,
-  FileCheck2
+  FileCheck2,
+  Plus
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
@@ -32,6 +33,8 @@ import {
   getStudentReminderScheduleAction,
   recordAcademicAdjustmentAction,
   renewDocumentAction,
+  addOriginalDocumentAction,
+  editDocumentDetailsAction,
   getDocumentHistoryAction,
   type DocumentVersionHistoryItem
 } from "@/app/(app)/students/actions";
@@ -211,6 +214,139 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [isLoadingStudent, setIsLoadingStudent] = React.useState(true);
   const [activeSubTab, setActiveSubTab] = React.useState<"personal" | "academic" | "contact" | "documents">("personal");
 
+  // Helper to verify if document number is valid (not placeholder/empty)
+  const hasValidDocumentNumber = React.useCallback((docNum?: string | null): boolean => {
+    if (!docNum) return false;
+    const trimmed = docNum.trim().toLowerCase();
+    return (
+      trimmed !== "" &&
+      trimmed !== "not provided" &&
+      trimmed !== "pending" &&
+      trimmed !== "not recorded" &&
+      trimmed !== "none" &&
+      trimmed !== "n/a" &&
+      trimmed !== "undefined" &&
+      trimmed !== "null"
+    );
+  }, []);
+
+  // Helper to verify if document details are recorded
+  const isDocRecorded = React.useCallback((doc?: StudentDocument | null): doc is StudentDocument => {
+    if (!doc || !doc.number) return false;
+    return hasValidDocumentNumber(doc.number);
+  }, [hasValidDocumentNumber]);
+
+  // Add / Edit Document Dialog State
+  const [addEditDocDialogOpen, setAddEditDocDialogOpen] = React.useState(false);
+  const [addEditMode, setAddEditMode] = React.useState<"add" | "edit">("add");
+  const [addEditDocType, setAddEditDocType] = React.useState<"passport" | "visa" | "efrro">("passport");
+  const [addEditForm, setAddEditForm] = React.useState({
+    documentNumber: "",
+    issueDate: "",
+    expiryDate: "",
+    placeOfIssue: "",
+    visaType: "Student (S-1)",
+    notes: "",
+    reason: "",
+    file: null as File | null
+  });
+  const [isSavingDoc, setIsSavingDoc] = React.useState(false);
+  const [addEditErrors, setAddEditErrors] = React.useState<Record<string, string>>({});
+
+  const handleOpenAddDocDialog = (docType: "passport" | "visa" | "efrro") => {
+    setAddEditDocType(docType);
+    setAddEditMode("add");
+    setAddEditForm({
+      documentNumber: "",
+      issueDate: "",
+      expiryDate: "",
+      placeOfIssue: "",
+      visaType: "Student (S-1)",
+      notes: "",
+      reason: "",
+      file: null
+    });
+    setAddEditErrors({});
+    setAddEditDocDialogOpen(true);
+  };
+
+  const handleOpenEditDocDialog = (docType: "passport" | "visa" | "efrro") => {
+    if (!student) return;
+    const currentDoc = docType === "passport" ? student.passport : docType === "visa" ? student.visa : student.efrro;
+    setAddEditDocType(docType);
+    setAddEditMode("edit");
+    setAddEditForm({
+      documentNumber: currentDoc?.number && hasValidDocumentNumber(currentDoc.number) ? currentDoc.number : "",
+      issueDate: currentDoc?.issueDate ? currentDoc.issueDate.split("T")[0] : "",
+      expiryDate: currentDoc?.expiryDate ? currentDoc.expiryDate.split("T")[0] : "",
+      placeOfIssue: currentDoc?.placeOfIssue || "",
+      visaType: currentDoc?.visaType || "Student (S-1)",
+      notes: currentDoc?.notes || "",
+      reason: "Administrative details correction",
+      file: null
+    });
+    setAddEditErrors({});
+    setAddEditDocDialogOpen(true);
+  };
+
+  const handleSubmitAddEditDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student) return;
+
+    const errors: Record<string, string> = {};
+    if (!addEditForm.documentNumber.trim()) errors.documentNumber = "Document number is required.";
+    if (!addEditForm.issueDate.trim()) errors.issueDate = "Issue date is required.";
+    if (!addEditForm.expiryDate.trim()) errors.expiryDate = "Expiration date is required.";
+    if (addEditForm.issueDate && addEditForm.expiryDate && addEditForm.expiryDate <= addEditForm.issueDate) {
+      errors.expiryDate = "Expiration date must be strictly after the issue date.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAddEditErrors(errors);
+      return;
+    }
+
+    setIsSavingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append("studentId", studentId);
+      formData.append("documentType", addEditDocType);
+      formData.append("documentNumber", addEditForm.documentNumber.trim());
+      formData.append("issueDate", addEditForm.issueDate.trim());
+      formData.append("expiryDate", addEditForm.expiryDate.trim());
+      if (addEditForm.placeOfIssue.trim()) formData.append("placeOfIssue", addEditForm.placeOfIssue.trim());
+      if (addEditForm.visaType.trim()) formData.append("visaType", addEditForm.visaType.trim());
+      if (addEditForm.notes.trim()) formData.append("notes", addEditForm.notes.trim());
+      if (addEditMode === "edit" && addEditForm.reason.trim()) formData.append("reason", addEditForm.reason.trim());
+      if (addEditForm.file) formData.append("file", addEditForm.file);
+
+      const res = addEditMode === "add" 
+        ? await addOriginalDocumentAction(formData)
+        : await editDocumentDetailsAction(formData);
+
+      if (res.success) {
+        toast.success(
+          addEditMode === "add" ? "Document Added" : "Document Updated",
+          {
+            description: addEditMode === "add"
+              ? `Original ${addEditDocType === "passport" ? "Passport" : addEditDocType === "visa" ? "Student Visa" : "eFRRO"} details added successfully.`
+              : `${addEditDocType === "passport" ? "Passport" : addEditDocType === "visa" ? "Student Visa" : "eFRRO"} details updated successfully.`
+          }
+        );
+        setAddEditDocDialogOpen(false);
+        await Promise.all([loadStudentData(), loadReminderSchedule()]);
+      } else {
+        toast.error("Operation Failed", { description: res.error || "Failed to save document details." });
+      }
+    } catch (err) {
+      toast.error("Save Error", {
+        description: err instanceof Error ? err.message : "Failed to record document details."
+      });
+    } finally {
+      setIsSavingDoc(false);
+    }
+  };
+
   // Renew Document Dialog State
   const [renewDialogOpen, setRenewDialogOpen] = React.useState(false);
   const [renewDocType, setRenewDocType] = React.useState<"passport" | "visa" | "efrro">("passport");
@@ -235,9 +371,19 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const handleOpenRenewDialog = (docType: "passport" | "visa" | "efrro") => {
     if (!student) return;
     const currentDoc = docType === "passport" ? student.passport : docType === "visa" ? student.visa : student.efrro;
+    
+    // Strict requirement: Cannot renew if no original document exists
+    if (!isDocRecorded(currentDoc)) {
+      toast.error("Original Document Required", {
+        description: `Original ${docType === "passport" ? "Passport" : docType === "visa" ? "Visa" : "eFRRO"} details must be added before renewal can be created.`
+      });
+      handleOpenAddDocDialog(docType);
+      return;
+    }
+
     setRenewDocType(docType);
     setRenewForm({
-      documentNumber: currentDoc?.number && currentDoc.number !== "Not provided" && currentDoc.number !== "Pending" ? currentDoc.number : "",
+      documentNumber: currentDoc?.number && hasValidDocumentNumber(currentDoc.number) ? currentDoc.number : "",
       issueDate: currentDoc?.issueDate ? currentDoc.issueDate.split("T")[0] : "",
       expiryDate: "",
       placeOfIssue: currentDoc?.placeOfIssue || "",
@@ -305,10 +451,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
           description: "New document version is now current and active in compliance schedules."
         });
         setRenewDialogOpen(false);
-        await loadStudentData();
-        await loadReminderSchedule();
+        await Promise.all([loadStudentData(), loadReminderSchedule()]);
       } else {
-        toast.error(res.error || "Failed to renew document.");
+        toast.error("Renewal Rejected", { description: res.error || "Failed to renew document." });
+        if (res.error?.includes("Original document details must be added")) {
+          setRenewDialogOpen(false);
+          handleOpenAddDocDialog(renewDocType);
+        }
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Unexpected error renewing document.");
@@ -1463,7 +1612,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 {/* 1. Passport Card */}
                 {(() => {
                   const doc = student.passport;
-                  const hasDoc = doc && doc.number && doc.number !== "Not provided" && doc.number !== "Pending";
+                  const hasDoc = isDocRecorded(doc);
                   const verLabel = doc?.versionLabel || (hasDoc ? (doc?.versionNumber ? (doc.versionNumber === 1 ? "Original" : `Renewal ${doc.versionNumber - 1}`) : "Original") : null);
                   const renewalCount = doc?.renewalCount ?? 0;
 
@@ -1494,7 +1643,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                             <FileText className="h-4 w-4 text-primary" />
                             Passport
                           </CardTitle>
-                          {verLabel ? (
+                          {hasDoc && verLabel ? (
                             <Badge variant="outline" className="text-[10px] font-bold bg-primary/10 text-primary border-primary/30">
                               {verLabel}
                             </Badge>
@@ -1506,74 +1655,110 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         </div>
                         <CardDescription className="text-[11px] text-muted-foreground">Passport & Travel Identification</CardDescription>
                       </CardHeader>
-                      <CardContent className="p-4 space-y-3.5 text-xs flex-1">
-                        <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
-                          <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">Passport Number</span>
-                          <span className="font-semibold text-foreground block font-mono text-sm">
-                            {hasDoc ? doc.number : "Pending Recording"}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-0.5">
-                            <span className="text-muted-foreground block text-[10px]">Issue Date</span>
-                            <span className="font-medium text-foreground block">
-                              {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                      
+                      {!hasDoc ? (
+                        <CardContent className="p-6 text-center space-y-2 flex-1 flex flex-col items-center justify-center">
+                          <div className="p-3 rounded-full bg-muted/40 text-muted-foreground">
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs text-muted-foreground font-medium">
+                            No passport details have been added.
+                          </p>
+                        </CardContent>
+                      ) : (
+                        <CardContent className="p-4 space-y-3.5 text-xs flex-1">
+                          <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
+                            <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">Passport Number</span>
+                            <span className="font-semibold text-foreground block font-mono text-sm break-all">
+                              {doc?.number || "—"}
                             </span>
                           </div>
-                          <div className="space-y-0.5">
-                            <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
-                            <span className={statusClass}>
-                              {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
-                            </span>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-0.5">
+                              <span className="text-muted-foreground block text-[10px]">Issue Date</span>
+                              <span className="font-medium text-foreground block">
+                                {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                              </span>
+                            </div>
+                            <div className="space-y-0.5">
+                              <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
+                              <span className={statusClass}>
+                                {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
+                              </span>
+                            </div>
                           </div>
-                        </div>
 
-                        {doc?.placeOfIssue && (
-                          <div className="space-y-0.5">
-                            <span className="text-muted-foreground block text-[10px]">Place of Issue</span>
-                            <span className="font-medium text-foreground block">{doc.placeOfIssue}</span>
+                          {doc?.placeOfIssue && (
+                            <div className="space-y-0.5">
+                              <span className="text-muted-foreground block text-[10px]">Place of Issue</span>
+                              <span className="font-medium text-foreground block">{doc.placeOfIssue}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
+                            <span className="text-muted-foreground">Total Renewals:</span>
+                            <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
                           </div>
-                        )}
 
-                        <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
-                          <span className="text-muted-foreground">Total Renewals:</span>
-                          <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
-                        </div>
+                          {doc?.fileDownloadUrl && (
+                            <div className="pt-1">
+                              <a
+                                href={doc.fileDownloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                View Current Document
+                              </a>
+                            </div>
+                          )}
+                        </CardContent>
+                      )}
 
-                        {doc?.fileDownloadUrl && (
-                          <div className="pt-1">
-                            <a
-                              href={doc.fileDownloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2 flex-wrap">
+                        {!hasDoc ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleOpenAddDocDialog("passport")}
+                            className="h-8 text-xs w-full gap-1.5 font-semibold"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add Passport Details
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenHistoryDialog("passport")}
+                              className="h-8 text-xs flex-1 min-w-[70px] gap-1.5"
                             >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              View Current Document
-                            </a>
-                          </div>
+                              <History className="h-3.5 w-3.5 text-muted-foreground" />
+                              History
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEditDocDialog("passport")}
+                              className="h-8 text-xs flex-1 min-w-[80px] gap-1.5"
+                            >
+                              <Edit3 className="h-3.5 w-3.5 text-muted-foreground" />
+                              Edit Details
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleOpenRenewDialog("passport")}
+                              className="h-8 text-xs flex-1 min-w-[100px] gap-1.5 font-semibold"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Renew Passport
+                            </Button>
+                          </>
                         )}
-                      </CardContent>
-                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenHistoryDialog("passport")}
-                          className="h-8 text-xs flex-1 gap-1.5"
-                        >
-                          <History className="h-3.5 w-3.5 text-muted-foreground" />
-                          History
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleOpenRenewDialog("passport")}
-                          className="h-8 text-xs flex-1 gap-1.5 font-semibold"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                          Renew
-                        </Button>
                       </CardFooter>
                     </Card>
                   );
@@ -1582,7 +1767,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 {/* 2. Visa Card */}
                 {(() => {
                   const doc = student.visa;
-                  const hasDoc = doc && doc.number && doc.number !== "Not provided" && doc.number !== "Pending";
+                  const hasDoc = isDocRecorded(doc);
                   const verLabel = doc?.versionLabel || (hasDoc ? (doc?.versionNumber ? (doc.versionNumber === 1 ? "Original" : `Renewal ${doc.versionNumber - 1}`) : "Original") : null);
                   const renewalCount = doc?.renewalCount ?? 0;
 
@@ -1613,7 +1798,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                             <FileCheck2 className="h-4 w-4 text-primary" />
                             Student Visa
                           </CardTitle>
-                          {verLabel ? (
+                          {hasDoc && verLabel ? (
                             <Badge variant="outline" className="text-[10px] font-bold bg-primary/10 text-primary border-primary/30">
                               {verLabel}
                             </Badge>
@@ -1625,74 +1810,110 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         </div>
                         <CardDescription className="text-[11px] text-muted-foreground">Visa & Entry Clearance</CardDescription>
                       </CardHeader>
-                      <CardContent className="p-4 space-y-3.5 text-xs flex-1">
-                        <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
-                          <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">Visa Number</span>
-                          <span className="font-semibold text-foreground block font-mono text-sm">
-                            {hasDoc ? doc.number : "Pending Recording"}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-0.5">
-                            <span className="text-muted-foreground block text-[10px]">Issue Date</span>
-                            <span className="font-medium text-foreground block">
-                              {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                      
+                      {!hasDoc ? (
+                        <CardContent className="p-6 text-center space-y-2 flex-1 flex flex-col items-center justify-center">
+                          <div className="p-3 rounded-full bg-muted/40 text-muted-foreground">
+                            <FileCheck2 className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs text-muted-foreground font-medium">
+                            No student visa details have been added.
+                          </p>
+                        </CardContent>
+                      ) : (
+                        <CardContent className="p-4 space-y-3.5 text-xs flex-1">
+                          <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
+                            <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">Visa Number</span>
+                            <span className="font-semibold text-foreground block font-mono text-sm break-all">
+                              {doc?.number || "—"}
                             </span>
                           </div>
-                          <div className="space-y-0.5">
-                            <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
-                            <span className={statusClass}>
-                              {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
-                            </span>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-0.5">
+                              <span className="text-muted-foreground block text-[10px]">Issue Date</span>
+                              <span className="font-medium text-foreground block">
+                                {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                              </span>
+                            </div>
+                            <div className="space-y-0.5">
+                              <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
+                              <span className={statusClass}>
+                                {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
+                              </span>
+                            </div>
                           </div>
-                        </div>
 
-                        {doc?.visaType && (
-                          <div className="space-y-0.5">
-                            <span className="text-muted-foreground block text-[10px]">Visa Category</span>
-                            <span className="font-medium text-foreground block">{doc.visaType}</span>
+                          {doc?.visaType && (
+                            <div className="space-y-0.5">
+                              <span className="text-muted-foreground block text-[10px]">Visa Category</span>
+                              <span className="font-medium text-foreground block">{doc.visaType}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
+                            <span className="text-muted-foreground">Total Renewals:</span>
+                            <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
                           </div>
-                        )}
 
-                        <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
-                          <span className="text-muted-foreground">Total Renewals:</span>
-                          <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
-                        </div>
+                          {doc?.fileDownloadUrl && (
+                            <div className="pt-1">
+                              <a
+                                href={doc.fileDownloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                View Current Document
+                              </a>
+                            </div>
+                          )}
+                        </CardContent>
+                      )}
 
-                        {doc?.fileDownloadUrl && (
-                          <div className="pt-1">
-                            <a
-                              href={doc.fileDownloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2 flex-wrap">
+                        {!hasDoc ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleOpenAddDocDialog("visa")}
+                            className="h-8 text-xs w-full gap-1.5 font-semibold"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add Visa Details
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenHistoryDialog("visa")}
+                              className="h-8 text-xs flex-1 min-w-[70px] gap-1.5"
                             >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              View Current Document
-                            </a>
-                          </div>
+                              <History className="h-3.5 w-3.5 text-muted-foreground" />
+                              History
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEditDocDialog("visa")}
+                              className="h-8 text-xs flex-1 min-w-[80px] gap-1.5"
+                            >
+                              <Edit3 className="h-3.5 w-3.5 text-muted-foreground" />
+                              Edit Details
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleOpenRenewDialog("visa")}
+                              className="h-8 text-xs flex-1 min-w-[100px] gap-1.5 font-semibold"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Renew Visa
+                            </Button>
+                          </>
                         )}
-                      </CardContent>
-                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenHistoryDialog("visa")}
-                          className="h-8 text-xs flex-1 gap-1.5"
-                        >
-                          <History className="h-3.5 w-3.5 text-muted-foreground" />
-                          History
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleOpenRenewDialog("visa")}
-                          className="h-8 text-xs flex-1 gap-1.5 font-semibold"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                          Renew
-                        </Button>
                       </CardFooter>
                     </Card>
                   );
@@ -1701,7 +1922,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 {/* 3. eFRRO Card */}
                 {(() => {
                   const doc = student.efrro;
-                  const hasDoc = doc && doc.number && doc.number !== "Not provided" && doc.number !== "Pending";
+                  const hasDoc = isDocRecorded(doc);
                   const verLabel = doc?.versionLabel || (hasDoc ? (doc?.versionNumber ? (doc.versionNumber === 1 ? "Original" : `Renewal ${doc.versionNumber - 1}`) : "Original") : null);
                   const renewalCount = doc?.renewalCount ?? 0;
 
@@ -1732,7 +1953,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
                             <ShieldCheck className="h-4 w-4 text-primary" />
                             eFRRO / Permit
                           </CardTitle>
-                          {verLabel ? (
+                          {hasDoc && verLabel ? (
                             <Badge variant="outline" className="text-[10px] font-bold bg-primary/10 text-primary border-primary/30">
                               {verLabel}
                             </Badge>
@@ -1744,67 +1965,103 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         </div>
                         <CardDescription className="text-[11px] text-muted-foreground">Residential Permit & Compliance</CardDescription>
                       </CardHeader>
-                      <CardContent className="p-4 space-y-3.5 text-xs flex-1">
-                        <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
-                          <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">eFRRO Number</span>
-                          <span className="font-semibold text-foreground block font-mono text-sm">
-                            {hasDoc ? doc.number : "Pending Recording"}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-0.5">
-                            <span className="text-muted-foreground block text-[10px]">Issue Date</span>
-                            <span className="font-medium text-foreground block">
-                              {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                      
+                      {!hasDoc ? (
+                        <CardContent className="p-6 text-center space-y-2 flex-1 flex flex-col items-center justify-center">
+                          <div className="p-3 rounded-full bg-muted/40 text-muted-foreground">
+                            <ShieldCheck className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs text-muted-foreground font-medium">
+                            No eFRRO details have been added.
+                          </p>
+                        </CardContent>
+                      ) : (
+                        <CardContent className="p-4 space-y-3.5 text-xs flex-1">
+                          <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
+                            <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">eFRRO Number</span>
+                            <span className="font-semibold text-foreground block font-mono text-sm break-all">
+                              {doc?.number || "—"}
                             </span>
                           </div>
-                          <div className="space-y-0.5">
-                            <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
-                            <span className={statusClass}>
-                              {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
-                            </span>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-0.5">
+                              <span className="text-muted-foreground block text-[10px]">Issue Date</span>
+                              <span className="font-medium text-foreground block">
+                                {doc?.issueDate ? AcademicProgressionEngine.formatDisplayDate(doc.issueDate) : "—"}
+                              </span>
+                            </div>
+                            <div className="space-y-0.5">
+                              <span className="text-muted-foreground block text-[10px]">Expiry Date</span>
+                              <span className={statusClass}>
+                                {doc?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(doc.expiryDate) : "—"}
+                              </span>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
-                          <span className="text-muted-foreground">Total Renewals:</span>
-                          <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
-                        </div>
+                          <div className="flex items-center justify-between pt-1 border-t border-border/30 text-[11px]">
+                            <span className="text-muted-foreground">Total Renewals:</span>
+                            <span className="font-bold text-foreground">{renewalCount} {renewalCount === 1 ? "renewal" : "renewals"}</span>
+                          </div>
 
-                        {doc?.fileDownloadUrl && (
-                          <div className="pt-1">
-                            <a
-                              href={doc.fileDownloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                          {doc?.fileDownloadUrl && (
+                            <div className="pt-1">
+                              <a
+                                href={doc.fileDownloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                View Current Document
+                              </a>
+                            </div>
+                          )}
+                        </CardContent>
+                      )}
+
+                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2 flex-wrap">
+                        {!hasDoc ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleOpenAddDocDialog("efrro")}
+                            className="h-8 text-xs w-full gap-1.5 font-semibold"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add eFRRO Details
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenHistoryDialog("efrro")}
+                              className="h-8 text-xs flex-1 min-w-[70px] gap-1.5"
                             >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              View Current Document
-                            </a>
-                          </div>
+                              <History className="h-3.5 w-3.5 text-muted-foreground" />
+                              History
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEditDocDialog("efrro")}
+                              className="h-8 text-xs flex-1 min-w-[80px] gap-1.5"
+                            >
+                              <Edit3 className="h-3.5 w-3.5 text-muted-foreground" />
+                              Edit Details
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleOpenRenewDialog("efrro")}
+                              className="h-8 text-xs flex-1 min-w-[100px] gap-1.5 font-semibold"
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Renew eFRRO
+                            </Button>
+                          </>
                         )}
-                      </CardContent>
-                      <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenHistoryDialog("efrro")}
-                          className="h-8 text-xs flex-1 gap-1.5"
-                        >
-                          <History className="h-3.5 w-3.5 text-muted-foreground" />
-                          History
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleOpenRenewDialog("efrro")}
-                          className="h-8 text-xs flex-1 gap-1.5 font-semibold"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                          Renew
-                        </Button>
                       </CardFooter>
                     </Card>
                   );
@@ -2508,6 +2765,205 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </div>
             </div>
 
+            {/* Legal & Compliance Documents Quick Management */}
+            <div className="pt-2 space-y-3">
+              <div className="flex items-center justify-between pb-1 border-b border-border/40">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Legal & Compliance Documents</h4>
+                </div>
+                <span className="text-[11px] text-muted-foreground">Passport, Visa, eFRRO</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Passport Card */}
+                {(() => {
+                  const hasPassport = isDocRecorded(student?.passport);
+                  return (
+                    <div className="p-3 rounded-xl border border-border/60 bg-muted/10 space-y-2 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
+                            <FileText className="h-3.5 w-3.5 text-primary" /> Passport
+                          </span>
+                          <Badge variant="outline" className="text-[9px]">
+                            {hasPassport ? (student?.passport?.versionLabel || "Original") : "Not Recorded"}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] font-mono text-muted-foreground truncate">
+                          {hasPassport ? `${student?.passport?.number} (Exp: ${student?.passport?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(student.passport.expiryDate) : "—"})` : "No passport details added"}
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5 pt-1">
+                        {!hasPassport ? (
+                          <Button
+                            type="button"
+                            variant="default"
+                            size="sm"
+                            onClick={() => {
+                              handleOpenAddDocDialog("passport");
+                            }}
+                            className="h-7 text-[11px] w-full gap-1 font-semibold"
+                          >
+                            <Plus className="h-3 w-3" /> Add Passport
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                handleOpenEditDocDialog("passport");
+                              }}
+                              className="h-7 text-[11px] flex-1 gap-1"
+                            >
+                              <Edit3 className="h-3 w-3" /> Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              onClick={() => {
+                                handleOpenRenewDialog("passport");
+                              }}
+                              className="h-7 text-[11px] flex-1 gap-1 font-semibold"
+                            >
+                              <RefreshCw className="h-3 w-3" /> Renew
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Visa Card */}
+                {(() => {
+                  const hasVisa = isDocRecorded(student?.visa);
+                  return (
+                    <div className="p-3 rounded-xl border border-border/60 bg-muted/10 space-y-2 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
+                            <FileCheck2 className="h-3.5 w-3.5 text-primary" /> Student Visa
+                          </span>
+                          <Badge variant="outline" className="text-[9px]">
+                            {hasVisa ? (student?.visa?.versionLabel || "Original") : "Not Recorded"}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] font-mono text-muted-foreground truncate">
+                          {hasVisa ? `${student?.visa?.number} (Exp: ${student?.visa?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(student.visa.expiryDate) : "—"})` : "No visa details added"}
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5 pt-1">
+                        {!hasVisa ? (
+                          <Button
+                            type="button"
+                            variant="default"
+                            size="sm"
+                            onClick={() => {
+                              handleOpenAddDocDialog("visa");
+                            }}
+                            className="h-7 text-[11px] w-full gap-1 font-semibold"
+                          >
+                            <Plus className="h-3 w-3" /> Add Visa
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                handleOpenEditDocDialog("visa");
+                              }}
+                              className="h-7 text-[11px] flex-1 gap-1"
+                            >
+                              <Edit3 className="h-3 w-3" /> Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              onClick={() => {
+                                handleOpenRenewDialog("visa");
+                              }}
+                              className="h-7 text-[11px] flex-1 gap-1 font-semibold"
+                            >
+                              <RefreshCw className="h-3 w-3" /> Renew
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* eFRRO Card */}
+                {(() => {
+                  const hasEfrro = isDocRecorded(student?.efrro);
+                  return (
+                    <div className="p-3 rounded-xl border border-border/60 bg-muted/10 space-y-2 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
+                            <ShieldCheck className="h-3.5 w-3.5 text-primary" /> eFRRO / Permit
+                          </span>
+                          <Badge variant="outline" className="text-[9px]">
+                            {hasEfrro ? (student?.efrro?.versionLabel || "Original") : "Not Recorded"}
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] font-mono text-muted-foreground truncate">
+                          {hasEfrro ? `${student?.efrro?.number} (Exp: ${student?.efrro?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(student.efrro.expiryDate) : "—"})` : "No eFRRO details added"}
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5 pt-1">
+                        {!hasEfrro ? (
+                          <Button
+                            type="button"
+                            variant="default"
+                            size="sm"
+                            onClick={() => {
+                              handleOpenAddDocDialog("efrro");
+                            }}
+                            className="h-7 text-[11px] w-full gap-1 font-semibold"
+                          >
+                            <Plus className="h-3 w-3" /> Add eFRRO
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                handleOpenEditDocDialog("efrro");
+                              }}
+                              className="h-7 text-[11px] flex-1 gap-1"
+                            >
+                              <Edit3 className="h-3 w-3" /> Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              onClick={() => {
+                                handleOpenRenewDialog("efrro");
+                              }}
+                              className="h-7 text-[11px] flex-1 gap-1 font-semibold"
+                            >
+                              <RefreshCw className="h-3 w-3" /> Renew
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
             {/* Consular & Embassy Information Section */}
             <div className="pt-2 space-y-3">
               <div className="flex items-center gap-2 pb-1 border-b border-border/40">
@@ -2766,6 +3222,172 @@ export default function StudentDetailsPage({ params }: PageProps) {
         onClose={handleCancelDiscard}
         onConfirm={handleConfirmDiscard}
       />
+
+      {/* Add / Edit Document Dialog Modal */}
+      <Dialog open={addEditDocDialogOpen} onOpenChange={setAddEditDocDialogOpen}>
+        <DialogContent className="sm:max-w-lg rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              {addEditMode === "add" ? (
+                <Plus className="h-4 w-4 text-primary" />
+              ) : (
+                <Edit3 className="h-4 w-4 text-primary" />
+              )}
+              {addEditMode === "add" ? "Add" : "Edit"}{" "}
+              {addEditDocType === "passport"
+                ? "Passport Details"
+                : addEditDocType === "visa"
+                ? "Student Visa Details"
+                : "eFRRO / Permit Details"}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              {addEditMode === "add"
+                ? "Enter original document details. This document will become the active original record in compliance tracking."
+                : "Update or correct current document details without creating a new renewal."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmitAddEditDoc} className="space-y-4 pt-2">
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">
+                  {addEditDocType === "passport" ? "Passport Number" : addEditDocType === "visa" ? "Visa Number" : "eFRRO Number"} <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  value={addEditForm.documentNumber}
+                  onChange={(e) => setAddEditForm(prev => ({ ...prev, documentNumber: e.target.value }))}
+                  placeholder={addEditDocType === "passport" ? "e.g. A12345678" : addEditDocType === "visa" ? "e.g. V1234567" : "e.g. 24010198"}
+                  className="h-9 text-xs font-mono"
+                />
+                {addEditErrors.documentNumber && (
+                  <p className="text-[11px] text-destructive">{addEditErrors.documentNumber}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">
+                    Issue Date <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    type="date"
+                    value={addEditForm.issueDate}
+                    onChange={(e) => setAddEditForm(prev => ({ ...prev, issueDate: e.target.value }))}
+                    className="h-9 text-xs"
+                  />
+                  {addEditErrors.issueDate && (
+                    <p className="text-[11px] text-destructive">{addEditErrors.issueDate}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">
+                    Expiration Date <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    type="date"
+                    value={addEditForm.expiryDate}
+                    onChange={(e) => setAddEditForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                    className="h-9 text-xs"
+                  />
+                  {addEditErrors.expiryDate && (
+                    <p className="text-[11px] text-destructive">{addEditErrors.expiryDate}</p>
+                  )}
+                </div>
+              </div>
+
+              {addEditDocType === "passport" && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">Place of Issue / Country (Optional)</label>
+                  <Input
+                    value={addEditForm.placeOfIssue}
+                    onChange={(e) => setAddEditForm(prev => ({ ...prev, placeOfIssue: e.target.value }))}
+                    placeholder="e.g. London, United Kingdom"
+                    className="h-9 text-xs"
+                  />
+                </div>
+              )}
+
+              {addEditDocType === "visa" && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">Visa Classification / Type (Optional)</label>
+                  <Input
+                    value={addEditForm.visaType}
+                    onChange={(e) => setAddEditForm(prev => ({ ...prev, visaType: e.target.value }))}
+                    placeholder="e.g. Student (S-1)"
+                    className="h-9 text-xs"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Attach Document File (Optional - PDF or Image)</label>
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setAddEditForm(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                  className="h-9 text-xs file:text-xs file:font-semibold file:text-primary cursor-pointer"
+                />
+                <p className="text-[10px] text-muted-foreground">Document metadata can be saved without a physical file. Physical file can be attached anytime.</p>
+              </div>
+
+              {addEditMode === "edit" && (
+                <div className="space-y-1">
+                  <label className="font-semibold text-foreground">Reason for Update / Correction (Optional)</label>
+                  <Input
+                    value={addEditForm.reason}
+                    onChange={(e) => setAddEditForm(prev => ({ ...prev, reason: e.target.value }))}
+                    placeholder="e.g. Corrected typo in expiry date"
+                    className="h-9 text-xs"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="font-semibold text-foreground">Administrative Notes (Optional)</label>
+                <Textarea
+                  value={addEditForm.notes}
+                  onChange={(e) => setAddEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="e.g. Document submitted upon arrival."
+                  rows={2}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3 border-t border-border/40">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAddEditDocDialogOpen(false)}
+                disabled={isSavingDoc}
+                className="text-xs rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSavingDoc}
+                className="text-xs rounded-xl font-semibold gap-1.5"
+              >
+                {isSavingDoc ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    {addEditMode === "add" ? <Plus className="h-3.5 w-3.5" /> : <Edit3 className="h-3.5 w-3.5" />}
+                    {addEditMode === "add" ? "Save Original Details" : "Save Changes"}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Renew Document Dialog Modal */}
       <Dialog open={renewDialogOpen} onOpenChange={setRenewDialogOpen}>

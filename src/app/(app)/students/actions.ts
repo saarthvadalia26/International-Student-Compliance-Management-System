@@ -1374,17 +1374,547 @@ export interface DocumentVersionHistoryItem {
 }
 
 /**
+ * Checks if a document number is genuinely recorded (non-empty and not a placeholder like 'Not provided' or 'Pending')
+ */
+function hasValidDocumentNumber(docNum?: string | null): boolean {
+  if (!docNum) return false;
+  const trimmed = docNum.trim().toLowerCase();
+  return (
+    trimmed !== "" &&
+    trimmed !== "not provided" &&
+    trimmed !== "pending" &&
+    trimmed !== "not recorded" &&
+    trimmed !== "none" &&
+    trimmed !== "n/a" &&
+    trimmed !== "undefined" &&
+    trimmed !== "null"
+  );
+}
+
+/**
+ * Server Action: Add Original Document Details (Passport, Visa, or eFRRO)
+ * 
+ * Core workflow for progressively completing student profiles:
+ * 1. Validates that NO valid original document already exists.
+ * 2. If a file is uploaded, saves it to Cloudflare R2 object storage.
+ * 3. Creates the first active version (v1 / 'Original') with verification_status: 'verified'.
+ * 4. Updates student_snapshot with the original document metadata and calculated compliance status.
+ * 5. Reconciles reminder schedules for this student.
+ * 6. Logs DOCUMENT_ORIGINAL_ADDED audit trail.
+ */
+export async function addOriginalDocumentAction(
+  formData: FormData
+): Promise<{
+  success: boolean;
+  versionNumber?: number;
+  versionLabel?: string;
+  error?: string;
+}> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to add document details." };
+    }
+
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: Only authorized staff may record document details." };
+    }
+
+    const studentId = formData.get("studentId") as string;
+    const documentType = formData.get("documentType") as "passport" | "visa" | "efrro";
+    const documentNumber = formData.get("documentNumber") as string;
+    const issueDate = formData.get("issueDate") as string;
+    const expiryDate = formData.get("expiryDate") as string;
+    const placeOfIssue = (formData.get("placeOfIssue") as string) || null;
+    const visaType = (formData.get("visaType") as string) || "Student (S-1)";
+    const notes = (formData.get("notes") as string) || "";
+    const file = formData.get("file") as File | null;
+
+    if (!studentId || !documentType) {
+      return { success: false, error: "Student ID and document type are required." };
+    }
+
+    if (!documentNumber || !documentNumber.trim()) {
+      return { success: false, error: "Document number is required." };
+    }
+
+    if (!issueDate || !issueDate.trim()) {
+      return { success: false, error: "Issue date is required." };
+    }
+
+    if (!expiryDate || !expiryDate.trim()) {
+      return { success: false, error: "Expiration date is required." };
+    }
+
+    const cleanDocNum = documentNumber.trim();
+    const cleanIssue = issueDate.trim().split("T")[0];
+    const cleanExpiry = expiryDate.trim().split("T")[0];
+    const issueD = new Date(cleanIssue);
+    const expiryD = new Date(cleanExpiry);
+
+    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
+      return { success: false, error: "Invalid date format. Please use YYYY-MM-DD." };
+    }
+
+    if (expiryD <= issueD) {
+      return { success: false, error: `The expiration date (${cleanExpiry}) must be strictly after the document issue date (${cleanIssue}).` };
+    }
+
+    const adminSupabase = getAdminSupabase();
+    const tableName = documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+    // 1. Verify that NO original document already exists
+    const [{ data: existingVersions }, { data: snapshot }] = await Promise.all([
+      adminSupabase
+        .from(tableName)
+        .select("id, version_number, is_active, document_number")
+        .eq("student_id", studentId)
+        .is("deleted_at", null),
+      adminSupabase
+        .from("student_snapshot")
+        .select("passport_number, visa_number, efrro_number")
+        .eq("student_id", studentId)
+        .maybeSingle()
+    ]);
+
+    const existingDocNum = documentType === "passport" ? snapshot?.passport_number :
+      documentType === "visa" ? snapshot?.visa_number : snapshot?.efrro_number;
+
+    const hasExistingVer = (existingVersions || []).some(v => hasValidDocumentNumber(v.document_number));
+    const hasExistingSnapshot = hasValidDocumentNumber(existingDocNum);
+
+    if (hasExistingVer || hasExistingSnapshot) {
+      return { 
+        success: false, 
+        error: "Original document details already exist for this student. Use 'Edit Details' to update information or 'Renew' to record a renewal." 
+      };
+    }
+
+    // 2. Handle optional attached physical file upload
+    let storagePath: string | null = null;
+    if (file && typeof file.arrayBuffer === "function" && file.size > 0) {
+      const { systemConfigService } = await import("@/lib/system-config");
+      const maxUploadSizeBytes = await systemConfigService.getMaxUploadSizeBytes();
+      const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
+
+      if (file.size > maxUploadSizeBytes) {
+        return { success: false, error: `File exceeds the maximum allowed size of ${maxUploadSizeMb} MB.` };
+      }
+
+      const safeExt = file.name.split(".").pop()?.toLowerCase() || "pdf";
+      const ext = ["pdf", "jpg", "jpeg", "png"].includes(safeExt) ? safeExt : "pdf";
+      const uniqueFileId = crypto.randomUUID();
+      storagePath = `students/${studentId}/${documentType}/v1/${uniqueFileId}.${ext}`;
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+      try {
+        const storage = StorageProviderFactory.getProvider();
+        await storage.upload("iscms-documents", storagePath, fileBuffer, file.type || "application/pdf");
+      } catch (uploadErr: unknown) {
+        console.error("[STORAGE_UPLOAD_ERROR]", uploadErr);
+        return { success: false, error: `Failed to upload document file to storage: ${uploadErr instanceof Error ? uploadErr.message : "Storage error"}` };
+      }
+    }
+
+    // 3. Insert new active verified version 1 ('Original')
+    const insertPayload: Record<string, unknown> = {
+      student_id: studentId,
+      version_number: 1,
+      is_active: true,
+      document_number: cleanDocNum,
+      issue_date: cleanIssue,
+      expiry_date: cleanExpiry,
+      file_path: storagePath,
+      verification_status: "verified",
+      verified_by: user.id,
+      verified_at: new Date().toISOString(),
+      notes: notes.trim() || "Original document recorded by administrator",
+      created_by: user.id,
+      updated_by: user.id
+    };
+
+    if (documentType === "passport") {
+      insertPayload.place_of_issue = placeOfIssue?.trim() || null;
+    } else if (documentType === "visa") {
+      insertPayload.visa_type = visaType?.trim() || "Student (S-1)";
+    }
+
+    const { data: newVer, error: insertErr } = await adminSupabase
+      .from(tableName)
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (insertErr || !newVer) {
+      if (storagePath) {
+        try {
+          const storage = StorageProviderFactory.getProvider();
+          await storage.delete("iscms-documents", storagePath);
+        } catch {}
+      }
+      return { success: false, error: `Database insert failed: ${insertErr?.message}` };
+    }
+
+    // 4. Update student_snapshot with original document information
+    const now = new Date();
+    const diffDays = Math.round((expiryD.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
+
+    const snapshotUpdates: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (documentType === "passport") {
+      snapshotUpdates.passport_number = cleanDocNum;
+      snapshotUpdates.passport_issue_date = cleanIssue;
+      snapshotUpdates.passport_expiry = cleanExpiry;
+      snapshotUpdates.passport_place_of_issue = placeOfIssue?.trim() || null;
+      snapshotUpdates.passport_status = calculatedDocStatus;
+    } else if (documentType === "visa") {
+      snapshotUpdates.visa_number = cleanDocNum;
+      snapshotUpdates.visa_issue_date = cleanIssue;
+      snapshotUpdates.visa_expiry = cleanExpiry;
+      snapshotUpdates.visa_type = visaType?.trim() || "Student (S-1)";
+      snapshotUpdates.visa_status = calculatedDocStatus;
+    } else {
+      snapshotUpdates.efrro_number = cleanDocNum;
+      snapshotUpdates.efrro_issue_date = cleanIssue;
+      snapshotUpdates.efrro_expiry = cleanExpiry;
+      snapshotUpdates.efrro_status = calculatedDocStatus;
+      snapshotUpdates.days_until_efrro_expiry = diffDays;
+    }
+
+    await adminSupabase
+      .from("student_snapshot")
+      .update(snapshotUpdates)
+      .eq("student_id", studentId);
+
+    // 5. Reconcile reminders
+    try {
+      const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+      await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, user.id);
+      const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
+      await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
+    } catch (reminderErr) {
+      console.warn("[ADD_ORIGINAL_DOC_REMINDER_RECONCILIATION_WARNING]", reminderErr);
+    }
+
+    // 6. Audit log DOCUMENT_ORIGINAL_ADDED
+    await adminSupabase.from("audit_log").insert({
+      actor_id: user.id,
+      action: "DOCUMENT_ORIGINAL_ADDED",
+      resource: `${tableName}/${newVer.id}`,
+      filters_applied: {
+        studentId,
+        documentType,
+        versionNumber: 1,
+        versionLabel: "Original",
+        documentNumber: cleanDocNum,
+        issueDate: cleanIssue,
+        expiryDate: cleanExpiry,
+        hasFile: Boolean(storagePath),
+        addedBy: user.email || user.id,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
+    revalidatePath("/reminders");
+
+    return { 
+      success: true, 
+      versionNumber: 1,
+      versionLabel: "Original"
+    };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "addOriginalDocumentAction" });
+    return { success: false, error: sanitized.message };
+  }
+}
+
+/**
+ * Server Action: Edit Existing Document Details (in-place modification)
+ * 
+ * Supports updating existing active document metadata and optionally replacing/adding a document file.
+ * Preserves current lifecycle version without creating a renewal.
+ */
+export async function editDocumentDetailsAction(
+  formData: FormData
+): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to edit document details." };
+    }
+
+    const { isInternalUser } = await import("@/lib/auth/permissions");
+    if (!isInternalUser(user)) {
+      return { success: false, error: "Forbidden: Only authorized staff may edit document details." };
+    }
+
+    const studentId = formData.get("studentId") as string;
+    const documentType = formData.get("documentType") as "passport" | "visa" | "efrro";
+    const documentNumber = formData.get("documentNumber") as string;
+    const issueDate = formData.get("issueDate") as string;
+    const expiryDate = formData.get("expiryDate") as string;
+    const placeOfIssue = (formData.get("placeOfIssue") as string) || null;
+    const visaType = (formData.get("visaType") as string) || "Student (S-1)";
+    const notes = (formData.get("notes") as string) || "";
+    const reason = (formData.get("reason") as string) || "Administrative details update";
+    const file = formData.get("file") as File | null;
+
+    if (!studentId || !documentType) {
+      return { success: false, error: "Student ID and document type are required." };
+    }
+
+    if (!documentNumber || !documentNumber.trim()) {
+      return { success: false, error: "Document number is required." };
+    }
+
+    if (!issueDate || !issueDate.trim()) {
+      return { success: false, error: "Issue date is required." };
+    }
+
+    if (!expiryDate || !expiryDate.trim()) {
+      return { success: false, error: "Expiration date is required." };
+    }
+
+    const cleanDocNum = documentNumber.trim();
+    const cleanIssue = issueDate.trim().split("T")[0];
+    const cleanExpiry = expiryDate.trim().split("T")[0];
+    const cleanPlace = placeOfIssue?.trim() || null;
+    const cleanVisaType = visaType?.trim() || "Student (S-1)";
+    const issueD = new Date(cleanIssue);
+    const expiryD = new Date(cleanExpiry);
+
+    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
+      return { success: false, error: "Invalid date format. Please use YYYY-MM-DD." };
+    }
+
+    if (expiryD <= issueD) {
+      return { success: false, error: `The expiration date (${cleanExpiry}) must be strictly after the document issue date (${cleanIssue}).` };
+    }
+
+    const adminSupabase = getAdminSupabase();
+    const tableName = documentType === "passport" 
+      ? "passport_versions" 
+      : documentType === "visa" 
+      ? "visa_versions" 
+      : "efrro_versions";
+
+    // 1. Fetch current active version and snapshot
+    const [{ data: activeVersion }, { data: currentSnapshot }] = await Promise.all([
+      adminSupabase
+        .from(tableName)
+        .select("*")
+        .eq("student_id", studentId)
+        .eq("is_active", true)
+        .is("deleted_at", null)
+        .maybeSingle(),
+      adminSupabase
+        .from("student_snapshot")
+        .select("*")
+        .eq("student_id", studentId)
+        .maybeSingle()
+    ]);
+
+    const snapshotDocNum = documentType === "passport" ? currentSnapshot?.passport_number :
+      documentType === "visa" ? currentSnapshot?.visa_number : currentSnapshot?.efrro_number;
+
+    if (!activeVersion && !hasValidDocumentNumber(snapshotDocNum)) {
+      return { success: false, error: "No original document exists to edit. Please add the original document details first." };
+    }
+
+    // 2. Handle optional file upload if a new file is attached
+    let newStoragePath: string | null = null;
+    if (file && typeof file.arrayBuffer === "function" && file.size > 0) {
+      const { systemConfigService } = await import("@/lib/system-config");
+      const maxUploadSizeBytes = await systemConfigService.getMaxUploadSizeBytes();
+      const maxUploadSizeMb = Math.round(maxUploadSizeBytes / (1024 * 1024));
+
+      if (file.size > maxUploadSizeBytes) {
+        return { success: false, error: `File exceeds the maximum allowed size of ${maxUploadSizeMb} MB.` };
+      }
+
+      const safeExt = file.name.split(".").pop()?.toLowerCase() || "pdf";
+      const ext = ["pdf", "jpg", "jpeg", "png"].includes(safeExt) ? safeExt : "pdf";
+      const uniqueFileId = crypto.randomUUID();
+      const verNum = activeVersion?.version_number || 1;
+      newStoragePath = `students/${studentId}/${documentType}/v${verNum}/${uniqueFileId}.${ext}`;
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+      try {
+        const storage = StorageProviderFactory.getProvider();
+        await storage.upload("iscms-documents", newStoragePath, fileBuffer, file.type || "application/pdf");
+      } catch (uploadErr: unknown) {
+        console.error("[STORAGE_UPLOAD_ERROR]", uploadErr);
+        return { success: false, error: `Failed to upload document file: ${uploadErr instanceof Error ? uploadErr.message : "Storage error"}` };
+      }
+    }
+
+    // 3. Update existing active version row or create active v1 row if missing in table
+    if (activeVersion) {
+      const updatePayload: Record<string, unknown> = {
+        document_number: cleanDocNum,
+        issue_date: cleanIssue,
+        expiry_date: cleanExpiry,
+        notes: notes.trim() || `Updated by administrator: ${reason.trim()}`,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id
+      };
+      if (newStoragePath) {
+        updatePayload.file_path = newStoragePath;
+      }
+      if (documentType === "passport") {
+        updatePayload.place_of_issue = cleanPlace;
+      } else if (documentType === "visa") {
+        updatePayload.visa_type = cleanVisaType;
+      }
+
+      const { error: updateVerErr } = await adminSupabase
+        .from(tableName)
+        .update(updatePayload)
+        .eq("id", activeVersion.id);
+
+      if (updateVerErr) {
+        return { success: false, error: `Failed to update document record: ${updateVerErr.message}` };
+      }
+    } else {
+      // Legacy document without a version row: insert v1
+      const insertPayload: Record<string, unknown> = {
+        student_id: studentId,
+        version_number: 1,
+        is_active: true,
+        document_number: cleanDocNum,
+        issue_date: cleanIssue,
+        expiry_date: cleanExpiry,
+        file_path: newStoragePath || null,
+        verification_status: "verified",
+        verified_by: user.id,
+        verified_at: new Date().toISOString(),
+        notes: notes.trim() || `Recorded by administrator: ${reason.trim()}`,
+        created_by: user.id,
+        updated_by: user.id
+      };
+      if (documentType === "passport") {
+        insertPayload.place_of_issue = cleanPlace;
+      } else if (documentType === "visa") {
+        insertPayload.visa_type = cleanVisaType;
+      }
+
+      const { error: insertErr } = await adminSupabase
+        .from(tableName)
+        .insert(insertPayload);
+
+      if (insertErr) {
+        return { success: false, error: `Failed to insert active document record: ${insertErr.message}` };
+      }
+    }
+
+    // 4. Update student_snapshot
+    const now = new Date();
+    const diffDays = Math.round((expiryD.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
+
+    const snapshotUpdates: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (documentType === "passport") {
+      snapshotUpdates.passport_number = cleanDocNum;
+      snapshotUpdates.passport_issue_date = cleanIssue;
+      snapshotUpdates.passport_expiry = cleanExpiry;
+      snapshotUpdates.passport_place_of_issue = cleanPlace;
+      snapshotUpdates.passport_status = calculatedDocStatus;
+    } else if (documentType === "visa") {
+      snapshotUpdates.visa_number = cleanDocNum;
+      snapshotUpdates.visa_issue_date = cleanIssue;
+      snapshotUpdates.visa_expiry = cleanExpiry;
+      snapshotUpdates.visa_type = cleanVisaType;
+      snapshotUpdates.visa_status = calculatedDocStatus;
+    } else {
+      snapshotUpdates.efrro_number = cleanDocNum;
+      snapshotUpdates.efrro_issue_date = cleanIssue;
+      snapshotUpdates.efrro_expiry = cleanExpiry;
+      snapshotUpdates.efrro_status = calculatedDocStatus;
+      snapshotUpdates.days_until_efrro_expiry = diffDays;
+    }
+
+    await adminSupabase
+      .from("student_snapshot")
+      .update(snapshotUpdates)
+      .eq("student_id", studentId);
+
+    // 5. Reconcile reminders
+    try {
+      const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+      await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, user.id);
+      const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
+      await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
+    } catch (reminderErr) {
+      console.warn("[EDIT_DOC_REMINDER_RECONCILIATION_WARNING]", reminderErr);
+    }
+
+    // 6. Audit log
+    await adminSupabase.from("audit_log").insert({
+      actor_id: user.id,
+      action: "DOCUMENT_METADATA_CORRECTED",
+      resource: `${tableName}/${activeVersion?.id || "snapshot"}`,
+      filters_applied: {
+        studentId,
+        documentType,
+        versionNumber: activeVersion?.version_number || 1,
+        documentNumber: cleanDocNum,
+        issueDate: cleanIssue,
+        expiryDate: cleanExpiry,
+        placeOfIssue: cleanPlace,
+        visaType: cleanVisaType,
+        reason: reason.trim(),
+        hasNewFile: Boolean(newStoragePath),
+        editedBy: user.email || user.id,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    revalidatePath(`/students/${studentId}`);
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
+    revalidatePath("/reminders");
+
+    return { success: true };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "editDocumentDetailsAction" });
+    return { success: false, error: sanitized.message };
+  }
+}
+
+/**
  * Server Action: Renew Document (Passport, Visa, or eFRRO)
  * 
  * Core business workflow for university administrators:
- * 1. Resolves all existing versions for the student and document type
- * 2. Calculates atomic next version: Original (v1) -> Renewal 1 (v2) -> Renewal 2 (v3) -> Renewal N (vN+1)
- * 3. If a file is uploaded, saves it securely to Cloudflare R2 object storage
- * 4. Sets previous active versions to is_active: false
- * 5. Creates new active version (is_active: true, verification_status: 'verified')
- * 6. Synchronizes student_snapshot with new document metadata
- * 7. Triggers reminder reconciliation for this student
- * 8. Creates audit log DOCUMENT_RENEWED
+ * 1. Strictly enforces that a valid original document MUST already exist.
+ * 2. Resolves all existing versions for the student and document type.
+ * 3. Calculates atomic next version: Original (v1) -> Renewal 1 (v2) -> Renewal 2 (v3) -> Renewal N (vN+1).
+ * 4. If a file is uploaded, saves it securely to Cloudflare R2 object storage.
+ * 5. Sets previous active versions to is_active: false.
+ * 6. Creates new active version (is_active: true, verification_status: 'verified').
+ * 7. Synchronizes student_snapshot with new document metadata.
+ * 8. Triggers reminder reconciliation for this student.
+ * 9. Creates audit log DOCUMENT_RENEWED.
  */
 export async function renewDocumentAction(
   formData: FormData
@@ -1454,26 +1984,48 @@ export async function renewDocumentAction(
       ? "visa_versions" 
       : "efrro_versions";
 
-    // 1. Fetch all existing versions to determine next sequence number
-    const { data: existingVersions, error: fetchErr } = await adminSupabase
-      .from(tableName)
-      .select("id, version_number, is_active, document_number")
-      .eq("student_id", studentId)
-      .is("deleted_at", null)
-      .order("version_number", { ascending: false });
+    // 1. Fetch all existing versions and snapshot to verify original existence & sequence
+    const [{ data: existingVersions, error: fetchErr }, { data: snapshot }] = await Promise.all([
+      adminSupabase
+        .from(tableName)
+        .select("id, version_number, is_active, document_number")
+        .eq("student_id", studentId)
+        .is("deleted_at", null)
+        .order("version_number", { ascending: false }),
+      adminSupabase
+        .from("student_snapshot")
+        .select("passport_number, visa_number, efrro_number")
+        .eq("student_id", studentId)
+        .maybeSingle()
+    ]);
 
     if (fetchErr) {
       return { success: false, error: `Failed to query existing versions: ${fetchErr.message}` };
     }
 
+    // STRICT BACKEND VALIDATION:
+    // A renewal must NEVER be used to create the first/original document.
+    const snapshotDocNum = documentType === "passport" ? snapshot?.passport_number :
+      documentType === "visa" ? snapshot?.visa_number : snapshot?.efrro_number;
+
+    const hasExistingVer = (existingVersions || []).some(v => hasValidDocumentNumber(v.document_number));
+    const hasExistingSnapshot = hasValidDocumentNumber(snapshotDocNum);
+
+    if (!hasExistingVer && !hasExistingSnapshot) {
+      return {
+        success: false,
+        error: "Original document details must be added before renewal can be created."
+      };
+    }
+
     const highestVersionNum = (existingVersions || []).length > 0
       ? Math.max(...(existingVersions || []).map(v => v.version_number || 0))
-      : 0;
-    const nextVersionNumber = highestVersionNum + 1;
-    const versionLabel = nextVersionNumber === 1 ? "Original" : `Renewal ${nextVersionNumber - 1}`;
+      : 1;
+    const nextVersionNumber = Math.max(highestVersionNum, 1) + 1;
+    const versionLabel = `Renewal ${nextVersionNumber - 1}`;
     const previousActive = (existingVersions || []).find(v => v.is_active);
-    const prevVersionNum = previousActive?.version_number || (highestVersionNum > 0 ? highestVersionNum : null);
-    const prevVersionLabel = prevVersionNum ? (prevVersionNum === 1 ? "Original" : `Renewal ${prevVersionNum - 1}`) : "None";
+    const prevVersionNum = previousActive?.version_number || (highestVersionNum > 0 ? highestVersionNum : 1);
+    const prevVersionLabel = prevVersionNum === 1 ? "Original" : `Renewal ${prevVersionNum - 1}`;
 
     // 2. Handle optional or attached physical file upload
     let storagePath: string | null = null;
@@ -1573,6 +2125,7 @@ export async function renewDocumentAction(
       snapshotUpdates.efrro_issue_date = cleanIssue;
       snapshotUpdates.efrro_expiry = cleanExpiry;
       snapshotUpdates.efrro_status = calculatedDocStatus;
+      snapshotUpdates.days_until_efrro_expiry = diffDays;
     }
 
     await adminSupabase
@@ -1581,8 +2134,14 @@ export async function renewDocumentAction(
       .eq("student_id", studentId);
 
     // 6. Reconcile reminders
-    const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
-    await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, "renew_document");
+    try {
+      const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+      await ReminderReconciliationService.reconcileStudentReminderSchedule(studentId, user.id);
+      const { ReminderSchedulerServer } = await import("@/domain/notifications/services/reminder-scheduler.server");
+      await ReminderSchedulerServer.evaluateAndQueueStudentDueReminders(studentId);
+    } catch (reminderErr) {
+      console.warn("[RENEW_DOC_REMINDER_RECONCILIATION_WARNING]", reminderErr);
+    }
 
     // 7. Audit log DOCUMENT_RENEWED
     await adminSupabase.from("audit_log").insert({
