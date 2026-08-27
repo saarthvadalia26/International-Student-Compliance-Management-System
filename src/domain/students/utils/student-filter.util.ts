@@ -9,9 +9,10 @@ import { normalizeAcademicLevel } from "@/domain/academic-programs/academic-leve
 
 export interface StudentExportFilterCriteria {
   searchQuery?: string;
-  complianceFilter?: string; // "all" | "compliant" | "warning" | "critical" | "non_compliant" | "expired"
+  complianceFilter?: string; // "all" | "compliant" | "warning" | "critical" | "non_compliant" | "expired" | "missing"
   academicFilter?: string; // "all" | "good_standing" | "probation" | "suspended"
   academicLevelFilter?: string; // "all" | string (e.g. "UG", "PG", "PhD", "diploma", "certificate")
+  admissionYearFilter?: string; // "all" | string (e.g. "2024-2025", "2023-2024")
   campusFilter?: string; // "all" | "not_specified" | string (e.g. "Gandhinagar", "Delhi")
   feePaymentCategoryFilter?: string; // "all" | "not_specified" | "self_financed" | "scholarship"
   scope?: "filtered" | "all";
@@ -27,6 +28,7 @@ export interface FilterableStudentTarget {
   programId?: string | null;
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
+  admissionAcademicYear?: string | null;
   school?: string | null;
   admissionCategory?: string | null;
   iccrApplicationNumber?: string | null;
@@ -35,6 +37,7 @@ export interface FilterableStudentTarget {
   feePaymentCategory?: string | null;
   passportNumber?: string | null;
   visaNumber?: string | null;
+  efrroNumber?: string | null;
   email?: string | null;
   complianceStatus: string;
   academicStatus: string;
@@ -67,8 +70,10 @@ export function matchStudentFilters(
       (student.iccrApplicationNumber || "").toLowerCase().includes(query) ||
       (student.siiApplicationNumber || "").toLowerCase().includes(query) ||
       (student.nfsuCampus || "").toLowerCase().includes(query) ||
+      (student.admissionAcademicYear || "").toLowerCase().includes(query) ||
       (student.passportNumber || "").toLowerCase().includes(query) ||
       (student.visaNumber || "").toLowerCase().includes(query) ||
+      (student.efrroNumber || "").toLowerCase().includes(query) ||
       (student.email || "").toLowerCase().includes(query);
 
     if (!matchesSearch) {
@@ -82,6 +87,10 @@ export function matchStudentFilters(
     const rawStatus = (student.complianceStatus || "").toLowerCase().trim();
     if (cFilter === "critical") {
       if (rawStatus !== "non_compliant" && rawStatus !== "expired") {
+        return false;
+      }
+    } else if (cFilter === "missing" || cFilter === "non_compliant") {
+      if (rawStatus !== "non_compliant" && rawStatus !== "missing") {
         return false;
       }
     } else if (rawStatus !== cFilter) {
@@ -106,7 +115,21 @@ export function matchStudentFilters(
     }
   }
 
-  // 5. NFSU Campus Filter
+  // 5. Admission / Academic Year Filter
+  if (criteria.admissionYearFilter && criteria.admissionYearFilter !== "all") {
+    const year = (student.admissionAcademicYear || "").trim();
+    if (criteria.admissionYearFilter === "not_specified") {
+      if (year !== "") {
+        return false;
+      }
+    } else {
+      if (year.toLowerCase() !== criteria.admissionYearFilter.trim().toLowerCase()) {
+        return false;
+      }
+    }
+  }
+
+  // 6. NFSU Campus Filter
   if (criteria.campusFilter && criteria.campusFilter !== "all") {
     const campus = (student.nfsuCampus || "").trim();
     if (criteria.campusFilter === "not_specified") {
@@ -120,7 +143,7 @@ export function matchStudentFilters(
     }
   }
 
-  // 6. Fee Payment Category Filter
+  // 7. Fee Payment Category Filter
   if (criteria.feePaymentCategoryFilter && criteria.feePaymentCategoryFilter !== "all") {
     const feeCategory = (student.feePaymentCategory || "").trim();
     if (criteria.feePaymentCategoryFilter === "not_specified") {

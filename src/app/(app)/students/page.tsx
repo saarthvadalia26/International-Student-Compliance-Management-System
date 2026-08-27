@@ -10,16 +10,27 @@ import {
   Eye,
   Trash2,
   AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Clock,
   Loader2,
   FileSpreadsheet,
   Download,
   ChevronDown,
-  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  RefreshCw,
+  Filter,
+  ShieldCheck,
+  ShieldAlert,
+  Building2,
   GraduationCap
 } from "lucide-react";
 import { toast } from "sonner";
 import { CountryFlag } from "@/components/ui/country-flag";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,34 +45,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ACADEMIC_LEVEL_OPTIONS, normalizeAcademicLevel } from "@/domain/academic-programs/academic-level";
 import { matchStudentFilters, StudentExportFilterCriteria } from "@/domain/students/utils/student-filter.util";
-
-export interface Student {
-  id: string;
-  fullName: string;
-  registrationNumber: string;
-  nationalityCode: string;
-  nationalityName: string;
-  programName: string;
-  programCode?: string | null;
-  programId?: string | null;
-  academicLevel?: string | null;
-  academicLevelLabel?: string | null;
-  school: string;
-  admissionCategory?: string | null;
-  iccrApplicationNumber?: string | null;
-  siiApplicationNumber?: string | null;
-  nfsuCampus?: string | null;
-  feePaymentCategory?: string | null;
-  passport: { number: string };
-  visa: { number: string };
-  email: string;
-  complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
-  academicStatus: "good_standing" | "probation" | "suspended";
-}
-
 import { useRouter } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
-import { getStudentsListAction, exportStudentsExcelAction } from "@/app/(app)/students/actions";
+import { getStudentsListAction, exportStudentsExcelAction, StudentListItem } from "@/app/(app)/students/actions";
+
+export type Student = StudentListItem;
+
+function formatDateDisplay(d?: string | null): string {
+  if (!d) return "—";
+  try {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return d;
+    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return d;
+  }
+}
 
 export default function StudentListPage() {
   const router = useRouter();
@@ -70,22 +69,29 @@ export default function StudentListPage() {
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
   const [academicLevelFilter, setAcademicLevelFilter] = React.useState<string>("all");
   const [campusFilter, setCampusFilter] = React.useState<string>("all");
+  const [admissionYearFilter, setAdmissionYearFilter] = React.useState<string>("all");
   const [feePaymentCategoryFilter, setFeePaymentCategoryFilter] = React.useState<string>("all");
   const [currentPage, setCurrentPage] = React.useState(1);
   const itemsPerPage = 10;
+  
   const [students, setStudents] = React.useState<Student[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isExporting, setIsExporting] = React.useState(false);
 
   const loadStudents = React.useCallback(async () => {
     try {
       setIsLoading(true);
+      setLoadError(null);
       const res = await getStudentsListAction();
       if (res.success && res.students) {
         setStudents(res.students);
+      } else {
+        setLoadError(res.error || "Unable to retrieve student records from database.");
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("[STUDENT_DIRECTORY] Failed loading students:", err);
+      setLoadError("An unexpected error occurred while loading international student records.");
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +101,7 @@ export default function StudentListPage() {
     loadStudents();
   }, [loadStudents]);
 
-  // Realtime Live Sync: Refresh server component data when students, passports, or visas change
+  // Realtime Live Sync: Refresh server component data when students, passports, visas, or snapshots change
   useRealtimeSubscription({ 
     table: "students", 
     onEvent: () => {
@@ -143,6 +149,22 @@ export default function StudentListPage() {
     return { list: sortedCampuses, notSpecifiedCount };
   }, [students]);
 
+  // Dynamically derive available admission years
+  const availableAdmissionYears = React.useMemo(() => {
+    const years = new Set<string>();
+    students.forEach((s) => {
+      if (s.admissionAcademicYear?.trim()) {
+        years.add(s.admissionAcademicYear.trim());
+      } else if (s.admissionDate) {
+        try {
+          const y = new Date(s.admissionDate).getFullYear();
+          if (y && !isNaN(y)) years.add(String(y));
+        } catch {}
+      }
+    });
+    return Array.from(years).sort().reverse();
+  }, [students]);
+
   // Determine whether any filtering is currently active
   const isFilterActive = Boolean(
     (searchQuery && searchQuery.trim() !== "") ||
@@ -150,6 +172,7 @@ export default function StudentListPage() {
     academicFilter !== "all" ||
     academicLevelFilter !== "all" ||
     campusFilter !== "all" ||
+    admissionYearFilter !== "all" ||
     feePaymentCategoryFilter !== "all"
   );
 
@@ -161,6 +184,7 @@ export default function StudentListPage() {
       academicFilter,
       academicLevelFilter,
       campusFilter,
+      admissionYearFilter,
       feePaymentCategoryFilter,
       scope: "filtered"
     };
@@ -177,6 +201,7 @@ export default function StudentListPage() {
           programId: student.programId,
           academicLevel: student.academicLevel,
           academicLevelLabel: student.academicLevelLabel,
+          admissionAcademicYear: student.admissionAcademicYear,
           school: student.school,
           admissionCategory: student.admissionCategory,
           iccrApplicationNumber: student.iccrApplicationNumber,
@@ -185,6 +210,7 @@ export default function StudentListPage() {
           feePaymentCategory: student.feePaymentCategory,
           passportNumber: student.passport?.number,
           visaNumber: student.visa?.number,
+          efrroNumber: student.efrro?.number,
           email: student.email,
           complianceStatus: student.complianceStatus,
           academicStatus: student.academicStatus
@@ -192,7 +218,7 @@ export default function StudentListPage() {
         filterCriteria
       )
     );
-  }, [students, searchQuery, complianceFilter, academicFilter, academicLevelFilter, campusFilter, feePaymentCategoryFilter]);
+  }, [students, searchQuery, complianceFilter, academicFilter, academicLevelFilter, campusFilter, admissionYearFilter, feePaymentCategoryFilter]);
 
   // Download filtered or full student directory as formatted Excel workbook (.xlsx)
   const handleExport = async (scope: "filtered" | "all" = "filtered") => {
@@ -215,6 +241,7 @@ export default function StudentListPage() {
         academicFilter,
         academicLevelFilter,
         campusFilter,
+        admissionYearFilter,
         feePaymentCategoryFilter,
         scope
       };
@@ -257,6 +284,7 @@ export default function StudentListPage() {
     setAcademicFilter("all");
     setAcademicLevelFilter("all");
     setCampusFilter("all");
+    setAdmissionYearFilter("all");
     setFeePaymentCategoryFilter("all");
     setCurrentPage(1);
   };
@@ -269,31 +297,140 @@ export default function StudentListPage() {
     return filteredStudents.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredStudents, currentPage, itemsPerPage]);
 
-  const getComplianceBadge = (status: Student["complianceStatus"]) => {
-    switch (status) {
-      case "compliant":
-        return <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium text-[11px] px-2 py-0.5 whitespace-nowrap">Compliant</Badge>;
-      case "warning":
-        return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-medium text-[11px] px-2 py-0.5 whitespace-nowrap">Warning</Badge>;
-      case "non_compliant":
-        return <Badge variant="destructive" className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 font-medium text-[11px] px-2 py-0.5 whitespace-nowrap">Non-Compliant</Badge>;
-      case "expired":
-        return <Badge variant="destructive" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 font-medium text-[11px] px-2 py-0.5 whitespace-nowrap">Expired</Badge>;
-      default:
-        return <Badge variant="outline" className="text-[11px] px-2 py-0.5 whitespace-nowrap">Unknown</Badge>;
+  // Overall compliance badge renderer
+  const renderOverallComplianceBadge = (rawStatus: string, mappedStatus: Student["complianceStatus"]) => {
+    const upper = (rawStatus || "").toUpperCase();
+    if (upper === "COMPLIANT" || mappedStatus === "compliant") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 whitespace-nowrap">
+          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+          Fully Compliant
+        </span>
+      );
     }
+    if (upper === "WARNING" || mappedStatus === "warning") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap">
+          <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+          Expiring Soon
+        </span>
+      );
+    }
+    if (upper === "EXPIRED" || mappedStatus === "expired") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/25 whitespace-nowrap">
+          <XCircle className="h-3 w-3 text-red-600 dark:text-red-400" />
+          Expired
+        </span>
+      );
+    }
+    if (upper === "PENDING_VERIFICATION") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/25 whitespace-nowrap">
+          <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+          Pending Review
+        </span>
+      );
+    }
+    // MISSING / REJECTED / non_compliant
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap">
+        <AlertTriangle className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+        Documents Missing
+      </span>
+    );
+  };
+
+  // Document micro-status badge renderer
+  const renderDocumentStatus = (
+    docName: "Passport" | "Visa" | "eFRRO",
+    docNumber?: string | null,
+    expiryDate?: string | null,
+    status?: string | null
+  ) => {
+    const isMissing = !docNumber || !docNumber.trim() || docNumber === "Not provided" || docNumber === "Pending" || status === "MISSING";
+    const isExpired = status === "EXPIRED";
+    const isWarning = status === "WARNING";
+    const isPending = status === "PENDING_VERIFICATION";
+
+    if (isMissing) {
+      return (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1 text-[11px] font-medium text-rose-600 dark:text-rose-400">
+            <AlertTriangle className="h-3 w-3 shrink-0" />
+            <span>Missing</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground/70 italic">Not recorded</p>
+        </div>
+      );
+    }
+
+    if (isExpired) {
+      return (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1 text-[11px] font-medium text-red-600 dark:text-red-400">
+            <XCircle className="h-3 w-3 shrink-0" />
+            <span className="font-mono">{docNumber}</span>
+          </div>
+          <p className="text-[10px] text-red-600/90 dark:text-red-400/90 font-medium">
+            Exp: {formatDateDisplay(expiryDate)} (Expired)
+          </p>
+        </div>
+      );
+    }
+
+    if (isWarning) {
+      return (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+            <Clock className="h-3 w-3 shrink-0" />
+            <span className="font-mono">{docNumber}</span>
+          </div>
+          <p className="text-[10px] text-amber-600/90 dark:text-amber-400/90">
+            Exp: {formatDateDisplay(expiryDate)}
+          </p>
+        </div>
+      );
+    }
+
+    if (isPending) {
+      return (
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+            <Clock className="h-3 w-3 shrink-0" />
+            <span className="font-mono">{docNumber}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Exp: {formatDateDisplay(expiryDate)}
+          </p>
+        </div>
+      );
+    }
+
+    // Default COMPLIANT
+    return (
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+          <CheckCircle2 className="h-3 w-3 shrink-0" />
+          <span className="font-mono font-semibold">{docNumber}</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          Exp: {formatDateDisplay(expiryDate)}
+        </p>
+      </div>
+    );
   };
 
   const getAcademicStatusBadge = (status: Student["academicStatus"]) => {
     switch (status) {
       case "good_standing":
-        return <Badge variant="outline" className="border-slate-200 text-slate-700 dark:border-zinc-800 dark:text-zinc-300 font-normal text-[11px] px-2 py-0.5 whitespace-nowrap">Good Standing</Badge>;
+        return <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400 font-normal text-[10px] px-2 py-0.5 whitespace-nowrap">Good Standing</Badge>;
       case "probation":
-        return <Badge variant="secondary" className="bg-orange-500/5 text-orange-600 dark:text-orange-400 border-orange-500/10 font-normal text-[11px] px-2 py-0.5 whitespace-nowrap">Academic Probation</Badge>;
+        return <Badge variant="secondary" className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20 font-normal text-[10px] px-2 py-0.5 whitespace-nowrap">Probation</Badge>;
       case "suspended":
-        return <Badge variant="destructive" className="bg-red-500/5 text-red-600 dark:text-red-400 border-red-500/10 font-normal text-[11px] px-2 py-0.5 whitespace-nowrap">Suspended</Badge>;
+        return <Badge variant="destructive" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20 font-normal text-[10px] px-2 py-0.5 whitespace-nowrap">Suspended</Badge>;
       default:
-        return <Badge variant="outline" className="text-[11px] px-2 py-0.5 whitespace-nowrap">Unknown</Badge>;
+        return <Badge variant="outline" className="text-[10px] px-2 py-0.5 whitespace-nowrap">Unknown</Badge>;
     }
   };
 
@@ -302,9 +439,14 @@ export default function StudentListPage() {
       {/* Top Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
         <div className="space-y-1 min-w-0">
-          <h1 className="font-h1 tracking-tight text-foreground text-2xl font-bold">International Student Directory</h1>
-          <p className="font-caption text-muted-foreground text-sm">
-            Search, filter, and audit academic standings and immigration compliance of registered international students.
+          <div className="flex items-center gap-2">
+            <h1 className="tracking-tight text-foreground text-2xl font-bold font-display">International Student Directory</h1>
+            <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5 bg-primary/5 text-primary border-primary/20">
+              {students.length} Registered
+            </Badge>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Centralized administrative directory for monitoring immigration compliance, document validity, and academic standing across all NFSU campuses.
           </p>
         </div>
         
@@ -372,7 +514,7 @@ export default function StudentListPage() {
             </Button>
           </Link>
           <Link href="/students/add" passHref>
-            <Button size="sm" className="h-9 shrink-0 text-xs font-medium shadow-xs">
+            <Button size="sm" className="h-9 shrink-0 text-xs font-medium shadow-xs bg-primary text-primary-foreground hover:bg-primary/90">
               <UserPlus className="mr-1.5 h-4 w-4" /> Register Student
             </Button>
           </Link>
@@ -380,13 +522,13 @@ export default function StudentListPage() {
       </div>
 
       {/* Filters and Search Controls Card */}
-      <Card className="border border-border/60 shadow-sm bg-card/60 rounded-xl">
+      <Card className="border border-border/70 shadow-sm bg-card rounded-xl">
         <CardContent className="p-4 flex flex-col gap-3.5">
           {/* Row 1: Search Bar */}
           <div className="relative w-full">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by student name, registration ID, NFSU campus, nationality, or application numbers..."
+              placeholder="Search by student name, enrollment ID, NFSU campus, nationality, passport, visa, or eFRRO number..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -406,7 +548,35 @@ export default function StudentListPage() {
           </div>
 
           {/* Row 2: Responsive Filter Dropdowns Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 w-full">
+            {/* Campus Filter */}
+            <div className="min-w-0">
+              <Select 
+                value={campusFilter} 
+                onValueChange={(val) => {
+                  setCampusFilter(val || "all");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs w-full bg-background font-medium">
+                  <SelectValue placeholder="NFSU Campus" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Campuses</SelectItem>
+                  {availableCampuses.list.map((c) => (
+                    <SelectItem key={c.name} value={c.name}>
+                      {c.name} ({c.count})
+                    </SelectItem>
+                  ))}
+                  {availableCampuses.notSpecifiedCount > 0 && (
+                    <SelectItem value="not_specified">
+                      Unspecified Campus ({availableCampuses.notSpecifiedCount})
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Compliance Filter */}
             <div className="min-w-0">
               <Select 
@@ -416,14 +586,15 @@ export default function StudentListPage() {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs w-full bg-background">
+                <SelectTrigger className="h-9 text-xs w-full bg-background font-medium">
                   <SelectValue placeholder="Compliance Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Compliance Statuses</SelectItem>
-                  <SelectItem value="compliant">Compliant</SelectItem>
-                  <SelectItem value="warning">Warning State</SelectItem>
-                  <SelectItem value="critical">Critical / Expired</SelectItem>
+                  <SelectItem value="compliant">Fully Compliant</SelectItem>
+                  <SelectItem value="missing">Documents Missing</SelectItem>
+                  <SelectItem value="warning">Expiring Soon (30 Days)</SelectItem>
+                  <SelectItem value="critical">Expired / Non-Compliant</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -437,7 +608,7 @@ export default function StudentListPage() {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs w-full bg-background">
+                <SelectTrigger className="h-9 text-xs w-full bg-background font-medium">
                   <SelectValue placeholder="Academic Level" />
                 </SelectTrigger>
                 <SelectContent>
@@ -451,7 +622,30 @@ export default function StudentListPage() {
               </Select>
             </div>
 
-            {/* Academic Status Filter */}
+            {/* Admission Academic Year Filter */}
+            <div className="min-w-0">
+              <Select 
+                value={admissionYearFilter} 
+                onValueChange={(val) => {
+                  setAdmissionYearFilter(val || "all");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs w-full bg-background font-medium">
+                  <SelectValue placeholder="Academic Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Academic Years</SelectItem>
+                  {availableAdmissionYears.map((yr) => (
+                    <SelectItem key={yr} value={yr}>
+                      Year {yr}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Academic Standing Filter */}
             <div className="min-w-0">
               <Select 
                 value={academicFilter} 
@@ -460,11 +654,11 @@ export default function StudentListPage() {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs w-full bg-background">
+                <SelectTrigger className="h-9 text-xs w-full bg-background font-medium">
                   <SelectValue placeholder="Academic Standing" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Academic Standings</SelectItem>
+                  <SelectItem value="all">All Standings</SelectItem>
                   <SelectItem value="good_standing">Good Standing</SelectItem>
                   <SelectItem value="probation">Academic Probation</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
@@ -472,35 +666,7 @@ export default function StudentListPage() {
               </Select>
             </div>
 
-            {/* NFSU Campus Filter */}
-            <div className="min-w-0">
-              <Select 
-                value={campusFilter} 
-                onValueChange={(val) => {
-                  setCampusFilter(val || "all");
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="h-9 text-xs w-full bg-background">
-                  <SelectValue placeholder="NFSU Campus" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All NFSU Campuses ({students.length})</SelectItem>
-                  {availableCampuses.list.map((c) => (
-                    <SelectItem key={c.name} value={c.name}>
-                      {c.name} ({c.count})
-                    </SelectItem>
-                  ))}
-                  {availableCampuses.notSpecifiedCount > 0 && (
-                    <SelectItem value="not_specified">
-                      Not Specified ({availableCampuses.notSpecifiedCount})
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Funding Type Filter */}
+            {/* Funding Category Filter */}
             <div className="min-w-0">
               <Select 
                 value={feePaymentCategoryFilter} 
@@ -509,7 +675,7 @@ export default function StudentListPage() {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger className="h-9 text-xs w-full bg-background">
+                <SelectTrigger className="h-9 text-xs w-full bg-background font-medium">
                   <SelectValue placeholder="Funding Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -550,9 +716,9 @@ export default function StudentListPage() {
                   variant="ghost" 
                   size="sm" 
                   onClick={resetFilters}
-                  className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground gap-1"
                 >
-                  Reset Filters
+                  <RefreshCw className="h-3 w-3" /> Reset Filters
                 </Button>
               )}
               <Button
@@ -560,7 +726,7 @@ export default function StudentListPage() {
                 size="sm"
                 disabled={isExporting || filteredStudents.length === 0}
                 onClick={() => handleExport(isFilterActive ? "filtered" : "all")}
-                className="h-8 text-xs gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                className="h-8 text-xs gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-medium"
               >
                 {isExporting ? (
                   <>
@@ -579,304 +745,382 @@ export default function StudentListPage() {
         </CardContent>
       </Card>
 
-      {/* Main Student Directory Responsive Container */}
-      <Card className="border border-border/60 shadow-sm overflow-hidden rounded-xl bg-card">
+      {/* Main Student Directory Table Container */}
+      <Card className="border border-border/70 shadow-sm overflow-hidden rounded-xl bg-card">
         {/* Loading State */}
         {isLoading ? (
-          <div className="py-16 text-center">
+          <div className="py-20 text-center">
             <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3">
-              <Loader2 className="h-7 w-7 animate-spin text-primary" />
-              <p className="font-medium text-sm text-foreground">Loading international student records...</p>
-              <p className="text-xs text-muted-foreground">Synchronizing student compliance status and academic details</p>
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="font-semibold text-sm text-foreground">Loading international student records...</p>
+              <p className="text-xs text-muted-foreground">Synchronizing Passport, Visa, and eFRRO compliance statuses</p>
+            </div>
+          </div>
+        ) : loadError ? (
+          /* Error State with Retry */
+          <div className="py-16 text-center px-4">
+            <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3 max-w-md mx-auto">
+              <div className="h-12 w-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-600">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <h3 className="font-semibold text-base text-foreground">Failed to Load Student Records</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">{loadError}</p>
+              <Button size="sm" onClick={loadStudents} className="mt-2 text-xs h-8 gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" /> Retry Connection
+              </Button>
             </div>
           </div>
         ) : paginatedStudents.length === 0 ? (
           /* Empty State */
           <div className="py-16 text-center px-4">
             <div className="flex flex-col items-center justify-center text-muted-foreground space-y-2.5 max-w-sm mx-auto">
-              <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
-              <h3 className="font-semibold text-base text-foreground">No student records found</h3>
-              <p className="text-xs text-muted-foreground">
-                No international students match your current search and filter parameters.
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <h3 className="font-semibold text-base text-foreground">
+                {isFilterActive ? "No matching students found" : "No students registered yet"}
+              </h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {isFilterActive 
+                  ? "No international students match your current search and filter parameters." 
+                  : "Get started by registering a new international student profile or importing an Excel roster."}
               </p>
-              <Button variant="outline" size="sm" onClick={resetFilters} className="mt-2 text-xs h-8">
-                Clear all filters
-              </Button>
+              {isFilterActive ? (
+                <Button variant="outline" size="sm" onClick={resetFilters} className="mt-2 text-xs h-8">
+                  Clear all filters
+                </Button>
+              ) : (
+                <Link href="/students/add" passHref>
+                  <Button size="sm" className="mt-2 text-xs h-8 gap-1.5">
+                    <UserPlus className="h-3.5 w-3.5" /> Register First Student
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         ) : (
           <div>
-            {/* Desktop / Laptop Fluid Grid View (>= 1024px) */}
-            <div className="hidden lg:block">
-              {/* Header Row */}
-              <div className="grid grid-cols-12 gap-3 px-5 py-3 bg-muted/40 text-xs font-semibold text-muted-foreground border-b border-border/50">
-                <div className="col-span-4">Student Identity</div>
-                <div className="col-span-2">Nationality</div>
-                <div className="col-span-3">Academic Program & Campus</div>
-                <div className="col-span-2">Status & Compliance</div>
-                <div className="col-span-1 text-right">Actions</div>
-              </div>
-
-              {/* Student Rows */}
-              <div className="divide-y divide-border/40">
-                {paginatedStudents.map((student) => (
-                  <div 
-                    key={student.id} 
-                    className="grid grid-cols-12 gap-3 px-5 py-3.5 items-center hover:bg-muted/25 transition-colors group"
-                  >
-                    {/* Student Identity */}
-                    <div className="col-span-4 min-w-0 pr-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs font-display border border-primary/20">
-                          {student.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+            {/* Desktop Full-Density Administrative Table (>= 1024px) */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1100px]">
+                <thead>
+                  <tr className="bg-muted/50 border-b border-border/70 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th scope="col" className="py-3 px-4 font-semibold">1. Student</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">2. Academic Info</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">3. Campus</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">4. Visa</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">5. Passport</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">6. eFRRO</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">7. Compliance</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">8. Status</th>
+                    <th scope="col" className="py-3 px-4 font-semibold text-right">9. Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40 text-xs">
+                  {paginatedStudents.map((student) => (
+                    <tr 
+                      key={student.id} 
+                      className="hover:bg-muted/30 transition-colors group"
+                    >
+                      {/* 1. Student Identity */}
+                      <td className="py-3 px-4 align-top">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs font-display border border-primary/20 mt-0.5">
+                            {student.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="space-y-1 min-w-0 max-w-[200px]">
+                            <Link 
+                              href={`/students/${student.id}`} 
+                              className="text-xs font-bold text-foreground hover:text-primary transition-colors block truncate group-hover:text-primary leading-tight"
+                              title={student.fullName}
+                            >
+                              {student.fullName}
+                            </Link>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[11px] text-muted-foreground font-mono font-medium">
+                                {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "Pending Reg ID"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              {student.nationalityCode && (
+                                <CountryFlag countryCode={student.nationalityCode} size="sm" />
+                              )}
+                              <span className="truncate">{student.nationalityName || "International"}</span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                              {student.admissionCategory && (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0 font-normal border-border/80 bg-muted/40">
+                                  {student.admissionCategory}
+                                </Badge>
+                              )}
+                              {student.iccrApplicationNumber && (
+                                <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 py-0.2 rounded font-mono">
+                                  ICCR: {student.iccrApplicationNumber}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-0.5 min-w-0 flex-1">
-                          <Link 
-                            href={`/students/${student.id}`} 
-                            className="text-sm font-semibold text-foreground hover:text-primary transition-colors block truncate group-hover:text-primary"
-                            title={student.fullName}
+                      </td>
+
+                      {/* 2. Academic Info */}
+                      <td className="py-3 px-3 align-top">
+                        <div className="space-y-1 min-w-0 max-w-[190px]">
+                          <div 
+                            className="text-xs font-semibold text-foreground leading-snug line-clamp-2" 
+                            title={student.programName}
                           >
-                            {student.fullName}
-                          </Link>
+                            {student.programName}
+                          </div>
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[11px] text-muted-foreground font-mono">
-                              {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "No ID"}
-                            </span>
-                            {student.admissionCategory && (
-                              <Badge variant="outline" className="text-[9px] px-1 py-0 font-normal border-border/80">
-                                {student.admissionCategory}
+                            {student.academicLevelLabel && (
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium shrink-0">
+                                {student.academicLevelLabel}
                               </Badge>
                             )}
-                            {student.iccrApplicationNumber && (
-                              <span className="text-[10px] text-muted-foreground/80 bg-muted/60 px-1 rounded">
-                                ICCR: {student.iccrApplicationNumber}
+                            {student.admissionAcademicYear && (
+                              <span className="text-[10px] text-muted-foreground font-medium">
+                                AY {student.admissionAcademicYear}
                               </span>
                             )}
                           </div>
+                          {student.school && (
+                            <p className="text-[10px] text-muted-foreground truncate" title={student.school}>
+                              {student.school}
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    </div>
+                      </td>
 
-                    {/* Nationality */}
-                    <div className="col-span-2 min-w-0 pr-2">
-                      <div className="flex items-center gap-2 font-medium text-xs text-foreground min-w-0">
-                        {student.nationalityCode ? (
-                          <CountryFlag countryCode={student.nationalityCode} size="md" />
-                        ) : (
-                          <div className="w-5 h-3.5 rounded bg-muted/60 border border-border/40 inline-block shrink-0" />
-                        )}
-                        <span className="truncate" title={student.nationalityName || "Not specified"}>
-                          {student.nationalityName || "Not specified"}
-                        </span>
-                      </div>
-                    </div>
+                      {/* 3. NFSU Campus */}
+                      <td className="py-3 px-3 align-top">
+                        <div className="min-w-0 max-w-[130px]">
+                          {student.nfsuCampus ? (
+                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-medium">
+                              <Building2 className="h-3 w-3 mr-1 shrink-0" />
+                              <span className="truncate">{student.nfsuCampus}</span>
+                            </Badge>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground/70 italic">
+                              Not Assigned
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
-                    {/* Academic Program & Campus */}
-                    <div className="col-span-3 min-w-0 pr-2 space-y-1">
-                      <div 
-                        className="text-xs font-medium text-foreground leading-snug line-clamp-2 break-words" 
-                        title={student.programName}
-                      >
-                        {student.programName}
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {student.school && (
-                          <span className="text-[10px] text-muted-foreground truncate max-w-[140px]" title={student.school}>
-                            {student.school}
-                          </span>
-                        )}
-                        {student.academicLevelLabel && (
-                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium shrink-0">
-                            {student.academicLevelLabel}
-                          </Badge>
-                        )}
-                        {student.nfsuCampus && (
-                          <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 font-medium shrink-0">
-                            {student.nfsuCampus}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+                      {/* 4. Visa Status */}
+                      <td className="py-3 px-3 align-top">
+                        {renderDocumentStatus("Visa", student.visa?.number, student.visa?.expiry, student.visa?.status)}
+                      </td>
 
-                    {/* Status & Compliance */}
-                    <div className="col-span-2 min-w-0 flex flex-col gap-1 items-start justify-center pr-2">
-                      {getAcademicStatusBadge(student.academicStatus)}
-                      {getComplianceBadge(student.complianceStatus)}
-                    </div>
+                      {/* 5. Passport Status */}
+                      <td className="py-3 px-3 align-top">
+                        {renderDocumentStatus("Passport", student.passport?.number, student.passport?.expiry, student.passport?.status)}
+                      </td>
 
-                    {/* Actions Menu */}
-                    <div className="col-span-1 text-right flex items-center justify-end">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger render={
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/80">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        } />
-                        <DropdownMenuContent align="end" className="w-[160px]">
-                          <DropdownMenuLabel className="text-xs font-semibold">Student Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-xs cursor-pointer"
-                            render={
-                              <Link href={`/students/${student.id}`} />
-                            }
-                          >
-                            <Eye className="mr-2 h-3.5 w-3.5 text-primary" /> View Profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-xs cursor-pointer text-destructive focus:text-destructive">
-                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Archive Profile
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      {/* 6. eFRRO Status */}
+                      <td className="py-3 px-3 align-top">
+                        {renderDocumentStatus("eFRRO", student.efrro?.number, student.efrro?.expiry, student.efrro?.status)}
+                      </td>
+
+                      {/* 7. Overall Compliance */}
+                      <td className="py-3 px-3 align-top">
+                        <div className="space-y-1">
+                          {renderOverallComplianceBadge(student.rawComplianceStatus, student.complianceStatus)}
+                          <div className="text-[10px] text-muted-foreground pl-0.5">
+                            Score: <span className="font-medium text-foreground">{student.complianceScore}%</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 8. Academic Standing */}
+                      <td className="py-3 px-3 align-top">
+                        {getAcademicStatusBadge(student.academicStatus)}
+                      </td>
+
+                      {/* 9. Actions */}
+                      <td className="py-3 px-4 align-top text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Link href={`/students/${student.id}`} passHref>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-7 text-xs px-2.5 gap-1 border-border hover:border-primary/40 hover:bg-primary/5 hover:text-primary font-medium"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-primary" />
+                              <span>View</span>
+                            </Button>
+                          </Link>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger render={
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted/80">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            } />
+                            <DropdownMenuContent align="end" className="w-[170px]">
+                              <DropdownMenuLabel className="text-xs font-semibold">Student Options</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-xs cursor-pointer"
+                                render={
+                                  <Link href={`/students/${student.id}`} />
+                                }
+                              >
+                                <Eye className="mr-2 h-3.5 w-3.5 text-primary" /> View Full Profile
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-xs cursor-pointer"
+                                render={
+                                  <Link href={`/students/${student.id}?tab=documents`} />
+                                }
+                              >
+                                <FileSpreadsheet className="mr-2 h-3.5 w-3.5 text-emerald-600" /> Renew Documents
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-xs cursor-pointer text-destructive focus:text-destructive">
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Archive Student
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
             {/* Mobile & Tablet Structured Responsive Cards (< 1024px) */}
             <div className="block lg:hidden divide-y divide-border/40">
               {paginatedStudents.map((student) => (
-                <div key={student.id} className="p-4 space-y-3 hover:bg-muted/20 transition-colors">
-                  {/* Top Bar: Identity & Actions */}
+                <div key={student.id} className="p-4 space-y-3.5 hover:bg-muted/20 transition-colors">
+                  {/* Top Bar: Identity & Primary Compliance Badge */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs font-display border border-primary/20">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs font-display border border-primary/20 mt-0.5">
                         {student.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 space-y-0.5">
                         <Link 
                           href={`/students/${student.id}`} 
-                          className="text-sm font-semibold text-foreground hover:text-primary transition-colors block break-words"
+                          className="text-sm font-bold text-foreground hover:text-primary transition-colors block break-words"
                         >
                           {student.fullName}
                         </Link>
-                        <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground mt-0.5">
-                          <span className="font-mono">
-                            {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "No ID"}
-                          </span>
-                          {student.admissionCategory && (
-                            <Badge variant="outline" className="text-[9px] px-1 py-0 font-normal">
-                              {student.admissionCategory}
-                            </Badge>
-                          )}
+                        <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
+                          <span className="font-mono">{student.registrationNumber || "No ID"}</span>
+                          <span>•</span>
+                          <div className="flex items-center gap-1">
+                            {student.nationalityCode && <CountryFlag countryCode={student.nationalityCode} size="sm" />}
+                            <span>{student.nationalityName}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger render={
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground shrink-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      } />
-                      <DropdownMenuContent align="end" className="w-[160px]">
-                        <DropdownMenuItem
-                          className="text-xs cursor-pointer"
-                          render={
-                            <Link href={`/students/${student.id}`} />
-                          }
-                        >
-                          <Eye className="mr-2 h-3.5 w-3.5 text-primary" /> View Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-xs cursor-pointer text-destructive focus:text-destructive">
-                          <Trash2 className="mr-2 h-3.5 w-3.5" /> Archive Profile
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="shrink-0 text-right space-y-1">
+                      {renderOverallComplianceBadge(student.rawComplianceStatus, student.complianceStatus)}
+                    </div>
                   </div>
 
-                  {/* Middle Info: Nationality & Academic Program */}
-                  <div className="bg-muted/30 rounded-lg p-3 space-y-2 border border-border/30">
-                    <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-                      {student.nationalityCode ? (
-                        <CountryFlag countryCode={student.nationalityCode} size="sm" />
-                      ) : (
-                        <div className="w-4 h-3 rounded bg-muted/60 border border-border/40 inline-block" />
-                      )}
-                      <span>{student.nationalityName || "Not specified"}</span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-xs font-semibold text-foreground leading-snug break-words">
-                        {student.programName}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {student.school}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                      {student.academicLevelLabel && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-medium">
-                          {student.academicLevelLabel}
-                        </Badge>
-                      )}
+                  {/* Academic & Campus Information */}
+                  <div className="bg-muted/40 p-2.5 rounded-lg border border-border/50 space-y-1.5 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-semibold text-foreground line-clamp-1">{student.programName}</span>
                       {student.nfsuCampus && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20 font-medium">
+                        <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 shrink-0">
                           {student.nfsuCampus}
                         </Badge>
                       )}
-                      {student.feePaymentCategory && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground border-border/60">
-                          {student.feePaymentCategory === "scholarship" ? "Scholarship" : "Self-Financed"}
-                        </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+                      {student.school && <span>{student.school}</span>}
+                      {student.academicLevelLabel && (
+                        <>
+                          <span>•</span>
+                          <span>{student.academicLevelLabel}</span>
+                        </>
+                      )}
+                      {student.admissionAcademicYear && (
+                        <>
+                          <span>•</span>
+                          <span>AY {student.admissionAcademicYear}</span>
+                        </>
                       )}
                     </div>
                   </div>
 
-                  {/* Bottom: Statuses & View Action */}
-                  <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {getAcademicStatusBadge(student.academicStatus)}
-                      {getComplianceBadge(student.complianceStatus)}
+                  {/* Document Breakdown Grid */}
+                  <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg border border-border/40 bg-background text-xs">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">Passport</span>
+                      {renderDocumentStatus("Passport", student.passport?.number, student.passport?.expiry, student.passport?.status)}
                     </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">Visa</span>
+                      {renderDocumentStatus("Visa", student.visa?.number, student.visa?.expiry, student.visa?.status)}
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">eFRRO</span>
+                      {renderDocumentStatus("eFRRO", student.efrro?.number, student.efrro?.expiry, student.efrro?.status)}
+                    </div>
+                  </div>
 
+                  {/* Bottom Row: Standing & View Button */}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      {getAcademicStatusBadge(student.academicStatus)}
+                      {student.admissionCategory && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          {student.admissionCategory}
+                        </Badge>
+                      )}
+                    </div>
                     <Link href={`/students/${student.id}`} passHref>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-primary hover:text-primary hover:bg-primary/10 px-2 font-medium">
-                        <span>Profile</span>
-                        <ArrowRight className="h-3 w-3" />
+                      <Button size="sm" variant="outline" className="h-8 text-xs px-3 gap-1 border-primary/30 text-primary hover:bg-primary/5">
+                        <Eye className="h-3.5 w-3.5" />
+                        <span>View Profile</span>
                       </Button>
                     </Link>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
 
-        {/* Pagination Section */}
-        {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/40 px-4 py-3 bg-muted/20">
-            <div className="text-xs text-muted-foreground font-caption order-2 sm:order-1 text-center sm:text-left">
-              Showing <span className="font-medium text-foreground">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
-              <span className="font-medium text-foreground">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of{" "}
-              <span className="font-medium text-foreground">{totalItems}</span> students
-            </div>
-            
-            <div className="flex items-center gap-1.5 order-1 sm:order-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="h-8 text-xs px-2.5"
-              >
-                Previous
-              </Button>
-              <div className="text-xs font-semibold text-muted-foreground px-2 font-caption whitespace-nowrap">
-                Page {currentPage} of {totalPages}
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-border/60 bg-muted/20 text-xs">
+                <p className="text-muted-foreground text-center sm:text-left">
+                  Showing <span className="font-medium text-foreground">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
+                  <span className="font-medium text-foreground">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of{" "}
+                  <span className="font-medium text-foreground">{totalItems}</span> students
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-0.5" /> Previous
+                  </Button>
+                  <div className="flex items-center px-2 font-medium text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 px-2 text-xs"
+                  >
+                    Next <ChevronRight className="h-4 w-4 ml-0.5" />
+                  </Button>
+                </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="h-8 text-xs px-2.5"
-              >
-                Next
-              </Button>
-            </div>
+            )}
           </div>
         )}
       </Card>

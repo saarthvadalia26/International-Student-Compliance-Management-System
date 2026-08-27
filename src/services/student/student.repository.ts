@@ -367,15 +367,14 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
       const passportStatus = calcStatus(passportNum, passportExp);
       const visaStatus = calcStatus(visaNum, visaExp);
-      const hasEfrro = Boolean(efrroNum && efrroNum.trim() && efrroExp);
-      const efrroStatus = hasEfrro ? calcStatus(efrroNum, efrroExp) : "COMPLIANT";
+      const efrroStatus = calcStatus(efrroNum, efrroExp);
 
       let overallCompliance = "COMPLIANT";
-      if (passportStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrro && efrroStatus === "EXPIRED")) {
+      if (passportStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
         overallCompliance = "EXPIRED";
-      } else if (passportStatus === "MISSING" || visaStatus === "MISSING") {
+      } else if (passportStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
         overallCompliance = "MISSING";
-      } else if (passportStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrro && efrroStatus === "WARNING")) {
+      } else if (passportStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING") {
         overallCompliance = "WARNING";
       }
 
@@ -394,7 +393,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         visa_issue_date: visaIssue,
         visa_expiry: visaExp,
         visa_type: visaType,
-        efrro_status: hasEfrro ? efrroStatus : "MISSING",
+        efrro_status: efrroStatus,
         efrro_number: efrroNum,
         efrro_issue_date: efrroIssue,
         efrro_expiry: efrroExp,

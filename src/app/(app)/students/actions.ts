@@ -30,6 +30,8 @@ export interface StudentListItem {
   programId?: string | null;
   academicLevel?: string | null;
   academicLevelLabel?: string | null;
+  admissionAcademicYear?: string | null;
+  admissionDate?: string | null;
   school: string;
   isSchoolOverridden?: boolean;
   overrideSchoolId?: string | null;
@@ -39,10 +41,27 @@ export interface StudentListItem {
   siiApplicationNumber?: string | null;
   nfsuCampus?: string | null;
   feePaymentCategory?: string | null;
-  passport: { number: string };
-  visa: { number: string };
+  passport: {
+    number: string;
+    expiry: string | null;
+    status: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION";
+  };
+  visa: {
+    number: string;
+    expiry: string | null;
+    status: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION";
+    type?: string | null;
+  };
+  efrro: {
+    number: string | null;
+    expiry: string | null;
+    status: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION";
+    daysUntilExpiry: number | null;
+  };
   email: string;
   complianceStatus: "compliant" | "warning" | "non_compliant" | "expired";
+  rawComplianceStatus: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION" | "REJECTED";
+  complianceScore: number;
   academicStatus: "good_standing" | "probation" | "suspended";
 }
 
@@ -344,7 +363,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         student_personal(full_name, nationality_code),
         student_contact(email, phone_home),
         student_academic(*),
-        student_snapshot(compliance_status, passport_number, visa_number)
+        student_snapshot(*)
       `)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
@@ -375,8 +394,8 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
           created_at,
           student_personal(full_name, nationality_code),
           student_contact(email, phone_home),
-          student_academic(program_id, program_code, academic_status, admission_category, sii_application_number, iccr_application_number, nfsu_campus),
-          student_snapshot(compliance_status, passport_number, visa_number)
+          student_academic(program_id, program_code, academic_status, admission_category, sii_application_number, iccr_application_number, nfsu_campus, admission_academic_year, admission_date),
+          student_snapshot(compliance_status, compliance_score, passport_number, passport_expiry, passport_status, visa_number, visa_expiry, visa_status, visa_type, efrro_number, efrro_expiry, efrro_status, days_until_efrro_expiry)
         `)
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
@@ -401,7 +420,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
             student_personal(full_name, nationality_code),
             student_contact(email),
             student_academic(program_code),
-            student_snapshot(compliance_status)
+            student_snapshot(compliance_status, passport_number, visa_number, efrro_number)
           `)
           .is("deleted_at", null)
           .order("created_at", { ascending: false });
@@ -520,6 +539,10 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       else if (rawStatus === "EXPIRED") mappedCompliance = "expired";
       else if (rawStatus === "MISSING" || rawStatus === "REJECTED") mappedCompliance = "non_compliant";
 
+      const passportStatus = (snapshot?.passport_status || (snapshot?.passport_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
+      const visaStatus = (snapshot?.visa_status || (snapshot?.visa_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
+      const efrroStatus = (snapshot?.efrro_status || (snapshot?.efrro_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
+
       return {
         id: r.id,
         fullName: personal?.full_name || "Unknown Student",
@@ -531,14 +554,33 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         programId: progId || progInfo.id || null,
         academicLevel: progInfo.academicLevel,
         academicLevelLabel: progInfo.academicLevel ? getAcademicLevelLabel(progInfo.academicLevel) : null,
+        admissionAcademicYear: academic?.admission_academic_year || null,
+        admissionDate: academic?.admission_date || null,
         school: resolvedSchool,
         isSchoolOverridden: isOverridden,
         overrideSchoolId: academic?.override_school_id || null,
         schoolOverrideReason: academic?.school_override_reason || null,
-        passport: { number: snapshot?.passport_number || "Pending" },
-        visa: { number: snapshot?.visa_number || "Pending" },
+        passport: {
+          number: snapshot?.passport_number || "Not provided",
+          expiry: snapshot?.passport_expiry || null,
+          status: passportStatus
+        },
+        visa: {
+          number: snapshot?.visa_number || "Not provided",
+          expiry: snapshot?.visa_expiry || null,
+          status: visaStatus,
+          type: snapshot?.visa_type || null
+        },
+        efrro: {
+          number: snapshot?.efrro_number || null,
+          expiry: snapshot?.efrro_expiry || null,
+          status: efrroStatus,
+          daysUntilExpiry: snapshot?.days_until_efrro_expiry ?? null
+        },
         email: contact?.email || "",
         complianceStatus: mappedCompliance,
+        rawComplianceStatus: (rawStatus || "MISSING") as any,
+        complianceScore: snapshot?.compliance_score ?? (mappedCompliance === "compliant" ? 100 : 0),
         academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing",
         admissionCategory: academic?.admission_category || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
@@ -2130,17 +2172,16 @@ export async function renewDocumentAction(
 
     const passStatus = documentType === "passport" ? calculatedDocStatus : (snapshot?.passport_status || "MISSING");
     const visaStatus = documentType === "visa" ? calculatedDocStatus : (snapshot?.visa_status || "MISSING");
-    const hasEfrro = documentType === "efrro" ? true : Boolean(snapshot?.efrro_number && snapshot?.efrro_number.trim());
-    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (hasEfrro ? (snapshot?.efrro_status || "COMPLIANT") : "COMPLIANT");
+    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (snapshot?.efrro_status || "MISSING");
 
     let overallCompliance = "COMPLIANT";
-    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrro && efrroStatus === "EXPIRED")) {
+    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
       overallCompliance = "EXPIRED";
-    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || (hasEfrro && efrroStatus === "REJECTED")) {
+    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || efrroStatus === "REJECTED") {
       overallCompliance = "REJECTED";
-    } else if (passStatus === "MISSING" || visaStatus === "MISSING") {
+    } else if (passStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
       overallCompliance = "MISSING";
-    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrro && efrroStatus === "WARNING") || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION") {
+    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING" || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || efrroStatus === "PENDING_VERIFICATION") {
       overallCompliance = "WARNING";
     }
 
@@ -2459,17 +2500,16 @@ export async function correctDocumentMetadataAction(
 
     const passStatus = documentType === "passport" ? calculatedDocStatus : (currentSnapshot?.passport_status || "MISSING");
     const visaStatus = documentType === "visa" ? calculatedDocStatus : (currentSnapshot?.visa_status || "MISSING");
-    const hasEfrro = documentType === "efrro" ? true : Boolean(currentSnapshot?.efrro_number && currentSnapshot?.efrro_number.trim());
-    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (hasEfrro ? (currentSnapshot?.efrro_status || "COMPLIANT") : "COMPLIANT");
+    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (currentSnapshot?.efrro_status || "MISSING");
 
     let overallCompliance = "COMPLIANT";
-    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrro && efrroStatus === "EXPIRED")) {
+    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
       overallCompliance = "EXPIRED";
-    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || (hasEfrro && efrroStatus === "REJECTED")) {
+    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || efrroStatus === "REJECTED") {
       overallCompliance = "REJECTED";
-    } else if (passStatus === "MISSING" || visaStatus === "MISSING") {
+    } else if (passStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
       overallCompliance = "MISSING";
-    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrro && efrroStatus === "WARNING") || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION") {
+    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING" || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || efrroStatus === "PENDING_VERIFICATION") {
       overallCompliance = "WARNING";
     }
 

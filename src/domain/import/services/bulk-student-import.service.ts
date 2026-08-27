@@ -1386,15 +1386,14 @@ export class BulkStudentImportService {
 
         const efrroNumber = data.efrro_number?.trim() || null;
         const efrroExpiry = data.efrro_expiry || null;
-        const hasEfrro = Boolean(efrroNumber && efrroExpiry);
-        const efrroStatus = hasEfrro ? calcDocStatus(efrroNumber, efrroExpiry) : "COMPLIANT";
+        const efrroStatus = calcDocStatus(efrroNumber, efrroExpiry);
 
         let overallCompliance = "COMPLIANT";
-        if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrro && efrroStatus === "EXPIRED")) {
+        if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
           overallCompliance = "EXPIRED";
-        } else if (passStatus === "MISSING" || visaStatus === "MISSING") {
+        } else if (passStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
           overallCompliance = "MISSING";
-        } else if (passStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrro && efrroStatus === "WARNING")) {
+        } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING") {
           overallCompliance = "WARNING";
         }
 
@@ -1412,7 +1411,7 @@ export class BulkStudentImportService {
           visa_issue_date: data.visa_issue_date || null,
           visa_expiry: visaExpiry,
           visa_type: data.visa_type?.trim() || "Student (S-1)",
-          efrro_status: hasEfrro ? efrroStatus : "MISSING",
+          efrro_status: efrroStatus,
           efrro_number: efrroNumber,
           efrro_issue_date: data.efrro_issue_date || null,
           efrro_expiry: efrroExpiry,

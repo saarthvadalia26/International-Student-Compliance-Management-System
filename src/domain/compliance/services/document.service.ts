@@ -44,39 +44,38 @@ export class ComplianceStatusService {
   }
 
   static calculateScoreAndStatus(snap: Partial<StudentSnapshot>): { score: number, status: ComplianceStatus, daysLeft: number | null } {
-    // 1. Resolve status for Passport & Visa (mandatory for international student compliance)
+    // 1. Resolve status for Passport & Visa & eFRRO (all mandatory for international student compliance in ISCMS)
     const passStatus: ComplianceStatus = snap.passportStatus || 
       ComplianceStatusService.calculateStatus(snap.passportExpiry || null, snap.passportNumber || null);
     
     const visaStatus: ComplianceStatus = snap.visaStatus || 
       ComplianceStatusService.calculateStatus(snap.visaExpiry || null, snap.visaNumber || null);
 
-    // 2. Resolve status for eFRRO (conditional: required if permit exists / recorded)
-    const hasEfrroRecord = Boolean(snap.efrroNumber && snap.efrroNumber.trim());
-    const efrroStatus: ComplianceStatus = hasEfrroRecord
-      ? (snap.efrroStatus || ComplianceStatusService.calculateStatus(snap.efrroExpiry || null, snap.efrroNumber || null))
-      : "COMPLIANT";
+    const efrroStatus: ComplianceStatus = snap.efrroStatus || 
+      ComplianceStatusService.calculateStatus(snap.efrroExpiry || null, snap.efrroNumber || null);
 
-    const evaluatedStatuses: ComplianceStatus[] = [passStatus, visaStatus];
-    if (hasEfrroRecord) {
-      evaluatedStatuses.push(efrroStatus);
-    }
-
-    // 3. Determine global compliance status
+    // 2. Determine global compliance status
+    // Order of Precedence:
+    // 1. EXPIRED: Any required document has expired
+    // 2. REJECTED: Any required document was rejected by staff
+    // 3. MISSING: Any required document (Passport, Visa, or eFRRO) is missing
+    // 4. WARNING: Any required document is expiring within 30 days
+    // 5. PENDING_VERIFICATION: Any required document is awaiting verification
+    // 6. COMPLIANT: All required documents are present, valid, and > 30 days remaining
     let globalStatus: ComplianceStatus = "COMPLIANT";
-    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || (hasEfrroRecord && efrroStatus === "EXPIRED")) {
+    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
       globalStatus = "EXPIRED";
-    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || (hasEfrroRecord && efrroStatus === "REJECTED")) {
+    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || efrroStatus === "REJECTED") {
       globalStatus = "REJECTED";
-    } else if (passStatus === "MISSING" || visaStatus === "MISSING") {
+    } else if (passStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
       globalStatus = "MISSING";
-    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || (hasEfrroRecord && efrroStatus === "WARNING")) {
+    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING") {
       globalStatus = "WARNING";
-    } else if (passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || (hasEfrroRecord && efrroStatus === "PENDING_VERIFICATION")) {
+    } else if (passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || efrroStatus === "PENDING_VERIFICATION") {
       globalStatus = "PENDING_VERIFICATION";
     }
 
-    // 4. Calculate compliance score
+    // 3. Calculate compliance score
     let score = 0;
     if (globalStatus === "COMPLIANT") {
       score = 100;
@@ -90,11 +89,11 @@ export class ComplianceStatusService {
       score = 0;
     }
 
-    // 5. Calc min days left values across active documents
+    // 4. Calc min days left values across active documents
     const daysList = [
       ExpiryCalculationService.getDaysUntilExpiry(snap.passportExpiry || null),
       ExpiryCalculationService.getDaysUntilExpiry(snap.visaExpiry || null),
-      hasEfrroRecord ? ExpiryCalculationService.getDaysUntilExpiry(snap.efrroExpiry || null) : null
+      ExpiryCalculationService.getDaysUntilExpiry(snap.efrroExpiry || null)
     ].filter((d): d is number => d !== null);
 
     const minDays = daysList.length > 0 ? Math.min(...daysList) : null;
