@@ -131,22 +131,50 @@ export async function emergencyForceLogoutAction(
     success: true,
     usersAffected,
     sessionsTerminated,
-    message: `Successfully terminated ${sessionsTerminated} sessions across ${usersAffected} administrative users.`,
+    message: `Successfully terminated ${sessionsTerminated} sessions across ${usersAffected} authorized Main Portal ${usersAffected === 1 ? "user" : "users"}.`,
   };
 }
 
-// ── User Count for Emergency Logout Dialog ─────────────────────────────────
+// ── User Scope and Count for Emergency Logout Dialog ───────────────────────
 
-export async function getActiveUserCountAction(): Promise<number> {
+export interface ActiveUserScope {
+  total: number;
+  administrators: number;
+  staff: number;
+}
+
+export async function getActiveUserScopeAction(): Promise<ActiveUserScope> {
   await getAdminUser();
   const adminClient = getAdminSupabase();
   const { data: { users }, error } = await adminClient.auth.admin.listUsers({
     page: 1,
     perPage: 1000,
   });
-  if (error || !users) return 0;
-  const adminStaffUsers = users.filter(isAdministrativeOrStaffUser);
-  return adminStaffUsers.length;
+  if (error || !users) return { total: 0, administrators: 0, staff: 0 };
+
+  const targetUsers = users.filter(isAdministrativeOrStaffUser);
+  let administrators = 0;
+  let staff = 0;
+
+  for (const u of targetUsers) {
+    const rawRole = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+    if (rawRole === "administrator" || rawRole === "admin") {
+      administrators++;
+    } else {
+      staff++;
+    }
+  }
+
+  return {
+    total: targetUsers.length,
+    administrators,
+    staff,
+  };
+}
+
+export async function getActiveUserCountAction(): Promise<number> {
+  const scope = await getActiveUserScopeAction();
+  return scope.total;
 }
 
 // ── Administrator User Account Management Actions ─────────────────────────

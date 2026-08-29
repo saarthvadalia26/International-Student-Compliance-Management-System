@@ -297,127 +297,73 @@ export default function StudentListPage() {
     return filteredStudents.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredStudents, currentPage, itemsPerPage]);
 
-  // Overall compliance badge renderer
-  const renderOverallComplianceBadge = (rawStatus: string, mappedStatus: Student["complianceStatus"]) => {
-    const upper = (rawStatus || "").toUpperCase();
-    if (upper === "COMPLIANT" || mappedStatus === "compliant") {
+  // Overall compliance badge renderer showing specific missing documents
+  const renderOverallComplianceBadge = (student: Student) => {
+    const rawStatus = (student.rawComplianceStatus || "").toUpperCase();
+    const mappedStatus = student.complianceStatus;
+
+    // Check specific missing documents
+    const isMissingNumber = (num?: string | null, status?: string | null) =>
+      !num || !num.trim() || num === "Not provided" || num === "Pending" || status === "MISSING";
+
+    const missingDocs: string[] = [];
+    if (isMissingNumber(student.passport?.number, student.passport?.status)) missingDocs.push("Passport");
+    if (isMissingNumber(student.visa?.number, student.visa?.status)) missingDocs.push("Visa");
+    if (isMissingNumber(student.efrro?.number, student.efrro?.status)) missingDocs.push("eFRRO");
+
+    if (missingDocs.length > 0) {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 whitespace-nowrap">
-          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-          Fully Compliant
+        <span 
+          className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap"
+          title={`Missing required documentation: ${missingDocs.join(", ")}`}
+        >
+          <AlertTriangle className="h-3 w-3 text-rose-600 dark:text-rose-400 shrink-0" />
+          <span>Missing: {missingDocs.join(", ")}</span>
         </span>
       );
     }
-    if (upper === "WARNING" || mappedStatus === "warning") {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap">
-          <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-          Expiring Soon
-        </span>
-      );
-    }
-    if (upper === "EXPIRED" || mappedStatus === "expired") {
+
+    if (rawStatus === "EXPIRED" || mappedStatus === "expired") {
       return (
         <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/25 whitespace-nowrap">
-          <XCircle className="h-3 w-3 text-red-600 dark:text-red-400" />
+          <XCircle className="h-3 w-3 text-red-600 dark:text-red-400 shrink-0" />
           Expired
         </span>
       );
     }
-    if (upper === "PENDING_VERIFICATION") {
+
+    if (rawStatus === "WARNING" || mappedStatus === "warning") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap">
+          <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+          Expiring Soon
+        </span>
+      );
+    }
+
+    if (rawStatus === "PENDING_VERIFICATION") {
       return (
         <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/25 whitespace-nowrap">
-          <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+          <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
           Pending Review
         </span>
       );
     }
-    // MISSING / REJECTED / non_compliant
+
+    if (rawStatus === "COMPLIANT" || mappedStatus === "compliant") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 whitespace-nowrap">
+          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          Fully Compliant
+        </span>
+      );
+    }
+
     return (
       <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap">
-        <AlertTriangle className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+        <AlertTriangle className="h-3 w-3 text-rose-600 dark:text-rose-400 shrink-0" />
         Documents Missing
       </span>
-    );
-  };
-
-  // Document micro-status badge renderer
-  const renderDocumentStatus = (
-    docName: "Passport" | "Visa" | "eFRRO",
-    docNumber?: string | null,
-    expiryDate?: string | null,
-    status?: string | null
-  ) => {
-    const isMissing = !docNumber || !docNumber.trim() || docNumber === "Not provided" || docNumber === "Pending" || status === "MISSING";
-    const isExpired = status === "EXPIRED";
-    const isWarning = status === "WARNING";
-    const isPending = status === "PENDING_VERIFICATION";
-
-    if (isMissing) {
-      return (
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-1 text-[11px] font-medium text-rose-600 dark:text-rose-400">
-            <AlertTriangle className="h-3 w-3 shrink-0" />
-            <span>Missing</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground/70 italic">Not recorded</p>
-        </div>
-      );
-    }
-
-    if (isExpired) {
-      return (
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-1 text-[11px] font-medium text-red-600 dark:text-red-400">
-            <XCircle className="h-3 w-3 shrink-0" />
-            <span className="font-mono">{docNumber}</span>
-          </div>
-          <p className="text-[10px] text-red-600/90 dark:text-red-400/90 font-medium">
-            Exp: {formatDateDisplay(expiryDate)} (Expired)
-          </p>
-        </div>
-      );
-    }
-
-    if (isWarning) {
-      return (
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-            <Clock className="h-3 w-3 shrink-0" />
-            <span className="font-mono">{docNumber}</span>
-          </div>
-          <p className="text-[10px] text-amber-600/90 dark:text-amber-400/90">
-            Exp: {formatDateDisplay(expiryDate)}
-          </p>
-        </div>
-      );
-    }
-
-    if (isPending) {
-      return (
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
-            <Clock className="h-3 w-3 shrink-0" />
-            <span className="font-mono">{docNumber}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground">
-            Exp: {formatDateDisplay(expiryDate)}
-          </p>
-        </div>
-      );
-    }
-
-    // Default COMPLIANT
-    return (
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-          <CheckCircle2 className="h-3 w-3 shrink-0" />
-          <span className="font-mono font-semibold">{docNumber}</span>
-        </div>
-        <p className="text-[10px] text-muted-foreground">
-          Exp: {formatDateDisplay(expiryDate)}
-        </p>
-      </div>
     );
   };
 
@@ -802,18 +748,15 @@ export default function StudentListPage() {
           <div>
             {/* Desktop Full-Density Administrative Table (>= 1024px) */}
             <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[1100px]">
+              <table className="w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-muted/50 border-b border-border/70 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                     <th scope="col" className="py-3 px-4 font-semibold">1. Student</th>
                     <th scope="col" className="py-3 px-3 font-semibold">2. Academic Info</th>
                     <th scope="col" className="py-3 px-3 font-semibold">3. Campus</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">4. Visa</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">5. Passport</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">6. eFRRO</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">7. Compliance</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">8. Status</th>
-                    <th scope="col" className="py-3 px-4 font-semibold text-right">9. Actions</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">4. Compliance</th>
+                    <th scope="col" className="py-3 px-3 font-semibold">5. Status</th>
+                    <th scope="col" className="py-3 px-4 font-semibold text-right">6. Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40 text-xs">
@@ -852,11 +795,6 @@ export default function StudentListPage() {
                                 <Badge variant="outline" className="text-[9px] px-1 py-0 font-normal border-border/80 bg-muted/40">
                                   {student.admissionCategory}
                                 </Badge>
-                              )}
-                              {student.iccrApplicationNumber && (
-                                <span className="text-[9px] text-muted-foreground bg-muted/60 px-1 py-0.2 rounded font-mono">
-                                  ICCR: {student.iccrApplicationNumber}
-                                </span>
                               )}
                             </div>
                           </div>
@@ -908,37 +846,19 @@ export default function StudentListPage() {
                         </div>
                       </td>
 
-                      {/* 4. Visa Status */}
+                      {/* 4. Overall Compliance */}
                       <td className="py-3 px-3 align-top">
-                        {renderDocumentStatus("Visa", student.visa?.number, student.visa?.expiry, student.visa?.status)}
-                      </td>
-
-                      {/* 5. Passport Status */}
-                      <td className="py-3 px-3 align-top">
-                        {renderDocumentStatus("Passport", student.passport?.number, student.passport?.expiry, student.passport?.status)}
-                      </td>
-
-                      {/* 6. eFRRO Status */}
-                      <td className="py-3 px-3 align-top">
-                        {renderDocumentStatus("eFRRO", student.efrro?.number, student.efrro?.expiry, student.efrro?.status)}
-                      </td>
-
-                      {/* 7. Overall Compliance */}
-                      <td className="py-3 px-3 align-top">
-                        <div className="space-y-1">
-                          {renderOverallComplianceBadge(student.rawComplianceStatus, student.complianceStatus)}
-                          <div className="text-[10px] text-muted-foreground pl-0.5">
-                            Score: <span className="font-medium text-foreground">{student.complianceScore}%</span>
-                          </div>
+                        <div>
+                          {renderOverallComplianceBadge(student)}
                         </div>
                       </td>
 
-                      {/* 8. Academic Standing */}
+                      {/* 5. Academic Standing */}
                       <td className="py-3 px-3 align-top">
                         {getAcademicStatusBadge(student.academicStatus)}
                       </td>
 
-                      {/* 9. Actions */}
+                      {/* 6. Actions */}
                       <td className="py-3 px-4 align-top text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <Link href={`/students/${student.id}`} passHref>
@@ -1019,8 +939,8 @@ export default function StudentListPage() {
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-right space-y-1">
-                      {renderOverallComplianceBadge(student.rawComplianceStatus, student.complianceStatus)}
+                    <div className="shrink-0 text-right">
+                      {renderOverallComplianceBadge(student)}
                     </div>
                   </div>
 
@@ -1048,22 +968,6 @@ export default function StudentListPage() {
                           <span>AY {student.admissionAcademicYear}</span>
                         </>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Document Breakdown Grid */}
-                  <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg border border-border/40 bg-background text-xs">
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">Passport</span>
-                      {renderDocumentStatus("Passport", student.passport?.number, student.passport?.expiry, student.passport?.status)}
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">Visa</span>
-                      {renderDocumentStatus("Visa", student.visa?.number, student.visa?.expiry, student.visa?.status)}
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">eFRRO</span>
-                      {renderDocumentStatus("eFRRO", student.efrro?.number, student.efrro?.expiry, student.efrro?.status)}
                     </div>
                   </div>
 

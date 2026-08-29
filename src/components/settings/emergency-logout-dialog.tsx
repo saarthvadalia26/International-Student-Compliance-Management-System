@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { ShieldAlert, AlertTriangle, Loader2 } from "lucide-react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { useRealtime } from "@/providers/realtime-provider";
-import { emergencyForceLogoutAction, getActiveUserCountAction } from "@/app/(app)/settings/actions";
+import { emergencyForceLogoutAction, getActiveUserScopeAction, type ActiveUserScope } from "@/app/(app)/settings/actions";
 import {
   Dialog,
   DialogContent,
@@ -42,14 +42,14 @@ export function EmergencyLogoutDialog({ open, onOpenChange }: EmergencyLogoutDia
   const supabase = getBrowserSupabase();
 
   const [step, setStep] = React.useState<Step>("confirm");
-  const [userCount, setUserCount] = React.useState<number | null>(null);
+  const [userScope, setUserScope] = React.useState<ActiveUserScope | null>(null);
   const [password, setPassword] = React.useState("");
   const [reason, setReason] = React.useState("");
   const [isVerifying, setIsVerifying] = React.useState(false);
   const [isExecuting, setIsExecuting] = React.useState(false);
   const [errorMsg, setErrorMsg] = React.useState("");
 
-  // Load user count when dialog opens
+  // Load user scope when dialog opens
   React.useEffect(() => {
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -57,11 +57,11 @@ export function EmergencyLogoutDialog({ open, onOpenChange }: EmergencyLogoutDia
     setPassword("");
     setReason("");
     setErrorMsg("");
-    setUserCount(null);
+    setUserScope(null);
 
-    getActiveUserCountAction()
-      .then(count => setUserCount(count))
-      .catch(() => setUserCount(null));
+    getActiveUserScopeAction()
+      .then(scope => setUserScope(scope))
+      .catch(() => setUserScope(null));
   }, [open]);
 
   const handleConfirm = () => {
@@ -107,7 +107,7 @@ export function EmergencyLogoutDialog({ open, onOpenChange }: EmergencyLogoutDia
       broadcastSessionLogout("emergency_logout");
 
       toast.success(`Emergency logout complete.`, {
-        description: `${result.sessionsTerminated} sessions terminated across ${result.usersAffected} users.`,
+        description: `${result.sessionsTerminated} sessions terminated across ${result.usersAffected} authorized Main Portal ${result.usersAffected === 1 ? "user" : "users"}.`,
         duration: 5000,
       });
 
@@ -152,13 +152,27 @@ export function EmergencyLogoutDialog({ open, onOpenChange }: EmergencyLogoutDia
             <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 space-y-2">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                <div className="text-xs text-destructive font-medium space-y-1">
+                <div className="text-xs text-destructive font-medium space-y-1.5">
                   <p>This will immediately terminate <strong>every active session</strong> across the entire system.</p>
-                  <p>
-                    {userCount !== null
-                      ? `Approximately ${userCount} administrative user account(s) will be affected.`
-                      : "Loading affected user count…"}
-                  </p>
+                  <div>
+                    {userScope !== null ? (
+                      <div className="space-y-0.5">
+                        <p>
+                          {userScope.total === 1
+                            ? "1 authorized Main Portal user account will be affected."
+                            : `${userScope.total} authorized Main Portal user accounts will be affected.`}
+                        </p>
+                        {userScope.total > 0 && (
+                          <p className="text-[11px] text-destructive/80 font-normal">
+                            • {userScope.administrators} {userScope.administrators === 1 ? "Administrator" : "Administrators"}
+                            {userScope.staff > 0 ? `, ${userScope.staff} ${userScope.staff === 1 ? "Staff member" : "Staff members"}` : ""}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p>Loading affected user count…</p>
+                    )}
+                  </div>
                   <p>You will also be signed out and must re-authenticate.</p>
                 </div>
               </div>
