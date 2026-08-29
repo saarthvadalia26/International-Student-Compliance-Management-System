@@ -156,7 +156,7 @@ export function EmergencyLogoutDialog({ open, onOpenChange }: EmergencyLogoutDia
                   <p>This will immediately terminate <strong>every active session</strong> across the entire system.</p>
                   <p>
                     {userCount !== null
-                      ? `Approximately ${userCount} user account(s) will be affected.`
+                      ? `Approximately ${userCount} administrative user account(s) will be affected.`
                       : "Loading affected user count…"}
                   </p>
                   <p>You will also be signed out and must re-authenticate.</p>

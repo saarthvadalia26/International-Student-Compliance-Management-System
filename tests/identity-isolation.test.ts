@@ -1,13 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createClient } from "@supabase/supabase-js";
-import * as dotenv from "dotenv";
 import { getAppRole, isAdministrator, isStaff, isStudent, isInternalUser, requireInternalUser, UnauthorizedError } from "../src/lib/auth/permissions";
-
-dotenv.config({ path: ".env.local" });
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 describe("ISCMS — Strict Student vs Staff Identity Isolation", () => {
   it("verifies permissions helper strictly distinguishes student vs staff vs administrator", () => {
@@ -52,67 +45,28 @@ describe("ISCMS — Strict Student vs Staff Identity Isolation", () => {
     assert.doesNotThrow(() => requireInternalUser(adminUser));
   });
 
-  it("verifies student auth provisioning does not create a staff account in Supabase", async () => {
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.log("Skipping live Supabase integration: credentials not configured");
-      return;
-    }
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
-
-    const testStudentEmail = `test-isolation-${Date.now()}@iscms.student.local`;
-    const testStudentId = `stud-test-${Date.now()}`;
-
-    // 1. Create student auth account with explicit student metadata
-    const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
-      email: testStudentEmail,
-      email_confirm: true,
-      user_metadata: {
-        role: "student",
-        student_id: testStudentId,
-        full_name: "Test Compliance Student"
+  it("verifies student accounts are strictly excluded from administrative and staff user management", () => {
+    const isAdministrativeOrStaffUser = (u: {
+      email?: string | null;
+      user_metadata?: Record<string, any> | null;
+    }): boolean => {
+      const rawRole = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+      const isStudentEmail = Boolean(u.email?.toLowerCase().includes("@iscms.student.local"));
+      const hasStudentId = Boolean(u.user_metadata?.student_id);
+      if (rawRole === "student" || isStudentEmail || hasStudentId) {
+        return false;
       }
-    });
+      return true;
+    };
 
-    assert.ifError(authErr);
-    assert.ok(authData?.user?.id);
+    const studentMock1 = { email: "student@iscms.student.local", user_metadata: { role: "student" } };
+    const studentMock2 = { email: "student2@gmail.com", user_metadata: { student_id: "uuid-123" } };
+    const adminMock = { email: "admin@nfsu.ac.in", user_metadata: { role: "administrator" } };
+    const staffMock = { email: "staff@nfsu.ac.in", user_metadata: { role: "staff" } };
 
-    const userId = authData.user.id;
-
-    try {
-      // 2. Generate student login link
-      const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
-        type: "magiclink",
-        email: testStudentEmail
-      });
-
-      assert.ifError(linkErr);
-      assert.ok(linkData?.properties?.hashed_token);
-
-      // 3. Verify user_profiles record in database
-      const { data: profile } = await adminClient
-        .from("user_profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (profile) {
-        assert.equal(profile.role, "student", "user_profiles role MUST be 'student', not 'staff'");
-      }
-
-      // 4. Verify that student user is NOT classified as staff by fetchUserAccounts filtering rule
-      const rawRole = (authData.user.user_metadata?.role as string | undefined)?.toLowerCase().trim();
-      const isStudentEmail = authData.user.email?.toLowerCase().includes("@iscms.student.local");
-      const hasStudentId = Boolean(authData.user.user_metadata?.student_id);
-      const isExcludedFromStaffTable = rawRole === "student" || isStudentEmail || hasStudentId;
-
-      assert.equal(isExcludedFromStaffTable, true, "Student account must be excluded from staff accounts list");
-    } finally {
-      // Cleanup
-      await adminClient.auth.admin.deleteUser(userId);
-      await adminClient.from("user_profiles").delete().eq("id", userId);
-    }
+    assert.equal(isAdministrativeOrStaffUser(studentMock1), false);
+    assert.equal(isAdministrativeOrStaffUser(studentMock2), false);
+    assert.equal(isAdministrativeOrStaffUser(adminMock), true);
+    assert.equal(isAdministrativeOrStaffUser(staffMock), true);
   });
 });

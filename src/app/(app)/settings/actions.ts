@@ -70,6 +70,19 @@ export interface EmergencyLogoutResult {
   message: string;
 }
 
+function isAdministrativeOrStaffUser(u: {
+  email?: string | null;
+  user_metadata?: Record<string, any> | null;
+}): boolean {
+  const rawRole = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+  const isStudentEmail = Boolean(u.email?.toLowerCase().includes("@iscms.student.local"));
+  const hasStudentId = Boolean(u.user_metadata?.student_id);
+  if (rawRole === "student" || isStudentEmail || hasStudentId) {
+    return false;
+  }
+  return true;
+}
+
 export async function emergencyForceLogoutAction(
   reason: string
 ): Promise<EmergencyLogoutResult> {
@@ -77,7 +90,7 @@ export async function emergencyForceLogoutAction(
   const meta = await getRequestMeta();
   const adminClient = getAdminSupabase();
 
-  // 1. List all auth users
+  // 1. List all auth users and filter strictly for administrative and staff accounts
   const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers({
     page: 1,
     perPage: 1000,
@@ -87,11 +100,13 @@ export async function emergencyForceLogoutAction(
     throw new Error(`Failed to list users: ${listError.message}`);
   }
 
-  // 2. Sign out every non-admin user globally (invalidate all their sessions)
-  let sessionsTerminated = 0;
-  const usersAffected = users.length;
+  const targetUsers = (users || []).filter(isAdministrativeOrStaffUser);
 
-  for (const u of users) {
+  // 2. Sign out every targeted administrative/staff user globally (invalidate all their sessions)
+  let sessionsTerminated = 0;
+  const usersAffected = targetUsers.length;
+
+  for (const u of targetUsers) {
     try {
       await adminClient.auth.admin.signOut(u.id, "global");
       sessionsTerminated++;
@@ -116,7 +131,7 @@ export async function emergencyForceLogoutAction(
     success: true,
     usersAffected,
     sessionsTerminated,
-    message: `Successfully terminated ${sessionsTerminated} sessions across ${usersAffected} users.`,
+    message: `Successfully terminated ${sessionsTerminated} sessions across ${usersAffected} administrative users.`,
   };
 }
 
@@ -129,8 +144,9 @@ export async function getActiveUserCountAction(): Promise<number> {
     page: 1,
     perPage: 1000,
   });
-  if (error) return 0;
-  return users.length;
+  if (error || !users) return 0;
+  const adminStaffUsers = users.filter(isAdministrativeOrStaffUser);
+  return adminStaffUsers.length;
 }
 
 // ── Administrator User Account Management Actions ─────────────────────────
@@ -139,7 +155,7 @@ export interface UserAccountItem {
   id: string;
   email: string;
   fullName: string;
-  role: "administrator" | "staff" | "student";
+  role: "administrator" | "staff";
   isDisabled: boolean;
   isProfileComplete?: boolean;
   createdAt: string;
@@ -178,18 +194,12 @@ export async function fetchUserAccountsAction(): Promise<UserAccountItem[]> {
     }
   }
 
-  const filteredUsers = users.filter((u) => {
-    const rawRole = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
-    const isStudentEmail = u.email?.toLowerCase().includes("@iscms.student.local");
-    const hasStudentId = Boolean(u.user_metadata?.student_id);
-    return rawRole !== "student" && !isStudentEmail && !hasStudentId;
-  });
+  const filteredUsers = users.filter(isAdministrativeOrStaffUser);
 
   return filteredUsers.map((u) => {
     const rawRole = (u.user_metadata?.role as string | undefined)?.toLowerCase().trim();
-    let role: "administrator" | "staff" | "student" = "staff";
+    let role: "administrator" | "staff" = "staff";
     if (rawRole === "administrator" || rawRole === "admin") role = "administrator";
-    else if (rawRole === "student") role = "student";
 
     const isDisabled = Boolean(u.banned_until && new Date(u.banned_until) > new Date());
     const profile = profileMap.get(u.id);
