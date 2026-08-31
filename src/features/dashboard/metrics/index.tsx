@@ -115,50 +115,62 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
   );
 }
 
+import { useUserRole } from "@/hooks/use-user-role";
+
 export function DashboardQuickActions() {
-  const actions = [
+  const { isAdministrator } = useUserRole();
+
+  const allActions = [
     {
       title: "Register Student",
       href: "/students/add",
       icon: UserPlus,
-      variant: "default" as const
+      variant: "default" as const,
+      adminOnly: false
     },
     {
-      title: "Search Student",
-      href: "/reports/students",
+      title: "Student Directory",
+      href: "/students",
       icon: Search,
-      variant: "secondary" as const
+      variant: "secondary" as const,
+      adminOnly: false
     },
     {
       title: "View Expiring eFRRO",
       href: "/reports/efrro?efrroStatus=warning",
       icon: Clock,
-      variant: "secondary" as const
+      variant: "secondary" as const,
+      adminOnly: true
     },
     {
       title: "Review Pending Uploads",
       href: "/reports/efrro?efrroStatus=pending",
       icon: FileText,
-      variant: "secondary" as const
+      variant: "secondary" as const,
+      adminOnly: true
     },
     {
       title: "Notification Center",
       href: "/reports/notifications",
       icon: Bell,
-      variant: "secondary" as const
+      variant: "secondary" as const,
+      adminOnly: true
     },
     {
       title: "Reports Directory",
       href: "/reports",
       icon: LayoutGrid,
-      variant: "secondary" as const
+      variant: "secondary" as const,
+      adminOnly: true
     }
   ];
+
+  const actions = allActions.filter(act => !act.adminOnly || isAdministrator);
 
   return (
     <Card className="border border-border/50 bg-card p-5 shadow-sm">
       <h3 className="text-sm font-semibold tracking-tight text-foreground mb-4">Quick Compliance Operations</h3>
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+      <div className={`grid gap-3 grid-cols-2 ${actions.length > 2 ? "md:grid-cols-3 lg:grid-cols-6" : "sm:grid-cols-2 max-w-md"}`}>
         {actions.map((act, i) => {
           const Icon = act.icon;
           return (

@@ -26,6 +26,10 @@ export const RegisterStudentValidationSchema = z.object({
   fatherWhatsapp: z.string().optional().nullable(),
   fatherWhatsappCountryCode: z.string().optional().nullable(),
   fatherWhatsappNumber: z.string().optional().nullable(),
+  fatherEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Please enter a valid Father email address format" }),
   motherName: z.string().max(255).optional().nullable(),
   motherMobile: z.string().optional().nullable(),
   motherMobileCountryCode: z.string().optional().nullable(),
@@ -33,6 +37,10 @@ export const RegisterStudentValidationSchema = z.object({
   motherWhatsapp: z.string().optional().nullable(),
   motherWhatsappCountryCode: z.string().optional().nullable(),
   motherWhatsappNumber: z.string().optional().nullable(),
+  motherEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Please enter a valid Mother email address format" }),
   email: z.string().optional().nullable().refine(val => {
     if (!val || !val.trim()) return true;
     return z.string().email().safeParse(val.trim()).success;
@@ -47,6 +55,7 @@ export const RegisterStudentValidationSchema = z.object({
   phoneHomeCountryCode: z.string().optional().nullable(),
   phoneHomeNumber: z.string().optional().nullable(),
   permanentAddress: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 5, { message: "Permanent address must be descriptive (at least 5 characters)" }),
+  presentAddress: z.string().optional().nullable(),
   localAddress: z.string().optional().nullable(),
   programId: z.string().optional().nullable(),
   programCode: z.string().optional().nullable(),
@@ -194,6 +203,10 @@ export const UpdateStudentValidationSchema = z.object({
   fatherWhatsapp: z.string().optional().nullable(),
   fatherWhatsappCountryCode: z.string().optional().nullable(),
   fatherWhatsappNumber: z.string().optional().nullable(),
+  fatherEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid Father email address format" }),
   motherName: z.string().max(255).optional().nullable(),
   motherMobile: z.string().optional().nullable(),
   motherMobileCountryCode: z.string().optional().nullable(),
@@ -201,6 +214,10 @@ export const UpdateStudentValidationSchema = z.object({
   motherWhatsapp: z.string().optional().nullable(),
   motherWhatsappCountryCode: z.string().optional().nullable(),
   motherWhatsappNumber: z.string().optional().nullable(),
+  motherEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid Mother email address format" }),
   email: z.string().optional().nullable().refine(val => {
     if (!val || !val.trim()) return true;
     return z.string().email().safeParse(val.trim()).success;
@@ -215,6 +232,7 @@ export const UpdateStudentValidationSchema = z.object({
   phoneHomeCountryCode: z.string().optional().nullable(),
   phoneHomeNumber: z.string().optional().nullable(),
   permanentAddress: z.string().optional().nullable(),
+  presentAddress: z.string().optional().nullable(),
   localAddress: z.string().optional().nullable(),
   programId: z.string().optional().nullable(),
   programCode: z.string().optional().nullable(),

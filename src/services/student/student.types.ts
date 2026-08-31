@@ -47,6 +47,7 @@ export interface StudentPersonal {
   fatherWhatsapp?: string | null;
   fatherWhatsappCountryCode?: string | null;
   fatherWhatsappNumber?: string | null;
+  fatherEmail?: string | null;
   motherName?: string | null;
   motherMobile?: string | null;
   motherMobileCountryCode?: string | null;
@@ -54,6 +55,7 @@ export interface StudentPersonal {
   motherWhatsapp?: string | null;
   motherWhatsappCountryCode?: string | null;
   motherWhatsappNumber?: string | null;
+  motherEmail?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -71,6 +73,7 @@ export interface StudentContact {
   phoneHomeCountryCode?: string | null;
   phoneHomeNumber?: string | null;
   permanentAddress: string | null;
+  presentAddress?: string | null;
   localAddress: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -168,6 +171,7 @@ export interface RegisterStudentInput {
   fatherWhatsapp?: string | null;
   fatherWhatsappCountryCode?: string | null;
   fatherWhatsappNumber?: string | null;
+  fatherEmail?: string | null;
   motherName?: string | null;
   motherMobile?: string | null;
   motherMobileCountryCode?: string | null;
@@ -175,6 +179,7 @@ export interface RegisterStudentInput {
   motherWhatsapp?: string | null;
   motherWhatsappCountryCode?: string | null;
   motherWhatsappNumber?: string | null;
+  motherEmail?: string | null;
   email?: string | null;
   phoneHome?: string | null;
   phoneLocal?: string | null;
@@ -183,6 +188,7 @@ export interface RegisterStudentInput {
   phoneHomeCountryCode?: string | null;
   phoneHomeNumber?: string | null;
   permanentAddress?: string | null;
+  presentAddress?: string | null;
   localAddress?: string | null;
   programId?: string | null;
   programCode?: string | null;
@@ -245,6 +251,7 @@ export interface UpdateStudentInput {
   fatherWhatsapp?: string | null;
   fatherWhatsappCountryCode?: string | null;
   fatherWhatsappNumber?: string | null;
+  fatherEmail?: string | null;
   motherName?: string | null;
   motherMobile?: string | null;
   motherMobileCountryCode?: string | null;
@@ -252,6 +259,7 @@ export interface UpdateStudentInput {
   motherWhatsapp?: string | null;
   motherWhatsappCountryCode?: string | null;
   motherWhatsappNumber?: string | null;
+  motherEmail?: string | null;
   email?: string | null;
   phoneHome?: string | null;
   phoneLocal?: string | null;
@@ -260,6 +268,7 @@ export interface UpdateStudentInput {
   phoneHomeCountryCode?: string | null;
   phoneHomeNumber?: string | null;
   permanentAddress?: string | null;
+  presentAddress?: string | null;
   localAddress?: string | null;
   programId?: string | null;
   programCode?: string | null;

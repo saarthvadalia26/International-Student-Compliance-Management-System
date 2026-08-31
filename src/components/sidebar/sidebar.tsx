@@ -146,12 +146,19 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       <nav className="flex-1 overflow-y-auto p-3 space-y-1.5 scrollbar-none">
         {desktopNavigation.items
           .filter((item: NavItem) => {
-            // Settings is Administrator-only
+            // Reminders, Reports, Settings, Monitoring are Administrator-only
+            if (item.href === "/reminders") return isAdministrator;
+            if (item.href === "/reports") return isAdministrator;
             if (item.href === "/settings") return isAdministrator;
+            if (item.href === "/monitoring") return isAdministrator;
             return true;
           })
           .map((item: NavItem) => {
-            const hasChildren = item.items && item.items.length > 0;
+            const visibleSubItems = item.items?.filter((subItem) => {
+              if (subItem.href === "/students/import") return isAdministrator;
+              return true;
+            });
+            const hasChildren = visibleSubItems && visibleSubItems.length > 0;
             const active = isLinkActive(item.href);
             const isOpen = openMenus[item.title];
             const resolvedHref = getResolvedHref(item.href);
@@ -189,7 +196,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
                     {/* Sub-menu rendering */}
                     {!isCollapsed && isOpen && (
                       <div className="mt-1 ml-8 space-y-1 border-l border-border pl-3 animate-in fade-in-50 slide-in-from-top-1 duration-150">
-                        {item.items?.map((subItem) => {
+                        {visibleSubItems?.map((subItem) => {
                           const subResolved = getResolvedHref(subItem.href);
                           const subActive = pathname === subResolved;
                           return (

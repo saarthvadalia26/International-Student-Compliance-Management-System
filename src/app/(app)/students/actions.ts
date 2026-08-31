@@ -101,6 +101,7 @@ export interface StudentDetailProfile {
   phoneHome: string;
   phoneLocal: string;
   permanentAddress: string;
+  presentAddress?: string | null;
   localAddress: string;
   currentSemester: number;
   academicStatus: "good_standing" | "probation" | "suspended";
@@ -120,6 +121,7 @@ export interface StudentDetailProfile {
   fatherWhatsapp?: string | null;
   fatherWhatsappCountryCode?: string | null;
   fatherWhatsappNumber?: string | null;
+  fatherEmail?: string | null;
   motherName?: string | null;
   motherMobile?: string | null;
   motherMobileCountryCode?: string | null;
@@ -127,6 +129,7 @@ export interface StudentDetailProfile {
   motherWhatsapp?: string | null;
   motherWhatsappCountryCode?: string | null;
   motherWhatsappNumber?: string | null;
+  motherEmail?: string | null;
   programName: string;
   programCode: string;
   programId?: string | null;
@@ -788,7 +791,8 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       phoneHome: contact?.phone_home || "",
       phoneLocal: contact?.phone_local || "",
       permanentAddress: contact?.permanent_address || "",
-      localAddress: contact?.local_address || "",
+      presentAddress: contact?.present_address || contact?.local_address || "",
+      localAddress: contact?.local_address || contact?.present_address || "",
       currentSemester: hasCourseConfig ? progression.currentSemester : (academic?.current_semester || 1),
       academicStatus: academic?.academic_status || "good_standing",
       status: record.status || "active",
@@ -807,6 +811,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       fatherWhatsapp: personal?.father_whatsapp || null,
       fatherWhatsappCountryCode: personal?.father_whatsapp_country_code || null,
       fatherWhatsappNumber: personal?.father_whatsapp_number || null,
+      fatherEmail: personal?.father_email || null,
       motherName: personal?.mother_name || null,
       motherMobile: personal?.mother_mobile || null,
       motherMobileCountryCode: personal?.mother_mobile_country_code || null,
@@ -814,6 +819,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       motherWhatsapp: personal?.mother_whatsapp || null,
       motherWhatsappCountryCode: personal?.mother_whatsapp_country_code || null,
       motherWhatsappNumber: personal?.mother_whatsapp_number || null,
+      motherEmail: personal?.mother_email || null,
       programName: progData?.programName || (academic?.program_code ? academic.program_code : "Not assigned yet"),
       programCode: progData?.programCode || academic?.program_code || "",
       programId: progData?.id || academic?.program_id || null,
@@ -3426,15 +3432,15 @@ export async function exportStudentsExcelAction(criteria: StudentExportFilterCri
     if (authError || !user) {
       return {
         success: false,
-        error: "You must be logged in as an authorized administrator or staff member to export student records."
+        error: "You must be logged in as an authorized administrator to export student records."
       };
     }
 
-    const { isInternalUser } = await import("@/lib/auth/permissions");
-    if (!isInternalUser(user)) {
+    const { isAdministrator } = await import("@/lib/auth/permissions");
+    if (!isAdministrator(user)) {
       return {
         success: false,
-        error: "Forbidden: Staff or Administrator privileges are required to export student data."
+        error: "Forbidden: Administrator privileges are required to export student records."
       };
     }
 

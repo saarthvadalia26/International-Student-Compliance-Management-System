@@ -19,6 +19,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -92,14 +93,17 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   email: { tab: "contact", elementId: "email", label: "Student Email" },
   phoneLocal: { tab: "contact", elementId: "phoneLocal", label: "Local Contact Phone" },
   permanentAddress: { tab: "contact", elementId: "permanentAddress", label: "Permanent Address" },
-  localAddress: { tab: "contact", elementId: "localAddress", label: "Local Address" },
+  presentAddress: { tab: "contact", elementId: "presentAddress", label: "Present / Current Address" },
+  localAddress: { tab: "contact", elementId: "presentAddress", label: "Present / Current Address" },
   
   fatherName: { tab: "contact", elementId: "fatherName", label: "Father Name" },
   fatherMobile: { tab: "contact", elementId: "fatherMobile", label: "Father Mobile" },
   fatherWhatsapp: { tab: "contact", elementId: "fatherWhatsapp", label: "Father WhatsApp" },
+  fatherEmail: { tab: "contact", elementId: "fatherEmail", label: "Father's Email ID" },
   motherName: { tab: "contact", elementId: "motherName", label: "Mother Name" },
   motherMobile: { tab: "contact", elementId: "motherMobile", label: "Mother Mobile" },
   motherWhatsapp: { tab: "contact", elementId: "motherWhatsapp", label: "Mother WhatsApp" },
+  motherEmail: { tab: "contact", elementId: "motherEmail", label: "Mother's Email ID" },
 
   relationshipName: { tab: "contact", elementId: "emergencyContactName", label: "Emergency Contact Name" },
   emergencyContactName: { tab: "contact", elementId: "emergencyContactName", label: "Emergency Contact Name" },
@@ -219,6 +223,7 @@ export default function StudentRegistrationPage() {
     phoneLocalCountryCode: "+91",
     phoneLocalNumber: "",
     permanentAddress: "",
+    presentAddress: "",
     localAddress: "",
 
     // Family Information
@@ -229,6 +234,7 @@ export default function StudentRegistrationPage() {
     fatherWhatsapp: "",
     fatherWhatsappCountryCode: "+91",
     fatherWhatsappNumber: "",
+    fatherEmail: "",
     motherName: "",
     motherMobile: "",
     motherMobileCountryCode: "+91",
@@ -236,6 +242,7 @@ export default function StudentRegistrationPage() {
     motherWhatsapp: "",
     motherWhatsappCountryCode: "+91",
     motherWhatsappNumber: "",
+    motherEmail: "",
 
     // Emergency Contact
     emergencyContactName: "",
@@ -437,6 +444,7 @@ export default function StudentRegistrationPage() {
       fatherWhatsapp: formData.fatherWhatsapp?.trim() || undefined,
       fatherWhatsappCountryCode: formData.fatherWhatsappCountryCode?.trim() || undefined,
       fatherWhatsappNumber: formData.fatherWhatsappNumber?.trim() || undefined,
+      fatherEmail: formData.fatherEmail?.trim().toLowerCase() || undefined,
       motherName: formData.motherName?.trim() || undefined,
       motherMobile: formData.motherMobile?.trim() || undefined,
       motherMobileCountryCode: formData.motherMobileCountryCode?.trim() || undefined,
@@ -444,6 +452,7 @@ export default function StudentRegistrationPage() {
       motherWhatsapp: formData.motherWhatsapp?.trim() || undefined,
       motherWhatsappCountryCode: formData.motherWhatsappCountryCode?.trim() || undefined,
       motherWhatsappNumber: formData.motherWhatsappNumber?.trim() || undefined,
+      motherEmail: formData.motherEmail?.trim().toLowerCase() || undefined,
 
       // Contact coordinates
       email: formData.email.trim().toLowerCase() || undefined,
@@ -454,7 +463,8 @@ export default function StudentRegistrationPage() {
       phoneLocalCountryCode: formData.phoneLocalCountryCode.trim() || undefined,
       phoneLocalNumber: formData.phoneLocalNumber.trim() || undefined,
       permanentAddress: formData.permanentAddress.trim() || undefined,
-      localAddress: formData.localAddress.trim() || undefined,
+      presentAddress: formData.presentAddress.trim() || formData.localAddress.trim() || undefined,
+      localAddress: formData.presentAddress.trim() || formData.localAddress.trim() || undefined,
 
       // Academic profile
       programId: formData.programId.trim() || undefined,
@@ -1325,19 +1335,38 @@ export default function StudentRegistrationPage() {
 
                     <div className="space-y-1.5 sm:col-span-2">
                       <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">
-                        Permanent Address (Home Country) <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                        Permanent Address <span className="text-muted-foreground text-[10px] font-normal">(Home Country, Optional)</span>
                       </label>
-                      <Input
+                      <Textarea
                         id="permanentAddress"
-                        placeholder="Full residential address in home country"
+                        placeholder="e.g. 123 Main Street, Kathmandu, Nepal"
                         value={formData.permanentAddress}
                         onChange={handleInputChange}
                         disabled={isSubmitting}
-                        className={`h-10 text-sm ${validationErrors.permanentAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        className={`min-h-16 text-sm ${validationErrors.permanentAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                       />
                       {validationErrors.permanentAddress && (
                         <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                           {validationErrors.permanentAddress}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-medium text-foreground" htmlFor="presentAddress">
+                        Present / Current Address <span className="text-muted-foreground text-[10px] font-normal">(India, Optional)</span>
+                      </label>
+                      <Textarea
+                        id="presentAddress"
+                        placeholder="e.g. Hostel Block B, NFSU Campus, Gandhinagar, Gujarat, India"
+                        value={formData.presentAddress}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`min-h-16 text-sm ${validationErrors.presentAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                      {validationErrors.presentAddress && (
+                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                          {validationErrors.presentAddress}
                         </p>
                       )}
                     </div>
@@ -1356,7 +1385,7 @@ export default function StudentRegistrationPage() {
                   {/* Father Details */}
                   <div className="p-3.5 rounded-xl border border-border/60 bg-muted/10 space-y-3">
                     <h4 className="text-xs font-semibold text-foreground">Father Details</h4>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-foreground" htmlFor="fatherName">
                           Father Full Name
@@ -1408,13 +1437,33 @@ export default function StudentRegistrationPage() {
                           defaultCountryCode="+91"
                         />
                       </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="fatherEmail">
+                          Father&apos;s Email ID
+                        </label>
+                        <Input
+                          id="fatherEmail"
+                          type="email"
+                          placeholder="e.g. father@example.com"
+                          value={formData.fatherEmail}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.fatherEmail ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                        />
+                        {validationErrors.fatherEmail && (
+                          <p className="text-[11px] font-medium text-destructive mt-1">
+                            {validationErrors.fatherEmail}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   {/* Mother Details */}
                   <div className="p-3.5 rounded-xl border border-border/60 bg-muted/10 space-y-3">
                     <h4 className="text-xs font-semibold text-foreground">Mother Details</h4>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-foreground" htmlFor="motherName">
                           Mother Full Name
@@ -1465,6 +1514,26 @@ export default function StudentRegistrationPage() {
                           placeholder="WhatsApp number"
                           defaultCountryCode="+91"
                         />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="motherEmail">
+                          Mother&apos;s Email ID
+                        </label>
+                        <Input
+                          id="motherEmail"
+                          type="email"
+                          placeholder="e.g. mother@example.com"
+                          value={formData.motherEmail}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.motherEmail ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                        />
+                        {validationErrors.motherEmail && (
+                          <p className="text-[11px] font-medium text-destructive mt-1">
+                            {validationErrors.motherEmail}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

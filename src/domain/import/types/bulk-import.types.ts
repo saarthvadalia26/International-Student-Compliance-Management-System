@@ -25,13 +25,16 @@ export type ISCMSImportField =
   | "phone_local_country_code"
   | "phone_local_number"
   | "permanent_address"
+  | "present_address"
   | "local_address"
   | "father_name"
   | "father_mobile"
   | "father_whatsapp"
+  | "father_email"
   | "mother_name"
   | "mother_mobile"
   | "mother_whatsapp"
+  | "mother_email"
   // Academic
   | "academic_program"
   | "academic_level"
@@ -231,12 +234,21 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
   },
   {
     field: "permanent_address",
-    label: "Permanent Address (Home Country)",
+    label: "Permanent Address",
     category: "Contact",
     required: false,
     description: "Complete permanent address in home country. Defaults to NULL if omitted.",
-    sample: "123 Ring Road, Kathmandu, Nepal",
-    aliases: ["permanent_address", "permanent address", "home address", "address in home country", "permanent_addr"]
+    sample: "123 Main Street, Kathmandu, Nepal",
+    aliases: ["permanent_address", "permanent address", "home address", "address in home country", "permanent_addr", "permanent address (home country)"]
+  },
+  {
+    field: "present_address",
+    label: "Present / Current Address",
+    category: "Contact",
+    required: false,
+    description: "Student's current residential address in India (hostel, campus residence, or local apartment). Defaults to NULL if omitted.",
+    sample: "Hostel Block B, NFSU Campus, Gandhinagar, Gujarat, India",
+    aliases: ["present_address", "present address", "current address", "current_address", "present / current address", "present/current address", "address in india", "hostel address", "hostel", "campus address"]
   },
   {
     field: "local_address",
@@ -245,7 +257,7 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     required: false,
     description: "Hostel room or local residence address. Defaults to NULL if omitted.",
     sample: "Hostel Block B, Room 302, NFSU Campus, Gandhinagar",
-    aliases: ["local_address", "local address", "campus address", "hostel address", "hostel", "current address"]
+    aliases: ["local_address", "local address"]
   },
   {
     field: "father_name",
@@ -275,6 +287,15 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     aliases: ["father_whatsapp", "father whatsapp", "father's whatsapp", "father wa", "father_wa"]
   },
   {
+    field: "father_email",
+    label: "Father Email ID",
+    category: "Contact",
+    required: false,
+    description: "Student's father email address (optional, validated if provided). Defaults to NULL if omitted.",
+    sample: "robert.doe@example.com",
+    aliases: ["father_email", "father email", "father's email", "father email id", "father mail", "fathers email", "father's email id", "father email address", "father_email_id"]
+  },
+  {
     field: "mother_name",
     label: "Mother Full Name",
     category: "Contact",
@@ -300,6 +321,15 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "Mother's WhatsApp messaging number with country code. Defaults to NULL if omitted.",
     sample: "+977-9822222222",
     aliases: ["mother_whatsapp", "mother whatsapp", "mother's whatsapp", "mother wa", "mother_wa"]
+  },
+  {
+    field: "mother_email",
+    label: "Mother Email ID",
+    category: "Contact",
+    required: false,
+    description: "Student's mother email address (optional, validated if provided). Defaults to NULL if omitted.",
+    sample: "mary.doe@example.com",
+    aliases: ["mother_email", "mother email", "mother's email", "mother email id", "mother mail", "mothers email", "mother's email id", "mother email address", "mother_email_id"]
   },
 
   // Academic

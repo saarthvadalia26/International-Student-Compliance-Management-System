@@ -79,11 +79,28 @@ export interface ReminderSummaryMetrics {
   };
 }
 
+import { getServerSupabase } from "@/lib/supabase/server";
+import { requireAdministrator } from "@/lib/auth/permissions";
+
+async function getAdminUser() {
+  const supabase = await getServerSupabase();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    if (process.env.NODE_ENV === "development") {
+      return { id: "dev-admin", email: "admin@iscms.internal" };
+    }
+    throw new Error("Unauthorized: Please log in as an Administrator.");
+  }
+  requireAdministrator(user);
+  return user;
+}
+
 /**
  * Fetch all reminder threshold rules with optional document_type filter
  */
 export async function fetchReminderRules(docType?: string): Promise<ReminderRuleDto[]> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
     let query = supabase
       .from("reminder_rules")
@@ -144,6 +161,7 @@ export async function saveReminderRule(payload: {
   templateId?: string | null;
 }): Promise<{ success: boolean; rule?: ReminderRuleDto; error?: string }> {
   try {
+    await getAdminUser();
     if (payload.channel === "email" || payload.channel === "both") {
       return { success: false, error: "Email notification channel is currently disabled. Please select WhatsApp." };
     }
@@ -194,6 +212,7 @@ export async function saveReminderRule(payload: {
  */
 export async function toggleReminderRule(id: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
     const { error } = await supabase
       .from("reminder_rules")
@@ -214,6 +233,7 @@ export async function toggleReminderRule(id: string, isActive: boolean): Promise
  */
 export async function deleteReminderRule(id: string): Promise<{ success: boolean; error?: string }> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
     const { error } = await supabase
       .from("reminder_rules")
@@ -241,6 +261,7 @@ export async function fetchNotificationTemplates(filters?: {
   eventType?: string;
 }): Promise<NotificationTemplateDto[]> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
     let query = supabase
       .from("notification_templates")
@@ -331,6 +352,7 @@ export async function saveNotificationTemplate(payload: {
   actorEmail?: string;
 }): Promise<{ success: boolean; template?: NotificationTemplateDto; error?: string }> {
   try {
+    await getAdminUser();
     // 1. Strict Business Validation
     const validation = TemplateValidator.validateTemplate({
       title: payload.title,
@@ -441,6 +463,7 @@ export async function duplicateNotificationTemplate(
   actorEmail?: string
 ): Promise<{ success: boolean; template?: NotificationTemplateDto; error?: string }> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
 
     const { data: source, error: sErr } = await supabase
@@ -508,6 +531,7 @@ export async function toggleNotificationTemplateStatus(
   actorEmail?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
     const isActive = status === "ACTIVE";
 
@@ -560,6 +584,7 @@ export async function toggleNotificationTemplateStatus(
  */
 export async function deleteNotificationTemplate(id: string, actorEmail?: string): Promise<{ success: boolean; archived?: boolean; error?: string }> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
 
     // Check if referenced in notifications
@@ -626,6 +651,7 @@ export async function deleteNotificationTemplate(id: string, actorEmail?: string
  */
 export async function fetchTemplateAuditLogs(templateId: string): Promise<TemplateAuditLogDto[]> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
     const { data, error } = await supabase
       .from("notification_template_audit_log")
@@ -664,6 +690,7 @@ export async function fetchCommunicationLogs(filters?: {
   limit?: number;
 }): Promise<CommunicationLogItem[]> {
   try {
+    await getAdminUser();
     const supabase = getAdminSupabase();
     let query = supabase
       .from("notifications")
@@ -731,6 +758,7 @@ export async function fetchCommunicationLogs(filters?: {
  * Fetch overview summary metrics for Passport, Visa, and eFRRO
  */
 export async function fetchReminderSummary(): Promise<ReminderSummaryMetrics> {
+  await getAdminUser();
   const fallback: ReminderSummaryMetrics = {
     passport: { total: 0, upcoming: 0, overdue: 0 },
     visa: { total: 0, upcoming: 0, overdue: 0 },

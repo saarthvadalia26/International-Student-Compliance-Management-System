@@ -134,6 +134,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           father_whatsapp: input.fatherWhatsapp?.trim() || null,
           father_whatsapp_country_code: input.fatherWhatsappCountryCode?.trim() || null,
           father_whatsapp_number: input.fatherWhatsappNumber?.trim() || null,
+          father_email: input.fatherEmail && input.fatherEmail.trim() ? input.fatherEmail.trim().toLowerCase() : null,
           mother_name: input.motherName?.trim() || null,
           mother_mobile: input.motherMobile?.trim() || null,
           mother_mobile_country_code: input.motherMobileCountryCode?.trim() || null,
@@ -141,6 +142,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           mother_whatsapp: input.motherWhatsapp?.trim() || null,
           mother_whatsapp_country_code: input.motherWhatsappCountryCode?.trim() || null,
           mother_whatsapp_number: input.motherWhatsappNumber?.trim() || null,
+          mother_email: input.motherEmail && input.motherEmail.trim() ? input.motherEmail.trim().toLowerCase() : null,
           created_by: actorId,
           updated_by: actorId
         })
@@ -168,7 +170,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
           phone_home_country_code: input.phoneHomeCountryCode?.trim() || null,
           phone_home_number: input.phoneHomeNumber?.trim() || null,
           permanent_address: permAddressVal,
-          local_address: input.localAddress?.trim() || null,
+          present_address: (input.presentAddress && input.presentAddress.trim()) ? input.presentAddress.trim() : (input.localAddress?.trim() || null),
+          local_address: (input.presentAddress && input.presentAddress.trim()) ? input.presentAddress.trim() : (input.localAddress?.trim() || null),
           created_by: actorId,
           updated_by: actorId
         })
@@ -442,6 +445,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           fatherWhatsapp: personalData.father_whatsapp || null,
           fatherWhatsappCountryCode: personalData.father_whatsapp_country_code || null,
           fatherWhatsappNumber: personalData.father_whatsapp_number || null,
+          fatherEmail: personalData.father_email || null,
           motherName: personalData.mother_name || null,
           motherMobile: personalData.mother_mobile || null,
           motherMobileCountryCode: personalData.mother_mobile_country_code || null,
@@ -449,6 +453,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           motherWhatsapp: personalData.mother_whatsapp || null,
           motherWhatsappCountryCode: personalData.mother_whatsapp_country_code || null,
           motherWhatsappNumber: personalData.mother_whatsapp_number || null,
+          motherEmail: personalData.mother_email || null,
           createdAt: new Date(personalData.created_at),
           updatedAt: new Date(personalData.updated_at),
           deletedAt: personalData.deleted_at ? new Date(personalData.deleted_at) : null,
@@ -461,7 +466,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
           phoneHome: contactData.phone_home,
           phoneLocal: contactData.phone_local,
           permanentAddress: contactData.permanent_address,
-          localAddress: contactData.local_address,
+          presentAddress: contactData.present_address || contactData.local_address || null,
+          localAddress: contactData.local_address || contactData.present_address || null,
           createdAt: new Date(contactData.created_at),
           updatedAt: new Date(contactData.updated_at),
           deletedAt: contactData.deleted_at ? new Date(contactData.deleted_at) : null,
@@ -589,6 +595,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         fatherWhatsapp: personal?.father_whatsapp || null,
         fatherWhatsappCountryCode: personal?.father_whatsapp_country_code || null,
         fatherWhatsappNumber: personal?.father_whatsapp_number || null,
+        fatherEmail: personal?.father_email || null,
         motherName: personal?.mother_name || null,
         motherMobile: personal?.mother_mobile || null,
         motherMobileCountryCode: personal?.mother_mobile_country_code || null,
@@ -596,6 +603,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         motherWhatsapp: personal?.mother_whatsapp || null,
         motherWhatsappCountryCode: personal?.mother_whatsapp_country_code || null,
         motherWhatsappNumber: personal?.mother_whatsapp_number || null,
+        motherEmail: personal?.mother_email || null,
         createdAt: personal?.created_at ? new Date(personal.created_at) : new Date(student.created_at),
         updatedAt: personal?.updated_at ? new Date(personal.updated_at) : new Date(student.updated_at),
         deletedAt: personal?.deleted_at ? new Date(personal.deleted_at) : null,
@@ -612,7 +620,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         phoneHomeCountryCode: contact?.phone_home_country_code || null,
         phoneHomeNumber: contact?.phone_home_number || null,
         permanentAddress: contact?.permanent_address || null,
-        localAddress: contact?.local_address || null,
+        presentAddress: contact?.present_address || contact?.local_address || null,
+        localAddress: contact?.local_address || contact?.present_address || null,
         createdAt: contact?.created_at ? new Date(contact.created_at) : new Date(student.created_at),
         updatedAt: contact?.updated_at ? new Date(contact.updated_at) : new Date(student.updated_at),
         deletedAt: contact?.deleted_at ? new Date(contact.deleted_at) : null,
@@ -770,6 +779,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.fatherWhatsapp !== undefined) personalUpdates.father_whatsapp = input.fatherWhatsapp ? input.fatherWhatsapp.trim() : null;
     if (input.fatherWhatsappCountryCode !== undefined) personalUpdates.father_whatsapp_country_code = input.fatherWhatsappCountryCode ? input.fatherWhatsappCountryCode.trim() : null;
     if (input.fatherWhatsappNumber !== undefined) personalUpdates.father_whatsapp_number = input.fatherWhatsappNumber ? input.fatherWhatsappNumber.trim() : null;
+    if (input.fatherEmail !== undefined) personalUpdates.father_email = input.fatherEmail && input.fatherEmail.trim() ? input.fatherEmail.trim().toLowerCase() : null;
     if (input.motherName !== undefined) personalUpdates.mother_name = input.motherName ? input.motherName.trim() : null;
     if (input.motherMobile !== undefined) personalUpdates.mother_mobile = input.motherMobile ? input.motherMobile.trim() : null;
     if (input.motherMobileCountryCode !== undefined) personalUpdates.mother_mobile_country_code = input.motherMobileCountryCode ? input.motherMobileCountryCode.trim() : null;
@@ -777,6 +787,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.motherWhatsapp !== undefined) personalUpdates.mother_whatsapp = input.motherWhatsapp ? input.motherWhatsapp.trim() : null;
     if (input.motherWhatsappCountryCode !== undefined) personalUpdates.mother_whatsapp_country_code = input.motherWhatsappCountryCode ? input.motherWhatsappCountryCode.trim() : null;
     if (input.motherWhatsappNumber !== undefined) personalUpdates.mother_whatsapp_number = input.motherWhatsappNumber ? input.motherWhatsappNumber.trim() : null;
+    if (input.motherEmail !== undefined) personalUpdates.mother_email = input.motherEmail && input.motherEmail.trim() ? input.motherEmail.trim().toLowerCase() : null;
 
     if (Object.keys(personalUpdates).length > 0) {
       personalUpdates.updated_at = new Date().toISOString();
@@ -794,7 +805,15 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.phoneHomeCountryCode !== undefined) contactUpdates.phone_home_country_code = input.phoneHomeCountryCode ? input.phoneHomeCountryCode.trim() : null;
     if (input.phoneHomeNumber !== undefined) contactUpdates.phone_home_number = input.phoneHomeNumber ? input.phoneHomeNumber.trim() : null;
     if (input.permanentAddress !== undefined) contactUpdates.permanent_address = input.permanentAddress && input.permanentAddress.trim() ? input.permanentAddress.trim() : null;
-    if (input.localAddress !== undefined) contactUpdates.local_address = input.localAddress ? input.localAddress.trim() : null;
+    if (input.presentAddress !== undefined) {
+      const pVal = input.presentAddress && input.presentAddress.trim() ? input.presentAddress.trim() : null;
+      contactUpdates.present_address = pVal;
+      contactUpdates.local_address = pVal;
+    } else if (input.localAddress !== undefined) {
+      const lVal = input.localAddress && input.localAddress.trim() ? input.localAddress.trim() : null;
+      contactUpdates.local_address = lVal;
+      contactUpdates.present_address = lVal;
+    }
     if (Object.keys(contactUpdates).length > 0) {
       contactUpdates.updated_at = new Date().toISOString();
       contactUpdates.updated_by = actorId;

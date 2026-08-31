@@ -93,7 +93,14 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Administrator-Only Route Guards ───────────────────────────────────────
-  const adminOnlyPaths = ["/dashboard/health", "/reports/audit", "/settings"];
+  const adminOnlyPaths = [
+    "/dashboard/health",
+    "/monitoring",
+    "/reports",
+    "/reminders",
+    "/settings",
+    "/students/import"
+  ];
 
   if (adminOnlyPaths.some((p) => pathname.startsWith(p))) {
     if (!user) {

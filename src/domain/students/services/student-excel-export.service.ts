@@ -17,6 +17,7 @@ import {
   generateStudentExportFilename 
 } from "../utils/student-filter.util";
 import type { User } from "@supabase/supabase-js";
+import { requireAdministrator } from "@/lib/auth/permissions";
 
 interface DatabaseVersionRow {
   id?: string;
@@ -160,6 +161,7 @@ export class StudentExcelExportService {
     mimeType: string;
     count: number;
   }> {
+    requireAdministrator(actor);
     const supabase = getAdminSupabase();
 
     // 1. Query full student dataset with related tables
@@ -346,6 +348,8 @@ export class StudentExcelExportService {
         email: contact?.email || "",
         phoneLocal: contact?.phone_local || contact?.phone_local_number || "N/A",
         phoneHome: contact?.phone_home || contact?.phone_home_number || "N/A",
+        permanentAddress: contact?.permanent_address || "",
+        presentAddress: contact?.present_address || contact?.local_address || "",
         emergencyContactName: primaryEmergency?.name || "N/A",
         emergencyContactPhone: primaryEmergency?.phone || "N/A",
         complianceStatus: mappedCompliance,
@@ -403,6 +407,8 @@ export class StudentExcelExportService {
       "Email Address",
       "Mobile (Local)",
       "Mobile (Home)",
+      "Permanent Address",
+      "Present / Current Address",
       "Emergency Contact Name",
       "Emergency Contact Phone"
     ];
@@ -454,6 +460,8 @@ export class StudentExcelExportService {
       s.email || "Not Provided",
       s.phoneLocal || "N/A",
       s.phoneHome || "N/A",
+      s.permanentAddress || "",
+      s.presentAddress || "",
       s.emergencyContactName || "N/A",
       s.emergencyContactPhone || "N/A"
     ]);
@@ -515,6 +523,8 @@ export class StudentExcelExportService {
       { wch: 28 }, // Email Address
       { wch: 18 }, // Mobile (Local)
       { wch: 18 }, // Mobile (Home)
+      { wch: 32 }, // Permanent Address
+      { wch: 32 }, // Present / Current Address
       { wch: 24 }, // Emergency Contact Name
       { wch: 20 }, // Emergency Contact Phone
     ];

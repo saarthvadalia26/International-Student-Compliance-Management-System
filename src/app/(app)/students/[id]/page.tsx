@@ -117,6 +117,7 @@ export interface StudentProfile {
   phoneHome: string;
   phoneLocal: string;
   permanentAddress: string;
+  presentAddress?: string | null;
   localAddress: string;
   currentSemester: number;
   totalSemesters?: number;
@@ -152,9 +153,11 @@ export interface StudentProfile {
   fatherName?: string | null;
   fatherMobile?: string | null;
   fatherWhatsapp?: string | null;
+  fatherEmail?: string | null;
   motherName?: string | null;
   motherMobile?: string | null;
   motherWhatsapp?: string | null;
+  motherEmail?: string | null;
   programName: string;
   programCode: string;
   programId?: string | null;
@@ -721,13 +724,16 @@ export default function StudentDetailsPage({ params }: PageProps) {
     phoneHome: "",
     phoneLocal: "",
     permanentAddress: "",
+    presentAddress: "",
     localAddress: "",
     fatherName: "",
     fatherMobile: "",
     fatherWhatsapp: "",
+    fatherEmail: "",
     motherName: "",
     motherMobile: "",
     motherWhatsapp: "",
+    motherEmail: "",
     emergencyContactName: "",
     emergencyContactRelation: "parent",
     emergencyContactPhone: "",
@@ -780,13 +786,16 @@ export default function StudentDetailsPage({ params }: PageProps) {
         phoneHome: student.phoneHome,
         phoneLocal: student.phoneLocal || "",
         permanentAddress: student.permanentAddress,
-        localAddress: student.localAddress || "",
+        presentAddress: student.presentAddress || student.localAddress || "",
+        localAddress: student.localAddress || student.presentAddress || "",
         fatherName: student.fatherName || "",
         fatherMobile: student.fatherMobile || "",
         fatherWhatsapp: student.fatherWhatsapp || "",
+        fatherEmail: student.fatherEmail || "",
         motherName: student.motherName || "",
         motherMobile: student.motherMobile || "",
         motherWhatsapp: student.motherWhatsapp || "",
+        motherEmail: student.motherEmail || "",
         emergencyContactName: student.emergencyContact?.name && student.emergencyContact.name !== "Not Specified" ? student.emergencyContact.name : "",
         emergencyContactRelation: student.emergencyContact?.relationship || "parent",
         emergencyContactPhone: student.emergencyContact?.phone && student.emergencyContact.phone !== "Not Specified" ? student.emergencyContact.phone : "",
@@ -845,7 +854,9 @@ export default function StudentDetailsPage({ params }: PageProps) {
       phoneHome: student.phoneHome,
       permanentAddress: student.permanentAddress,
       fatherName: student.fatherName,
+      fatherEmail: student.fatherEmail,
       motherName: student.motherName,
+      motherEmail: student.motherEmail,
       emergencyContactName: student.emergencyContact?.name,
       emergencyContactPhone: student.emergencyContact?.phone,
       passportNumber: student.passport?.number,
@@ -867,6 +878,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(editForm.email.trim())) {
         toast.error("Validation Error", { description: "Please enter a valid email address format." });
+        return;
+      }
+    }
+    if (editForm.fatherEmail && editForm.fatherEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editForm.fatherEmail.trim())) {
+        toast.error("Validation Error", { description: "Please enter a valid Father Email ID format." });
+        return;
+      }
+    }
+    if (editForm.motherEmail && editForm.motherEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editForm.motherEmail.trim())) {
+        toast.error("Validation Error", { description: "Please enter a valid Mother Email ID format." });
         return;
       }
     }
@@ -906,14 +931,17 @@ export default function StudentDetailsPage({ params }: PageProps) {
         email: editForm.email?.trim() || undefined,
         phoneHome: editForm.phoneHome?.trim() || undefined,
         phoneLocal: editForm.phoneLocal?.trim() || undefined,
-        permanentAddress: editForm.permanentAddress?.trim() || undefined,
-        localAddress: editForm.localAddress?.trim() || undefined,
-        fatherName: editForm.fatherName?.trim() || undefined,
-        fatherMobile: editForm.fatherMobile?.trim() || undefined,
-        fatherWhatsapp: editForm.fatherWhatsapp?.trim() || undefined,
-        motherName: editForm.motherName?.trim() || undefined,
-        motherMobile: editForm.motherMobile?.trim() || undefined,
-        motherWhatsapp: editForm.motherWhatsapp?.trim() || undefined,
+        permanentAddress: editForm.permanentAddress !== undefined ? (editForm.permanentAddress?.trim() || null) : undefined,
+        presentAddress: editForm.presentAddress !== undefined ? (editForm.presentAddress?.trim() || null) : (editForm.localAddress !== undefined ? (editForm.localAddress?.trim() || null) : undefined),
+        localAddress: editForm.presentAddress !== undefined ? (editForm.presentAddress?.trim() || null) : (editForm.localAddress !== undefined ? (editForm.localAddress?.trim() || null) : undefined),
+        fatherName: editForm.fatherName !== undefined ? (editForm.fatherName?.trim() || null) : undefined,
+        fatherMobile: editForm.fatherMobile !== undefined ? (editForm.fatherMobile?.trim() || null) : undefined,
+        fatherWhatsapp: editForm.fatherWhatsapp !== undefined ? (editForm.fatherWhatsapp?.trim() || null) : undefined,
+        fatherEmail: editForm.fatherEmail !== undefined ? (editForm.fatherEmail.trim() ? editForm.fatherEmail.trim().toLowerCase() : null) : undefined,
+        motherName: editForm.motherName !== undefined ? (editForm.motherName?.trim() || null) : undefined,
+        motherMobile: editForm.motherMobile !== undefined ? (editForm.motherMobile?.trim() || null) : undefined,
+        motherWhatsapp: editForm.motherWhatsapp !== undefined ? (editForm.motherWhatsapp?.trim() || null) : undefined,
+        motherEmail: editForm.motherEmail !== undefined ? (editForm.motherEmail.trim() ? editForm.motherEmail.trim().toLowerCase() : null) : undefined,
         relationshipName: editForm.emergencyContactName?.trim() || undefined,
         relationshipType: (editForm.emergencyContactRelation as RelationshipType) || undefined,
         relationshipPhone: editForm.emergencyContactPhone?.trim() || undefined,
@@ -1511,12 +1539,12 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <span className="text-muted-foreground block font-caption">Permanent Home Address</span>
+                      <span className="text-muted-foreground block font-caption">Permanent Address</span>
                       <span className="font-medium text-foreground block leading-relaxed">{student.permanentAddress || "Not provided"}</span>
                     </div>
                     <div className="space-y-1">
-                      <span className="text-muted-foreground block font-caption">Local Address (Host Country Hostel/Rent)</span>
-                      <span className="font-medium text-foreground block leading-relaxed">{student.localAddress || "Not provided"}</span>
+                      <span className="text-muted-foreground block font-caption">Present / Current Address</span>
+                      <span className="font-medium text-foreground block leading-relaxed">{student.presentAddress || student.localAddress || "Not provided"}</span>
                     </div>
                   </div>
 
@@ -1566,6 +1594,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
                         <span className="text-muted-foreground block font-caption">WhatsApp Number</span>
                         <span className="font-medium text-foreground block">{student.fatherWhatsapp || "Not provided"}</span>
                       </div>
+                      <div className="space-y-1">
+                        <span className="text-muted-foreground block font-caption">Email ID</span>
+                        <span className="font-medium text-foreground block truncate">{student.fatherEmail || "Not provided"}</span>
+                      </div>
                     </div>
 
                     {/* Mother Details */}
@@ -1582,6 +1614,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       <div className="space-y-1">
                         <span className="text-muted-foreground block font-caption">WhatsApp Number</span>
                         <span className="font-medium text-foreground block">{student.motherWhatsapp || "Not provided"}</span>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-muted-foreground block font-caption">Email ID</span>
+                        <span className="font-medium text-foreground block truncate">{student.motherEmail || "Not provided"}</span>
                       </div>
                     </div>
                   </div>
@@ -2673,13 +2709,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">Permanent Home Address</label>
-                <Textarea id="permanentAddress" value={editForm.permanentAddress} onChange={handleFormChange} className="min-h-16 text-sm" />
+                <label className="text-xs font-medium text-foreground" htmlFor="permanentAddress">Permanent Address</label>
+                <Textarea id="permanentAddress" value={editForm.permanentAddress} onChange={handleFormChange} placeholder="e.g. 123 Main Street, Kathmandu, Nepal" className="min-h-16 text-sm" />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="localAddress">Local Host Address</label>
-                <Textarea id="localAddress" value={editForm.localAddress} onChange={handleFormChange} className="min-h-16 text-sm" />
+                <label className="text-xs font-medium text-foreground" htmlFor="presentAddress">Present / Current Address</label>
+                <Textarea id="presentAddress" value={editForm.presentAddress !== undefined ? editForm.presentAddress : editForm.localAddress} onChange={(e) => setEditForm(p => ({ ...p, presentAddress: e.target.value, localAddress: e.target.value }))} placeholder="e.g. Hostel Block B, NFSU Campus, Gandhinagar, Gujarat, India" className="min-h-16 text-sm" />
               </div>
             </div>
 
@@ -2707,6 +2743,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <Input id="fatherWhatsapp" value={editForm.fatherWhatsapp} onChange={handleFormChange} placeholder="e.g. +44 7911 123456" className="h-9 text-sm" />
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="fatherEmail">Father Email ID</label>
+                  <Input id="fatherEmail" type="email" value={editForm.fatherEmail} onChange={handleFormChange} placeholder="e.g. father@example.com" className="h-9 text-sm" />
+                </div>
               </div>
 
               {/* Mother Details */}
@@ -2725,6 +2765,10 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <label className="text-xs font-medium text-foreground" htmlFor="motherWhatsapp">Mother WhatsApp Number</label>
                     <Input id="motherWhatsapp" value={editForm.motherWhatsapp} onChange={handleFormChange} placeholder="e.g. +44 7911 654321" className="h-9 text-sm" />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="motherEmail">Mother Email ID</label>
+                  <Input id="motherEmail" type="email" value={editForm.motherEmail} onChange={handleFormChange} placeholder="e.g. mother@example.com" className="h-9 text-sm" />
                 </div>
               </div>
             </div>

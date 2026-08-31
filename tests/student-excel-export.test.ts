@@ -445,23 +445,17 @@ describe("ISCMS Student Excel Export Acceptance Tests", () => {
   // 4. SECURITY & AUTHORIZATION TESTS
   // --------------------------------------------------------------------------
 
-  it("Test 13: Role-based access control allows admin and staff, rejects student", () => {
+  it("Test 13: Role-based access control restricts export to administrator only, rejects staff and student", () => {
     const adminUser: any = { id: "u1", email: "admin@nfsu.ac.in", user_metadata: { role: "administrator" } };
     const staffUser: any = { id: "u2", email: "staff@nfsu.ac.in", user_metadata: { role: "staff" } };
     const studentUser: any = { id: "u3", email: "student@nfsu.ac.in", user_metadata: { role: "student" } };
     const unauthenticatedUser: any = null;
 
-    assert.equal(isInternalUser(adminUser), true);
     assert.equal(isAdministrator(adminUser), true);
+    assert.equal(isAdministrator(staffUser), false);
+    assert.equal(isAdministrator(studentUser), false);
+    assert.equal(isAdministrator(unauthenticatedUser), false);
 
-    assert.equal(isInternalUser(staffUser), true);
-    assert.equal(isStaff(staffUser), true);
-
-    assert.equal(isInternalUser(studentUser), false);
-    assert.equal(isStudent(studentUser), true);
-
-    assert.equal(isInternalUser(unauthenticatedUser), false);
-
-    console.log("✅ [PASS] Authorization guards correctly restrict export to administrator and staff roles");
+    console.log("✅ [PASS] Authorization guards correctly restrict export to administrator role only");
   });
 });

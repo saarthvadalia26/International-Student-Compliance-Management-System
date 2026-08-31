@@ -708,6 +708,40 @@ export class BulkStudentImportService {
         warningsBreakdown.addressMissing++;
       }
 
+      // Optional Father Email format validation
+      const fatherEmail = mappedData.father_email?.trim() || "";
+      if (fatherEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(fatherEmail)) {
+          errors.push({
+            field: "father_email",
+            fieldLabel: "Father Email ID",
+            value: fatherEmail,
+            problem: "Invalid Father email address format.",
+            suggestion: "Enter a valid email address (e.g. father@example.com)."
+          });
+        } else {
+          mappedData.father_email = fatherEmail.toLowerCase();
+        }
+      }
+
+      // Optional Mother Email format validation
+      const motherEmail = mappedData.mother_email?.trim() || "";
+      if (motherEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(motherEmail)) {
+          errors.push({
+            field: "mother_email",
+            fieldLabel: "Mother Email ID",
+            value: motherEmail,
+            problem: "Invalid Mother email address format.",
+            suggestion: "Enter a valid email address (e.g. mother@example.com)."
+          });
+        } else {
+          mappedData.mother_email = motherEmail.toLowerCase();
+        }
+      }
+
       // =========================================================================
       // 6. OPTIONAL EMERGENCY CONTACT & RELATIONSHIP
       // =========================================================================
@@ -1191,6 +1225,7 @@ export class BulkStudentImportService {
             father_whatsapp: fatherWhatsappParsed?.formattedE164 || (data.father_whatsapp ? data.father_whatsapp.trim() : null),
             father_whatsapp_country_code: fatherWhatsappParsed?.countryCode || null,
             father_whatsapp_number: fatherWhatsappParsed?.number || null,
+            father_email: data.father_email ? data.father_email.trim().toLowerCase() : null,
             mother_name: data.mother_name?.trim() || null,
             mother_mobile: motherPhoneParsed?.formattedE164 || (data.mother_mobile ? data.mother_mobile.trim() : null),
             mother_mobile_country_code: motherPhoneParsed?.countryCode || null,
@@ -1198,6 +1233,7 @@ export class BulkStudentImportService {
             mother_whatsapp: motherWhatsappParsed?.formattedE164 || (data.mother_whatsapp ? data.mother_whatsapp.trim() : null),
             mother_whatsapp_country_code: motherWhatsappParsed?.countryCode || null,
             mother_whatsapp_number: motherWhatsappParsed?.number || null,
+            mother_email: data.mother_email ? data.mother_email.trim().toLowerCase() : null,
             created_by: params.actorId,
             updated_by: params.actorId
           });
@@ -1226,7 +1262,8 @@ export class BulkStudentImportService {
             phone_local_country_code: localPhoneParsed.countryCode,
             phone_local_number: localPhoneParsed.number,
             permanent_address: data.permanent_address ? data.permanent_address.trim() : null,
-            local_address: data.local_address ? data.local_address.trim() : null,
+            present_address: data.present_address ? data.present_address.trim() : (data.local_address ? data.local_address.trim() : null),
+            local_address: data.present_address ? data.present_address.trim() : (data.local_address ? data.local_address.trim() : null),
             created_by: params.actorId,
             updated_by: params.actorId
           });

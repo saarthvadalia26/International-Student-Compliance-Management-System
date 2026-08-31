@@ -154,7 +154,7 @@ export async function downloadImportTemplateAction(format: "xlsx" | "csv" = "xls
   error?: string;
 }> {
   try {
-    await getInternalUser();
+    await getAdminUser();
     const { buffer, fileName, mimeType } = BulkStudentImportService.generateImportTemplate(format);
     return {
       success: true,
@@ -178,7 +178,7 @@ export async function fetchImportHistoryAction(): Promise<{
   error?: string;
 }> {
   try {
-    await getInternalUser();
+    await getAdminUser();
     const batches = await BulkStudentImportService.listImportBatches();
     return {
       success: true,
@@ -205,7 +205,7 @@ export async function downloadImportErrorReportAction(
   error?: string;
 }> {
   try {
-    await getInternalUser();
+    await getAdminUser();
     const { buffer, fileName, mimeType } = BulkStudentImportService.generateErrorReport(report, executionErrors);
     return {
       success: true,

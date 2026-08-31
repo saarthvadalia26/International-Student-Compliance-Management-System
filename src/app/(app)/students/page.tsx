@@ -47,6 +47,7 @@ import { ACADEMIC_LEVEL_OPTIONS, normalizeAcademicLevel } from "@/domain/academi
 import { matchStudentFilters, StudentExportFilterCriteria } from "@/domain/students/utils/student-filter.util";
 import { useRouter } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+import { useUserRole } from "@/hooks/use-user-role";
 import { getStudentsListAction, exportStudentsExcelAction, StudentListItem } from "@/app/(app)/students/actions";
 
 export type Student = StudentListItem;
@@ -64,6 +65,7 @@ function formatDateDisplay(d?: string | null): string {
 
 export default function StudentListPage() {
   const router = useRouter();
+  const { isAdministrator } = useUserRole();
   const [searchQuery, setSearchQuery] = React.useState("");
   const [complianceFilter, setComplianceFilter] = React.useState<string>("all");
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
@@ -397,68 +399,75 @@ export default function StudentListPage() {
         </div>
         
         <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-          {/* Export Excel Action */}
-          <DropdownMenu>
-            <DropdownMenuTrigger render={
-              <Button 
-                variant="outline" 
-                size="sm" 
-                disabled={isExporting || students.length === 0}
-                className="h-9 gap-1.5 border-border hover:bg-muted/50 text-xs font-medium"
-              >
-                {isExporting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
-                    <span>Preparing Excel...</span>
-                  </>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                    <span>Export Excel</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
-                  </>
-                )}
-              </Button>
-            } />
-            <DropdownMenuContent align="end" className="w-[260px]">
-              <DropdownMenuLabel className="text-xs font-semibold">Student Excel Export</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                disabled={isExporting || filteredStudents.length === 0}
-                onClick={() => handleExport("filtered")}
-                className="text-xs cursor-pointer flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <Download className="h-3.5 w-3.5 text-emerald-600" />
-                  {isFilterActive ? "Export Filtered Students" : "Export All Students"}
-                </span>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                  {filteredStudents.length}
-                </Badge>
-              </DropdownMenuItem>
-              {isFilterActive && (
-                <DropdownMenuItem
+          {/* Export Excel Action — Administrator Only */}
+          {isAdministrator && (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={
+                <Button 
+                  variant="outline" 
+                  size="sm" 
                   disabled={isExporting || students.length === 0}
-                  onClick={() => handleExport("all")}
+                  className="h-9 gap-1.5 border-border hover:bg-muted/50 text-xs font-medium"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
+                      <span>Preparing Excel...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                      <span>Export Excel</span>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
+                    </>
+                  )}
+                </Button>
+              } />
+              <DropdownMenuContent align="end" className="w-[260px]">
+                <DropdownMenuLabel className="text-xs font-semibold">Student Excel Export</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={isExporting || filteredStudents.length === 0}
+                  onClick={() => handleExport("filtered")}
                   className="text-xs cursor-pointer flex items-center justify-between"
                 >
                   <span className="flex items-center gap-2">
-                    <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                    Export All Students
+                    <Download className="h-3.5 w-3.5 text-emerald-600" />
+                    {isFilterActive ? "Export Filtered Students" : "Export All Students"}
                   </span>
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                    {students.length}
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    {filteredStudents.length}
                   </Badge>
                 </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {isFilterActive && (
+                  <DropdownMenuItem
+                    disabled={isExporting || students.length === 0}
+                    onClick={() => handleExport("all")}
+                    className="text-xs cursor-pointer flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                      Export All Students
+                    </span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      {students.length}
+                    </Badge>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
-          <Link href="/students/import" passHref>
-            <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border hover:bg-muted/50 text-xs font-medium">
-              <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Bulk Import
-            </Button>
-          </Link>
+          {/* Bulk Import Action — Administrator Only */}
+          {isAdministrator && (
+            <Link href="/students/import" passHref>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 border-border hover:bg-muted/50 text-xs font-medium">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Bulk Import
+              </Button>
+            </Link>
+          )}
+
+          {/* Register Student — Permitted for both Administrator and Staff */}
           <Link href="/students/add" passHref>
             <Button size="sm" className="h-9 shrink-0 text-xs font-medium shadow-xs bg-primary text-primary-foreground hover:bg-primary/90">
               <UserPlus className="mr-1.5 h-4 w-4" /> Register Student

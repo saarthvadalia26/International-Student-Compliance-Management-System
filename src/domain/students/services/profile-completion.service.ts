@@ -58,11 +58,14 @@ export interface StudentProfileEvaluationData {
   phoneHome?: string | null;
   phoneLocal?: string | null;
   permanentAddress?: string | null;
+  presentAddress?: string | null;
   localAddress?: string | null;
 
   // Family
   fatherName?: string | null;
+  fatherEmail?: string | null;
   motherName?: string | null;
+  motherEmail?: string | null;
 
   // Emergency / Relationships
   emergencyContactName?: string | null;

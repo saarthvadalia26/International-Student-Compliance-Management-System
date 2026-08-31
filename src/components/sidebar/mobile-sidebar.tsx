@@ -126,11 +126,19 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
           <nav className="flex-1 overflow-y-auto p-4 space-y-1.5 scrollbar-none">
             {mobileNavigation.items
               .filter((item: NavItem) => {
+                // Reminders, Reports, Settings, Monitoring are Administrator-only
+                if (item.href === "/reminders") return isAdministrator;
+                if (item.href === "/reports") return isAdministrator;
                 if (item.href === "/settings") return isAdministrator;
+                if (item.href === "/monitoring") return isAdministrator;
                 return true;
               })
               .map((item: NavItem) => {
-                const hasChildren = Boolean(item.items && item.items.length > 0);
+                const visibleSubItems = item.items?.filter((subItem) => {
+                  if (subItem.href === "/students/import") return isAdministrator;
+                  return true;
+                });
+                const hasChildren = Boolean(visibleSubItems && visibleSubItems.length > 0);
                 const active = isLinkActive(item.href);
                 const isExpanded = Boolean(openMenus[item.title]);
                 const resolvedHref = getResolvedHref(item.href);
@@ -169,7 +177,7 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
                           id={`mobile-submenu-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
                           className="mt-1 ml-6 space-y-1 border-l border-border/60 pl-3 animate-in fade-in-50 slide-in-from-top-1 duration-150"
                         >
-                          {item.items?.map((subItem) => {
+                          {visibleSubItems?.map((subItem) => {
                             const subResolved = getResolvedHref(subItem.href);
                             const subActive = pathname === subResolved;
 

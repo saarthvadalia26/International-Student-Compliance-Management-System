@@ -26,6 +26,10 @@ export const StudentPersonalSchema = z.object({
   fatherWhatsapp: z.string().optional().nullable(),
   fatherWhatsappCountryCode: z.string().optional().nullable(),
   fatherWhatsappNumber: z.string().optional().nullable(),
+  fatherEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid Father email address format" }),
   motherName: z.string().max(255).optional().nullable(),
   motherMobile: z.string().optional().nullable(),
   motherMobileCountryCode: z.string().optional().nullable(),
@@ -33,6 +37,10 @@ export const StudentPersonalSchema = z.object({
   motherWhatsapp: z.string().optional().nullable(),
   motherWhatsappCountryCode: z.string().optional().nullable(),
   motherWhatsappNumber: z.string().optional().nullable(),
+  motherEmail: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    return z.string().email().safeParse(val.trim()).success;
+  }, { message: "Invalid Mother email address format" }),
   religion: z.string().max(50).optional().nullable(),
 });
 
@@ -52,6 +60,7 @@ export const StudentContactSchema = z.object({
   phoneHomeCountryCode: z.string().optional().nullable(),
   phoneHomeNumber: z.string().optional().nullable(),
   permanentAddress: z.string().optional().nullable(),
+  presentAddress: z.string().optional().nullable(),
   localAddress: z.string().optional().nullable(),
 });
 
