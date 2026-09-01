@@ -788,8 +788,10 @@ export class BulkStudentImportService {
 
       // Optional ICCR & SII Application Numbers (independent of category)
       const iccrAppNo = mappedData.iccr_application_number?.trim() || "";
+      const iccrScheme = mappedData.iccr_scholarship_scheme_name?.trim() || "";
       const siiAppNo = mappedData.sii_application_number?.trim() || "";
       mappedData.iccr_application_number = iccrAppNo;
+      mappedData.iccr_scholarship_scheme_name = iccrScheme;
       mappedData.sii_application_number = siiAppNo;
 
       // Conditional Other -> Admission Category Other check
@@ -1314,6 +1316,7 @@ export class BulkStudentImportService {
         }
 
         const resolvedIccrAppNo = data.iccr_application_number?.trim() || null;
+        const resolvedIccrScheme = data.iccr_scholarship_scheme_name?.trim() || null;
         const resolvedSiiNo = data.sii_application_number?.trim() || null;
 
         let { error: acadErr } = await supabase
@@ -1329,6 +1332,7 @@ export class BulkStudentImportService {
             admission_category_other: data.admission_category === "other" ? (data.admission_category_other?.trim() || null) : null,
             sii_application_number: resolvedSiiNo,
             iccr_application_number: resolvedIccrAppNo,
+            iccr_scholarship_scheme_name: resolvedIccrScheme,
             nfsu_campus: data.nfsu_campus ? data.nfsu_campus.trim() : null,
             academic_status: "good_standing",
             created_by: params.actorId,

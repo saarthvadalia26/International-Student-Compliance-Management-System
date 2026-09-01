@@ -323,6 +323,7 @@ describe("ISCMS Student Excel Export Acceptance Tests", () => {
       "Student Name",
       "Registration / Enrolment Number",
       "ICCR Application Number",
+      "Name of ICCR Scholarship Scheme",
       "SII Application Number",
       "NFSU Campus",
       "Admission / Academic Year",
@@ -370,6 +371,7 @@ describe("ISCMS Student Excel Export Acceptance Tests", () => {
       s.fullName,
       s.registrationNumber || "Not Provided",
       s.iccrApplicationNumber || "N/A",
+      s.iccrScholarshipSchemeName || "",
       s.siiApplicationNumber || "N/A",
       s.nfsuCampus || "Not Specified",
       "2024-25",
@@ -431,14 +433,15 @@ describe("ISCMS Student Excel Export Acceptance Tests", () => {
 
     // Verify row count (1 header + 5 students)
     assert.equal(parsedData.length, 6);
-    // Verify column count (44 columns)
-    assert.equal(parsedData[0].length, 44);
+    // Verify column count (45 columns)
+    assert.equal(parsedData[0].length, 45);
     assert.equal(parsedData[0][1], "Student Name");
-    assert.equal(parsedData[0][5], "NFSU Campus");
+    assert.equal(parsedData[0][4], "Name of ICCR Scholarship Scheme");
+    assert.equal(parsedData[0][6], "NFSU Campus");
     assert.equal(parsedData[1][1], "Ahmed Al-Mansoor");
     assert.equal(parsedData[3][1], "Jean-Pierre Nkurunziza");
 
-    console.log("✅ [PASS] Workbook integrity verified: Sheet 'Students', 38 columns, 5 data rows, UTF-8 unicode preserved");
+    console.log("✅ [PASS] Workbook integrity verified: Sheet 'Students', 45 columns, 5 data rows, UTF-8 unicode preserved");
   });
 
   // --------------------------------------------------------------------------

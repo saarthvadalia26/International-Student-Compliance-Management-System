@@ -75,6 +75,7 @@ export const StudentAcademicSchema = z.object({
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
+  iccrScholarshipSchemeName: z.string().max(255).optional().nullable(),
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
     const ad = new Date(data.admissionDate);

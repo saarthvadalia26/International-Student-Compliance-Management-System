@@ -145,6 +145,7 @@ export interface StudentDetailProfile {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  iccrScholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: string | null;
@@ -834,6 +835,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       admissionCategoryOther: academic?.admission_category_other || null,
       siiApplicationNumber: academic?.sii_application_number || null,
       iccrApplicationNumber: academic?.iccr_application_number || null,
+      iccrScholarshipSchemeName: academic?.iccr_scholarship_scheme_name || null,
       nfsuCampus: academic?.nfsu_campus || null,
       admissionAcademicYear: academic?.admission_academic_year || null,
       feePaymentCategory: academic?.fee_payment_category || null,

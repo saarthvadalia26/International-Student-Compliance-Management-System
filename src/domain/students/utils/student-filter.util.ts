@@ -32,6 +32,7 @@ export interface FilterableStudentTarget {
   school?: string | null;
   admissionCategory?: string | null;
   iccrApplicationNumber?: string | null;
+  iccrScholarshipSchemeName?: string | null;
   siiApplicationNumber?: string | null;
   nfsuCampus?: string | null;
   feePaymentCategory?: string | null;

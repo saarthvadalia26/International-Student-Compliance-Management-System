@@ -241,6 +241,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
           sii_application_number: resolvedSiiNo,
           iccr_application_number: resolvedIccrNo,
+          iccr_scholarship_scheme_name: input.iccrScholarshipSchemeName ? input.iccrScholarshipSchemeName.trim() : null,
           nfsu_campus: resolvedNfsuCampus,
           admission_academic_year: input.admissionAcademicYear ? input.admissionAcademicYear.trim() : null,
           fee_payment_category: input.feePaymentCategory || null,
@@ -485,6 +486,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           admissionCategoryOther: academicData.admission_category_other || null,
           siiApplicationNumber: academicData.sii_application_number || null,
           iccrApplicationNumber: academicData.iccr_application_number || null,
+          iccrScholarshipSchemeName: academicData.iccr_scholarship_scheme_name || null,
           nfsuCampus: academicData.nfsu_campus || null,
           admissionAcademicYear: academicData.admission_academic_year || null,
           feePaymentCategory: academicData.fee_payment_category || null,
@@ -642,6 +644,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         admissionCategoryOther: academic?.admission_category_other || null,
         siiApplicationNumber: academic?.sii_application_number || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
+        iccrScholarshipSchemeName: academic?.iccr_scholarship_scheme_name || null,
         nfsuCampus: academic?.nfsu_campus || null,
         admissionAcademicYear: academic?.admission_academic_year || null,
         feePaymentCategory: academic?.fee_payment_category || null,
@@ -843,6 +846,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
     }
     if (input.iccrApplicationNumber !== undefined) {
       academicUpdates.iccr_application_number = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
+    }
+    if (input.iccrScholarshipSchemeName !== undefined) {
+      academicUpdates.iccr_scholarship_scheme_name = input.iccrScholarshipSchemeName ? input.iccrScholarshipSchemeName.trim() : null;
     }
     if (input.siiApplicationNumber !== undefined) {
       academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;

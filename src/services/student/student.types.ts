@@ -100,6 +100,7 @@ export interface StudentAcademic {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  iccrScholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | null;
@@ -201,6 +202,7 @@ export interface RegisterStudentInput {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  iccrScholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | null;
@@ -282,6 +284,7 @@ export interface UpdateStudentInput {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  iccrScholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | null;

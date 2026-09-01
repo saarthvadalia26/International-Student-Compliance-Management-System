@@ -81,6 +81,7 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   admissionCategoryOther: { tab: "academic", elementId: "admissionCategoryOther", label: "Custom Admission Track" },
   siiApplicationNumber: { tab: "academic", elementId: "siiApplicationNumber", label: "SII Application Number" },
   iccrApplicationNumber: { tab: "academic", elementId: "iccrApplicationNumber", label: "ICCR Application Number" },
+  iccrScholarshipSchemeName: { tab: "academic", elementId: "iccrScholarshipSchemeName", label: "Name of ICCR Scholarship Scheme" },
   nfsuCampus: { tab: "academic", elementId: "nfsuCampus", label: "NFSU Campus" },
   admissionAcademicYear: { tab: "academic", elementId: "admissionAcademicYear", label: "Admission / Academic Year" },
   feePaymentCategory: { tab: "academic", elementId: "feePaymentCategory", label: "Fee Payment Category" },
@@ -206,6 +207,7 @@ export default function StudentRegistrationPage() {
     admissionCategoryOther: "",
     siiApplicationNumber: "",
     iccrApplicationNumber: "",
+    iccrScholarshipSchemeName: "",
     nfsuCampus: "",
     admissionAcademicYear: "",
     feePaymentCategory: "",
@@ -476,6 +478,7 @@ export default function StudentRegistrationPage() {
       admissionCategoryOther: formData.admissionCategory === "other" ? (formData.admissionCategoryOther.trim() || undefined) : undefined,
       siiApplicationNumber: formData.siiApplicationNumber?.trim() || undefined,
       iccrApplicationNumber: formData.iccrApplicationNumber?.trim() || undefined,
+      iccrScholarshipSchemeName: formData.iccrScholarshipSchemeName?.trim() || undefined,
       nfsuCampus: formData.nfsuCampus?.trim() || undefined,
       admissionAcademicYear: formData.admissionAcademicYear?.trim() || undefined,
       feePaymentCategory: (formData.feePaymentCategory as FeePaymentCategory) || undefined,
@@ -962,6 +965,26 @@ export default function StudentRegistrationPage() {
                     {validationErrors.iccrApplicationNumber && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                         {validationErrors.iccrApplicationNumber}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Name of ICCR Scholarship Scheme - Always visible, optional */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-medium text-foreground" htmlFor="iccrScholarshipSchemeName">
+                      Name of ICCR Scholarship Scheme <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Input
+                      id="iccrScholarshipSchemeName"
+                      placeholder="e.g. Silver Jubilee Scholarship Scheme, Africa Scholarship Scheme"
+                      value={formData.iccrScholarshipSchemeName}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className={`h-10 text-sm ${validationErrors.iccrScholarshipSchemeName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                    />
+                    {validationErrors.iccrScholarshipSchemeName && (
+                      <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                        {validationErrors.iccrScholarshipSchemeName}
                       </p>
                     )}
                   </div>

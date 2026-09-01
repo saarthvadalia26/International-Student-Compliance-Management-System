@@ -173,6 +173,7 @@ export interface StudentProfile {
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
+  iccrScholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | string | null;
@@ -714,6 +715,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     admissionCategoryOther: "",
     siiApplicationNumber: "",
     iccrApplicationNumber: "",
+    iccrScholarshipSchemeName: "",
     nfsuCampus: "",
     admissionAcademicYear: "",
     feePaymentCategory: "",
@@ -776,6 +778,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         admissionCategoryOther: student.admissionCategoryOther || "",
         siiApplicationNumber: student.siiApplicationNumber || "",
         iccrApplicationNumber: student.iccrApplicationNumber || "",
+        iccrScholarshipSchemeName: student.iccrScholarshipSchemeName || "",
         nfsuCampus: student.nfsuCampus || "",
         admissionAcademicYear: student.admissionAcademicYear || "",
         feePaymentCategory: student.feePaymentCategory || "",
@@ -956,6 +959,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         admissionCategoryOther: editForm.admissionCategory === "other" ? (editForm.admissionCategoryOther?.trim() || undefined) : undefined,
         siiApplicationNumber: editForm.siiApplicationNumber ? editForm.siiApplicationNumber.trim() : null,
         iccrApplicationNumber: editForm.iccrApplicationNumber ? editForm.iccrApplicationNumber.trim() : null,
+        iccrScholarshipSchemeName: editForm.iccrScholarshipSchemeName ? editForm.iccrScholarshipSchemeName.trim() : null,
         nfsuCampus: editForm.nfsuCampus ? editForm.nfsuCampus.trim() : null,
         admissionAcademicYear: editForm.admissionAcademicYear?.trim() || null,
         feePaymentCategory: (editForm.feePaymentCategory as FeePaymentCategory) || null,
@@ -1323,6 +1327,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <span className="text-muted-foreground block text-[11px] font-medium">ICCR Application Number</span>
                     <span className="font-semibold text-foreground block font-mono">
                       {student.iccrApplicationNumber || "Not provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Name of ICCR Scholarship Scheme</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.iccrScholarshipSchemeName || "Not provided"}
                     </span>
                   </div>
 
@@ -2469,6 +2480,19 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     value={editForm.iccrApplicationNumber} 
                     onChange={handleFormChange} 
                     className="h-9 text-sm font-mono" 
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="iccrScholarshipSchemeName">
+                    Name of ICCR Scholarship Scheme
+                  </label>
+                  <Input 
+                    id="iccrScholarshipSchemeName" 
+                    placeholder="e.g. Silver Jubilee Scholarship Scheme" 
+                    value={editForm.iccrScholarshipSchemeName} 
+                    onChange={handleFormChange} 
+                    className="h-9 text-sm" 
                   />
                 </div>
 

@@ -315,6 +315,7 @@ export class StudentExcelExportService {
         admissionCategory: academic?.admission_category || null,
         admissionCategoryOther: academic?.admission_category_other || null,
         iccrApplicationNumber: academic?.iccr_application_number || "",
+        iccrScholarshipSchemeName: academic?.iccr_scholarship_scheme_name || "",
         siiApplicationNumber: academic?.sii_application_number || "",
         nfsuCampus: academic?.nfsu_campus || "",
         admissionAcademicYear: academic?.admission_academic_year || "",
@@ -366,6 +367,7 @@ export class StudentExcelExportService {
       "Student Name",
       "Registration / Enrolment Number",
       "ICCR Application Number",
+      "Name of ICCR Scholarship Scheme",
       "SII Application Number",
       "NFSU Campus",
       "Admission / Academic Year",
@@ -419,6 +421,7 @@ export class StudentExcelExportService {
       s.fullName || "N/A",
       s.registrationNumber || "Not Provided",
       s.iccrApplicationNumber || "N/A",
+      s.iccrScholarshipSchemeName || "",
       s.siiApplicationNumber || "N/A",
       s.nfsuCampus ? s.nfsuCampus : "Not Specified",
       s.admissionAcademicYear || "",
@@ -482,6 +485,7 @@ export class StudentExcelExportService {
       { wch: 26 }, // Student Name
       { wch: 24 }, // Enrolment Number
       { wch: 22 }, // ICCR Number
+      { wch: 30 }, // Name of ICCR Scholarship Scheme
       { wch: 22 }, // SII Number
       { wch: 20 }, // NFSU Campus
       { wch: 22 }, // Admission / Academic Year

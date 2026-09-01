@@ -44,6 +44,7 @@ export type ISCMSImportField =
   | "admission_category_other"
   | "sii_application_number"
   | "iccr_application_number"
+  | "iccr_scholarship_scheme_name"
   | "nfsu_campus"
   | "current_semester"
   | "expected_graduation"
@@ -378,6 +379,25 @@ export const ISCMS_FIELD_DEFINITIONS: FieldDefinition[] = [
       "iccr number",
       "iccr ref",
       "iccr_ref"
+    ]
+  },
+  {
+    field: "iccr_scholarship_scheme_name",
+    label: "Name of ICCR Scholarship Scheme",
+    category: "Academic",
+    required: false,
+    description: "Name of the ICCR scholarship scheme under which the student is studying (e.g. Silver Jubilee Scholarship Scheme, Africa Scholarship Scheme).",
+    sample: "Silver Jubilee Scholarship Scheme",
+    aliases: [
+      "iccr_scholarship_scheme_name",
+      "iccr scholarship scheme name",
+      "iccr scholarship scheme",
+      "iccr_scholarship_scheme",
+      "scholarship scheme name",
+      "scholarship_scheme_name",
+      "iccr scheme",
+      "name of iccr scholarship scheme",
+      "scholarship scheme"
     ]
   },
   {

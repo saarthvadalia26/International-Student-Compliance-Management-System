@@ -68,6 +68,7 @@ export const RegisterStudentValidationSchema = z.object({
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
+  iccrScholarshipSchemeName: z.string().max(255).optional().nullable(),
   nfsuCampus: z.string().max(255).optional().nullable(),
   admissionAcademicYear: z.string().max(20).optional().nullable(),
   feePaymentCategory: z.enum(["self_financed", "scholarship"], {
@@ -244,6 +245,7 @@ export const UpdateStudentValidationSchema = z.object({
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
+  iccrScholarshipSchemeName: z.string().max(255).optional().nullable(),
   nfsuCampus: z.string().max(255).optional().nullable(),
   admissionAcademicYear: z.string().max(20).optional().nullable(),
   feePaymentCategory: z.enum(["self_financed", "scholarship"]).optional().nullable(),

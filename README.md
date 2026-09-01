@@ -84,6 +84,7 @@ Managing these obligations through disconnected spreadsheets or manual filing in
 * **Canonical Academic Hierarchy**: Structured data model linking Schools/Departments to Academic Programs and Student Academic profiles.
 * **Degree Level Catalog**: Configurable support for Undergraduate (`UG`), Postgraduate (`PG`), Integrated (`INTEGRATED`), Doctoral (`PhD`), and Diploma programs.
 * **Semester Progression Engine**: Computes current academic semester and expected graduation date dynamically from admission date and program duration.
+* **ICCR Scholarship Scheme Name** (`iccr_scholarship_scheme_name`): Optional free-text field on the Student Academic profile that records the name of the applicable ICCR scholarship scheme (e.g., *Silver Jubilee Scholarship Scheme*, *Africa Scholarship Scheme*). The field is independent of the ICCR Application Number and SII Application Number. Existing students may have no value for this field. It does not affect document compliance, Passport compliance, Visa compliance, eFRRO compliance, reminders, notifications, or document renewal logic. The field is included in the Student Excel Export for authorized users.
 
 ### 🌍 Country & Dial Code Master Data
 * **ISO 3166-1 Master Catalog**: Built-in dataset containing 120+ countries with official names, 2-letter alpha codes, and international phone dial codes.
@@ -120,7 +121,7 @@ flowchart TD
     end
 
     subgraph DataTier["Data & Infrastructure Layer"]
-        E[(Supabase PostgreSQL 15+<br/>• Row Level Security<br/>• Realtime Pub/Sub<br/>• 68 SQL Migrations)]
+        E[(Supabase PostgreSQL 15+<br/>• Row Level Security<br/>• Realtime Pub/Sub<br/>• 71 SQL Migrations)]
         F[(Object Storage<br/>• Single Canonical Bucket<br/>• iscms-documents<br/>• Presigned S3 URLs)]
         G[Notification Gateways<br/>• Meta WhatsApp Cloud API<br/>• Resend Email Gateway<br/>• In-App WebSocket Feed]
     end
@@ -355,7 +356,7 @@ cp .env.example .env.local
 Edit `.env.local` and supply your `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### 3. Database Migration
-Apply the 68 SQL migration scripts in `supabase/migrations/` in numerical sequence against your Supabase database instance.
+Apply the 71 SQL migration scripts in `supabase/migrations/` in numerical sequence against your Supabase database instance.
 
 ### 4. Run Development Server
 ```bash
@@ -428,7 +429,6 @@ The canonical source of truth for the application version is `package.json`. The
 - [x] Initial setup wizard, recovery mode, and live diagnostics.
 
 ### In Development (`v0.3.0`) — Planned
-- [ ] **Self-Service Student Verification Portal**: Enhanced student interface for renewal submissions and compliance tracking.
 - [ ] **Automated External WhatsApp Integration**: Production integration with Meta WhatsApp Business Cloud API for automated dispatch.
 - [ ] **Enterprise Email Gateway**: Production SMTP/Resend email notification pipeline.
 - [ ] **Advanced Compliance Dossier Exports**: Consolidated PDF report generation for institutional audits.
@@ -484,7 +484,7 @@ ISCMS implements layered defense-in-depth principles:
 │   ├── lib/                     # Supabase client helpers and utilities
 │   └── providers/               # Theme, Realtime, and Query context providers
 ├── supabase/
-│   └── migrations/              # 68 sequential PostgreSQL SQL migration files
+│   └── migrations/              # 71 sequential PostgreSQL SQL migration files
 ├── tests/                       # Automated domain test suites
 ├── CHANGELOG.md                 # Complete release history
 ├── package.json                 # Project dependencies & canonical version
