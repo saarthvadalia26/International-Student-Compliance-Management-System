@@ -258,7 +258,7 @@ ON CONFLICT (name) DO NOTHING;
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Correct historical typos (e.g. 'Reasearch' -> 'Research (R-1)') in document versions and snapshots
-UPDATE public.student_document_versions
+UPDATE public.visa_versions
 SET visa_type = 'Research (R-1)'
 WHERE visa_type ILIKE 'reasearch%' OR visa_type = 'Research';
 
