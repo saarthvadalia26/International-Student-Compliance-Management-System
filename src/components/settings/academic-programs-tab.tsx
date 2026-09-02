@@ -650,11 +650,13 @@ export function AcademicProgramsTab() {
 
   return (
     <Card className="rounded-2xl border-border/80 shadow-xs overflow-hidden">
-      <CardHeader className="bg-muted/30 border-b border-border/60 pb-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+      {/* ── Header: Title + Action button ───────────────────────────── */}
+      <CardHeader className="bg-muted/30 border-b border-border/60 pb-0 pt-5 px-6">
+        <div className="flex flex-col gap-4">
+          {/* Top row: icon + title + add button */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                 {subView === "programs" ? (
                   <GraduationCap className="h-4 w-4" />
                 ) : subView === "schools" ? (
@@ -665,74 +667,79 @@ export function AcademicProgramsTab() {
                   <MapPin className="h-4 w-4" />
                 )}
               </div>
-              <CardTitle className="text-base font-semibold">
-                {subView === "programs" ? "Academic Programs Master Data" : 
-                 subView === "schools" ? "Schools & Departments Master Data" : 
-                 subView === "scholarships" ? "Scholarship Schemes Master Data" :
-                 "NFSU Campuses Master Data"}
-              </CardTitle>
+              <div className="min-w-0">
+                <CardTitle className="text-sm font-semibold leading-tight truncate">
+                  {subView === "programs" ? "Academic Programs" : 
+                   subView === "schools" ? "Schools & Departments" : 
+                   subView === "scholarships" ? "Scholarship Schemes" :
+                   "NFSU Campuses"}
+                </CardTitle>
+                <CardDescription className="text-[11px] text-muted-foreground mt-0.5 hidden sm:block">
+                  {subView === "programs" ? "Degree programs, durations, and semester progression configs" : 
+                   subView === "schools" ? "Authoritative academic schools and department records" :
+                   subView === "scholarships" ? "Scholarship schemes available to international students" :
+                   "NFSU campus locations and institutional sites"}
+                </CardDescription>
+              </div>
             </div>
-            <CardDescription className="text-xs text-muted-foreground mt-1">
-              {subView === "programs" ? "Manage degree programs, duration limits, and automated semester progression configurations." : 
-               subView === "schools" ? "Manage authoritative academic schools and departments." :
-               subView === "scholarships" ? "Manage scholarship schemes available for international students." :
-               "Manage National Forensic Sciences University (NFSU) campus locations."}
-            </CardDescription>
+
+            {/* Add action button */}
+            {subView === "programs" ? (
+              <Button onClick={handleOpenAddProgram} size="sm" className="text-xs h-8 gap-1.5 rounded-lg shadow-xs shrink-0">
+                <Plus className="h-3.5 w-3.5" /> Add Program
+              </Button>
+            ) : subView === "schools" ? (
+              <Button onClick={handleOpenAddSchool} size="sm" className="text-xs h-8 gap-1.5 rounded-lg shadow-xs shrink-0">
+                <Plus className="h-3.5 w-3.5" /> Add School
+              </Button>
+            ) : subView === "scholarships" ? (
+              <Button onClick={handleOpenAddScholarship} size="sm" className="text-xs h-8 gap-1.5 rounded-lg shadow-xs shrink-0">
+                <Plus className="h-3.5 w-3.5" /> Add Scheme
+              </Button>
+            ) : (
+              <Button onClick={handleOpenAddCampus} size="sm" className="text-xs h-8 gap-1.5 rounded-lg shadow-xs shrink-0">
+                <Plus className="h-3.5 w-3.5" /> Add Campus
+              </Button>
+            )}
           </div>
 
-          {/* Sub-view switcher */}
-          <div className="flex flex-wrap items-center bg-muted/60 p-1 rounded-xl border border-border/40 text-xs gap-1">
-            <button
-              type="button"
-              onClick={() => setSubView("programs")}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${subView === "programs" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              Programs ({programs.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSubView("schools")}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${subView === "schools" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <Building2 className="h-3.5 w-3.5" />
-              Schools ({schools.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSubView("scholarships")}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${subView === "scholarships" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <Award className="h-3.5 w-3.5" />
-              Scholarships ({scholarships.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSubView("campuses")}
-              className={`px-3 py-1 rounded-lg font-medium transition-colors flex items-center gap-1.5 ${subView === "campuses" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <MapPin className="h-3.5 w-3.5" />
-              Campuses ({campuses.length})
-            </button>
+          {/* ── Sub-tab underline bar ─────────────────────────────────── */}
+          <div className="flex items-end border-b border-border/50 -mx-6 px-6 gap-0">
+            {([
+              { id: "programs",     icon: BookOpen,   label: "Programs",     count: programs.length },
+              { id: "schools",      icon: Building2,  label: "Schools",      count: schools.length },
+              { id: "scholarships", icon: Award,      label: "Scholarships", count: scholarships.length },
+              { id: "campuses",     icon: MapPin,     label: "Campuses",     count: campuses.length },
+            ] as const).map(({ id, icon: Icon, label, count }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSubView(id)}
+                className={[
+                  "relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all duration-150 select-none whitespace-nowrap",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-t",
+                  subView === id
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                ].join(" ")}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span>{label}</span>
+                <span className={[
+                  "inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded-full text-[10px] font-semibold tabular-nums",
+                  subView === id
+                    ? "bg-primary/15 text-primary"
+                    : "bg-muted text-muted-foreground"
+                ].join(" ")}>
+                  {count}
+                </span>
+                {/* Active underline indicator */}
+                {subView === id && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-primary" />
+                )}
+              </button>
+            ))}
           </div>
-
-          {subView === "programs" ? (
-            <Button onClick={handleOpenAddProgram} size="sm" className="text-xs h-9 gap-1.5 rounded-xl shadow-xs">
-              <Plus className="h-4 w-4" /> Add Program
-            </Button>
-          ) : subView === "schools" ? (
-            <Button onClick={handleOpenAddSchool} size="sm" className="text-xs h-9 gap-1.5 rounded-xl shadow-xs">
-              <Plus className="h-4 w-4" /> Add School
-            </Button>
-          ) : subView === "scholarships" ? (
-            <Button onClick={handleOpenAddScholarship} size="sm" className="text-xs h-9 gap-1.5 rounded-xl shadow-xs">
-              <Plus className="h-4 w-4" /> Add Scholarship Scheme
-            </Button>
-          ) : (
-            <Button onClick={handleOpenAddCampus} size="sm" className="text-xs h-9 gap-1.5 rounded-xl shadow-xs">
-              <Plus className="h-4 w-4" /> Add Campus
-            </Button>
-          )}
         </div>
       </CardHeader>
 
