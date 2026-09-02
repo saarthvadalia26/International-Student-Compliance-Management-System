@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatDate } from "@/lib/utils/date";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNotificationCenter } from "@/hooks/use-notification-center";
@@ -102,11 +103,7 @@ export function NotificationCenterWorkspace({
       if (diffMins < 60) return `${diffMins} minutes ago`;
       if (diffHours < 24) return `${diffHours} hours ago`;
       if (diffDays < 7) return `${diffDays} days ago`;
-      return date.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
+      return formatDate(date);
     } catch {
       return "Recently";
     }

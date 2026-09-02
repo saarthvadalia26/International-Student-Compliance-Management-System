@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Download, Printer, Search, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useDebounce } from "@/hooks/use-debounce";
+import { formatDateTime } from "@/lib/utils/date";
 
 export default function AuditReportPage() {
   const [data, setData] = useState<AuditReportRow[]>([]);
@@ -178,7 +179,7 @@ export default function AuditReportPage() {
                         {row.action}
                       </span>
                     </td>
-                    <td className="p-3 text-muted-foreground">{row.timestamp.toLocaleString()}</td>
+                    <td className="p-3 text-muted-foreground">{formatDateTime(row.timestamp)}</td>
                     <td className="p-3 text-foreground font-mono">{row.resource}</td>
                     <td className="p-3 uppercase text-muted-foreground font-medium">{row.exportType || "N/A"}</td>
                     <td className="p-3 text-muted-foreground max-w-[200px] truncate" title={JSON.stringify(row.filtersApplied)}>

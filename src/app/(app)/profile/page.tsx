@@ -10,6 +10,7 @@ import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { updateMyProfileNameAction } from "./actions";
 import { getInitials, isNameComplete } from "@/utils/name-utils";
 import { toast } from "sonner";
+import { formatDate, formatDateTime } from "@/lib/utils/date";
 
 export default function AdminProfilePage() {
   const supabase = getBrowserSupabase();
@@ -218,14 +219,14 @@ export default function AdminProfilePage() {
                     <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Account Created</span>
                     <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> 
-                      {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "N/A"}
+                      {profile.createdAt ? formatDate(profile.createdAt) : "N/A"}
                     </p>
                   </div>
                   <div className="space-y-0.5 sm:col-span-2">
                     <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground">Last Session Login</span>
                     <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                      {profile.lastLogin ? new Date(profile.lastLogin).toLocaleString() : "N/A"}
+                      {profile.lastLogin ? formatDateTime(profile.lastLogin) : "N/A"}
                     </p>
                   </div>
                 </div>

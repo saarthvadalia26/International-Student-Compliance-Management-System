@@ -65,6 +65,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { SearchableProgramSelector } from "@/components/ui/searchable-program-selector";
 import { DatePicker } from "@/components/ui/date-picker";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
 import { AcademicProgram } from "@/domain/academic-programs/types";
@@ -2903,11 +2904,29 @@ export default function StudentDetailsPage({ params }: PageProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="phoneHome">Home Country Phone</label>
-                  <Input id="phoneHome" value={editForm.phoneHome} onChange={handleFormChange} className="h-9 text-sm" />
+                  <PhoneInput 
+                    id="phoneHome" 
+                    value={editForm.phoneHome} 
+                    onChange={(composite) => {
+                      setEditForm(p => ({ ...p, phoneHome: composite }));
+                      setIsDirty(true);
+                    }} 
+                    placeholder="Home country phone" 
+                    defaultCountryCode="+91" 
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="phoneLocal">Local Host Phone</label>
-                  <Input id="phoneLocal" value={editForm.phoneLocal} onChange={handleFormChange} className="h-9 text-sm" />
+                  <PhoneInput 
+                    id="phoneLocal" 
+                    value={editForm.phoneLocal} 
+                    onChange={(composite) => {
+                      setEditForm(p => ({ ...p, phoneLocal: composite }));
+                      setIsDirty(true);
+                    }} 
+                    placeholder="Local host phone" 
+                    defaultCountryCode="+91" 
+                  />
                 </div>
               </div>
 
@@ -2939,11 +2958,29 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="fatherMobile">Father Mobile Number</label>
-                    <Input id="fatherMobile" value={editForm.fatherMobile} onChange={handleFormChange} placeholder="e.g. +44 7911 123456" className="h-9 text-sm" />
+                    <PhoneInput 
+                      id="fatherMobile" 
+                      value={editForm.fatherMobile} 
+                      onChange={(composite) => {
+                        setEditForm(p => ({ ...p, fatherMobile: composite }));
+                        setIsDirty(true);
+                      }} 
+                      placeholder="Father mobile number" 
+                      defaultCountryCode="+91" 
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="fatherWhatsapp">Father WhatsApp Number</label>
-                    <Input id="fatherWhatsapp" value={editForm.fatherWhatsapp} onChange={handleFormChange} placeholder="e.g. +44 7911 123456" className="h-9 text-sm" />
+                    <PhoneInput 
+                      id="fatherWhatsapp" 
+                      value={editForm.fatherWhatsapp} 
+                      onChange={(composite) => {
+                        setEditForm(p => ({ ...p, fatherWhatsapp: composite }));
+                        setIsDirty(true);
+                      }} 
+                      placeholder="Father WhatsApp number" 
+                      defaultCountryCode="+91" 
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -2962,11 +2999,29 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="motherMobile">Mother Mobile Number</label>
-                    <Input id="motherMobile" value={editForm.motherMobile} onChange={handleFormChange} placeholder="e.g. +44 7911 654321" className="h-9 text-sm" />
+                    <PhoneInput 
+                      id="motherMobile" 
+                      value={editForm.motherMobile} 
+                      onChange={(composite) => {
+                        setEditForm(p => ({ ...p, motherMobile: composite }));
+                        setIsDirty(true);
+                      }} 
+                      placeholder="Mother mobile number" 
+                      defaultCountryCode="+91" 
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground" htmlFor="motherWhatsapp">Mother WhatsApp Number</label>
-                    <Input id="motherWhatsapp" value={editForm.motherWhatsapp} onChange={handleFormChange} placeholder="e.g. +44 7911 654321" className="h-9 text-sm" />
+                    <PhoneInput 
+                      id="motherWhatsapp" 
+                      value={editForm.motherWhatsapp} 
+                      onChange={(composite) => {
+                        setEditForm(p => ({ ...p, motherWhatsapp: composite }));
+                        setIsDirty(true);
+                      }} 
+                      placeholder="Mother WhatsApp number" 
+                      defaultCountryCode="+91" 
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -3003,7 +3058,16 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactPhone">Primary Phone</label>
-                  <Input id="emergencyContactPhone" value={editForm.emergencyContactPhone} onChange={handleFormChange} className="h-9 text-sm" />
+                  <PhoneInput 
+                    id="emergencyContactPhone" 
+                    value={editForm.emergencyContactPhone} 
+                    onChange={(composite) => {
+                      setEditForm(p => ({ ...p, emergencyContactPhone: composite }));
+                      setIsDirty(true);
+                    }} 
+                    placeholder="Emergency contact phone" 
+                    defaultCountryCode="+91" 
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="emergencyContactEmail">Email Address</label>

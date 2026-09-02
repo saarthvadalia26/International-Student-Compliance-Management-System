@@ -3,6 +3,7 @@ import {
   ReminderScheduleItem, 
   StudentReminderScheduleResponse 
 } from "../types/reminder.types";
+import { formatDate } from "@/lib/utils/date";
 
 export interface ReminderRuleConfig {
   id: string;
@@ -240,8 +241,8 @@ export class ExpiryReminderEngine {
             status: "DISPATCHED",
             statusLabel: isDelivered ? "Delivered" : "Dispatched",
             statusReason: isDelivered
-              ? `Delivered via ${matchingNotif.channel} on ${new Date(log?.created_at || sentDate).toLocaleDateString()}`
-              : `Dispatched via ${matchingNotif.channel} on ${new Date(sentDate).toLocaleDateString()}`,
+              ? `Delivered via ${matchingNotif.channel} on ${formatDate(log?.created_at || sentDate)}`
+              : `Dispatched via ${matchingNotif.channel} on ${formatDate(sentDate)}`,
             dispatchedAt: sentDate,
             deliveredAt: isDelivered ? (log?.created_at || sentDate) : null,
             deliveryStatus: log?.status || matchingNotif.status,

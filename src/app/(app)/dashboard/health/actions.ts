@@ -6,6 +6,7 @@ import { requireAdministrator } from "@/lib/auth/permissions";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
 import { SystemDiagnosticsService } from "@/domain/system/services/system-diagnostics.service";
 import { SystemInfrastructureDiagnostics } from "@/domain/system/types/diagnostics.types";
+import { formatDateTime } from "@/lib/utils/date";
 
 export interface SystemHealthMetrics {
   totalStudents: number;
@@ -127,7 +128,7 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
 
   if (latestJobRes.data && latestJobRes.data.length > 0) {
     const latestJob = latestJobRes.data[0];
-    lastSchedulerRun = latestJob.started_at ? new Date(latestJob.started_at).toLocaleString() : "Running";
+    lastSchedulerRun = latestJob.started_at ? formatDateTime(latestJob.started_at) : "Running";
     
     // Sum jobs processed and failed from history
     jobsProcessedCount = latestJobRes.data.reduce((acc, job) => acc + (job.processed_count || 0), 0);
@@ -158,7 +159,7 @@ export async function fetchSystemHealthMetrics(): Promise<SystemHealthMetrics> {
     deploymentPlatform: diagnostics.runtime.platform,
     deploymentType: diagnostics.runtime.environment,
     deploymentTime: diagnostics.deployment.deployedAt 
-      ? new Date(diagnostics.deployment.deployedAt).toLocaleString() 
+      ? formatDateTime(diagnostics.deployment.deployedAt) 
       : "Local / Development",
     deploymentRegion: diagnostics.runtime.region,
     nodeVersion: diagnostics.runtime.nodeVersion,

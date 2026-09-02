@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { STATUS_CONFIGS, DeliveryStatus } from "../constants/constants";
 import { fetchCommunicationLogs, CommunicationLogItem, ReminderSummaryMetrics } from "@/app/(app)/reminders/actions";
 import { getDocumentBadgeClass } from "@/features/compliance/constants/constants";
+import { formatDate, formatDateTime } from "@/lib/utils/date";
 
 export interface NotificationHealthMetricsProps {
   summary: ReminderSummaryMetrics | null;
@@ -340,10 +341,10 @@ export function NotificationQueueTable(): React.JSX.Element {
                     </TableCell>
                     <TableCell>{getStatusBadge(item.status)}</TableCell>
                     <TableCell className="text-muted-foreground font-caption">
-                      {new Date(item.scheduledFor).toLocaleDateString()}
+                      {formatDate(item.scheduledFor)}
                     </TableCell>
                     <TableCell className="text-muted-foreground font-caption">
-                      {new Date(item.createdAt).toLocaleString()}
+                      {formatDateTime(item.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedItem(item)} title="Inspect Delivery Payload">

@@ -52,15 +52,10 @@ import { getStudentsListAction, exportStudentsExcelAction, StudentListItem } fro
 
 export type Student = StudentListItem;
 
+import { formatDate } from "@/lib/utils/date";
+
 function formatDateDisplay(d?: string | null): string {
-  if (!d) return "—";
-  try {
-    const date = new Date(d);
-    if (isNaN(date.getTime())) return d;
-    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  } catch {
-    return d;
-  }
+  return formatDate(d);
 }
 
 export default function StudentListPage() {

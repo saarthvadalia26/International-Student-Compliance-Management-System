@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/utils/date";
 import { useUserRole } from "@/hooks/use-user-role";
 import {
   fetchUserAccountsAction,
@@ -314,7 +315,7 @@ export function UserManagementTab() {
                           )}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
-                          {new Date(u.createdAt).toLocaleDateString()}
+                          {formatDate(u.createdAt)}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">

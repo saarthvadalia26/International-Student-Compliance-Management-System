@@ -2,17 +2,28 @@
 
 import * as React from "react";
 import { ChevronDown, Check, Search } from "lucide-react";
-import { Country, countryList, searchCountries, getCountryByPhoneCode, getCountryByCode, formatE164Phone } from "@/utils/countries";
+import { 
+  Country, 
+  countryList, 
+  searchCountries, 
+  getCountryByPhoneCode, 
+  getCountryByIso2, 
+  getCountryByCode, 
+  formatE164Phone 
+} from "@/utils/countries";
 import { CountryFlag } from "./country-flag";
 import { Input } from "./input";
 import { cn } from "@/lib/utils";
 
 export interface PhoneInputProps {
   id?: string;
-  countryCode?: string;
+  countryCode?: string;      // e.g. "+91", "+1", "+44"
+  countryIso2?: string;      // Canonical ISO Alpha-2: e.g. "IN", "US", "CA", "GB", "AE", "YE", "TZ", "MV"
   number?: string;
   value?: string;
   onCountryCodeChange?: (countryCode: string) => void;
+  onCountryIso2Change?: (iso2: string) => void;
+  onCountryChange?: (country: Country) => void;
   onNumberChange?: (number: string) => void;
   onChange?: (compositeE164: string, countryCode: string, number: string) => void;
   placeholder?: string;
@@ -20,60 +31,82 @@ export interface PhoneInputProps {
   required?: boolean;
   className?: string;
   defaultCountryCode?: string;
+  defaultCountryIso2?: string;
 }
 
 export function PhoneInput({
   id,
   countryCode: propCountryCode,
+  countryIso2: propCountryIso2,
   number: propNumber,
   value: propValue,
   onCountryCodeChange,
+  onCountryIso2Change,
+  onCountryChange,
   onNumberChange,
   onChange,
   placeholder = "Phone number",
   disabled = false,
   required = false,
   className,
-  defaultCountryCode = "+91"
+  defaultCountryCode = "+91",
+  defaultCountryIso2
 }: PhoneInputProps) {
-  // Determine initial country code and number
+  // Determine initial country code, iso2, and phone number
   const parseInitial = () => {
-    if (propCountryCode !== undefined || propNumber !== undefined) {
+    let initialIso2 = propCountryIso2 || defaultCountryIso2;
+    let initialCode = propCountryCode;
+    let initialNum = propNumber || "";
+
+    if (initialIso2 && !initialCode) {
+      const c = getCountryByIso2(initialIso2);
+      if (c && c.phoneCode) initialCode = c.phoneCode;
+    }
+
+    if (propCountryCode !== undefined || propNumber !== undefined || propCountryIso2 !== undefined) {
       return {
-        code: propCountryCode || defaultCountryCode,
-        num: propNumber || ""
+        iso2: initialIso2 || (initialCode ? getCountryByPhoneCode(initialCode)?.alpha2 : "IN"),
+        code: initialCode || defaultCountryCode,
+        num: initialNum
       };
     }
+
     if (propValue) {
       const clean = propValue.trim();
       if (clean.startsWith("+")) {
-        // Find best matching country code
+        // Find best matching country code by longest dial code prefix
         const matched = countryList
           .filter(c => c.phoneCode && clean.startsWith(c.phoneCode))
           .sort((a, b) => (b.phoneCode?.length || 0) - (a.phoneCode?.length || 0))[0];
 
         if (matched && matched.phoneCode) {
           return {
+            iso2: matched.alpha2,
             code: matched.phoneCode,
             num: clean.substring(matched.phoneCode.length).replace(/[^\d]/g, "")
           };
         }
       }
       return {
+        iso2: defaultCountryIso2 || "IN",
         code: defaultCountryCode,
         num: clean.replace(/[^\d]/g, "")
       };
     }
+
     return {
+      iso2: defaultCountryIso2 || "IN",
       code: defaultCountryCode,
       num: ""
     };
   };
 
   const initial = parseInitial();
+  const [internalIso2, setInternalIso2] = React.useState<string | undefined>(initial.iso2);
   const [internalCode, setInternalCode] = React.useState(initial.code);
   const [internalNumber, setInternalNumber] = React.useState(initial.num);
 
+  const activeIso2 = propCountryIso2 !== undefined ? propCountryIso2 : internalIso2;
   const activeCode = propCountryCode !== undefined ? (propCountryCode || defaultCountryCode) : internalCode;
   const activeNumber = propNumber !== undefined ? (propNumber || "") : internalNumber;
 
@@ -93,34 +126,57 @@ export function PhoneInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Selected Country lookup
-  const selectedCountry = React.useMemo(() => {
-    return getCountryByPhoneCode(activeCode) || getCountryByCode(activeCode) || {
+  // Selected Country resolution: Uses canonical ISO-2 first, then disambiguated phone code lookup
+  const selectedCountry: Country = React.useMemo(() => {
+    if (activeIso2) {
+      const byIso2 = getCountryByIso2(activeIso2);
+      if (byIso2) return byIso2;
+    }
+
+    if (activeCode) {
+      const byPhone = getCountryByPhoneCode(activeCode, activeIso2);
+      if (byPhone) return byPhone;
+    }
+
+    return getCountryByCode(activeCode) || {
       name: "International",
       code: "INT",
+      alpha2: "INT",
+      numeric: "000",
+      officialName: "International",
+      nationality: "International",
       flag: "🌐",
-      phoneCode: activeCode
+      phoneCode: activeCode || "+91",
+      region: "Global",
+      subregion: "Global"
     };
-  }, [activeCode]);
+  }, [activeIso2, activeCode]);
 
-  // Filtered countries for selector
+  // Filtered countries for selector with relevance-based search ranking
   const filteredCountries = React.useMemo(() => {
     const all = countryList.filter(c => Boolean(c.phoneCode && c.isActive !== false));
     if (!search || !search.trim()) return all;
     return searchCountries(search, true).filter(c => Boolean(c.phoneCode));
   }, [search]);
 
-  const handleSelectCountry = (code: string) => {
-    const cleanCode = code.startsWith("+") ? code : `+${code}`;
-    setInternalCode(cleanCode);
+  const handleSelectCountry = (country: Country) => {
+    const dialCode = country.phoneCode || "+91";
+    setInternalIso2(country.alpha2);
+    setInternalCode(dialCode);
     setIsOpen(false);
     setSearch("");
 
+    if (onCountryIso2Change) {
+      onCountryIso2Change(country.alpha2);
+    }
     if (onCountryCodeChange) {
-      onCountryCodeChange(cleanCode);
+      onCountryCodeChange(dialCode);
+    }
+    if (onCountryChange) {
+      onCountryChange(country);
     }
     if (onChange) {
-      onChange(formatE164Phone(cleanCode, activeNumber), cleanCode, activeNumber);
+      onChange(formatE164Phone(dialCode, activeNumber), dialCode, activeNumber);
     }
   };
 
@@ -136,10 +192,13 @@ export function PhoneInput({
 
       if (matched && matched.phoneCode) {
         const remainingNum = clean.substring(matched.phoneCode.length).replace(/[^\d]/g, "");
+        setInternalIso2(matched.alpha2);
         setInternalCode(matched.phoneCode);
         setInternalNumber(remainingNum);
 
+        if (onCountryIso2Change) onCountryIso2Change(matched.alpha2);
         if (onCountryCodeChange) onCountryCodeChange(matched.phoneCode);
+        if (onCountryChange) onCountryChange(matched);
         if (onNumberChange) onNumberChange(remainingNum);
         if (onChange) onChange(formatE164Phone(matched.phoneCode, remainingNum), matched.phoneCode, remainingNum);
         return;
@@ -176,18 +235,21 @@ export function PhoneInput({
           )}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
-          aria-label="Select phone country code"
+          aria-label={`Selected phone country: ${selectedCountry.name} (${selectedCountry.phoneCode || activeCode})`}
+          title={`${selectedCountry.name} (${selectedCountry.phoneCode || activeCode})`}
         >
           <span className="text-base leading-none">
             <CountryFlag countryCode={selectedCountry.code || "IND"} fallbackEmoji={selectedCountry.flag || "🌐"} />
           </span>
-          <span className="font-mono text-xs text-foreground font-semibold">{activeCode}</span>
+          <span className="font-mono text-xs text-foreground font-semibold">
+            {selectedCountry.phoneCode || activeCode}
+          </span>
           <ChevronDown className="h-3 w-3 text-muted-foreground ml-0.5 opacity-70" />
         </button>
 
         {/* Dropdown Menu */}
         {isOpen && (
-          <div className="absolute top-full left-0 z-50 mt-1 w-72 max-w-[calc(100vw-2.5rem)] max-h-64 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg overflow-hidden flex flex-col">
+          <div className="absolute top-full left-0 z-50 mt-1 w-76 max-w-[calc(100vw-2.5rem)] max-h-72 rounded-lg border border-border bg-popover text-popover-foreground shadow-xl overflow-hidden flex flex-col animate-in fade-in-0 zoom-in-95">
             {/* Search header */}
             <div className="p-2 border-b border-border bg-muted/20">
               <div className="relative">
@@ -195,7 +257,7 @@ export function PhoneInput({
                 <Input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search country or code..."
+                  placeholder="Search country, code (e.g. +91, US)..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-8 pl-8 text-xs rounded-md"
@@ -203,23 +265,27 @@ export function PhoneInput({
               </div>
             </div>
 
-            {/* List */}
-            <div className="overflow-y-auto max-h-52 divide-y divide-border/20 py-1">
+            {/* Country List */}
+            <div className="overflow-y-auto max-h-60 divide-y divide-border/20 py-1">
               {filteredCountries.length === 0 ? (
                 <div className="p-3 text-center text-xs text-muted-foreground">
                   No matching countries found
                 </div>
               ) : (
                 filteredCountries.map((c: Country) => {
-                  const isSelected = c.phoneCode === activeCode;
+                  // If canonical ISO-2 is available, check against alpha2; otherwise check phoneCode
+                  const isSelected = activeIso2 
+                    ? c.alpha2.toUpperCase() === activeIso2.toUpperCase()
+                    : c.phoneCode === activeCode;
+
                   return (
                     <button
-                      key={`${c.code}-${c.phoneCode}`}
+                      key={`${c.alpha2}-${c.phoneCode}`}
                       type="button"
-                      onClick={() => handleSelectCountry(c.phoneCode || "+91")}
+                      onClick={() => handleSelectCountry(c)}
                       className={cn(
                         "w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-accent hover:text-accent-foreground transition-colors",
-                        isSelected && "bg-accent/40 font-semibold"
+                        isSelected && "bg-accent/50 font-semibold text-primary"
                       )}
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -227,9 +293,12 @@ export function PhoneInput({
                           <CountryFlag countryCode={c.code} fallbackEmoji={c.flag} />
                         </span>
                         <span className="truncate">{c.name}</span>
+                        <span className="text-[10px] text-muted-foreground font-mono shrink-0 uppercase">
+                          ({c.alpha2})
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                        <span className="font-mono text-muted-foreground">{c.phoneCode}</span>
+                        <span className="font-mono text-muted-foreground font-medium">{c.phoneCode}</span>
                         {isSelected && <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
                       </div>
                     </button>

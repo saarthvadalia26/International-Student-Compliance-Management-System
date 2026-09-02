@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Download, Printer, Search, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useDebounce } from "@/hooks/use-debounce";
+import { formatDate, formatDateTime } from "@/lib/utils/date";
 
 export default function NotificationReportPage() {
   const [data, setData] = useState<NotificationReportRow[]>([]);
@@ -188,7 +189,7 @@ export default function NotificationReportPage() {
                   <tr key={row.notificationId} className="border-b border-border/40 hover:bg-muted/10 transition-colors">
                     <td className="p-3 font-medium text-foreground">{row.registrationNumber}</td>
                     <td className="p-3 text-foreground font-semibold">{row.studentName}</td>
-                    <td className="p-3 text-muted-foreground">{row.reminderDate.toLocaleDateString()}</td>
+                    <td className="p-3 text-muted-foreground">{formatDate(row.reminderDate)}</td>
                     <td className="p-3 text-foreground font-medium">{row.reminderRuleDays} Days</td>
                     <td className="p-3 text-muted-foreground uppercase">{row.channel}</td>
                     <td className="p-3">
@@ -206,10 +207,10 @@ export default function NotificationReportPage() {
                     </td>
                     <td className="p-3 text-muted-foreground">{row.retryCount}</td>
                     <td className="p-3 text-muted-foreground">
-                      {row.lastAttemptAt ? row.lastAttemptAt.toLocaleDateString() : "N/A"}
+                      {row.lastAttemptAt ? formatDateTime(row.lastAttemptAt) : "N/A"}
                     </td>
                     <td className="p-3 text-muted-foreground">
-                      {row.nextRetryAt ? row.nextRetryAt.toLocaleDateString() : "N/A"}
+                      {row.nextRetryAt ? formatDateTime(row.nextRetryAt) : "N/A"}
                     </td>
                     <td className="p-3">
                       <span className="capitalize px-1.5 py-0.5 rounded-full text-[10px] bg-zinc-100 dark:bg-zinc-800 text-muted-foreground">

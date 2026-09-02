@@ -9,6 +9,7 @@ import { Loader2, Download, Printer, Search, ArrowUpDown, ChevronLeft, ChevronRi
 import { Card } from "@/components/ui/card";
 import { useDebounce } from "@/hooks/use-debounce";
 import { ExporterService } from "@/domain/reports/services/exporters";
+import { formatDate, formatDateTime } from "@/lib/utils/date";
 
 export default function EfrroReportPage() {
   const [data, setData] = useState<EfrroReportRow[]>([]);
@@ -264,7 +265,7 @@ export default function EfrroReportPage() {
                         </div>
                       </td>
                       <td className="p-3 text-muted-foreground">
-                        {row.expiryDate ? row.expiryDate.toLocaleDateString() : "N/A"}
+                        {row.expiryDate ? formatDate(row.expiryDate) : "N/A"}
                       </td>
                       <td className="p-3">
                         {row.daysRemaining !== null ? (
@@ -287,7 +288,7 @@ export default function EfrroReportPage() {
                         </span>
                       </td>
                       <td className="p-3 text-muted-foreground">
-                        {row.lastReminderSentAt ? row.lastReminderSentAt.toLocaleDateString() : "N/A"}
+                        {row.lastReminderSentAt ? formatDateTime(row.lastReminderSentAt) : "N/A"}
                       </td>
                       <td className="p-3">
                         <span className={`capitalize px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${

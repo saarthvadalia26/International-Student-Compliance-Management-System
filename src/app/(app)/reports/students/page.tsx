@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { useDebounce } from "@/hooks/use-debounce";
 import { toast } from "sonner";
 import { NationalitySelector } from "@/components/ui/nationality-selector";
+import { formatDate } from "@/lib/utils/date";
 
 export default function StudentReportPage() {
   const [data, setData] = useState<StudentReportRow[]>([]);
@@ -294,7 +295,7 @@ export default function StudentReportPage() {
                       {row.academicLevelLabel || (row.academicLevel ? row.academicLevel : "Not Specified")}
                     </td>
                     <td className="p-3 text-muted-foreground">
-                      {row.expectedGraduation ? row.expectedGraduation.toLocaleDateString() : "N/A"}
+                      {row.expectedGraduation ? formatDate(row.expectedGraduation) : "N/A"}
                     </td>
                     <td className="p-3">
                       <span className="capitalize px-1.5 py-0.5 rounded-full text-[10px] bg-zinc-100 dark:bg-zinc-800 text-muted-foreground">

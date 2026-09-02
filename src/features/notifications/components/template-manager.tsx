@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { formatDate, formatDateTime } from "@/lib/utils/date";
 import { 
   fetchNotificationTemplates, 
   saveNotificationTemplate, 
@@ -531,7 +532,7 @@ export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps)
 
                         {/* Updated */}
                         <td className="py-3.5 px-4 text-muted-foreground text-[11px]">
-                          {tpl.updatedAt ? new Date(tpl.updatedAt).toLocaleDateString() : "Initial"}
+                          {tpl.updatedAt ? formatDate(tpl.updatedAt) : "Initial"}
                         </td>
 
                         {/* Actions */}
@@ -1007,7 +1008,7 @@ export function TemplateManager({ initialTemplates = [] }: TemplateManagerProps)
                           {log.action}
                         </Badge>
                         <span className="text-[10px] text-muted-foreground">
-                          {new Date(log.createdAt).toLocaleString()}
+                          {formatDateTime(log.createdAt)}
                         </span>
                       </div>
                       <p className="text-[11px] text-muted-foreground pt-1">

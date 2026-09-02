@@ -95,7 +95,7 @@ export class AcademicProgressionEngine {
   }
 
   /**
-   * Formats YYYY-MM-DD into enterprise display format (e.g. "01 Aug 2025")
+   * Formats date string into enterprise standard DD/MM/YYYY (e.g. "01/08/2025")
    */
   public static formatDisplayDate(dateStr: string | null | undefined): string {
     if (!dateStr) return "Not Recorded";
@@ -103,16 +103,16 @@ export class AcademicProgressionEngine {
     if (!normalized) return "Not Recorded";
     const [yStr, mStr, dStr] = normalized.split("-");
     const year = parseInt(yStr, 10);
-    const monthIndex = parseInt(mStr, 10) - 1;
+    const month = parseInt(mStr, 10);
     const day = parseInt(dStr, 10);
 
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    if (isNaN(year) || isNaN(monthIndex) || isNaN(day) || monthIndex < 0 || monthIndex > 11) {
+    if (isNaN(year) || isNaN(month) || isNaN(day) || month < 1 || month > 12) {
       return dateStr;
     }
 
     const dayPadded = String(day).padStart(2, "0");
-    return `${dayPadded} ${monthNames[monthIndex]} ${year}`;
+    const monthPadded = String(month).padStart(2, "0");
+    return `${dayPadded}/${monthPadded}/${year}`;
   }
 
   /**

@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/utils/date";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import {
@@ -1301,7 +1302,7 @@ export default function BulkStudentImportPage() {
                             {batch.fileName}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground font-mono">
-                            {new Date(batch.createdAt).toLocaleString()}
+                            {formatDateTime(batch.createdAt)}
                           </TableCell>
                           <TableCell className="text-xs text-center font-mono font-semibold">
                             {batch.totalRows}

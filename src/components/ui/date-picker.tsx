@@ -58,7 +58,7 @@ export const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
       value = "",
       onChange,
       onValueChange,
-      placeholder = "Select date...",
+      placeholder = "DD/MM/YYYY",
       disabled = false,
       error,
       className,
@@ -398,10 +398,12 @@ export const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
       }
     };
 
-    // Human-readable formatted display date (e.g., "14 Aug 2000")
+    // Human-readable formatted display date: strictly DD/MM/YYYY (e.g. 14/08/2000)
     const displayValue = React.useMemo(() => {
       if (!parsedDate) return "";
-      return `${parsedDate.day} ${MONTH_NAMES_SHORT[parsedDate.month]} ${parsedDate.year}`;
+      const dayPadded = String(parsedDate.day).padStart(2, "0");
+      const monthPadded = String(parsedDate.month + 1).padStart(2, "0");
+      return `${dayPadded}/${monthPadded}/${parsedDate.year}`;
     }, [parsedDate]);
 
     // Generate year options for quick dropdown jump
