@@ -2063,17 +2063,17 @@ export default function StudentRegistrationPage() {
                       />
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 md:col-span-2">
                       <label className="text-xs font-medium text-foreground" htmlFor="branchAddress">
                         Branch Address
                       </label>
-                      <Input
+                      <Textarea
                         id="branchAddress"
-                        placeholder="e.g. Gandhinagar Main Branch, Gujarat"
+                        placeholder="e.g. Gandhinagar Main Branch, Sector 9, Gujarat, India"
                         value={formData.branchAddress}
                         onChange={handleInputChange}
                         disabled={isSubmitting}
-                        className={`h-10 text-sm ${validationErrors.branchAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        className={`min-h-16 text-sm resize-y ${validationErrors.branchAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                       />
                     </div>
                   </div>

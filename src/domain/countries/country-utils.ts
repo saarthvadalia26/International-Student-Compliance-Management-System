@@ -89,11 +89,37 @@ export function normalizeCountryInputSync(val: string | null | undefined): {
          (c.nationality && c.nationality.toLowerCase() === lower)
   );
 
-  if (!match) return null;
-  return {
-    isoAlpha3: match.isoAlpha3,
-    country: match
-  };
+  if (match) {
+    return {
+      isoAlpha3: match.isoAlpha3,
+      country: match
+    };
+  }
+
+  // 6. Valid 3-letter ISO Alpha-3 format fallback (supports custom countries added via Settings)
+  if (/^[A-Z]{3}$/.test(upper)) {
+    return {
+      isoAlpha3: upper,
+      country: {
+        id: `c-${lower}`,
+        name: upper,
+        isoAlpha2: upper.slice(0, 2),
+        isoAlpha3: upper,
+        isoNumeric: "000",
+        officialName: upper,
+        nationality: upper,
+        flag: "🌐",
+        region: "Global",
+        subregion: "Global",
+        displayOrder: 999,
+        isActive: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z"
+      }
+    };
+  }
+
+  return null;
 }
 
 /**

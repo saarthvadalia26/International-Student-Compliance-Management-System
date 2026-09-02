@@ -3341,14 +3341,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-medium text-foreground" htmlFor="branchAddress">Branch Address</label>
-                  <Input 
+                  <Textarea 
                     id="branchAddress" 
                     value={editForm.branchAddress} 
                     onChange={handleFormChange} 
-                    placeholder="e.g. Gandhinagar Main Branch, Gujarat" 
-                    className="h-9 text-sm" 
+                    placeholder="e.g. Gandhinagar Main Branch, Sector 9, Gujarat, India" 
+                    className="min-h-16 text-sm resize-y" 
                   />
                 </div>
               </div>
