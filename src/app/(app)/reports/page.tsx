@@ -48,9 +48,9 @@ export default function ReportsPage() {
         {reports.map((report, idx) => {
           const Icon = report.icon;
           return (
-            <Link key={idx} href={report.href} passHref>
-              <Card className="border border-border/50 bg-card hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer group">
-                <CardHeader className="flex flex-row items-start justify-between pb-2">
+            <Link key={idx} href={report.href} passHref className="h-full">
+              <Card className="h-full flex flex-col border border-border/50 bg-card hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer group">
+                <CardHeader className="flex flex-row items-start justify-between pb-2 flex-1">
                   <div className="space-y-1">
                     <CardTitle className="text-base font-semibold group-hover:text-primary transition-colors">
                       {report.title}
