@@ -11,6 +11,7 @@ import {
 } from "../types";
 import { ExporterService } from "./exporters";
 import { StorageProviderFactory } from "@/domain/storage/factory";
+import { formatDateForExcel, formatDateTime } from "@/lib/utils/date";
 
 export class ReportingService {
   private storageProvider = StorageProviderFactory.getProvider();
@@ -137,7 +138,7 @@ export class ReportingService {
       row.school,
       row.programme,
       row.academicLevelLabel || (row.academicLevel ? row.academicLevel : "Not Specified"),
-      row.expectedGraduation ? row.expectedGraduation.toISOString().split("T")[0] : "N/A",
+      row.expectedGraduation ? formatDateForExcel(row.expectedGraduation) : "N/A",
       row.status,
       row.complianceStatus
     ]);
@@ -194,11 +195,11 @@ export class ReportingService {
       row.registrationNumber,
       row.fullName,
       ExporterService.maskIdentifier(row.efrroNumber), // Security: Mask document number by default
-      row.expiryDate ? row.expiryDate.toISOString().split("T")[0] : "N/A",
+      row.expiryDate ? formatDateForExcel(row.expiryDate) : "N/A",
       row.daysRemaining !== null ? String(row.daysRemaining) : "N/A",
       row.complianceStatus,
       row.reminderSent ? "Yes" : "No",
-      row.lastReminderSentAt ? row.lastReminderSentAt.toISOString().split("T")[0] : "N/A",
+      row.lastReminderSentAt ? formatDateForExcel(row.lastReminderSentAt) : "N/A",
       row.verificationStatus || "N/A"
     ]);
 
@@ -251,12 +252,12 @@ export class ReportingService {
     const rows = reportData.data.map(row => [
       row.studentName,
       row.registrationNumber,
-      row.reminderDate.toISOString().split("T")[0],
+      formatDateForExcel(row.reminderDate),
       String(row.reminderRuleDays),
       row.channel,
       row.status,
       String(row.retryCount),
-      row.lastAttemptAt ? row.lastAttemptAt.toISOString() : "N/A"
+      row.lastAttemptAt ? formatDateTime(row.lastAttemptAt) : "N/A"
     ]);
 
     const content = format === "csv" 
@@ -307,7 +308,7 @@ export class ReportingService {
     const rows = reportData.data.map(row => [
       row.actorEmail || "System/Unknown",
       row.action,
-      row.timestamp.toISOString(),
+      formatDateTime(row.timestamp),
       row.resource,
       row.exportType || "N/A",
       JSON.stringify(row.filtersApplied),

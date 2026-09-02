@@ -16,6 +16,8 @@ import { AcademicProgram } from "@/domain/academic-programs/types";
 import { SchoolService } from "@/domain/schools/school.service";
 import { StudentExcelExportService } from "@/domain/students/services/student-excel-export.service";
 import { StudentExportFilterCriteria } from "@/domain/students/utils/student-filter.util";
+import { parseDateToISO, formatToDDMMYYYY } from "@/lib/utils/date";
+import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
 
 const studentService = new StudentService();
 
@@ -1524,17 +1526,15 @@ export async function addOriginalDocumentAction(
     }
 
     const cleanDocNum = documentNumber.trim();
-    const cleanIssue = issueDate.trim().split("T")[0];
-    const cleanExpiry = expiryDate.trim().split("T")[0];
-    const issueD = new Date(cleanIssue);
-    const expiryD = new Date(cleanExpiry);
+    const cleanIssue = parseDateToISO(issueDate);
+    const cleanExpiry = parseDateToISO(expiryDate);
 
-    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
-      return { success: false, error: "Invalid date format. Please use YYYY-MM-DD." };
+    if (!cleanIssue || !cleanExpiry) {
+      return { success: false, error: "Invalid date format. Please use DD/MM/YYYY." };
     }
 
-    if (expiryD <= issueD) {
-      return { success: false, error: `The expiration date (${cleanExpiry}) must be strictly after the document issue date (${cleanIssue}).` };
+    if (cleanExpiry <= cleanIssue) {
+      return { success: false, error: `The expiration date (${formatToDDMMYYYY(cleanExpiry)}) must be strictly after the document issue date (${formatToDDMMYYYY(cleanIssue)}).` };
     }
 
     const adminSupabase = getAdminSupabase();
@@ -1637,8 +1637,7 @@ export async function addOriginalDocumentAction(
     }
 
     // 4. Update student_snapshot with original document information
-    const now = new Date();
-    const diffDays = Math.round((expiryD.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = CalendarDateEngine.diffCalendarDays(cleanExpiry, CalendarDateEngine.getTodayISO());
     const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
 
     const snapshotUpdates: Record<string, unknown> = {
@@ -1768,19 +1767,17 @@ export async function editDocumentDetailsAction(
     }
 
     const cleanDocNum = documentNumber.trim();
-    const cleanIssue = issueDate.trim().split("T")[0];
-    const cleanExpiry = expiryDate.trim().split("T")[0];
+    const cleanIssue = parseDateToISO(issueDate);
+    const cleanExpiry = parseDateToISO(expiryDate);
     const cleanPlace = placeOfIssue?.trim() || null;
     const cleanVisaType = visaType?.trim() || "Student (S-1)";
-    const issueD = new Date(cleanIssue);
-    const expiryD = new Date(cleanExpiry);
 
-    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
-      return { success: false, error: "Invalid date format. Please use YYYY-MM-DD." };
+    if (!cleanIssue || !cleanExpiry) {
+      return { success: false, error: "Invalid date format. Please use DD/MM/YYYY." };
     }
 
-    if (expiryD <= issueD) {
-      return { success: false, error: `The expiration date (${cleanExpiry}) must be strictly after the document issue date (${cleanIssue}).` };
+    if (cleanExpiry <= cleanIssue) {
+      return { success: false, error: `The expiration date (${formatToDDMMYYYY(cleanExpiry)}) must be strictly after the document issue date (${formatToDDMMYYYY(cleanIssue)}).` };
     }
 
     const adminSupabase = getAdminSupabase();
@@ -1900,8 +1897,7 @@ export async function editDocumentDetailsAction(
     }
 
     // 4. Update student_snapshot
-    const now = new Date();
-    const diffDays = Math.round((expiryD.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = CalendarDateEngine.diffCalendarDays(cleanExpiry, CalendarDateEngine.getTodayISO());
     const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
 
     const snapshotUpdates: Record<string, unknown> = {
@@ -2038,17 +2034,15 @@ export async function renewDocumentAction(
     }
 
     const cleanDocNum = documentNumber.trim();
-    const cleanIssue = issueDate.trim().split("T")[0];
-    const cleanExpiry = expiryDate.trim().split("T")[0];
-    const issueD = new Date(cleanIssue);
-    const expiryD = new Date(cleanExpiry);
+    const cleanIssue = parseDateToISO(issueDate);
+    const cleanExpiry = parseDateToISO(expiryDate);
 
-    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
-      return { success: false, error: "Invalid date format. Please use YYYY-MM-DD." };
+    if (!cleanIssue || !cleanExpiry) {
+      return { success: false, error: "Invalid date format. Please use DD/MM/YYYY." };
     }
 
-    if (expiryD <= issueD) {
-      return { success: false, error: `The expiration date (${cleanExpiry}) must be strictly after the document issue date (${cleanIssue}).` };
+    if (cleanExpiry <= cleanIssue) {
+      return { success: false, error: `The expiration date (${formatToDDMMYYYY(cleanExpiry)}) must be strictly after the document issue date (${formatToDDMMYYYY(cleanIssue)}).` };
     }
 
     const adminSupabase = getAdminSupabase();
@@ -2174,8 +2168,7 @@ export async function renewDocumentAction(
     }
 
     // 5. Update student_snapshot with new current document information
-    const now = new Date();
-    const diffDays = Math.round((expiryD.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = CalendarDateEngine.diffCalendarDays(cleanExpiry, CalendarDateEngine.getTodayISO());
     const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
 
     const snapshotUpdates: Record<string, unknown> = {
@@ -2413,21 +2406,18 @@ export async function correctDocumentMetadataAction(
     }
 
     const cleanDocNum = documentNumber.trim();
-    const cleanIssue = issueDate.trim().split("T")[0];
-    const cleanExpiry = expiryDate.trim().split("T")[0];
+    const cleanIssue = parseDateToISO(issueDate);
+    const cleanExpiry = parseDateToISO(expiryDate);
     const cleanPlace = placeOfIssue?.trim() || null;
     const cleanVisaType = visaType?.trim() || "Student (S-1)";
     const cleanReason = reason.trim();
 
-    const issueD = new Date(cleanIssue);
-    const expiryD = new Date(cleanExpiry);
-
-    if (isNaN(issueD.getTime()) || isNaN(expiryD.getTime())) {
-      return { success: false, error: "Invalid date format provided. Use YYYY-MM-DD." };
+    if (!cleanIssue || !cleanExpiry) {
+      return { success: false, error: "Invalid date format provided. Use DD/MM/YYYY." };
     }
 
-    if (expiryD <= issueD) {
-      return { success: false, error: `The expiration date must be strictly after the document issue date (${cleanIssue}).` };
+    if (cleanExpiry <= cleanIssue) {
+      return { success: false, error: `The expiration date must be strictly after the document issue date (${formatToDDMMYYYY(cleanIssue)}).` };
     }
 
     const adminSupabase = getAdminSupabase();

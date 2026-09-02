@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
+import { parseDateToISO } from "@/lib/utils/date";
 
 export const RegisterStudentValidationSchema = z.object({
   registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
@@ -14,9 +15,11 @@ export const RegisterStudentValidationSchema = z.object({
   }).optional().nullable(),
   dateOfBirth: z.string().optional().nullable().refine((dob) => {
     if (!dob || !dob.trim()) return true;
-    const date = new Date(dob);
-    return !isNaN(date.getTime()) && date < new Date();
-  }, { message: "Date of birth must be a valid date in the past" }),
+    const iso = parseDateToISO(dob);
+    if (!iso) return false;
+    const today = new Date().toISOString().split("T")[0];
+    return iso <= today;
+  }, { message: "Date of birth must be a valid date in the past (DD/MM/YYYY)" }),
   maritalStatus: z.enum(["single", "married", "divorced", "widowed", "separated", "other", "prefer_not_to_say"], {
     message: "Please select a valid marital status"
   }).optional().nullable(),
@@ -67,9 +70,9 @@ export const RegisterStudentValidationSchema = z.object({
   admissionDate: z.string().optional().nullable(),
   joiningDate: z.string().optional().nullable().refine((jd) => {
     if (!jd || !jd.trim()) return true;
-    const date = new Date(jd);
-    return !isNaN(date.getTime());
-  }, { message: "Joining date must be a valid date format" }),
+    const iso = parseDateToISO(jd);
+    return Boolean(iso);
+  }, { message: "Joining date must be a valid date in DD/MM/YYYY format" }),
   expectedGraduation: z.string().optional().nullable(),
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"], {
@@ -159,9 +162,9 @@ export const RegisterStudentValidationSchema = z.object({
   path: ["admissionCategoryOther"]
 }).refine((data) => {
   if (data.passportIssueDate && data.passportExpiry && data.passportIssueDate.trim() && data.passportExpiry.trim()) {
-    const pi = new Date(data.passportIssueDate);
-    const pe = new Date(data.passportExpiry);
-    if (!isNaN(pi.getTime()) && !isNaN(pe.getTime())) {
+    const pi = parseDateToISO(data.passportIssueDate);
+    const pe = parseDateToISO(data.passportExpiry);
+    if (pi && pe) {
       return pe > pi;
     }
   }
@@ -171,9 +174,9 @@ export const RegisterStudentValidationSchema = z.object({
   path: ["passportExpiry"]
 }).refine((data) => {
   if (data.visaIssueDate && data.visaExpiry && data.visaIssueDate.trim() && data.visaExpiry.trim()) {
-    const vi = new Date(data.visaIssueDate);
-    const ve = new Date(data.visaExpiry);
-    if (!isNaN(vi.getTime()) && !isNaN(ve.getTime())) {
+    const vi = parseDateToISO(data.visaIssueDate);
+    const ve = parseDateToISO(data.visaExpiry);
+    if (vi && ve) {
       return ve > vi;
     }
   }
@@ -183,9 +186,9 @@ export const RegisterStudentValidationSchema = z.object({
   path: ["visaExpiry"]
 }).refine((data) => {
   if (data.efrroIssueDate && data.efrroExpiry && data.efrroIssueDate.trim() && data.efrroExpiry.trim()) {
-    const ei = new Date(data.efrroIssueDate);
-    const ee = new Date(data.efrroExpiry);
-    if (!isNaN(ei.getTime()) && !isNaN(ee.getTime())) {
+    const ei = parseDateToISO(data.efrroIssueDate);
+    const ee = parseDateToISO(data.efrroExpiry);
+    if (ei && ee) {
       return ee > ei;
     }
   }
@@ -195,9 +198,9 @@ export const RegisterStudentValidationSchema = z.object({
   path: ["efrroExpiry"]
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
-    const ad = new Date(data.admissionDate);
-    const eg = new Date(data.expectedGraduation);
-    if (!isNaN(ad.getTime()) && !isNaN(eg.getTime())) {
+    const ad = parseDateToISO(data.admissionDate);
+    const eg = parseDateToISO(data.expectedGraduation);
+    if (ad && eg) {
       return eg > ad;
     }
   }
@@ -219,9 +222,11 @@ export const UpdateStudentValidationSchema = z.object({
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional().nullable(),
   dateOfBirth: z.string().optional().nullable().refine((dob) => {
     if (!dob || !dob.trim()) return true;
-    const date = new Date(dob);
-    return !isNaN(date.getTime()) && date < new Date();
-  }, { message: "Date of birth must be a valid date in the past" }),
+    const iso = parseDateToISO(dob);
+    if (!iso) return false;
+    const today = new Date().toISOString().split("T")[0];
+    return iso <= today;
+  }, { message: "Date of birth must be a valid date in the past (DD/MM/YYYY)" }),
   maritalStatus: z.enum(["single", "married", "divorced", "widowed", "separated", "other", "prefer_not_to_say"]).optional().nullable(),
   bloodGroup: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).optional().nullable(),
   physicalDisability: z.boolean().optional().nullable(),
@@ -268,9 +273,9 @@ export const UpdateStudentValidationSchema = z.object({
   admissionDate: z.string().optional().nullable(),
   joiningDate: z.string().optional().nullable().refine((jd) => {
     if (!jd || !jd.trim()) return true;
-    const date = new Date(jd);
-    return !isNaN(date.getTime());
-  }, { message: "Joining date must be a valid date format" }),
+    const iso = parseDateToISO(jd);
+    return Boolean(iso);
+  }, { message: "Joining date must be a valid date in DD/MM/YYYY format" }),
   expectedGraduation: z.string().optional().nullable(),
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   academicStatus: z.enum(["good_standing", "probation", "suspended"]).optional(),

@@ -2,6 +2,8 @@
  * Domain Types, Enums, and Utility Functions for Expanded Student Registration
  */
 
+import { parseDateOnlyString } from "@/lib/utils/date";
+
 export type MaritalStatus = 
   | "single" 
   | "married" 
@@ -166,21 +168,10 @@ function parseDateInput(val: string | Date | null | undefined): Date | null {
   const str = String(val).trim();
   if (!str) return null;
   
-  // Try direct YYYY-MM-DD parse
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    const [y, m, d] = str.split("-").map(Number);
-    return new Date(y, m - 1, d);
-  }
-
-  // Try DD/MM/YYYY or MM/DD/YYYY
-  if (str.includes("/")) {
-    const parts = str.split("/").map(Number);
-    if (parts.length === 3) {
-      if (parts[2] > 1900) {
-        // DD/MM/YYYY
-        return new Date(parts[2], parts[1] - 1, parts[0]);
-      }
-    }
+  const parts = parseDateOnlyString(str);
+  if (parts) {
+    const dt = new Date(parts.year, parts.month - 1, parts.day);
+    return isNaN(dt.getTime()) ? null : dt;
   }
 
   const dt = new Date(str);

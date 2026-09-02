@@ -65,6 +65,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { SearchableProgramSelector } from "@/components/ui/searchable-program-selector";
 import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateToISO, formatToDDMMYYYY, formatDate } from "@/lib/utils/date";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
@@ -303,8 +304,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setAddEditMode("edit");
     setAddEditForm({
       documentNumber: currentDoc?.number && hasValidDocumentNumber(currentDoc.number) ? currentDoc.number : "",
-      issueDate: currentDoc?.issueDate ? currentDoc.issueDate.split("T")[0] : "",
-      expiryDate: currentDoc?.expiryDate ? currentDoc.expiryDate.split("T")[0] : "",
+      issueDate: currentDoc?.issueDate ? formatToDDMMYYYY(currentDoc.issueDate) : "",
+      expiryDate: currentDoc?.expiryDate ? formatToDDMMYYYY(currentDoc.expiryDate) : "",
       placeOfIssue: currentDoc?.placeOfIssue || "",
       visaType: currentDoc?.visaType || "Student (S-1)",
       notes: currentDoc?.notes || "",
@@ -321,9 +322,21 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
     const errors: Record<string, string> = {};
     if (!addEditForm.documentNumber.trim()) errors.documentNumber = "Document number is required.";
-    if (!addEditForm.issueDate.trim()) errors.issueDate = "Issue date is required.";
-    if (!addEditForm.expiryDate.trim()) errors.expiryDate = "Expiration date is required.";
-    if (addEditForm.issueDate && addEditForm.expiryDate && addEditForm.expiryDate <= addEditForm.issueDate) {
+    if (!addEditForm.issueDate.trim()) {
+      errors.issueDate = "Issue date is required.";
+    } else if (!parseDateToISO(addEditForm.issueDate)) {
+      errors.issueDate = "Please enter a valid date in DD/MM/YYYY format.";
+    }
+
+    if (!addEditForm.expiryDate.trim()) {
+      errors.expiryDate = "Expiration date is required.";
+    } else if (!parseDateToISO(addEditForm.expiryDate)) {
+      errors.expiryDate = "Please enter a valid date in DD/MM/YYYY format.";
+    }
+
+    const isoIssue = parseDateToISO(addEditForm.issueDate);
+    const isoExpiry = parseDateToISO(addEditForm.expiryDate);
+    if (isoIssue && isoExpiry && isoExpiry <= isoIssue) {
       errors.expiryDate = "Expiration date must be strictly after the issue date.";
     }
 
@@ -338,8 +351,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
       formData.append("studentId", studentId);
       formData.append("documentType", addEditDocType);
       formData.append("documentNumber", addEditForm.documentNumber.trim());
-      formData.append("issueDate", addEditForm.issueDate.trim());
-      formData.append("expiryDate", addEditForm.expiryDate.trim());
+      formData.append("issueDate", isoIssue || addEditForm.issueDate.trim());
+      formData.append("expiryDate", isoExpiry || addEditForm.expiryDate.trim());
       if (addEditForm.placeOfIssue.trim()) formData.append("placeOfIssue", addEditForm.placeOfIssue.trim());
       if (addEditForm.visaType.trim()) formData.append("visaType", addEditForm.visaType.trim());
       if (addEditForm.notes.trim()) formData.append("notes", addEditForm.notes.trim());
@@ -410,7 +423,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setRenewDocType(docType);
     setRenewForm({
       documentNumber: currentDoc?.number && hasValidDocumentNumber(currentDoc.number) ? currentDoc.number : "",
-      issueDate: currentDoc?.issueDate ? currentDoc.issueDate.split("T")[0] : "",
+      issueDate: currentDoc?.issueDate ? formatToDDMMYYYY(currentDoc.issueDate) : "",
       expiryDate: "",
       placeOfIssue: currentDoc?.placeOfIssue || "",
       visaType: currentDoc?.visaType || "Student (S-1)",
@@ -447,9 +460,21 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
     const errors: Record<string, string> = {};
     if (!renewForm.documentNumber.trim()) errors.documentNumber = "Document number is required.";
-    if (!renewForm.issueDate.trim()) errors.issueDate = "Issue date is required.";
-    if (!renewForm.expiryDate.trim()) errors.expiryDate = "Expiration date is required.";
-    if (renewForm.issueDate && renewForm.expiryDate && renewForm.expiryDate <= renewForm.issueDate) {
+    if (!renewForm.issueDate.trim()) {
+      errors.issueDate = "Issue date is required.";
+    } else if (!parseDateToISO(renewForm.issueDate)) {
+      errors.issueDate = "Please enter a valid date in DD/MM/YYYY format.";
+    }
+
+    if (!renewForm.expiryDate.trim()) {
+      errors.expiryDate = "Expiration date is required.";
+    } else if (!parseDateToISO(renewForm.expiryDate)) {
+      errors.expiryDate = "Please enter a valid date in DD/MM/YYYY format.";
+    }
+
+    const isoIssue = parseDateToISO(renewForm.issueDate);
+    const isoExpiry = parseDateToISO(renewForm.expiryDate);
+    if (isoIssue && isoExpiry && isoExpiry <= isoIssue) {
       errors.expiryDate = "Expiration date must be strictly after the issue date.";
     }
 
@@ -464,8 +489,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
       formData.append("studentId", studentId);
       formData.append("documentType", renewDocType);
       formData.append("documentNumber", renewForm.documentNumber.trim());
-      formData.append("issueDate", renewForm.issueDate.trim());
-      formData.append("expiryDate", renewForm.expiryDate.trim());
+      formData.append("issueDate", isoIssue || renewForm.issueDate.trim());
+      formData.append("expiryDate", isoExpiry || renewForm.expiryDate.trim());
       if (renewForm.placeOfIssue.trim()) formData.append("placeOfIssue", renewForm.placeOfIssue.trim());
       if (renewForm.visaType.trim()) formData.append("visaType", renewForm.visaType.trim());
       if (renewForm.notes.trim()) formData.append("notes", renewForm.notes.trim());
@@ -549,7 +574,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     if (!student) return;
     setAdjustmentForm({
       adjustmentType: "semester_override",
-      effectiveDate: new Date().toISOString().split("T")[0],
+      effectiveDate: formatDate(new Date(), ""),
       adjustedSemester: student.currentSemester || 1,
       newProgramCode: student.programCode || "",
       reason: "",
@@ -569,14 +594,18 @@ export default function StudentDetailsPage({ params }: PageProps) {
     if (!adjustmentForm.reason.trim()) {
       errors.reason = "A mandatory institutional reason is required.";
     }
-    if (!adjustmentForm.effectiveDate) {
+    if (!adjustmentForm.effectiveDate || !adjustmentForm.effectiveDate.trim()) {
       errors.effectiveDate = "Effective date is required.";
+    } else if (!parseDateToISO(adjustmentForm.effectiveDate)) {
+      errors.effectiveDate = "Please enter a valid effective date in DD/MM/YYYY format.";
     }
 
     if (Object.keys(errors).length > 0) {
       setAdjustmentErrors(errors);
       return;
     }
+
+    const effectiveISO = parseDateToISO(adjustmentForm.effectiveDate);
 
     setIsSavingAdjustment(true);
     setSaveAdjustmentSuccess(false);
@@ -585,7 +614,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     try {
       const res = await recordAcademicAdjustmentAction(studentId, {
         adjustmentType: adjustmentForm.adjustmentType,
-        effectiveDate: adjustmentForm.effectiveDate,
+        effectiveDate: effectiveISO || adjustmentForm.effectiveDate,
         previousSemester: student.currentSemester,
         adjustedSemester: Number(adjustmentForm.adjustedSemester) || null,
         previousProgramCode: student.programCode,
@@ -802,7 +831,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         fullName: student.fullName,
         nationalityCode: student.nationalityCode || "",
         email: student.email,
-        dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split("T")[0] : "",
+        dateOfBirth: student.dateOfBirth ? formatToDDMMYYYY(student.dateOfBirth) : "",
         gender: student.gender || "",
         maritalStatus: student.maritalStatus || "",
         bloodGroup: student.bloodGroup || "",
@@ -812,9 +841,9 @@ export default function StudentDetailsPage({ params }: PageProps) {
         isSchoolOverridden: Boolean(student.isSchoolOverridden),
         overrideSchoolId: student.overrideSchoolId || "",
         schoolOverrideReason: student.schoolOverrideReason || "",
-        admissionDate: student.admissionDate ? student.admissionDate.split("T")[0] : "",
-        joiningDate: student.joiningDate ? student.joiningDate.split("T")[0] : "",
-        expectedGraduation: student.expectedGraduation ? student.expectedGraduation.split("T")[0] : "",
+        admissionDate: student.admissionDate ? formatToDDMMYYYY(student.admissionDate) : "",
+        joiningDate: student.joiningDate ? formatToDDMMYYYY(student.joiningDate) : "",
+        expectedGraduation: student.expectedGraduation ? formatToDDMMYYYY(student.expectedGraduation) : "",
         admissionCategory: student.admissionCategory || "",
         admissionCategoryOther: student.admissionCategoryOther || "",
         siiApplicationNumber: student.siiApplicationNumber || "",
@@ -974,7 +1003,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         registrationNumber: editForm.registrationNumber?.trim() || null,
         fullName: editForm.fullName.trim(),
         nationalityCode: editForm.nationalityCode ? (normalizeCountryInputSync(editForm.nationalityCode)?.isoAlpha3 || editForm.nationalityCode.trim().toUpperCase()) : undefined,
-        dateOfBirth: editForm.dateOfBirth?.trim() || undefined,
+        dateOfBirth: editForm.dateOfBirth?.trim() ? (parseDateToISO(editForm.dateOfBirth) || undefined) : undefined,
         gender: (editForm.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
         maritalStatus: (editForm.maritalStatus as MaritalStatus) || undefined,
         bloodGroup: editForm.bloodGroup?.trim() || undefined,
@@ -1001,9 +1030,9 @@ export default function StudentDetailsPage({ params }: PageProps) {
         programCode: editForm.program?.trim() || undefined,
         overrideSchoolId: editForm.isSchoolOverridden ? (editForm.overrideSchoolId || null) : null,
         schoolOverrideReason: editForm.isSchoolOverridden ? (editForm.schoolOverrideReason?.trim() || null) : null,
-        admissionDate: editForm.admissionDate?.trim() || undefined,
-        joiningDate: editForm.joiningDate?.trim() || null,
-        expectedGraduation: editForm.expectedGraduation?.trim() || undefined,
+        admissionDate: editForm.admissionDate?.trim() ? (parseDateToISO(editForm.admissionDate) || undefined) : undefined,
+        joiningDate: editForm.joiningDate?.trim() ? (parseDateToISO(editForm.joiningDate) || null) : null,
+        expectedGraduation: editForm.expectedGraduation?.trim() ? (parseDateToISO(editForm.expectedGraduation) || undefined) : undefined,
         admissionCategory: (editForm.admissionCategory as AdmissionCategory) || undefined,
         admissionCategoryOther: editForm.admissionCategory === "other" ? (editForm.admissionCategoryOther?.trim() || undefined) : undefined,
         siiApplicationNumber: editForm.siiApplicationNumber ? editForm.siiApplicationNumber.trim() : null,
@@ -3684,30 +3713,26 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   <label className="font-semibold text-foreground">
                     Issue Date <span className="text-destructive">*</span>
                   </label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={addEditForm.issueDate}
                     onChange={(e) => setAddEditForm(prev => ({ ...prev, issueDate: e.target.value }))}
-                    className="h-9 text-xs"
+                    onValueChange={(v) => setAddEditForm(prev => ({ ...prev, issueDate: v }))}
+                    placeholder="DD/MM/YYYY"
+                    error={addEditErrors.issueDate}
                   />
-                  {addEditErrors.issueDate && (
-                    <p className="text-[11px] text-destructive">{addEditErrors.issueDate}</p>
-                  )}
                 </div>
 
                 <div className="space-y-1">
                   <label className="font-semibold text-foreground">
                     Expiration Date <span className="text-destructive">*</span>
                   </label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={addEditForm.expiryDate}
                     onChange={(e) => setAddEditForm(prev => ({ ...prev, expiryDate: e.target.value }))}
-                    className="h-9 text-xs"
+                    onValueChange={(v) => setAddEditForm(prev => ({ ...prev, expiryDate: v }))}
+                    placeholder="DD/MM/YYYY"
+                    error={addEditErrors.expiryDate}
                   />
-                  {addEditErrors.expiryDate && (
-                    <p className="text-[11px] text-destructive">{addEditErrors.expiryDate}</p>
-                  )}
                 </div>
               </div>
 
@@ -3851,30 +3876,26 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   <label className="font-semibold text-foreground">
                     Issue Date <span className="text-destructive">*</span>
                   </label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={renewForm.issueDate}
                     onChange={(e) => setRenewForm(prev => ({ ...prev, issueDate: e.target.value }))}
-                    className="h-9 text-xs"
+                    onValueChange={(v) => setRenewForm(prev => ({ ...prev, issueDate: v }))}
+                    placeholder="DD/MM/YYYY"
+                    error={renewErrors.issueDate}
                   />
-                  {renewErrors.issueDate && (
-                    <p className="text-[11px] text-destructive">{renewErrors.issueDate}</p>
-                  )}
                 </div>
 
                 <div className="space-y-1">
                   <label className="font-semibold text-foreground">
                     Expiration Date <span className="text-destructive">*</span>
                   </label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={renewForm.expiryDate}
                     onChange={(e) => setRenewForm(prev => ({ ...prev, expiryDate: e.target.value }))}
-                    className="h-9 text-xs"
+                    onValueChange={(v) => setRenewForm(prev => ({ ...prev, expiryDate: v }))}
+                    placeholder="DD/MM/YYYY"
+                    error={renewErrors.expiryDate}
                   />
-                  {renewErrors.expiryDate && (
-                    <p className="text-[11px] text-destructive">{renewErrors.expiryDate}</p>
-                  )}
                 </div>
               </div>
 

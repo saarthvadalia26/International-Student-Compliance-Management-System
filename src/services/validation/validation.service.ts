@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseDateToISO } from "@/lib/utils/date";
 
 // 1. Core Student Schema
 export const StudentSchema = z.object({
@@ -13,9 +14,11 @@ export const StudentPersonalSchema = z.object({
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional().nullable(),
   dateOfBirth: z.string().optional().nullable().refine((dob) => {
     if (!dob || !dob.trim()) return true;
-    const date = new Date(dob);
-    return !isNaN(date.getTime()) && date < new Date();
-  }, { message: "Date of birth must be in the past" }),
+    const iso = parseDateToISO(dob);
+    if (!iso) return false;
+    const today = new Date().toISOString().split("T")[0];
+    return iso <= today;
+  }, { message: "Date of birth must be in the past (DD/MM/YYYY)" }),
   maritalStatus: z.enum(["single", "married", "divorced", "widowed", "separated", "other", "prefer_not_to_say"]).optional().nullable(),
   bloodGroup: z.string().max(10).optional().nullable(),
   physicalDisability: z.boolean().optional().nullable(),
@@ -81,9 +84,9 @@ export const StudentAcademicSchema = z.object({
   nfsuCampus: z.string().max(255).optional().nullable(),
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
-    const ad = new Date(data.admissionDate);
-    const eg = new Date(data.expectedGraduation);
-    if (!isNaN(ad.getTime()) && !isNaN(eg.getTime())) {
+    const ad = parseDateToISO(data.admissionDate);
+    const eg = parseDateToISO(data.expectedGraduation);
+    if (ad && eg) {
       return eg > ad;
     }
   }
@@ -118,9 +121,12 @@ export const PassportSchema = z.object({
   isCurrent: z.boolean().default(true),
   verificationStatus: z.enum(["pending", "verified", "rejected"]).default("pending"),
 }).refine((data) => {
-  const issue = new Date(data.issueDate);
-  const expiry = new Date(data.expiryDate);
-  return expiry > issue;
+  const issue = parseDateToISO(data.issueDate);
+  const expiry = parseDateToISO(data.expiryDate);
+  if (issue && expiry) {
+    return expiry > issue;
+  }
+  return true;
 }, {
   message: "Passport expiry date must be after issue date",
   path: ["expiryDate"]
@@ -135,9 +141,12 @@ export const VisaSchema = z.object({
   isCurrent: z.boolean().default(true),
   verificationStatus: z.enum(["pending", "verified", "rejected"]).default("pending"),
 }).refine((data) => {
-  const issue = new Date(data.issueDate);
-  const expiry = new Date(data.expiryDate);
-  return expiry > issue;
+  const issue = parseDateToISO(data.issueDate);
+  const expiry = parseDateToISO(data.expiryDate);
+  if (issue && expiry) {
+    return expiry > issue;
+  }
+  return true;
 }, {
   message: "Visa expiry date must be after issue date",
   path: ["expiryDate"]
@@ -152,9 +161,12 @@ export const EfrroSchema = z.object({
   isCurrent: z.boolean().default(true),
   verificationStatus: z.enum(["pending", "verified", "rejected"]).default("pending"),
 }).refine((data) => {
-  const issue = new Date(data.issueDate);
-  const expiry = new Date(data.expiryDate);
-  return expiry > issue;
+  const issue = parseDateToISO(data.issueDate);
+  const expiry = parseDateToISO(data.expiryDate);
+  if (issue && expiry) {
+    return expiry > issue;
+  }
+  return true;
 }, {
   message: "eFRRO expiry date must be after issue date",
   path: ["expiryDate"]

@@ -1,25 +1,22 @@
+import { parseDateOnlyString } from "@/lib/utils/date";
+
 /**
  * Pure, reliable calendar date arithmetic functions to avoid JavaScript timezone offset anomalies.
  * Safe for use in both Client Components and Server Components.
  */
 export class CalendarDateEngine {
   /**
-   * Parses a YYYY-MM-DD date string (or ISO string) into a midday UTC Date to prevent day-boundary shifts.
+   * Parses a YYYY-MM-DD or DD/MM/YYYY date string into a midday UTC Date to prevent day-boundary shifts.
    */
   static parseDateOnly(dateStr: string): Date {
     const cleanStr = String(dateStr).trim();
     if (!cleanStr) return new Date(NaN);
     
-    const datePart = cleanStr.split("T")[0].replace(/\//g, "-");
-    const parts = datePart.split("-");
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        return new Date(Date.UTC(year, month, day, 12, 0, 0));
-      }
+    const parts = parseDateOnlyString(cleanStr);
+    if (parts) {
+      return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0));
     }
+
     const fallback = new Date(cleanStr);
     return new Date(Date.UTC(fallback.getUTCFullYear(), fallback.getUTCMonth(), fallback.getUTCDate(), 12, 0, 0));
   }

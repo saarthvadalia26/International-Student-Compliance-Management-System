@@ -144,46 +144,16 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   branchAddress: { tab: "documents", elementId: "branchAddress", label: "Branch Address" }
 };
 
+import { parseDateToISO } from "@/lib/utils/date";
+
 /**
  * Normalizes any incoming date string or Date instance to a strict local YYYY-MM-DD format.
- * Strictly prevents interpreting non-date 3-letter strings (like country codes "MAR", "MAY") as dates.
+ * Uses centralized timezone-safe parser that strictly interprets slash formats as DD/MM/YYYY.
  */
 function normalizeDateToISO(val: Date | string | undefined | null): string {
   if (!val) return "";
-  if (val instanceof Date) {
-    if (isNaN(val.getTime())) return "";
-    const y = val.getFullYear();
-    const m = String(val.getMonth() + 1).padStart(2, "0");
-    const d = String(val.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }
-  const str = String(val).trim();
-  if (!str) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  if (str.includes("T") && /^\d{4}-\d{2}-\d{2}T/.test(str)) return str.split("T")[0];
-  const slashParts = str.split("/");
-  if (slashParts.length === 3) {
-    if (slashParts[0].length === 4) {
-      return `${slashParts[0]}-${slashParts[1].padStart(2, "0")}-${slashParts[2].padStart(2, "0")}`;
-    } else if (slashParts[2].length === 4) {
-      return `${slashParts[2]}-${slashParts[0].padStart(2, "0")}-${slashParts[1].padStart(2, "0")}`;
-    }
-  }
-  const hyphenParts = str.split("-");
-  if (hyphenParts.length === 3 && hyphenParts[2].length === 4) {
-    return `${hyphenParts[2]}-${hyphenParts[1].padStart(2, "0")}-${hyphenParts[0].padStart(2, "0")}`;
-  }
-  // Only attempt Date parsing if string contains numeric digits to avoid colliding with 3-letter country codes
-  if (/\d/.test(str)) {
-    const dt = new Date(str);
-    if (!isNaN(dt.getTime())) {
-      const y = dt.getFullYear();
-      const m = String(dt.getMonth() + 1).padStart(2, "0");
-      const d = String(dt.getDate()).padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    }
-  }
-  return str;
+  const iso = parseDateToISO(val);
+  return iso || "";
 }
 
 export default function StudentRegistrationPage() {
@@ -847,7 +817,7 @@ export default function StudentRegistrationPage() {
                       disableFuture={true}
                       maxDate={new Date()}
                       startYear={1940}
-                      placeholder="Select date of birth..."
+                      placeholder="DD/MM/YYYY"
                       error={validationErrors.dateOfBirth}
                     />
                     <p className="text-[11px] text-muted-foreground font-caption">
@@ -1329,7 +1299,7 @@ export default function StudentRegistrationPage() {
                       disabled={isSubmitting}
                       startYear={2015}
                       endYear={new Date().getFullYear() + 2}
-                      placeholder="Select admission date..."
+                      placeholder="DD/MM/YYYY"
                       error={validationErrors.admissionDate}
                     />
                   </div>
@@ -1346,7 +1316,7 @@ export default function StudentRegistrationPage() {
                       disabled={isSubmitting}
                       startYear={2015}
                       endYear={new Date().getFullYear() + 2}
-                      placeholder="Select official joining date..."
+                      placeholder="DD/MM/YYYY"
                       error={validationErrors.joiningDate}
                     />
                   </div>
@@ -1363,7 +1333,7 @@ export default function StudentRegistrationPage() {
                       disabled={isSubmitting}
                       startYear={2015}
                       endYear={new Date().getFullYear() + 10}
-                      placeholder="Select expected graduation..."
+                      placeholder="DD/MM/YYYY"
                       error={validationErrors.expectedGraduation}
                     />
                   </div>
@@ -1882,7 +1852,7 @@ export default function StudentRegistrationPage() {
                         onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
                         onValueChange={(v) => handleSelectChange("passportIssueDate", v)}
                         disabled={isSubmitting}
-                        placeholder="Select passport issue date..."
+                        placeholder="DD/MM/YYYY"
                         error={validationErrors.passportIssueDate}
                       />
                     </div>
@@ -1897,7 +1867,7 @@ export default function StudentRegistrationPage() {
                         onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
                         onValueChange={(v) => handleSelectChange("passportExpiry", v)}
                         disabled={isSubmitting}
-                        placeholder="Select passport expiry date..."
+                        placeholder="DD/MM/YYYY"
                         error={validationErrors.passportExpiry}
                       />
                       {validationErrors.passportExpiry && (
@@ -1968,7 +1938,7 @@ export default function StudentRegistrationPage() {
                         onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
                         onValueChange={(v) => handleSelectChange("visaIssueDate", v)}
                         disabled={isSubmitting}
-                        placeholder="Select visa issue date..."
+                        placeholder="DD/MM/YYYY"
                         error={validationErrors.visaIssueDate}
                       />
                     </div>
@@ -1983,7 +1953,7 @@ export default function StudentRegistrationPage() {
                         onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
                         onValueChange={(v) => handleSelectChange("visaExpiry", v)}
                         disabled={isSubmitting}
-                        placeholder="Select visa expiry date..."
+                        placeholder="DD/MM/YYYY"
                         error={validationErrors.visaExpiry}
                       />
                       {validationErrors.visaExpiry && (
@@ -2025,7 +1995,7 @@ export default function StudentRegistrationPage() {
                         onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
                         onValueChange={(v) => handleSelectChange("efrroIssueDate", v)}
                         disabled={isSubmitting}
-                        placeholder="Select issue date..."
+                        placeholder="DD/MM/YYYY"
                         error={validationErrors.efrroIssueDate}
                       />
                     </div>
@@ -2040,7 +2010,7 @@ export default function StudentRegistrationPage() {
                         onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
                         onValueChange={(v) => handleSelectChange("efrroExpiry", v)}
                         disabled={isSubmitting}
-                        placeholder="Select expiry date..."
+                        placeholder="DD/MM/YYYY"
                         error={validationErrors.efrroExpiry}
                       />
                     </div>
