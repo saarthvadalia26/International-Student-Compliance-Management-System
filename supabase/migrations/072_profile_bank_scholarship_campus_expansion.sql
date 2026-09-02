@@ -23,6 +23,19 @@ CREATE INDEX IF NOT EXISTS idx_student_academic_joining_date
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Helper Trigger Function: Ensure public.update_timestamp() exists
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.update_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 2. Sensitive Bank Details: Create public.student_bank_details table
 -- ─────────────────────────────────────────────────────────────────────────────
 
