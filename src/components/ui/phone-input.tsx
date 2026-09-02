@@ -54,9 +54,9 @@ export function PhoneInput({
 }: PhoneInputProps) {
   // Determine initial country code, iso2, and phone number
   const parseInitial = () => {
-    let initialIso2 = propCountryIso2 || defaultCountryIso2;
+    const initialIso2 = propCountryIso2 || defaultCountryIso2;
     let initialCode = propCountryCode;
-    let initialNum = propNumber || "";
+    const initialNum = propNumber || "";
 
     if (initialIso2 && !initialCode) {
       const c = getCountryByIso2(initialIso2);

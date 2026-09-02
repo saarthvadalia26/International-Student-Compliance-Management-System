@@ -143,6 +143,8 @@ export interface StudentDetailProfile {
   joiningDate?: string | null;
   expectedGraduation: string;
   admissionCategory?: string | null;
+  lastEducationalQualification?: string | null;
+  lastEducationalInstitution?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
@@ -844,6 +846,8 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       joiningDate: academic?.joining_date || null,
       expectedGraduation: hasCourseConfig ? (progression.expectedGraduationDateISO || academic?.expected_graduation || "") : (academic?.expected_graduation || ""),
       admissionCategory: academic?.admission_category || null,
+      lastEducationalQualification: academic?.last_educational_qualification || null,
+      lastEducationalInstitution: academic?.last_educational_institution || null,
       admissionCategoryOther: academic?.admission_category_other || null,
       siiApplicationNumber: academic?.sii_application_number || null,
       iccrApplicationNumber: academic?.iccr_application_number || null,

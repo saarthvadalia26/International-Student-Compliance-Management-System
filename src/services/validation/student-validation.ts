@@ -75,6 +75,8 @@ export const RegisterStudentValidationSchema = z.object({
   admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"], {
     message: "Please select a valid admission category"
   }).optional().nullable(),
+  lastEducationalQualification: z.string().max(255).optional().nullable(),
+  lastEducationalInstitution: z.string().max(255).optional().nullable(),
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
@@ -273,6 +275,8 @@ export const UpdateStudentValidationSchema = z.object({
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   academicStatus: z.enum(["good_standing", "probation", "suspended"]).optional(),
   admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"]).optional().nullable(),
+  lastEducationalQualification: z.string().max(255).optional().nullable(),
+  lastEducationalInstitution: z.string().max(255).optional().nullable(),
   admissionCategoryOther: z.string().optional().nullable(),
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),

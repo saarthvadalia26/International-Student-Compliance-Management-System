@@ -242,6 +242,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
           current_semester: calculatedSemester,
           academic_status: "good_standing",
           admission_category: input.admissionCategory || null,
+          last_educational_qualification: input.lastEducationalQualification ? input.lastEducationalQualification.trim() : null,
+          last_educational_institution: input.lastEducationalInstitution ? input.lastEducationalInstitution.trim() : null,
           admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
           sii_application_number: resolvedSiiNo,
           iccr_application_number: resolvedIccrNo,
@@ -684,6 +686,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         currentSemester: academic?.current_semester ?? null,
         academicStatus: academic?.academic_status || "good_standing",
         admissionCategory: academic?.admission_category || null,
+        lastEducationalQualification: academic?.last_educational_qualification || null,
+        lastEducationalInstitution: academic?.last_educational_institution || null,
         admissionCategoryOther: academic?.admission_category_other || null,
         siiApplicationNumber: academic?.sii_application_number || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
@@ -932,6 +936,12 @@ export class SupabaseStudentRepository implements IStudentRepository {
       academicUpdates.hostel_fee_currency = input.hostelFeeCurrency || null;
     }
     if (input.admissionCategoryOther !== undefined) academicUpdates.admission_category_other = input.admissionCategoryOther ? input.admissionCategoryOther.trim() : null;
+    if (input.lastEducationalQualification !== undefined) {
+      academicUpdates.last_educational_qualification = input.lastEducationalQualification ? input.lastEducationalQualification.trim() : null;
+    }
+    if (input.lastEducationalInstitution !== undefined) {
+      academicUpdates.last_educational_institution = input.lastEducationalInstitution ? input.lastEducationalInstitution.trim() : null;
+    }
     if (input.overrideSchoolId !== undefined) academicUpdates.override_school_id = input.overrideSchoolId ? input.overrideSchoolId.trim() : null;
     if (input.schoolOverrideReason !== undefined) academicUpdates.school_override_reason = input.schoolOverrideReason ? input.schoolOverrideReason.trim() : null;
 

@@ -98,6 +98,8 @@ export interface StudentAcademic {
   currentSemester: number | null;
   academicStatus: AcademicStatus;
   admissionCategory?: AdmissionCategory | null;
+  lastEducationalQualification?: string | null;
+  lastEducationalInstitution?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
@@ -215,6 +217,8 @@ export interface RegisterStudentInput {
   expectedGraduation?: Date | string | null;
   currentSemester?: number | null;
   admissionCategory?: AdmissionCategory | null;
+  lastEducationalQualification?: string | null;
+  lastEducationalInstitution?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
@@ -305,6 +309,8 @@ export interface UpdateStudentInput {
   currentSemester?: number | null;
   academicStatus?: AcademicStatus;
   admissionCategory?: AdmissionCategory | null;
+  lastEducationalQualification?: string | null;
+  lastEducationalInstitution?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;

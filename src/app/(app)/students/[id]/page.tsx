@@ -188,6 +188,8 @@ export interface StudentProfile {
   iccrScholarshipSchemeName?: string | null;
   scholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
+  lastEducationalQualification?: string | null;
+  lastEducationalInstitution?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | string | null;
   tuitionFeeAmount?: number | null;
@@ -748,6 +750,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
     iccrApplicationNumber: "",
     iccrScholarshipSchemeName: "",
     nfsuCampus: "",
+    lastEducationalQualification: "",
+    lastEducationalInstitution: "",
     admissionAcademicYear: "",
     feePaymentCategory: "",
     tuitionFeeAmount: "",
@@ -817,6 +821,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
         iccrApplicationNumber: student.iccrApplicationNumber || "",
         iccrScholarshipSchemeName: student.iccrScholarshipSchemeName || "",
         nfsuCampus: student.nfsuCampus || "",
+        lastEducationalQualification: student.lastEducationalQualification || "",
+        lastEducationalInstitution: student.lastEducationalInstitution || "",
         admissionAcademicYear: student.admissionAcademicYear || "",
         feePaymentCategory: student.feePaymentCategory || "",
         tuitionFeeAmount: student.tuitionFeeAmount !== null && student.tuitionFeeAmount !== undefined ? String(student.tuitionFeeAmount) : "",
@@ -1005,6 +1011,8 @@ export default function StudentDetailsPage({ params }: PageProps) {
         iccrScholarshipSchemeName: editForm.iccrScholarshipSchemeName ? editForm.iccrScholarshipSchemeName.trim() : null,
         scholarshipSchemeName: editForm.iccrScholarshipSchemeName ? editForm.iccrScholarshipSchemeName.trim() : null,
         nfsuCampus: editForm.nfsuCampus ? editForm.nfsuCampus.trim() : null,
+        lastEducationalQualification: editForm.lastEducationalQualification !== undefined ? (editForm.lastEducationalQualification?.trim() || null) : undefined,
+        lastEducationalInstitution: editForm.lastEducationalInstitution !== undefined ? (editForm.lastEducationalInstitution?.trim() || null) : undefined,
         admissionAcademicYear: editForm.admissionAcademicYear?.trim() || null,
         feePaymentCategory: (editForm.feePaymentCategory as FeePaymentCategory) || null,
         tuitionFeeAmount: editForm.tuitionFeeAmount?.trim() !== "" ? Number(editForm.tuitionFeeAmount) : null,
@@ -1526,6 +1534,20 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       <span>{AcademicProgressionEngine.formatDisplayDate(student.expectedGraduation)}</span>
                     </div>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Last Educational Qualification</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.lastEducationalQualification || "Not recorded"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Name of University/Institute/School</span>
+                    <span className="font-semibold text-foreground block">
+                      {student.lastEducationalInstitution || "Not recorded"}
+                    </span>
                   </div>
                 </div>
 
@@ -2841,6 +2863,33 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       setEditForm(prev => ({ ...prev, expectedGraduation: e.target.value }));
                       setIsDirty(true);
                     }}
+                  />
+                </div>
+
+                {/* Prior Educational Background */}
+                <div className="space-y-1.5 sm:col-span-2 pt-2 border-t border-border/40">
+                  <span className="text-xs font-semibold text-foreground tracking-wide block">Prior Educational Background</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="lastEducationalQualification">Last Educational Qualification</label>
+                  <Input 
+                    id="lastEducationalQualification" 
+                    placeholder="e.g. Bachelor of Science" 
+                    value={editForm.lastEducationalQualification} 
+                    onChange={handleFormChange} 
+                    className="h-9 text-sm" 
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="lastEducationalInstitution">Name of University/Institute/School</label>
+                  <Input 
+                    id="lastEducationalInstitution" 
+                    placeholder="e.g. ABC University" 
+                    value={editForm.lastEducationalInstitution} 
+                    onChange={handleFormChange} 
+                    className="h-9 text-sm" 
                   />
                 </div>
 

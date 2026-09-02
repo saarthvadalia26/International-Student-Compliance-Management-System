@@ -1171,7 +1171,7 @@ export function AcademicProgramsTab() {
             </div>
           </DialogHeader>
           <div className="space-y-2 py-2 text-xs">
-            <p className="text-foreground">Are you sure you want to delete <span className="font-semibold text-foreground">"{programToDelete?.programName}"</span>?</p>
+            <p className="text-foreground">Are you sure you want to delete <span className="font-semibold text-foreground">&ldquo;{programToDelete?.programName}&rdquo;</span>?</p>
             {deleteProgramError && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-xs flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -1269,7 +1269,7 @@ export function AcademicProgramsTab() {
             </div>
           </DialogHeader>
           <div className="space-y-2 py-2 text-xs">
-            <p className="text-foreground">Are you sure you want to delete <span className="font-semibold text-foreground">"{schoolToDelete?.name}"</span>?</p>
+            <p className="text-foreground">Are you sure you want to delete <span className="font-semibold text-foreground">&ldquo;{schoolToDelete?.name}&rdquo;</span>?</p>
             {deleteSchoolError && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-xs flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -1380,7 +1380,7 @@ export function AcademicProgramsTab() {
           </DialogHeader>
           <div className="space-y-2 py-2 text-xs">
             <p className="text-foreground">
-              Are you sure you want to delete scholarship scheme <span className="font-semibold text-foreground">"{scholarshipToDelete?.name}"</span>?
+              Are you sure you want to delete scholarship scheme <span className="font-semibold text-foreground">&ldquo;{scholarshipToDelete?.name}&rdquo;</span>?
             </p>
             {scholarshipToDelete?.studentUsageCount && scholarshipToDelete.studentUsageCount > 0 ? (
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 rounded-xl text-xs flex items-start gap-2">
@@ -1510,7 +1510,7 @@ export function AcademicProgramsTab() {
           </DialogHeader>
           <div className="space-y-2 py-2 text-xs">
             <p className="text-foreground">
-              Are you sure you want to delete campus <span className="font-semibold text-foreground">"{campusToDelete?.name}"</span>?
+              Are you sure you want to delete campus <span className="font-semibold text-foreground">&ldquo;{campusToDelete?.name}&rdquo;</span>?
             </p>
             {campusToDelete?.studentUsageCount && campusToDelete.studentUsageCount > 0 ? (
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 rounded-xl text-xs flex items-start gap-2">

@@ -85,6 +85,7 @@ Managing these obligations through disconnected spreadsheets or manual filing in
 * **Degree Level Catalog**: Configurable support for Undergraduate (`UG`), Postgraduate (`PG`), Integrated (`INTEGRATED`), Doctoral (`PhD`), and Diploma programs.
 * **Semester Progression Engine**: Computes current academic semester and expected graduation date dynamically from admission date and program duration.
 * **ICCR Scholarship Scheme Name** (`iccr_scholarship_scheme_name`): Optional free-text field on the Student Academic profile that records the name of the applicable ICCR scholarship scheme (e.g., *Silver Jubilee Scholarship Scheme*, *Africa Scholarship Scheme*). The field is independent of the ICCR Application Number and SII Application Number. Existing students may have no value for this field. It does not affect document compliance, Passport compliance, Visa compliance, eFRRO compliance, reminders, notifications, or document renewal logic. The field is included in the Student Excel Export for authorized users.
+* **Last Educational Qualification & Name of University/Institute/School** (`last_educational_qualification`, `last_educational_institution`): Optional fields in the Academic Details section that record the student's prior educational background before enrolling in the university (e.g., *Bachelor of Technology* from *ABC University*). Both fields are completely optional throughout the system, can be populated independently or left blank, and are stored in `public.student_academic`. They are displayed in the Student Profile and included in the Student Excel Export for authorized administrators. As purely informational academic records, neither field affects compliance scoring, document status, passport/visa/eFRRO checks, reminders, or notifications.
 
 ### 🌍 Country & Dial Code Master Data
 * **ISO 3166-1 Master Catalog**: Built-in dataset containing 120+ countries with official names, 2-letter alpha codes, and international phone dial codes.
@@ -248,6 +249,7 @@ Student Academic Record (Admission Date, Current Semester, Expected Graduation)
 * **Semester Calculation**: Automatically determines the student's active semester using admission dates and standard semester durations.
 * **Adjustments**: Audited recording of student academic status changes, leaves of absence, and semester adjustments.
 * **Referential Integrity**: PostgreSQL constraints prevent deletion of academic programs while active student enrollments exist.
+* **Prior Educational Background**: Captures the student's previous qualification and institution (`last_educational_qualification`, `last_educational_institution`) as optional informational fields within the Academic Profile and Excel export.
 
 ---
 

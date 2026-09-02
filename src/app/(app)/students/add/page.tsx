@@ -93,6 +93,8 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   iccrScholarshipSchemeName: { tab: "academic", elementId: "iccrScholarshipSchemeName", label: "Name of ICCR Scholarship Scheme" },
   scholarshipSchemeName: { tab: "academic", elementId: "iccrScholarshipSchemeName", label: "Scholarship Scheme" },
   nfsuCampus: { tab: "academic", elementId: "nfsuCampus", label: "NFSU Campus" },
+  lastEducationalQualification: { tab: "academic", elementId: "lastEducationalQualification", label: "Last Educational Qualification" },
+  lastEducationalInstitution: { tab: "academic", elementId: "lastEducationalInstitution", label: "Name of University/Institute/School" },
   admissionAcademicYear: { tab: "academic", elementId: "admissionAcademicYear", label: "Admission / Academic Year" },
   feePaymentCategory: { tab: "academic", elementId: "feePaymentCategory", label: "Fee Payment Category" },
   tuitionFeeAmount: { tab: "academic", elementId: "tuitionFeeAmount", label: "Tuition Fees Amount" },
@@ -248,6 +250,8 @@ export default function StudentRegistrationPage() {
     iccrApplicationNumber: "",
     iccrScholarshipSchemeName: "",
     nfsuCampus: "",
+    lastEducationalQualification: "",
+    lastEducationalInstitution: "",
     admissionAcademicYear: "",
     feePaymentCategory: "",
     tuitionFeeAmount: "",
@@ -529,6 +533,8 @@ export default function StudentRegistrationPage() {
       iccrScholarshipSchemeName: formData.iccrScholarshipSchemeName?.trim() || undefined,
       scholarshipSchemeName: formData.iccrScholarshipSchemeName?.trim() || undefined,
       nfsuCampus: formData.nfsuCampus?.trim() || undefined,
+      lastEducationalQualification: formData.lastEducationalQualification?.trim() || undefined,
+      lastEducationalInstitution: formData.lastEducationalInstitution?.trim() || undefined,
       admissionAcademicYear: formData.admissionAcademicYear?.trim() || undefined,
       feePaymentCategory: (formData.feePaymentCategory as FeePaymentCategory) || undefined,
       tuitionFeeAmount: formData.tuitionFeeAmount?.trim() !== "" ? Number(formData.tuitionFeeAmount) : undefined,
@@ -1359,6 +1365,39 @@ export default function StudentRegistrationPage() {
                       endYear={new Date().getFullYear() + 10}
                       placeholder="Select expected graduation..."
                       error={validationErrors.expectedGraduation}
+                    />
+                  </div>
+
+                  {/* Prior Educational Background */}
+                  <div className="space-y-1.5 sm:col-span-2 pt-2 border-t border-border/40">
+                    <span className="text-xs font-semibold text-foreground tracking-wide block">Prior Educational Background</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="lastEducationalQualification">
+                      Last Educational Qualification <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Input
+                      id="lastEducationalQualification"
+                      placeholder="e.g. Bachelor of Science"
+                      value={formData.lastEducationalQualification}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className="h-10 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="lastEducationalInstitution">
+                      Name of University/Institute/School <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <Input
+                      id="lastEducationalInstitution"
+                      placeholder="e.g. ABC University"
+                      value={formData.lastEducationalInstitution}
+                      onChange={handleInputChange}
+                      disabled={isSubmitting}
+                      className="h-10 text-sm"
                     />
                   </div>
                 </div>
