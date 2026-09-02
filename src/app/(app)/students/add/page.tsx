@@ -36,7 +36,7 @@ import { getActiveCampusesAction } from "@/app/(app)/settings/campus-actions";
 import { AcademicProgram, getAcademicLevelLabel } from "@/domain/academic-programs/types";
 import { ScholarshipScheme } from "@/domain/scholarships/types";
 import { Campus } from "@/domain/campuses/types";
-import { CountryService } from "@/domain/countries/country.service";
+import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 import { RegisterStudentValidationSchema } from "@/services/validation/student-validation";
 import { registerStudentAction } from "@/app/(app)/students/actions";
 import { RegisterStudentInput } from "@/services/student/student.types";
@@ -478,7 +478,7 @@ export default function StudentRegistrationPage() {
     const validationPayload: RegisterStudentInput = {
       registrationNumber: formData.enrollmentNumber?.trim() || undefined,
       fullName: formData.fullName.trim(),
-      nationalityCode: formData.nationality ? (CountryService.normalizeCountryInputSync(formData.nationality)?.isoAlpha3 || formData.nationality.trim().toUpperCase()) : undefined,
+      nationalityCode: formData.nationality ? (normalizeCountryInputSync(formData.nationality)?.isoAlpha3 || formData.nationality.trim().toUpperCase()) : undefined,
       gender: (formData.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
       dateOfBirth: sanitizedDob || undefined,
       maritalStatus: (formData.maritalStatus as MaritalStatus) || undefined,

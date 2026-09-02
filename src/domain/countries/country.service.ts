@@ -1,6 +1,7 @@
+import "server-only";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { Country, CreateCountryDto, UpdateCountryDto, CountryFilterOptions } from "./types";
-import { ISO_MASTER_COUNTRIES } from "./iso-countries.data";
+import { ISO_MASTER_COUNTRIES, normalizeCountryInputSync as normalizeCountryInputSyncUtil } from "./country-utils";
 
 export { ISO_MASTER_COUNTRIES };
 
@@ -184,25 +185,7 @@ export class CountryService {
     isoAlpha3: string;
     country: Country;
   } | null {
-    if (!val || !val.trim()) return null;
-    const clean = val.trim();
-    const upper = clean.toUpperCase();
-    const lower = clean.toLowerCase();
-
-    const match = ISO_MASTER_COUNTRIES.find(
-      c => c.isoAlpha3 === upper ||
-           c.isoAlpha2 === upper ||
-           c.isoNumeric === clean ||
-           c.name.toLowerCase() === lower ||
-           (c.officialName && c.officialName.toLowerCase() === lower) ||
-           (c.nationality && c.nationality.toLowerCase() === lower)
-    );
-
-    if (!match) return null;
-    return {
-      isoAlpha3: match.isoAlpha3,
-      country: match
-    };
+    return normalizeCountryInputSyncUtil(val);
   }
 
   /**

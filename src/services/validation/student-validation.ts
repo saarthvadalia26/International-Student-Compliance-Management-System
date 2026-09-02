@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { CountryService } from "@/domain/countries/country.service";
+import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 
 export const RegisterStudentValidationSchema = z.object({
   registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
   fullName: z.string().trim().min(2, "Full name must be at least 2 characters").max(255),
   nationalityCode: z.string().optional().nullable().refine(val => {
     if (!val || !val.trim()) return true;
-    const norm = CountryService.normalizeCountryInputSync(val);
+    const norm = normalizeCountryInputSync(val);
     return Boolean(norm);
   }, { message: "Please select a valid nationality" }),
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"], {
@@ -211,7 +211,7 @@ export const UpdateStudentValidationSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters").max(255).optional(),
   nationalityCode: z.string().optional().nullable().refine(val => {
     if (!val || !val.trim()) return true;
-    const norm = CountryService.normalizeCountryInputSync(val);
+    const norm = normalizeCountryInputSync(val);
     return Boolean(norm);
   }, { message: "Please select a valid nationality" }),
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional().nullable(),

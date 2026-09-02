@@ -22,7 +22,7 @@ import {
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { normalizeAcademicLevel } from "@/domain/academic-programs/academic-level";
 import { DEFAULT_FALLBACK_PROGRAMS, LEGACY_PROGRAM_ALIASES } from "@/domain/academic-programs/academic-program.service";
-import { CountryService } from "@/domain/countries/country.service";
+import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 
 export class BulkStudentImportService {
 
@@ -206,7 +206,7 @@ export class BulkStudentImportService {
    */
   static normalizeNationality(val: string): string | null {
     if (!val || !val.trim()) return null;
-    const norm = CountryService.normalizeCountryInputSync(val);
+    const norm = normalizeCountryInputSync(val);
     return norm ? norm.isoAlpha3 : null;
   }
 
@@ -529,7 +529,7 @@ export class BulkStudentImportService {
           warning: "Nationality not provided. Will be stored as NULL and can be updated later."
         });
       } else {
-        const norm = CountryService.normalizeCountryInputSync(nationalityRaw);
+        const norm = normalizeCountryInputSync(nationalityRaw);
         if (!norm) {
           warnings.push({
             field: "nationality",

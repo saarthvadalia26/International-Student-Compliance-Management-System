@@ -48,7 +48,7 @@ import { getActiveCampusesAction } from "@/app/(app)/settings/campus-actions";
 import { School } from "@/domain/schools/types";
 import { ScholarshipScheme } from "@/domain/scholarships/types";
 import { Campus } from "@/domain/campuses/types";
-import { CountryService } from "@/domain/countries/country.service";
+import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
@@ -966,7 +966,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
       const res = await updateStudentAction(studentId, {
         registrationNumber: editForm.registrationNumber?.trim() || null,
         fullName: editForm.fullName.trim(),
-        nationalityCode: editForm.nationalityCode ? (CountryService.normalizeCountryInputSync(editForm.nationalityCode)?.isoAlpha3 || editForm.nationalityCode.trim().toUpperCase()) : undefined,
+        nationalityCode: editForm.nationalityCode ? (normalizeCountryInputSync(editForm.nationalityCode)?.isoAlpha3 || editForm.nationalityCode.trim().toUpperCase()) : undefined,
         dateOfBirth: editForm.dateOfBirth?.trim() || undefined,
         gender: (editForm.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
         maritalStatus: (editForm.maritalStatus as MaritalStatus) || undefined,

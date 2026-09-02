@@ -9,7 +9,7 @@ import {
 import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
 import { AcademicProgramService } from "@/domain/academic-programs/academic-program.service";
 import { AcademicProgram } from "@/domain/academic-programs/types";
-import { CountryService } from "@/domain/countries/country.service";
+import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 
 export interface IStudentRepository {
   createStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile>;
@@ -114,7 +114,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
       // 2. Insert into student_personal table
       const dobFormatted = this.formatDate(input.dateOfBirth);
       const nationalityCode = input.nationalityCode && input.nationalityCode.trim() 
-        ? (CountryService.normalizeCountryInputSync(input.nationalityCode)?.isoAlpha3 || input.nationalityCode.trim().toUpperCase()) 
+        ? (normalizeCountryInputSync(input.nationalityCode)?.isoAlpha3 || input.nationalityCode.trim().toUpperCase()) 
         : null;
 
       const { data: personalData, error: personalError } = await supabase
@@ -822,7 +822,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.fullName !== undefined) personalUpdates.full_name = input.fullName.trim();
     if (input.nationalityCode !== undefined) {
       personalUpdates.nationality_code = input.nationalityCode && input.nationalityCode.trim()
-        ? (CountryService.normalizeCountryInputSync(input.nationalityCode)?.isoAlpha3 || input.nationalityCode.trim().toUpperCase())
+        ? (normalizeCountryInputSync(input.nationalityCode)?.isoAlpha3 || input.nationalityCode.trim().toUpperCase())
         : null;
     }
     if (input.gender !== undefined) personalUpdates.gender = input.gender || null;

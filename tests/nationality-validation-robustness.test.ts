@@ -2,6 +2,7 @@ import "./test-preload";
 import assert from "node:assert/strict";
 import { RegisterStudentValidationSchema, UpdateStudentValidationSchema } from "../src/services/validation/student-validation";
 import { CountryService } from "../src/domain/countries/country.service";
+import { normalizeCountryInputSync } from "../src/domain/countries/country-utils";
 
 let passed = 0;
 let failed = 0;
@@ -36,6 +37,11 @@ test("Normalizes ISO Alpha-3 codes accurately", () => {
   const c3 = CountryService.normalizeCountryInputSync("FJI");
   assert.equal(c3?.isoAlpha3, "FJI");
   assert.equal(c3?.country.name, "Fiji");
+
+  // Also test client-safe country-utils directly
+  const c4 = normalizeCountryInputSync("IND");
+  assert.equal(c4?.isoAlpha3, "IND");
+  assert.equal(c4?.country.name, "India");
 });
 
 test("BUG REPRODUCTION PREVENTION: Month-abbreviation country codes (MAR, DEU, NPL) never get corrupted into dates", () => {
