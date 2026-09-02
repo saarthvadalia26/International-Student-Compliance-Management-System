@@ -9,6 +9,7 @@ import {
 import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/academic/services/semester-progression.service";
 import { AcademicProgramService } from "@/domain/academic-programs/academic-program.service";
 import { AcademicProgram } from "@/domain/academic-programs/types";
+import { CountryService } from "@/domain/countries/country.service";
 
 export interface IStudentRepository {
   createStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile>;
@@ -113,7 +114,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
       // 2. Insert into student_personal table
       const dobFormatted = this.formatDate(input.dateOfBirth);
       const nationalityCode = input.nationalityCode && input.nationalityCode.trim() 
-        ? input.nationalityCode.trim().toUpperCase() 
+        ? (CountryService.normalizeCountryInputSync(input.nationalityCode)?.isoAlpha3 || input.nationalityCode.trim().toUpperCase()) 
         : null;
 
       const { data: personalData, error: personalError } = await supabase
@@ -224,6 +225,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
       const resolvedIccrNo = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
       const resolvedSiiNo = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
       const resolvedNfsuCampus = input.nfsuCampus ? input.nfsuCampus.trim() : null;
+      const resolvedScholarshipScheme = input.scholarshipSchemeName ? input.scholarshipSchemeName.trim() : (input.iccrScholarshipSchemeName ? input.iccrScholarshipSchemeName.trim() : null);
+      const joiningDateFormatted = this.formatDate(input.joiningDate);
 
       let { data: academicData, error: academicError } = await supabase
         .from("student_academic")
@@ -234,6 +237,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           override_school_id: input.overrideSchoolId?.trim() || null,
           school_override_reason: input.overrideSchoolId ? (input.schoolOverrideReason?.trim() || null) : null,
           admission_date: admFormatted,
+          joining_date: joiningDateFormatted,
           expected_graduation: expGradFormatted,
           current_semester: calculatedSemester,
           academic_status: "good_standing",
@@ -241,7 +245,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
           sii_application_number: resolvedSiiNo,
           iccr_application_number: resolvedIccrNo,
-          iccr_scholarship_scheme_name: input.iccrScholarshipSchemeName ? input.iccrScholarshipSchemeName.trim() : null,
+          iccr_scholarship_scheme_name: resolvedScholarshipScheme,
           nfsu_campus: resolvedNfsuCampus,
           admission_academic_year: input.admissionAcademicYear ? input.admissionAcademicYear.trim() : null,
           fee_payment_category: input.feePaymentCategory || null,
@@ -263,6 +267,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
             program_id: programIdVal,
             program_code: programCodeVal,
             admission_date: admFormatted,
+            joining_date: joiningDateFormatted,
             expected_graduation: expGradFormatted,
             current_semester: calculatedSemester,
             academic_status: "good_standing",
@@ -406,6 +411,28 @@ export class SupabaseStudentRepository implements IStudentRepository {
         compliance_status: overallCompliance
       });
 
+      // 8.5. Insert into student_bank_details table if bank details provided
+      let bankData: Record<string, unknown> | null = null;
+      const bankNameVal = (input.bankName || input.bankDetails?.bankName)?.trim() || null;
+      const accountNumVal = (input.accountNumber || input.bankDetails?.accountNumber)?.trim() || null;
+      const ifscVal = (input.ifscCode || input.bankDetails?.ifscCode)?.trim() || null;
+      const branchAddrVal = (input.branchAddress || input.bankDetails?.branchAddress)?.trim() || null;
+
+      if (bankNameVal || accountNumVal || ifscVal || branchAddrVal) {
+        const { data: insertedBank } = await supabase
+          .from("student_bank_details")
+          .insert({
+            student_id: studentId,
+            bank_name: bankNameVal,
+            account_number: accountNumVal,
+            ifsc_code: ifscVal,
+            branch_address: branchAddrVal
+          })
+          .select()
+          .maybeSingle();
+        bankData = insertedBank;
+      }
+
       // 9. Record entry in audit_log
       await supabase.from("audit_log").insert({
         actor_id: actorId,
@@ -479,6 +506,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           studentId: academicData.student_id,
           programCode: academicData.program_code,
           admissionDate: academicData.admission_date ? new Date(academicData.admission_date) : null,
+          joiningDate: academicData.joining_date ? new Date(academicData.joining_date) : null,
           expectedGraduation: academicData.expected_graduation ? new Date(academicData.expected_graduation) : null,
           currentSemester: academicData.current_semester,
           academicStatus: academicData.academic_status,
@@ -487,6 +515,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
           siiApplicationNumber: academicData.sii_application_number || null,
           iccrApplicationNumber: academicData.iccr_application_number || null,
           iccrScholarshipSchemeName: academicData.iccr_scholarship_scheme_name || null,
+          scholarshipSchemeName: academicData.iccr_scholarship_scheme_name || null,
           nfsuCampus: academicData.nfsu_campus || null,
           admissionAcademicYear: academicData.admission_academic_year || null,
           feePaymentCategory: academicData.fee_payment_category || null,
@@ -526,6 +555,17 @@ export class SupabaseStudentRepository implements IStudentRepository {
           deletedAt: embassyData.deleted_at ? new Date(embassyData.deleted_at) : null,
           createdBy: embassyData.created_by,
           updatedBy: embassyData.updated_by
+        } : null,
+        bankDetails: bankData ? {
+          id: bankData.id as string,
+          studentId: bankData.student_id as string,
+          bankName: (bankData.bank_name as string) || null,
+          accountNumber: (bankData.account_number as string) || null,
+          ifscCode: (bankData.ifsc_code as string) || null,
+          branchAddress: (bankData.branch_address as string) || null,
+          createdAt: bankData.created_at ? new Date(bankData.created_at as string) : undefined,
+          updatedAt: bankData.updated_at ? new Date(bankData.updated_at as string) : undefined,
+          deletedAt: bankData.deleted_at ? new Date(bankData.deleted_at as string) : null
         } : null
       };
     } catch (innerErr) {
@@ -553,7 +593,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         student_contact(*),
         student_academic(*),
         student_relationships(*),
-        student_embassy(*)
+        student_embassy(*),
+        student_bank_details(*)
       `)
       .eq("id", id)
       .is("deleted_at", null)
@@ -568,6 +609,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     const academic = student.student_academic?.[0] || student.student_academic;
     const relationships: RelationshipRow[] = Array.isArray(student.student_relationships) ? student.student_relationships : [];
     const embassy = student.student_embassy?.[0] || student.student_embassy || null;
+    const bank = student.student_bank_details?.[0] || student.student_bank_details || null;
 
     return {
       student: {
@@ -637,6 +679,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         overrideSchoolId: academic?.override_school_id || null,
         schoolOverrideReason: academic?.school_override_reason || null,
         admissionDate: academic?.admission_date ? new Date(academic.admission_date) : null,
+        joiningDate: academic?.joining_date ? new Date(academic.joining_date) : null,
         expectedGraduation: academic?.expected_graduation ? new Date(academic.expected_graduation) : null,
         currentSemester: academic?.current_semester ?? null,
         academicStatus: academic?.academic_status || "good_standing",
@@ -645,6 +688,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
         siiApplicationNumber: academic?.sii_application_number || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
         iccrScholarshipSchemeName: academic?.iccr_scholarship_scheme_name || null,
+        scholarshipSchemeName: academic?.iccr_scholarship_scheme_name || null,
         nfsuCampus: academic?.nfsu_campus || null,
         admissionAcademicYear: academic?.admission_academic_year || null,
         feePaymentCategory: academic?.fee_payment_category || null,
@@ -687,6 +731,17 @@ export class SupabaseStudentRepository implements IStudentRepository {
         deletedAt: embassy.deleted_at ? new Date(embassy.deleted_at) : null,
         createdBy: embassy.created_by,
         updatedBy: embassy.updated_by
+      } : null,
+      bankDetails: bank ? {
+        id: bank.id,
+        studentId: bank.student_id,
+        bankName: bank.bank_name || null,
+        accountNumber: bank.account_number || null,
+        ifscCode: bank.ifsc_code || null,
+        branchAddress: bank.branch_address || null,
+        createdAt: bank.created_at ? new Date(bank.created_at) : undefined,
+        updatedAt: bank.updated_at ? new Date(bank.updated_at) : undefined,
+        deletedAt: bank.deleted_at ? new Date(bank.deleted_at) : null
       } : null
     };
   }
@@ -767,7 +822,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.fullName !== undefined) personalUpdates.full_name = input.fullName.trim();
     if (input.nationalityCode !== undefined) {
       personalUpdates.nationality_code = input.nationalityCode && input.nationalityCode.trim()
-        ? input.nationalityCode.trim().toUpperCase()
+        ? (CountryService.normalizeCountryInputSync(input.nationalityCode)?.isoAlpha3 || input.nationalityCode.trim().toUpperCase())
         : null;
     }
     if (input.gender !== undefined) personalUpdates.gender = input.gender || null;
@@ -839,6 +894,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
     }
 
     if (input.admissionDate !== undefined) academicUpdates.admission_date = this.formatDate(input.admissionDate);
+    if (input.joiningDate !== undefined) academicUpdates.joining_date = this.formatDate(input.joiningDate);
     if (input.expectedGraduation !== undefined) academicUpdates.expected_graduation = this.formatDate(input.expectedGraduation);
     if (input.academicStatus) academicUpdates.academic_status = input.academicStatus;
     if (input.admissionCategory !== undefined) {
@@ -847,8 +903,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
     if (input.iccrApplicationNumber !== undefined) {
       academicUpdates.iccr_application_number = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
     }
-    if (input.iccrScholarshipSchemeName !== undefined) {
-      academicUpdates.iccr_scholarship_scheme_name = input.iccrScholarshipSchemeName ? input.iccrScholarshipSchemeName.trim() : null;
+    if (input.iccrScholarshipSchemeName !== undefined || input.scholarshipSchemeName !== undefined) {
+      const schemeVal = input.scholarshipSchemeName !== undefined ? input.scholarshipSchemeName : input.iccrScholarshipSchemeName;
+      academicUpdates.iccr_scholarship_scheme_name = schemeVal ? schemeVal.trim() : null;
     }
     if (input.siiApplicationNumber !== undefined) {
       academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
@@ -863,7 +920,6 @@ export class SupabaseStudentRepository implements IStudentRepository {
       academicUpdates.fee_payment_category = input.feePaymentCategory || null;
     }
     if (input.tuitionFeeAmount !== undefined) {
-      // Preserve NULL vs 0: only store null when explicitly set to null/undefined
       academicUpdates.tuition_fee_amount = input.tuitionFeeAmount !== null ? input.tuitionFeeAmount : null;
     }
     if (input.tuitionFeeCurrency !== undefined) {
@@ -1056,6 +1112,62 @@ export class SupabaseStudentRepository implements IStudentRepository {
       }
     }
 
+    // 5.5. Update or Upsert student_bank_details table
+    const hasBankInputs =
+      input.bankName !== undefined ||
+      input.accountNumber !== undefined ||
+      input.ifscCode !== undefined ||
+      input.branchAddress !== undefined ||
+      input.bankDetails !== undefined;
+
+    if (hasBankInputs) {
+      const bankNameVal = input.bankName !== undefined 
+        ? (input.bankName ? input.bankName.trim() : null) 
+        : (input.bankDetails?.bankName ? input.bankDetails.bankName.trim() : (input.bankDetails !== undefined ? null : undefined));
+      const accountNumVal = input.accountNumber !== undefined 
+        ? (input.accountNumber ? input.accountNumber.trim() : null) 
+        : (input.bankDetails?.accountNumber ? input.bankDetails.accountNumber.trim() : (input.bankDetails !== undefined ? null : undefined));
+      const ifscVal = input.ifscCode !== undefined 
+        ? (input.ifscCode ? input.ifscCode.trim() : null) 
+        : (input.bankDetails?.ifscCode ? input.bankDetails.ifscCode.trim() : (input.bankDetails !== undefined ? null : undefined));
+      const branchAddrVal = input.branchAddress !== undefined 
+        ? (input.branchAddress ? input.branchAddress.trim() : null) 
+        : (input.bankDetails?.branchAddress ? input.bankDetails.branchAddress.trim() : (input.bankDetails !== undefined ? null : undefined));
+
+      const { data: existingBank } = await supabase
+        .from("student_bank_details")
+        .select("id")
+        .eq("student_id", id)
+        .maybeSingle();
+
+      const bankPayload: Record<string, unknown> = {
+        updated_at: new Date().toISOString()
+      };
+      if (bankNameVal !== undefined) bankPayload.bank_name = bankNameVal;
+      if (accountNumVal !== undefined) bankPayload.account_number = accountNumVal;
+      if (ifscVal !== undefined) bankPayload.ifsc_code = ifscVal;
+      if (branchAddrVal !== undefined) bankPayload.branch_address = branchAddrVal;
+
+      if (existingBank) {
+        if (Object.keys(bankPayload).length > 1) {
+          await supabase
+            .from("student_bank_details")
+            .update(bankPayload)
+            .eq("student_id", id);
+        }
+      } else if (bankNameVal || accountNumVal || ifscVal || branchAddrVal) {
+        await supabase
+          .from("student_bank_details")
+          .insert({
+            student_id: id,
+            bank_name: bankNameVal || null,
+            account_number: accountNumVal || null,
+            ifsc_code: ifscVal || null,
+            branch_address: branchAddrVal || null
+          });
+      }
+    }
+
     // 6. Record update audit log
     await supabase.from("audit_log").insert({
       actor_id: actorId,
@@ -1089,7 +1201,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
         student_contact!inner(*),
         student_academic!inner(*),
         student_relationships(*),
-        student_embassy(*)
+        student_embassy(*),
+        student_bank_details(*)
       `)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
@@ -1116,6 +1229,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
       const academic = student.student_academic?.[0] || student.student_academic;
       const relationships: RelationshipRow[] = Array.isArray(student.student_relationships) ? student.student_relationships : [];
       const embassy = student.student_embassy?.[0] || student.student_embassy || null;
+      const bank = student.student_bank_details?.[0] || student.student_bank_details || null;
 
       if (personal && contact && academic) {
         profiles.push({
@@ -1160,9 +1274,11 @@ export class SupabaseStudentRepository implements IStudentRepository {
             studentId: academic.student_id,
             programCode: academic.program_code,
             admissionDate: new Date(academic.admission_date),
+            joiningDate: academic.joining_date ? new Date(academic.joining_date) : null,
             expectedGraduation: new Date(academic.expected_graduation),
             currentSemester: academic.current_semester,
             academicStatus: academic.academic_status,
+            scholarshipSchemeName: academic.iccr_scholarship_scheme_name || null,
             createdAt: new Date(academic.created_at),
             updatedAt: new Date(academic.updated_at),
             deletedAt: academic.deleted_at ? new Date(academic.deleted_at) : null,
@@ -1198,6 +1314,17 @@ export class SupabaseStudentRepository implements IStudentRepository {
             deletedAt: embassy.deleted_at ? new Date(embassy.deleted_at) : null,
             createdBy: embassy.created_by,
             updatedBy: embassy.updated_by
+          } : null,
+          bankDetails: bank ? {
+            id: bank.id,
+            studentId: bank.student_id,
+            bankName: bank.bank_name || null,
+            accountNumber: bank.account_number || null,
+            ifscCode: bank.ifsc_code || null,
+            branchAddress: bank.branch_address || null,
+            createdAt: bank.created_at ? new Date(bank.created_at) : undefined,
+            updatedAt: bank.updated_at ? new Date(bank.updated_at) : undefined,
+            deletedAt: bank.deleted_at ? new Date(bank.deleted_at) : null
           } : null
         });
       }
@@ -1231,6 +1358,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
       supabase.from("student_academic").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
       supabase.from("student_relationships").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
       supabase.from("student_embassy").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
+      supabase.from("student_bank_details").update({ deleted_at: now, updated_at: now }).eq("student_id", id),
       supabase.from("passport_versions").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
       supabase.from("visa_versions").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
       supabase.from("efrro_versions").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id)

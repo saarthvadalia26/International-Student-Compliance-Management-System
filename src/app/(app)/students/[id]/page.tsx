@@ -25,7 +25,11 @@ import {
   FileText,
   RefreshCw,
   FileCheck2,
-  Plus
+  Plus,
+  Landmark,
+  Edit2,
+  Award,
+  MapPin
 } from "lucide-react";
 import { 
   getStudentDetailsAction, 
@@ -39,7 +43,13 @@ import {
   type DocumentVersionHistoryItem
 } from "@/app/(app)/students/actions";
 import { getActiveSchoolsAction } from "@/app/(app)/settings/schools-actions";
+import { getActiveScholarshipSchemesAction } from "@/app/(app)/settings/scholarship-actions";
+import { getActiveCampusesAction } from "@/app/(app)/settings/campus-actions";
 import { School } from "@/domain/schools/types";
+import { ScholarshipScheme } from "@/domain/scholarships/types";
+import { Campus } from "@/domain/campuses/types";
+import { CountryService } from "@/domain/countries/country.service";
+import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -168,12 +178,14 @@ export interface StudentProfile {
   overrideSchoolId?: string | null;
   schoolOverrideReason?: string | null;
   admissionDate: string;
+  joiningDate?: string | null;
   expectedGraduation: string;
   admissionCategory?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   iccrScholarshipSchemeName?: string | null;
+  scholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | string | null;
@@ -204,6 +216,13 @@ export interface StudentProfile {
     website?: string;
     contactPerson?: string;
   };
+  bankDetails?: {
+    id?: string;
+    bankName?: string | null;
+    accountNumber?: string | null;
+    ifscCode?: string | null;
+    branchAddress?: string | null;
+  } | null;
 }
 
 interface PageProps {
@@ -216,7 +235,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
   
   const [student, setStudent] = React.useState<StudentProfile | undefined>(undefined);
   const [isLoadingStudent, setIsLoadingStudent] = React.useState(true);
-  const [activeSubTab, setActiveSubTab] = React.useState<"personal" | "academic" | "contact" | "documents">("personal");
+  const [activeSubTab, setActiveSubTab] = React.useState<"personal" | "academic" | "contact" | "documents" | "bank">("personal");
 
   // Helper to verify if document number is valid (not placeholder/empty)
   const hasValidDocumentNumber = React.useCallback((docNum?: string | null): boolean => {
@@ -470,10 +489,6 @@ export default function StudentDetailsPage({ params }: PageProps) {
     }
   };
 
-  // Academic Programs & Schools Reference State
-  const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
-  const [schools, setSchools] = React.useState<School[]>([]);
-
   // Expiry-Driven Reminder Schedule State
   const [reminderSchedule, setReminderSchedule] = React.useState<StudentReminderScheduleResponse | null>(null);
   const [selectedReminderDoc, setSelectedReminderDoc] = React.useState<"passport" | "visa" | "efrro">("passport");
@@ -679,17 +694,30 @@ export default function StudentDetailsPage({ params }: PageProps) {
     loadReminderSchedule();
   }, [loadStudentData, loadReminderSchedule]);
 
+  const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
+  const [schools, setSchools] = React.useState<School[]>([]);
+  const [scholarshipSchemes, setScholarshipSchemes] = React.useState<ScholarshipScheme[]>([]);
+  const [campuses, setCampuses] = React.useState<Campus[]>([]);
+
   React.useEffect(() => {
     async function loadReferenceData() {
-      const [progRes, schoolRes] = await Promise.all([
+      const [progRes, schoolRes, schRes, campRes] = await Promise.all([
         getActiveAcademicProgramsAction(),
-        getActiveSchoolsAction()
+        getActiveSchoolsAction(),
+        getActiveScholarshipSchemesAction(),
+        getActiveCampusesAction()
       ]);
       if (progRes.success && progRes.programs) {
         setAcademicPrograms(progRes.programs);
       }
       if (schoolRes.success && schoolRes.schools) {
         setSchools(schoolRes.schools);
+      }
+      if (schRes.success && schRes.schemes) {
+        setScholarshipSchemes(schRes.schemes);
+      }
+      if (campRes.success && campRes.campuses) {
+        setCampuses(campRes.campuses);
       }
     }
     loadReferenceData();
@@ -701,6 +729,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
   const [editForm, setEditForm] = React.useState({
     registrationNumber: "",
     fullName: "",
+    nationalityCode: "",
     email: "",
     dateOfBirth: "",
     gender: "",
@@ -710,6 +739,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
     programId: "",
     program: "",
     admissionDate: "",
+    joiningDate: "",
     expectedGraduation: "",
     admissionCategory: "",
     admissionCategoryOther: "",
@@ -753,7 +783,11 @@ export default function StudentDetailsPage({ params }: PageProps) {
     embassyPhone: "",
     embassyEmail: "",
     embassyWebsite: "",
-    embassyContactPerson: ""
+    embassyContactPerson: "",
+    bankName: "",
+    accountNumber: "",
+    ifscCode: "",
+    branchAddress: ""
   });
 
   const openEditDialog = () => {
@@ -761,6 +795,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
       setEditForm({
         registrationNumber: student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "",
         fullName: student.fullName,
+        nationalityCode: student.nationalityCode || "",
         email: student.email,
         dateOfBirth: student.dateOfBirth ? student.dateOfBirth.split("T")[0] : "",
         gender: student.gender || "",
@@ -773,6 +808,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
         overrideSchoolId: student.overrideSchoolId || "",
         schoolOverrideReason: student.schoolOverrideReason || "",
         admissionDate: student.admissionDate ? student.admissionDate.split("T")[0] : "",
+        joiningDate: student.joiningDate ? student.joiningDate.split("T")[0] : "",
         expectedGraduation: student.expectedGraduation ? student.expectedGraduation.split("T")[0] : "",
         admissionCategory: student.admissionCategory || "",
         admissionCategoryOther: student.admissionCategoryOther || "",
@@ -813,7 +849,11 @@ export default function StudentDetailsPage({ params }: PageProps) {
         embassyPhone: student.embassy?.phone || "",
         embassyEmail: student.embassy?.email || "",
         embassyWebsite: student.embassy?.website || "",
-        embassyContactPerson: student.embassy?.contactPerson || ""
+        embassyContactPerson: student.embassy?.contactPerson || "",
+        bankName: student.bankDetails?.bankName || "",
+        accountNumber: student.bankDetails?.accountNumber || "",
+        ifscCode: student.bankDetails?.ifscCode || "",
+        branchAddress: student.bankDetails?.branchAddress || ""
       });
       setIsDirty(false);
       setIsEditDialogOpen(true);
@@ -926,6 +966,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
       const res = await updateStudentAction(studentId, {
         registrationNumber: editForm.registrationNumber?.trim() || null,
         fullName: editForm.fullName.trim(),
+        nationalityCode: editForm.nationalityCode ? (CountryService.normalizeCountryInputSync(editForm.nationalityCode)?.isoAlpha3 || editForm.nationalityCode.trim().toUpperCase()) : undefined,
         dateOfBirth: editForm.dateOfBirth?.trim() || undefined,
         gender: (editForm.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
         maritalStatus: (editForm.maritalStatus as MaritalStatus) || undefined,
@@ -954,12 +995,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
         overrideSchoolId: editForm.isSchoolOverridden ? (editForm.overrideSchoolId || null) : null,
         schoolOverrideReason: editForm.isSchoolOverridden ? (editForm.schoolOverrideReason?.trim() || null) : null,
         admissionDate: editForm.admissionDate?.trim() || undefined,
+        joiningDate: editForm.joiningDate?.trim() || null,
         expectedGraduation: editForm.expectedGraduation?.trim() || undefined,
         admissionCategory: (editForm.admissionCategory as AdmissionCategory) || undefined,
         admissionCategoryOther: editForm.admissionCategory === "other" ? (editForm.admissionCategoryOther?.trim() || undefined) : undefined,
         siiApplicationNumber: editForm.siiApplicationNumber ? editForm.siiApplicationNumber.trim() : null,
         iccrApplicationNumber: editForm.iccrApplicationNumber ? editForm.iccrApplicationNumber.trim() : null,
         iccrScholarshipSchemeName: editForm.iccrScholarshipSchemeName ? editForm.iccrScholarshipSchemeName.trim() : null,
+        scholarshipSchemeName: editForm.iccrScholarshipSchemeName ? editForm.iccrScholarshipSchemeName.trim() : null,
         nfsuCampus: editForm.nfsuCampus ? editForm.nfsuCampus.trim() : null,
         admissionAcademicYear: editForm.admissionAcademicYear?.trim() || null,
         feePaymentCategory: (editForm.feePaymentCategory as FeePaymentCategory) || null,
@@ -977,7 +1020,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
         embassyPhone: editForm.embassyPhone.trim() || undefined,
         embassyEmail: editForm.embassyEmail.trim() || undefined,
         embassyWebsite: editForm.embassyWebsite.trim() || undefined,
-        embassyContactPerson: editForm.embassyContactPerson.trim() || undefined
+        embassyContactPerson: editForm.embassyContactPerson.trim() || undefined,
+
+        // Bank Details
+        bankName: editForm.bankName?.trim() || null,
+        accountNumber: editForm.accountNumber?.trim() || null,
+        ifscCode: editForm.ifscCode?.trim() || null,
+        branchAddress: editForm.branchAddress?.trim() || null
       });
 
       if (res.success) {
@@ -1183,6 +1232,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
               title="Compliance Documents"
               isActive={activeSubTab === "documents"}
               onClick={() => setActiveSubTab("documents")}
+              variant="segmented"
+              size="sm"
+            />
+            <SectionNavCard
+              icon={Landmark}
+              title="Bank Details"
+              isActive={activeSubTab === "bank"}
+              onClick={() => setActiveSubTab("bank")}
               variant="segmented"
               size="sm"
             />
@@ -1395,6 +1452,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
                     <div className="flex items-center gap-1.5 font-semibold text-foreground flex-wrap">
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       <span>{AcademicProgressionEngine.formatDisplayDate(student.admissionDate)}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Joining Date</span>
+                    <div className="flex items-center gap-1.5 font-semibold text-foreground flex-wrap">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span>{student.joiningDate ? AcademicProgressionEngine.formatDisplayDate(student.joiningDate) : "Not recorded"}</span>
                     </div>
                   </div>
 
@@ -2116,6 +2181,71 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </div>
             </div>
           )}
+
+          {/* Tab 5: Bank Details */}
+          {activeSubTab === "bank" && (
+            <Card className="border border-border/60 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="pb-4 border-b border-border/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Landmark className="h-4 w-4 text-primary" />
+                      Student Bank Account Details
+                    </CardTitle>
+                    <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                      Authoritative bank account coordinates for stipends, fellowships, refunds, and financial liaisons.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs h-8 gap-1.5 rounded-xl border-border/70"
+                    onClick={openEditDialog}
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                    Edit Bank Details
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2 text-xs w-full min-w-0">
+                  <div className="space-y-1 p-3.5 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Bank Name</span>
+                    <span className="font-semibold text-foreground block text-sm break-words">
+                      {student.bankDetails?.bankName || "Not provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3.5 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Account Number</span>
+                    <span className="font-semibold text-foreground block font-mono text-sm tracking-wider">
+                      {student.bankDetails?.accountNumber || "Not provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3.5 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">IFSC Code</span>
+                    <span className="font-semibold text-foreground block font-mono text-sm uppercase">
+                      {student.bankDetails?.ifscCode || "Not provided"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 p-3.5 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                    <span className="text-muted-foreground block text-[11px] font-medium">Branch Address</span>
+                    <span className="font-semibold text-foreground block break-words">
+                      {student.bankDetails?.branchAddress || "Not provided"}
+                    </span>
+                  </div>
+                </div>
+
+                {!student.bankDetails?.bankName && !student.bankDetails?.accountNumber && (
+                  <div className="p-4 rounded-xl border border-dashed border-border/70 text-center text-xs text-muted-foreground bg-muted/10">
+                    No bank account details have been recorded yet. Click &quot;Edit Bank Details&quot; or &quot;Complete Profile&quot; to configure bank coordinates.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Emergency Contacts + Consular Info + DEDICATED REMINDER SCHEDULE */}
@@ -2258,6 +2388,18 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-medium text-foreground" htmlFor="fullName">Full Legal Name *</label>
                   <Input id="fullName" value={editForm.fullName} onChange={handleFormChange} className="h-9 text-sm" required />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-foreground" htmlFor="nationalityCode">Nationality</label>
+                  <NationalitySelector
+                    value={editForm.nationalityCode}
+                    onChange={(val) => {
+                      setEditForm(prev => ({ ...prev, nationalityCode: val || "" }));
+                      setIsDirty(true);
+                    }}
+                    placeholder="Search and select nationality..."
+                  />
                 </div>
 
                 <div className="space-y-1.5">
@@ -2485,15 +2627,27 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground" htmlFor="iccrScholarshipSchemeName">
-                    Name of ICCR Scholarship Scheme
+                    Scholarship Scheme
                   </label>
-                  <Input 
-                    id="iccrScholarshipSchemeName" 
-                    placeholder="e.g. Silver Jubilee Scholarship Scheme" 
-                    value={editForm.iccrScholarshipSchemeName} 
-                    onChange={handleFormChange} 
-                    className="h-9 text-sm" 
-                  />
+                  <Select
+                    value={editForm.iccrScholarshipSchemeName || "none"}
+                    onValueChange={(val) => {
+                      setEditForm(prev => ({ ...prev, iccrScholarshipSchemeName: !val || val === "none" ? "" : val }));
+                      setIsDirty(true);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select scholarship scheme..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None / Not Applicable</SelectItem>
+                      {scholarshipSchemes.map((s) => (
+                        <SelectItem key={s.id} value={s.name}>
+                          {s.name} {s.code ? `(${s.code})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5">
@@ -2513,13 +2667,25 @@ export default function StudentDetailsPage({ params }: PageProps) {
                   <label className="text-xs font-medium text-foreground" htmlFor="nfsuCampus">
                     NFSU Campus
                   </label>
-                  <Input 
-                    id="nfsuCampus" 
-                    placeholder="e.g. Delhi Campus, Gandhinagar Campus, Mumbai Campus" 
-                    value={editForm.nfsuCampus} 
-                    onChange={handleFormChange} 
-                    className="h-9 text-sm" 
-                  />
+                  <Select
+                    value={editForm.nfsuCampus || "none"}
+                    onValueChange={(val) => {
+                      setEditForm(prev => ({ ...prev, nfsuCampus: !val || val === "none" ? "" : val }));
+                      setIsDirty(true);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select NFSU campus..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not Specified</SelectItem>
+                      {campuses.map((c) => (
+                        <SelectItem key={c.id} value={c.name}>
+                          {c.name} {c.code ? `(${c.code})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5 sm:col-span-2">
@@ -2649,6 +2815,19 @@ export default function StudentDetailsPage({ params }: PageProps) {
                       setEditForm(prev => ({ ...prev, admissionDate: e.target.value }));
                       setIsDirty(true);
                     }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="joiningDate">Joining Date</label>
+                  <DatePicker
+                    id="joiningDate"
+                    value={editForm.joiningDate}
+                    onChange={(e) => {
+                      setEditForm(prev => ({ ...prev, joiningDate: e.target.value }));
+                      setIsDirty(true);
+                    }}
+                    placeholder="Select joining date..."
                   />
                 </div>
 
@@ -3120,6 +3299,61 @@ export default function StudentDetailsPage({ params }: PageProps) {
               </div>
             </div>
 
+            {/* Bank Details Section */}
+            <div className="pt-2 space-y-3">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/40">
+                <Landmark className="h-4 w-4 text-primary" />
+                <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Bank Details (Optional)</h4>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="bankName">Bank Name</label>
+                  <Input 
+                    id="bankName" 
+                    value={editForm.bankName} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. State Bank of India" 
+                    className="h-9 text-sm" 
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="accountNumber">Account Number</label>
+                  <Input 
+                    id="accountNumber" 
+                    type="text"
+                    value={editForm.accountNumber} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. 000123456789 (Preserves leading zeros)" 
+                    className="h-9 text-sm font-mono" 
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="ifscCode">IFSC Code</label>
+                  <Input 
+                    id="ifscCode" 
+                    value={editForm.ifscCode} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. SBIN0001234" 
+                    className="h-9 text-sm font-mono uppercase" 
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="branchAddress">Branch Address</label>
+                  <Input 
+                    id="branchAddress" 
+                    value={editForm.branchAddress} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. Gandhinagar Main Branch, Gujarat" 
+                    className="h-9 text-sm" 
+                  />
+                </div>
+              </div>
+            </div>
+
             <DialogFooter className="pt-3">
               <Button type="button" variant="outline" size="sm" onClick={() => handleCloseDialog(false)}>Cancel</Button>
               <AsyncActionButton
@@ -3378,13 +3612,25 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
               {addEditDocType === "visa" && (
                 <div className="space-y-1">
-                  <label className="font-semibold text-foreground">Visa Classification / Type (Optional)</label>
-                  <Input
-                    value={addEditForm.visaType}
-                    onChange={(e) => setAddEditForm(prev => ({ ...prev, visaType: e.target.value }))}
-                    placeholder="e.g. Student (S-1)"
-                    className="h-9 text-xs"
-                  />
+                  <label className="font-semibold text-foreground">Visa Classification</label>
+                  <Select
+                    value={addEditForm.visaType || "Student (S-1)"}
+                    onValueChange={(val) => setAddEditForm(prev => ({ ...prev, visaType: val || "Student (S-1)" }))}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select Visa Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Student (S-1)">Student (S-1)</SelectItem>
+                      <SelectItem value="Student (S-2)">Student (S-2)</SelectItem>
+                      <SelectItem value="Student (S-3)">Student (S-3)</SelectItem>
+                      <SelectItem value="Student (S-4)">Student (S-4)</SelectItem>
+                      <SelectItem value="Student (S-5)">Student (S-5)</SelectItem>
+                      <SelectItem value="Research (R-1)">Research (R-1)</SelectItem>
+                      <SelectItem value="Intern (I-1)">Intern (I-1)</SelectItem>
+                      <SelectItem value="Other">Other Category</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
@@ -3533,13 +3779,25 @@ export default function StudentDetailsPage({ params }: PageProps) {
 
               {renewDocType === "visa" && (
                 <div className="space-y-1">
-                  <label className="font-semibold text-foreground">Visa Category / Type (Optional)</label>
-                  <Input
-                    value={renewForm.visaType}
-                    onChange={(e) => setRenewForm(prev => ({ ...prev, visaType: e.target.value }))}
-                    placeholder="e.g. Student (S-1)"
-                    className="h-9 text-xs"
-                  />
+                  <label className="font-semibold text-foreground">Visa Classification</label>
+                  <Select
+                    value={renewForm.visaType || "Student (S-1)"}
+                    onValueChange={(val) => setRenewForm(prev => ({ ...prev, visaType: val || "Student (S-1)" }))}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select Visa Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Student (S-1)">Student (S-1)</SelectItem>
+                      <SelectItem value="Student (S-2)">Student (S-2)</SelectItem>
+                      <SelectItem value="Student (S-3)">Student (S-3)</SelectItem>
+                      <SelectItem value="Student (S-4)">Student (S-4)</SelectItem>
+                      <SelectItem value="Student (S-5)">Student (S-5)</SelectItem>
+                      <SelectItem value="Research (R-1)">Research (R-1)</SelectItem>
+                      <SelectItem value="Intern (I-1)">Intern (I-1)</SelectItem>
+                      <SelectItem value="Other">Other Category</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 

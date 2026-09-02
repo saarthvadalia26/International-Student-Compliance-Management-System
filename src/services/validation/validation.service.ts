@@ -68,6 +68,7 @@ export const StudentContactSchema = z.object({
 export const StudentAcademicSchema = z.object({
   programCode: z.string().optional().nullable().or(z.literal("")),
   admissionDate: z.string().optional().nullable().or(z.literal("")),
+  joiningDate: z.string().optional().nullable().or(z.literal("")),
   expectedGraduation: z.string().optional().nullable().or(z.literal("")),
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   academicStatus: z.enum(["good_standing", "probation", "suspended"]).default("good_standing"),
@@ -76,6 +77,8 @@ export const StudentAcademicSchema = z.object({
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
   iccrScholarshipSchemeName: z.string().max(255).optional().nullable(),
+  scholarshipSchemeName: z.string().max(255).optional().nullable(),
+  nfsuCampus: z.string().max(255).optional().nullable(),
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
     const ad = new Date(data.admissionDate);
@@ -96,6 +99,14 @@ export const StudentAcademicSchema = z.object({
 }, {
   message: "Please specify the custom admission category",
   path: ["admissionCategoryOther"]
+});
+
+// 5. Sensitive Bank Details Schema
+export const StudentBankDetailsSchema = z.object({
+  bankName: z.string().max(255).optional().nullable(),
+  accountNumber: z.string().max(100).optional().nullable(),
+  ifscCode: z.string().max(50).optional().nullable(),
+  branchAddress: z.string().max(1000).optional().nullable(),
 });
 
 // 5. Passport Document Schema (matching BR-003)

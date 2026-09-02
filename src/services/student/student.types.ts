@@ -93,6 +93,7 @@ export interface StudentAcademic {
   overrideSchoolId?: string | null;
   schoolOverrideReason?: string | null;
   admissionDate: Date | null;
+  joiningDate?: Date | null;
   expectedGraduation: Date | null;
   currentSemester: number | null;
   academicStatus: AcademicStatus;
@@ -101,6 +102,7 @@ export interface StudentAcademic {
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   iccrScholarshipSchemeName?: string | null;
+  scholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | null;
@@ -147,6 +149,18 @@ export interface StudentEmbassy {
   updatedBy: string | null;
 }
 
+export interface StudentBankDetails {
+  id?: string;
+  studentId?: string;
+  bankName: string | null;
+  accountNumber: string | null;
+  ifscCode: string | null;
+  branchAddress: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  deletedAt?: Date | null;
+}
+
 export interface FullStudentProfile {
   student: Student;
   personal: StudentPersonal;
@@ -154,6 +168,7 @@ export interface FullStudentProfile {
   academic: StudentAcademic;
   relationships: StudentRelationship[];
   embassy: StudentEmbassy | null;
+  bankDetails?: StudentBankDetails | null;
 }
 
 export interface RegisterStudentInput {
@@ -196,6 +211,7 @@ export interface RegisterStudentInput {
   overrideSchoolId?: string | null;
   schoolOverrideReason?: string | null;
   admissionDate?: Date | string | null;
+  joiningDate?: Date | string | null;
   expectedGraduation?: Date | string | null;
   currentSemester?: number | null;
   admissionCategory?: AdmissionCategory | null;
@@ -203,6 +219,7 @@ export interface RegisterStudentInput {
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   iccrScholarshipSchemeName?: string | null;
+  scholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | null;
@@ -234,6 +251,12 @@ export interface RegisterStudentInput {
   efrroNumber?: string | null;
   efrroIssueDate?: Date | string | null;
   efrroExpiry?: Date | string | null;
+  // Bank details fields (Optional)
+  bankName?: string | null;
+  accountNumber?: string | null;
+  ifscCode?: string | null;
+  branchAddress?: string | null;
+  bankDetails?: StudentBankDetails | null;
 }
 
 export interface UpdateStudentInput {
@@ -277,6 +300,7 @@ export interface UpdateStudentInput {
   overrideSchoolId?: string | null;
   schoolOverrideReason?: string | null;
   admissionDate?: string | Date | null;
+  joiningDate?: string | Date | null;
   expectedGraduation?: string | Date | null;
   currentSemester?: number | null;
   academicStatus?: AcademicStatus;
@@ -285,6 +309,7 @@ export interface UpdateStudentInput {
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   iccrScholarshipSchemeName?: string | null;
+  scholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: FeePaymentCategory | null;
@@ -306,6 +331,12 @@ export interface UpdateStudentInput {
   embassyEmail?: string | null;
   embassyWebsite?: string | null;
   embassyContactPerson?: string | null;
+  // Bank details fields (Optional)
+  bankName?: string | null;
+  accountNumber?: string | null;
+  ifscCode?: string | null;
+  branchAddress?: string | null;
+  bankDetails?: StudentBankDetails | null;
 }
 
 export interface StudentFilterOptions {

@@ -14,7 +14,10 @@ import {
   Layers, 
   Sparkles, 
   Info,
-  Users
+  Users,
+  Landmark,
+  Award,
+  MapPin
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
@@ -28,7 +31,12 @@ import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { SearchableProgramSelector } from "@/components/ui/searchable-program-selector";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { getActiveAcademicProgramsAction } from "@/app/(app)/settings/academic-programs-actions";
+import { getActiveScholarshipSchemesAction } from "@/app/(app)/settings/scholarship-actions";
+import { getActiveCampusesAction } from "@/app/(app)/settings/campus-actions";
 import { AcademicProgram, getAcademicLevelLabel } from "@/domain/academic-programs/types";
+import { ScholarshipScheme } from "@/domain/scholarships/types";
+import { Campus } from "@/domain/campuses/types";
+import { CountryService } from "@/domain/countries/country.service";
 import { RegisterStudentValidationSchema } from "@/services/validation/student-validation";
 import { registerStudentAction } from "@/app/(app)/students/actions";
 import { RegisterStudentInput } from "@/services/student/student.types";
@@ -75,6 +83,7 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   program: { tab: "academic", elementId: "program", label: "Academic Program" },
   school: { tab: "academic", elementId: "school", label: "School / Department" },
   admissionDate: { tab: "academic", elementId: "admissionDate", label: "Admission Date" },
+  joiningDate: { tab: "academic", elementId: "joiningDate", label: "Joining Date" },
   expectedGraduation: { tab: "academic", elementId: "expectedGraduation", label: "Expected Graduation Date" },
   currentSemester: { tab: "academic", elementId: "currentSemester", label: "Current Semester" },
   admissionCategory: { tab: "academic", elementId: "admissionCategory", label: "Admission Category" },
@@ -82,6 +91,7 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   siiApplicationNumber: { tab: "academic", elementId: "siiApplicationNumber", label: "SII Application Number" },
   iccrApplicationNumber: { tab: "academic", elementId: "iccrApplicationNumber", label: "ICCR Application Number" },
   iccrScholarshipSchemeName: { tab: "academic", elementId: "iccrScholarshipSchemeName", label: "Name of ICCR Scholarship Scheme" },
+  scholarshipSchemeName: { tab: "academic", elementId: "iccrScholarshipSchemeName", label: "Scholarship Scheme" },
   nfsuCampus: { tab: "academic", elementId: "nfsuCampus", label: "NFSU Campus" },
   admissionAcademicYear: { tab: "academic", elementId: "admissionAcademicYear", label: "Admission / Academic Year" },
   feePaymentCategory: { tab: "academic", elementId: "feePaymentCategory", label: "Fee Payment Category" },
@@ -124,11 +134,17 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   visaType: { tab: "documents", elementId: "visaType", label: "Visa Classification" },
   efrroNumber: { tab: "documents", elementId: "efrroNumber", label: "eFRRO / Registration Number" },
   efrroIssueDate: { tab: "documents", elementId: "efrroIssueDate", label: "eFRRO Issue Date" },
-  efrroExpiry: { tab: "documents", elementId: "efrroExpiry", label: "eFRRO Expiration Date" }
+  efrroExpiry: { tab: "documents", elementId: "efrroExpiry", label: "eFRRO Expiration Date" },
+
+  bankName: { tab: "documents", elementId: "bankName", label: "Bank Name" },
+  accountNumber: { tab: "documents", elementId: "accountNumber", label: "Account Number" },
+  ifscCode: { tab: "documents", elementId: "ifscCode", label: "IFSC Code" },
+  branchAddress: { tab: "documents", elementId: "branchAddress", label: "Branch Address" }
 };
 
 /**
- * Normalizes any incoming date string or Date instance to a strict local YYYY-MM-DD format
+ * Normalizes any incoming date string or Date instance to a strict local YYYY-MM-DD format.
+ * Strictly prevents interpreting non-date 3-letter strings (like country codes "MAR", "MAY") as dates.
  */
 function normalizeDateToISO(val: Date | string | undefined | null): string {
   if (!val) return "";
@@ -142,7 +158,7 @@ function normalizeDateToISO(val: Date | string | undefined | null): string {
   const str = String(val).trim();
   if (!str) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  if (str.includes("T")) return str.split("T")[0];
+  if (str.includes("T") && /^\d{4}-\d{2}-\d{2}T/.test(str)) return str.split("T")[0];
   const slashParts = str.split("/");
   if (slashParts.length === 3) {
     if (slashParts[0].length === 4) {
@@ -151,12 +167,19 @@ function normalizeDateToISO(val: Date | string | undefined | null): string {
       return `${slashParts[2]}-${slashParts[0].padStart(2, "0")}-${slashParts[1].padStart(2, "0")}`;
     }
   }
-  const dt = new Date(str);
-  if (!isNaN(dt.getTime())) {
-    const y = dt.getFullYear();
-    const m = String(dt.getMonth() + 1).padStart(2, "0");
-    const d = String(dt.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+  const hyphenParts = str.split("-");
+  if (hyphenParts.length === 3 && hyphenParts[2].length === 4) {
+    return `${hyphenParts[2]}-${hyphenParts[1].padStart(2, "0")}-${hyphenParts[0].padStart(2, "0")}`;
+  }
+  // Only attempt Date parsing if string contains numeric digits to avoid colliding with 3-letter country codes
+  if (/\d/.test(str)) {
+    const dt = new Date(str);
+    if (!isNaN(dt.getTime())) {
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
   }
   return str;
 }
@@ -169,20 +192,35 @@ export default function StudentRegistrationPage() {
   const [submittingError, setSubmittingError] = React.useState(false);
   const [validationErrors, setValidationErrors] = React.useState<Record<string, string>>({});
 
-  // Dynamic Academic Programs state
+  // Dynamic Academic Master Data state
   const [academicPrograms, setAcademicPrograms] = React.useState<AcademicProgram[]>([]);
+  const [scholarshipSchemes, setScholarshipSchemes] = React.useState<ScholarshipScheme[]>([]);
+  const [campuses, setCampuses] = React.useState<Campus[]>([]);
   const [isLoadingPrograms, setIsLoadingPrograms] = React.useState(true);
 
   React.useEffect(() => {
-    async function loadPrograms() {
+    async function loadMasterData() {
       setIsLoadingPrograms(true);
-      const res = await getActiveAcademicProgramsAction();
-      if (res.success && res.programs) {
-        setAcademicPrograms(res.programs);
+      try {
+        const [progRes, schRes, campRes] = await Promise.all([
+          getActiveAcademicProgramsAction(),
+          getActiveScholarshipSchemesAction(),
+          getActiveCampusesAction()
+        ]);
+        if (progRes.success && progRes.programs) {
+          setAcademicPrograms(progRes.programs);
+        }
+        if (schRes.success && schRes.schemes) {
+          setScholarshipSchemes(schRes.schemes);
+        }
+        if (campRes.success && campRes.campuses) {
+          setCampuses(campRes.campuses);
+        }
+      } finally {
+        setIsLoadingPrograms(false);
       }
-      setIsLoadingPrograms(false);
     }
-    loadPrograms();
+    loadMasterData();
   }, []);
 
   // Form State (persisted across all tab transitions)
@@ -202,6 +240,7 @@ export default function StudentRegistrationPage() {
     program: "",
     school: "",
     admissionDate: "",
+    joiningDate: "",
     expectedGraduation: "",
     admissionCategory: "",
     admissionCategoryOther: "",
@@ -266,6 +305,12 @@ export default function StudentRegistrationPage() {
     efrroNumber: "",
     efrroIssueDate: "",
     efrroExpiry: "",
+
+    // Bank Details (Optional)
+    bankName: "",
+    accountNumber: "",
+    ifscCode: "",
+    branchAddress: ""
   });
 
   // Calculate error counts per tab
@@ -369,7 +414,8 @@ export default function StudentRegistrationPage() {
   };
 
   const handleSelectChange = (field: string, value: string) => {
-    const normalizedVal = normalizeDateToISO(value) || value;
+    const isDateField = field.toLowerCase().includes("date") || field.toLowerCase().includes("expiry");
+    const normalizedVal = isDateField ? (normalizeDateToISO(value) || value) : value;
 
     // Clear validation error on select/date change
     const relatedKey = field === "nationality" ? "nationalityCode" 
@@ -413,6 +459,7 @@ export default function StudentRegistrationPage() {
 
     const sanitizedDob = normalizeDateToISO(formData.dateOfBirth);
     const sanitizedAdm = normalizeDateToISO(formData.admissionDate);
+    const sanitizedJoining = normalizeDateToISO(formData.joiningDate);
     const sanitizedGrad = normalizeDateToISO(formData.expectedGraduation);
     const sanitizedPassIssue = normalizeDateToISO(formData.passportIssueDate);
     const sanitizedPassExp = normalizeDateToISO(formData.passportExpiry);
@@ -431,7 +478,7 @@ export default function StudentRegistrationPage() {
     const validationPayload: RegisterStudentInput = {
       registrationNumber: formData.enrollmentNumber?.trim() || undefined,
       fullName: formData.fullName.trim(),
-      nationalityCode: formData.nationality.trim().toUpperCase() || undefined,
+      nationalityCode: formData.nationality ? (CountryService.normalizeCountryInputSync(formData.nationality)?.isoAlpha3 || formData.nationality.trim().toUpperCase()) : undefined,
       gender: (formData.gender as "male" | "female" | "other" | "transgender" | "prefer_not_to_say") || undefined,
       dateOfBirth: sanitizedDob || undefined,
       maritalStatus: (formData.maritalStatus as MaritalStatus) || undefined,
@@ -472,6 +519,7 @@ export default function StudentRegistrationPage() {
       programId: formData.programId.trim() || undefined,
       programCode: formData.program.trim() || undefined,
       admissionDate: sanitizedAdm || undefined,
+      joiningDate: sanitizedJoining || undefined,
       expectedGraduation: sanitizedGrad || undefined,
       currentSemester: formData.program.trim() ? 1 : undefined,
       admissionCategory: (formData.admissionCategory as AdmissionCategory) || undefined,
@@ -479,6 +527,7 @@ export default function StudentRegistrationPage() {
       siiApplicationNumber: formData.siiApplicationNumber?.trim() || undefined,
       iccrApplicationNumber: formData.iccrApplicationNumber?.trim() || undefined,
       iccrScholarshipSchemeName: formData.iccrScholarshipSchemeName?.trim() || undefined,
+      scholarshipSchemeName: formData.iccrScholarshipSchemeName?.trim() || undefined,
       nfsuCampus: formData.nfsuCampus?.trim() || undefined,
       admissionAcademicYear: formData.admissionAcademicYear?.trim() || undefined,
       feePaymentCategory: (formData.feePaymentCategory as FeePaymentCategory) || undefined,
@@ -504,7 +553,13 @@ export default function StudentRegistrationPage() {
       visaType: formData.visaType.trim() || undefined,
       efrroNumber: formData.efrroNumber.trim() || undefined,
       efrroIssueDate: sanitizedEfrroIssue || undefined,
-      efrroExpiry: sanitizedEfrroExp || undefined
+      efrroExpiry: sanitizedEfrroExp || undefined,
+
+      // Bank Details (Optional)
+      bankName: formData.bankName?.trim() || undefined,
+      accountNumber: formData.accountNumber?.trim() || undefined,
+      ifscCode: formData.ifscCode?.trim() || undefined,
+      branchAddress: formData.branchAddress?.trim() || undefined
     };
 
     const result = RegisterStudentValidationSchema.safeParse(validationPayload);
@@ -969,19 +1024,45 @@ export default function StudentRegistrationPage() {
                     )}
                   </div>
 
-                  {/* Name of ICCR Scholarship Scheme - Always visible, optional */}
+                  {/* Name of ICCR Scholarship Scheme - Dynamic master data or text fallback */}
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium text-foreground" htmlFor="iccrScholarshipSchemeName">
-                      Name of ICCR Scholarship Scheme <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    <label className="text-xs font-medium text-foreground flex items-center justify-between" htmlFor="iccrScholarshipSchemeName">
+                      <span>Scholarship Scheme <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span></span>
+                      {scholarshipSchemes.length > 0 && (
+                        <span className="text-[10px] text-muted-foreground">Configured in Master Data</span>
+                      )}
                     </label>
-                    <Input
-                      id="iccrScholarshipSchemeName"
-                      placeholder="e.g. Silver Jubilee Scholarship Scheme, Africa Scholarship Scheme"
-                      value={formData.iccrScholarshipSchemeName}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.iccrScholarshipSchemeName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
+                    {scholarshipSchemes.length > 0 ? (
+                      <Select
+                        value={formData.iccrScholarshipSchemeName || "none"}
+                        onValueChange={(v) => handleSelectChange("iccrScholarshipSchemeName", !v || v === "none" ? "" : v)}
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger
+                          id="iccrScholarshipSchemeName"
+                          className={`h-10 text-xs ${validationErrors.iccrScholarshipSchemeName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        >
+                          <SelectValue placeholder="Select Scholarship Scheme (None / Direct)" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="none">None / Direct Admission</SelectItem>
+                          {scholarshipSchemes.map((sch) => (
+                            <SelectItem key={sch.id} value={sch.name} className="text-xs">
+                              {sch.name} {sch.code ? `(${sch.code})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="iccrScholarshipSchemeName"
+                        placeholder="e.g. Silver Jubilee Scholarship Scheme, Africa Scholarship Scheme"
+                        value={formData.iccrScholarshipSchemeName}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.iccrScholarshipSchemeName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                    )}
                     {validationErrors.iccrScholarshipSchemeName && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                         {validationErrors.iccrScholarshipSchemeName}
@@ -1009,19 +1090,45 @@ export default function StudentRegistrationPage() {
                     )}
                   </div>
 
-                  {/* NFSU Campus - Always visible, optional */}
+                  {/* NFSU Campus - Dynamic master data or text fallback */}
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-medium text-foreground" htmlFor="nfsuCampus">
-                      NFSU Campus <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    <label className="text-xs font-medium text-foreground flex items-center justify-between" htmlFor="nfsuCampus">
+                      <span>NFSU Campus <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span></span>
+                      {campuses.length > 0 && (
+                        <span className="text-[10px] text-muted-foreground">Configured in Master Data</span>
+                      )}
                     </label>
-                    <Input
-                      id="nfsuCampus"
-                      placeholder="e.g. Delhi Campus, Gandhinagar Campus, Mumbai Campus"
-                      value={formData.nfsuCampus}
-                      onChange={handleInputChange}
-                      disabled={isSubmitting}
-                      className={`h-10 text-sm ${validationErrors.nfsuCampus ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                    />
+                    {campuses.length > 0 ? (
+                      <Select
+                        value={formData.nfsuCampus || "none"}
+                        onValueChange={(v) => handleSelectChange("nfsuCampus", !v || v === "none" ? "" : v)}
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger
+                          id="nfsuCampus"
+                          className={`h-10 text-xs ${validationErrors.nfsuCampus ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        >
+                          <SelectValue placeholder="Select NFSU Campus" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="none">Not Specified</SelectItem>
+                          {campuses.map((c) => (
+                            <SelectItem key={c.id} value={c.name} className="text-xs">
+                              {c.name} {c.location ? `— ${c.location}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="nfsuCampus"
+                        placeholder="e.g. Delhi Campus, Gandhinagar Campus, Mumbai Campus"
+                        value={formData.nfsuCampus}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.nfsuCampus ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                    )}
                     {validationErrors.nfsuCampus && (
                       <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
                         {validationErrors.nfsuCampus}
@@ -1167,7 +1274,7 @@ export default function StudentRegistrationPage() {
                     )}
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground flex items-center gap-1" htmlFor="program">
                       Academic Program <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
@@ -1183,7 +1290,7 @@ export default function StudentRegistrationPage() {
                   </div>
 
                   {selectedProgram ? (
-                    <div className="p-3.5 bg-muted/40 rounded-lg border border-border/60 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3.5 bg-muted/40 rounded-lg border border-border/60 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:col-span-2">
                       <div>
                         <span className="text-muted-foreground block text-[11px] font-medium">Assigned School / Department</span>
                         <span className="font-semibold text-foreground block break-words mt-0.5">
@@ -1198,7 +1305,7 @@ export default function StudentRegistrationPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3 bg-muted/20 rounded-lg border border-dashed border-border/60 text-xs text-muted-foreground flex items-center gap-2">
+                    <div className="p-3 bg-muted/20 rounded-lg border border-dashed border-border/60 text-xs text-muted-foreground flex items-center gap-2 sm:col-span-2">
                       <Info className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span>School/Department and Academic Level will automatically resolve once an Academic Program is selected.</span>
                     </div>
@@ -1222,6 +1329,23 @@ export default function StudentRegistrationPage() {
                   </div>
 
                   <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground" htmlFor="joiningDate">
+                      Joining Date <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+                    </label>
+                    <DatePicker
+                      id="joiningDate"
+                      value={formData.joiningDate}
+                      onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                      onValueChange={(v) => handleSelectChange("joiningDate", v)}
+                      disabled={isSubmitting}
+                      startYear={2015}
+                      endYear={new Date().getFullYear() + 2}
+                      placeholder="Select official joining date..."
+                      error={validationErrors.joiningDate}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-foreground" htmlFor="expectedGraduation">
                       Expected Graduation Date <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
                     </label>
@@ -1784,6 +1908,10 @@ export default function StudentRegistrationPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Student (S-1)">Student (S-1)</SelectItem>
+                          <SelectItem value="Student (S-2)">Student (S-2)</SelectItem>
+                          <SelectItem value="Student (S-3)">Student (S-3)</SelectItem>
+                          <SelectItem value="Student (S-4)">Student (S-4)</SelectItem>
+                          <SelectItem value="Student (S-5)">Student (S-5)</SelectItem>
                           <SelectItem value="Research (R-1)">Research (R-1)</SelectItem>
                           <SelectItem value="Intern (I-1)">Intern (I-1)</SelectItem>
                           <SelectItem value="Other">Other Category</SelectItem>
@@ -1875,6 +2003,77 @@ export default function StudentRegistrationPage() {
                         disabled={isSubmitting}
                         placeholder="Select expiry date..."
                         error={validationErrors.efrroExpiry}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Bank Details */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Landmark className="h-4 w-4 text-primary shrink-0" />
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Bank Details (Optional)</h3>
+                      <p className="text-[11px] text-muted-foreground">Account coordinates for stipend, refund, and institutional financial liaison.</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="bankName">
+                        Bank Name
+                      </label>
+                      <Input
+                        id="bankName"
+                        placeholder="e.g. State Bank of India"
+                        value={formData.bankName}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.bankName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="accountNumber">
+                        Account Number
+                      </label>
+                      <Input
+                        id="accountNumber"
+                        type="text"
+                        placeholder="e.g. 000123456789 (Preserves leading zeros)"
+                        value={formData.accountNumber}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm font-mono ${validationErrors.accountNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="ifscCode">
+                        IFSC Code
+                      </label>
+                      <Input
+                        id="ifscCode"
+                        placeholder="e.g. SBIN0001234"
+                        value={formData.ifscCode}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm font-mono uppercase ${validationErrors.ifscCode ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground" htmlFor="branchAddress">
+                        Branch Address
+                      </label>
+                      <Input
+                        id="branchAddress"
+                        placeholder="e.g. Gandhinagar Main Branch, Gujarat"
+                        value={formData.branchAddress}
+                        onChange={handleInputChange}
+                        disabled={isSubmitting}
+                        className={`h-10 text-sm ${validationErrors.branchAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
                       />
                     </div>
                   </div>

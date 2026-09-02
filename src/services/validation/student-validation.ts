@@ -1,9 +1,14 @@
 import { z } from "zod";
+import { CountryService } from "@/domain/countries/country.service";
 
 export const RegisterStudentValidationSchema = z.object({
   registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
   fullName: z.string().trim().min(2, "Full name must be at least 2 characters").max(255),
-  nationalityCode: z.string().optional().nullable().refine(val => !val || val.trim().length === 3 || val.trim().length >= 2, { message: "Please select a valid nationality" }),
+  nationalityCode: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    const norm = CountryService.normalizeCountryInputSync(val);
+    return Boolean(norm);
+  }, { message: "Please select a valid nationality" }),
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"], {
     message: "Please select a valid gender option"
   }).optional().nullable(),
@@ -60,6 +65,11 @@ export const RegisterStudentValidationSchema = z.object({
   programId: z.string().optional().nullable(),
   programCode: z.string().optional().nullable(),
   admissionDate: z.string().optional().nullable(),
+  joiningDate: z.string().optional().nullable().refine((jd) => {
+    if (!jd || !jd.trim()) return true;
+    const date = new Date(jd);
+    return !isNaN(date.getTime());
+  }, { message: "Joining date must be a valid date format" }),
   expectedGraduation: z.string().optional().nullable(),
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   admissionCategory: z.enum(["iccr", "sii", "direct", "foreign_govt_sponsored", "other"], {
@@ -69,6 +79,7 @@ export const RegisterStudentValidationSchema = z.object({
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
   iccrScholarshipSchemeName: z.string().max(255).optional().nullable(),
+  scholarshipSchemeName: z.string().max(255).optional().nullable(),
   nfsuCampus: z.string().max(255).optional().nullable(),
   admissionAcademicYear: z.string().max(20).optional().nullable(),
   feePaymentCategory: z.enum(["self_financed", "scholarship"], {
@@ -120,10 +131,21 @@ export const RegisterStudentValidationSchema = z.object({
   visaNumber: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 5, { message: "Visa number must contain at least 5 characters" }),
   visaIssueDate: z.string().optional().nullable(),
   visaExpiry: z.string().optional().nullable(),
-  visaType: z.string().optional().nullable(),
+  visaType: z.string().max(100).optional().nullable(),
   efrroNumber: z.string().optional().nullable().refine(val => !val || !val.trim() || val.trim().length >= 3, { message: "eFRRO number must contain at least 3 characters" }),
   efrroIssueDate: z.string().optional().nullable(),
-  efrroExpiry: z.string().optional().nullable()
+  efrroExpiry: z.string().optional().nullable(),
+  // Bank Details fields (All Optional)
+  bankName: z.string().max(255).optional().nullable(),
+  accountNumber: z.string().max(100).optional().nullable(),
+  ifscCode: z.string().max(50).optional().nullable(),
+  branchAddress: z.string().max(1000).optional().nullable(),
+  bankDetails: z.object({
+    bankName: z.string().max(255).optional().nullable(),
+    accountNumber: z.string().max(100).optional().nullable(),
+    ifscCode: z.string().max(50).optional().nullable(),
+    branchAddress: z.string().max(1000).optional().nullable()
+  }).optional().nullable()
 }).refine((data) => {
   // Conditional rule: If admissionCategory is Other, admissionCategoryOther (Please specify) is mandatory
   if (data.admissionCategory === "other") {
@@ -187,7 +209,11 @@ export const UpdateStudentValidationSchema = z.object({
   status: z.enum(["active", "suspended", "graduated", "withdrawn"]).optional(),
   registrationNumber: z.string().optional().nullable().refine(val => !val || val.trim().length >= 3, { message: "Enrollment number must contain at least 3 characters" }).refine(val => !val || val.trim().length <= 50, { message: "Enrollment number cannot exceed 50 characters" }),
   fullName: z.string().min(2, "Full name must be at least 2 characters").max(255).optional(),
-  nationalityCode: z.string().optional().nullable(),
+  nationalityCode: z.string().optional().nullable().refine(val => {
+    if (!val || !val.trim()) return true;
+    const norm = CountryService.normalizeCountryInputSync(val);
+    return Boolean(norm);
+  }, { message: "Please select a valid nationality" }),
   gender: z.enum(["male", "female", "other", "transgender", "prefer_not_to_say"]).optional().nullable(),
   dateOfBirth: z.string().optional().nullable().refine((dob) => {
     if (!dob || !dob.trim()) return true;
@@ -238,6 +264,11 @@ export const UpdateStudentValidationSchema = z.object({
   programId: z.string().optional().nullable(),
   programCode: z.string().optional().nullable(),
   admissionDate: z.string().optional().nullable(),
+  joiningDate: z.string().optional().nullable().refine((jd) => {
+    if (!jd || !jd.trim()) return true;
+    const date = new Date(jd);
+    return !isNaN(date.getTime());
+  }, { message: "Joining date must be a valid date format" }),
   expectedGraduation: z.string().optional().nullable(),
   currentSemester: z.number().int().min(1).max(20).optional().nullable(),
   academicStatus: z.enum(["good_standing", "probation", "suspended"]).optional(),
@@ -246,6 +277,7 @@ export const UpdateStudentValidationSchema = z.object({
   siiApplicationNumber: z.string().optional().nullable(),
   iccrApplicationNumber: z.string().optional().nullable(),
   iccrScholarshipSchemeName: z.string().max(255).optional().nullable(),
+  scholarshipSchemeName: z.string().max(255).optional().nullable(),
   nfsuCampus: z.string().max(255).optional().nullable(),
   admissionAcademicYear: z.string().max(20).optional().nullable(),
   feePaymentCategory: z.enum(["self_financed", "scholarship"]).optional().nullable(),
@@ -280,7 +312,18 @@ export const UpdateStudentValidationSchema = z.object({
     return z.string().email().safeParse(val.trim()).success;
   }, { message: "Invalid consular email address format" }),
   embassyWebsite: z.string().optional().nullable(),
-  embassyContactPerson: z.string().optional().nullable()
+  embassyContactPerson: z.string().optional().nullable(),
+  // Bank Details fields (All Optional)
+  bankName: z.string().max(255).optional().nullable(),
+  accountNumber: z.string().max(100).optional().nullable(),
+  ifscCode: z.string().max(50).optional().nullable(),
+  branchAddress: z.string().max(1000).optional().nullable(),
+  bankDetails: z.object({
+    bankName: z.string().max(255).optional().nullable(),
+    accountNumber: z.string().max(100).optional().nullable(),
+    ifscCode: z.string().max(50).optional().nullable(),
+    branchAddress: z.string().max(1000).optional().nullable()
+  }).optional().nullable()
 }).refine((data) => {
   if (data.admissionCategory === "other") {
     return Boolean(data.admissionCategoryOther && data.admissionCategoryOther.trim().length > 0);

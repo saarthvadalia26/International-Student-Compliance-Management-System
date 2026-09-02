@@ -140,12 +140,14 @@ export interface StudentDetailProfile {
   overrideSchoolId?: string | null;
   schoolOverrideReason?: string | null;
   admissionDate: string;
+  joiningDate?: string | null;
   expectedGraduation: string;
   admissionCategory?: string | null;
   admissionCategoryOther?: string | null;
   siiApplicationNumber?: string | null;
   iccrApplicationNumber?: string | null;
   iccrScholarshipSchemeName?: string | null;
+  scholarshipSchemeName?: string | null;
   nfsuCampus?: string | null;
   admissionAcademicYear?: string | null;
   feePaymentCategory?: string | null;
@@ -193,6 +195,13 @@ export interface StudentDetailProfile {
     website: string;
     contactPerson?: string;
   };
+  bankDetails?: {
+    id?: string;
+    bankName?: string | null;
+    accountNumber?: string | null;
+    ifscCode?: string | null;
+    branchAddress?: string | null;
+  } | null;
 }
 
 export interface DocumentVersionItem {
@@ -632,6 +641,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         student_relationships(*),
         student_embassy(*),
         student_snapshot(*),
+        student_bank_details(*),
         passport_versions(*),
         visa_versions(*),
         efrro_versions(*)
@@ -654,6 +664,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     const primaryContact = relationships[0] || {};
     const embassy = record.student_embassy?.[0] || record.student_embassy || {};
     const snapshot = record.student_snapshot?.[0] || record.student_snapshot || {};
+    const bank = record.student_bank_details?.[0] || record.student_bank_details || null;
 
     const hasValidFile = (row?: VersionDatabaseRow | null) => {
       if (!row || !row.file_path) return false;
@@ -830,12 +841,14 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       overrideSchoolId: academic?.override_school_id || null,
       schoolOverrideReason: academic?.school_override_reason || null,
       admissionDate: academic?.admission_date || "",
+      joiningDate: academic?.joining_date || null,
       expectedGraduation: hasCourseConfig ? (progression.expectedGraduationDateISO || academic?.expected_graduation || "") : (academic?.expected_graduation || ""),
       admissionCategory: academic?.admission_category || null,
       admissionCategoryOther: academic?.admission_category_other || null,
       siiApplicationNumber: academic?.sii_application_number || null,
       iccrApplicationNumber: academic?.iccr_application_number || null,
       iccrScholarshipSchemeName: academic?.iccr_scholarship_scheme_name || null,
+      scholarshipSchemeName: academic?.iccr_scholarship_scheme_name || null,
       nfsuCampus: academic?.nfsu_campus || null,
       admissionAcademicYear: academic?.admission_academic_year || null,
       feePaymentCategory: academic?.fee_payment_category || null,
@@ -929,7 +942,14 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         country: embassy.country || "",
         website: embassy.website || "",
         contactPerson: embassy.contact_person || ""
-      }
+      },
+      bankDetails: bank ? {
+        id: bank.id,
+        bankName: bank.bank_name || null,
+        accountNumber: bank.account_number || null,
+        ifscCode: bank.ifsc_code || null,
+        branchAddress: bank.branch_address || null
+      } : null
     };
 
     return {
