@@ -1318,6 +1318,10 @@ export class BulkStudentImportService {
         const resolvedIccrAppNo = data.iccr_application_number?.trim() || null;
         const resolvedIccrScheme = data.iccr_scholarship_scheme_name?.trim() || null;
         const resolvedSiiNo = data.sii_application_number?.trim() || null;
+        const rawCampus = data.nfsu_campus?.trim() || null;
+        const resolvedNfsuCampus = rawCampus && rawCampus.toLowerCase() === "gandhinagar"
+          ? "Gandhinagar Headquarter"
+          : rawCampus;
 
         let { error: acadErr } = await supabase
           .from("student_academic")
@@ -1333,7 +1337,7 @@ export class BulkStudentImportService {
             sii_application_number: resolvedSiiNo,
             iccr_application_number: resolvedIccrAppNo,
             iccr_scholarship_scheme_name: resolvedIccrScheme,
-            nfsu_campus: data.nfsu_campus ? data.nfsu_campus.trim() : null,
+            nfsu_campus: resolvedNfsuCampus,
             academic_status: "good_standing",
             created_by: params.actorId,
             updated_by: params.actorId

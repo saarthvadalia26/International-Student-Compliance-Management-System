@@ -199,7 +199,10 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
       const resolvedIccrNo = input.iccrApplicationNumber ? input.iccrApplicationNumber.trim() : null;
       const resolvedSiiNo = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
-      const resolvedNfsuCampus = input.nfsuCampus ? input.nfsuCampus.trim() : null;
+      const rawCampus = input.nfsuCampus ? input.nfsuCampus.trim() : null;
+      const resolvedNfsuCampus = rawCampus && rawCampus.toLowerCase() === "gandhinagar"
+        ? "Gandhinagar Headquarter"
+        : rawCampus;
       const resolvedScholarshipScheme = input.scholarshipSchemeName ? input.scholarshipSchemeName.trim() : (input.iccrScholarshipSchemeName ? input.iccrScholarshipSchemeName.trim() : null);
       const joiningDateFormatted = this.formatDate(input.joiningDate);
 
@@ -251,6 +254,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
             admission_category: input.admissionCategory || null,
             admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
             sii_application_number: resolvedSiiNo,
+            nfsu_campus: resolvedNfsuCampus,
             created_by: actorId,
             updated_by: actorId
           })
@@ -890,7 +894,10 @@ export class SupabaseStudentRepository implements IStudentRepository {
       academicUpdates.sii_application_number = input.siiApplicationNumber ? input.siiApplicationNumber.trim() : null;
     }
     if (input.nfsuCampus !== undefined) {
-      academicUpdates.nfsu_campus = input.nfsuCampus ? input.nfsuCampus.trim() : null;
+      const rawCampus = input.nfsuCampus ? input.nfsuCampus.trim() : null;
+      academicUpdates.nfsu_campus = rawCampus && rawCampus.toLowerCase() === "gandhinagar"
+        ? "Gandhinagar Headquarter"
+        : rawCampus;
     }
     if (input.admissionAcademicYear !== undefined) {
       academicUpdates.admission_academic_year = input.admissionAcademicYear ? input.admissionAcademicYear.trim() : null;

@@ -49,6 +49,8 @@ import { useRouter } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 import { useUserRole } from "@/hooks/use-user-role";
 import { getStudentsListAction, exportStudentsExcelAction, StudentListItem } from "@/app/(app)/students/actions";
+import { getActiveCampusesAction } from "@/app/(app)/settings/campus-actions";
+import { Campus } from "@/domain/campuses/types";
 
 export type Student = StudentListItem;
 
@@ -128,23 +130,50 @@ export default function StudentListPage() {
     } 
   });
 
-  // Dynamically derive available campuses and counts from student records
+  // Load centralized master-data campuses
+  const [masterCampuses, setMasterCampuses] = React.useState<Campus[]>([]);
+
+  React.useEffect(() => {
+    getActiveCampusesAction().then((res) => {
+      if (res.success && res.campuses) {
+        setMasterCampuses(res.campuses);
+      }
+    });
+  }, []);
+
+  // Dynamically derive available campuses from centralized Master Data with student counts
   const availableCampuses = React.useMemo(() => {
     const campusCounts = new Map<string, number>();
     let notSpecifiedCount = 0;
+
+    // Seed master campuses so staff can filter by any master-data campus
+    masterCampuses.forEach((mc) => {
+      campusCounts.set(mc.name, 0);
+    });
+
     students.forEach((s) => {
       const c = s.nfsuCampus?.trim();
       if (c) {
-        campusCounts.set(c, (campusCounts.get(c) || 0) + 1);
+        // Resolve against master campuses (case-insensitive)
+        const masterMatch = masterCampuses.find(mc => mc.name.toLowerCase() === c.toLowerCase());
+        const canonicalName = masterMatch ? masterMatch.name : c;
+        campusCounts.set(canonicalName, (campusCounts.get(canonicalName) || 0) + 1);
       } else {
         notSpecifiedCount++;
       }
     });
+
+    // Campuses with students first, then alphabetical
     const sortedCampuses = Array.from(campusCounts.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, count]) => ({ name, count }));
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => {
+        if (a.count > 0 && b.count === 0) return -1;
+        if (a.count === 0 && b.count > 0) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
     return { list: sortedCampuses, notSpecifiedCount };
-  }, [students]);
+  }, [students, masterCampuses]);
 
   // Dynamically derive available admission years
   const availableAdmissionYears = React.useMemo(() => {
