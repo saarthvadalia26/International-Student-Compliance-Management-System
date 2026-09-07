@@ -411,7 +411,7 @@ export function TimelinePercentageDistribution({
                 <span className="font-medium text-foreground">{item.name}</span>
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-semibold text-foreground">
-                    {calculatePercentage(item.value, total, 0)}
+                    {calculatePercentage(item.value, total, 1)}
                   </span>
                   <span className="text-[11px] text-muted-foreground font-sans">
                     ({item.value.toLocaleString()})
@@ -427,7 +427,7 @@ export function TimelinePercentageDistribution({
                   aria-valuenow={item.value}
                   aria-valuemin={0}
                   aria-valuemax={maxVal}
-                  aria-label={`${item.name}: ${calculatePercentage(item.value, total)}`}
+                  aria-label={`${item.name}: ${calculatePercentage(item.value, total, 1)}`}
                 />
               </div>
             </div>

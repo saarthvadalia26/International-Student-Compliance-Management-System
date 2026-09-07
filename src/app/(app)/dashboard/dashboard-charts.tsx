@@ -133,7 +133,7 @@ export function DashboardCharts({ chartsData }: DashboardChartsProps) {
           <TimelinePercentageDistribution
             data={chartsData.monthlyAdmissions}
             metricLabel="Admissions"
-            emptyMessage="No historical admission dates recorded"
+            emptyMessage="No admission data available"
           />
         </ChartWrapper>
       </div>

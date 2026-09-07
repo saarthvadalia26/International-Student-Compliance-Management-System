@@ -25,6 +25,7 @@ export function RealtimeDashboardListener() {
   useRealtimeSubscription({ table: "efrro_versions", onEvent: handleDashboardMutation });
   useRealtimeSubscription({ table: "notifications", onEvent: handleDashboardMutation });
   useRealtimeSubscription({ table: "students", onEvent: handleDashboardMutation });
+  useRealtimeSubscription({ table: "student_academic", onEvent: handleDashboardMutation });
   useRealtimeSubscription({ table: "academic_programs", onEvent: handleDashboardMutation });
 
   return null; // Silent listener component

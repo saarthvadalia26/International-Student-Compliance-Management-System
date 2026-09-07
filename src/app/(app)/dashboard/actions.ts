@@ -6,6 +6,11 @@ import { SupabaseReportRepository } from "@/domain/reports/repositories/report.r
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
 import { DEFAULT_FALLBACK_SCHOOLS } from "@/domain/schools/school.service";
 import { unstable_cache } from "next/cache";
+import { parseDateOnlyString } from "@/lib/utils/date";
+import { 
+  aggregateMonthlyAdmissions, 
+  aggregateEfrroExpiryTimeline 
+} from "@/domain/reports/utils/admissions-distribution";
 
 const reportRepo = new SupabaseReportRepository();
 
@@ -53,17 +58,37 @@ async function _fetchAnalyticsChartsInternal() {
     academicProgramsRes,
     schoolsRes
   ] = await Promise.all([
-    // 1. Group by nationality
-    supabase.from("student_personal").select("nationality_code"),
-    // 2. Group by program (with graceful fallback if migration 056 is pending)
-    supabase.from("student_academic").select("program_id, program_code, admission_date, override_school_id").then(async (res) => {
-      if (res.error && res.error.message.includes("override_school_id")) {
-        return supabase.from("student_academic").select("program_id, program_code, admission_date");
-      }
-      return res;
-    }),
-    // 3. Group by compliance and efrro expiry
-    supabase.from("student_snapshot").select("compliance_status, efrro_expiry, efrro_status"),
+    // 1. Group by nationality (active, non-deleted students only)
+    supabase
+      .from("student_personal")
+      .select("nationality_code, students!inner(id, status, deleted_at)")
+      .is("deleted_at", null)
+      .is("students.deleted_at", null)
+      .eq("students.status", "active"),
+    // 2. Group by program (active, non-deleted students only, with graceful fallback if migration 056 is pending)
+    supabase
+      .from("student_academic")
+      .select("program_id, program_code, admission_date, override_school_id, students!inner(id, status, deleted_at)")
+      .is("deleted_at", null)
+      .is("students.deleted_at", null)
+      .eq("students.status", "active")
+      .then(async (res) => {
+        if (res.error && res.error.message.includes("override_school_id")) {
+          return supabase
+            .from("student_academic")
+            .select("program_id, program_code, admission_date, students!inner(id, status, deleted_at)")
+            .is("deleted_at", null)
+            .is("students.deleted_at", null)
+            .eq("students.status", "active");
+        }
+        return res;
+      }),
+    // 3. Group by compliance and efrro expiry (active, non-deleted students only)
+    supabase
+      .from("student_snapshot")
+      .select("compliance_status, efrro_expiry, efrro_status, students!inner(id, status, deleted_at)")
+      .is("students.deleted_at", null)
+      .eq("students.status", "active"),
     // 4. Group by notification statuses
     supabase.from(NOTIFICATION_TABLE_NAME).select("status"),
     // 5. Reference data
@@ -220,38 +245,15 @@ async function _fetchAnalyticsChartsInternal() {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // 4. Monthly Admissions
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const admissionCounts: Record<string, { count: number; timestamp: number }> = {};
-  ((academicRes.data || []) as any[]).forEach((row: any) => {
-    if (row.admission_date) {
-      const date = new Date(row.admission_date);
-      const label = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-      if (!admissionCounts[label]) {
-        admissionCounts[label] = { count: 0, timestamp: new Date(date.getFullYear(), date.getMonth(), 1).getTime() };
-      }
-      admissionCounts[label].count += 1;
-    }
-  });
-  const monthlyAdmissions = Object.entries(admissionCounts)
-    .sort((a, b) => a[1].timestamp - b[1].timestamp)
-    .map(([name, data]) => ({ name, value: data.count }));
+  // 4. Monthly Admissions (Grouped strictly by Year + Month without timezone distortion)
+  const monthlyAdmissions = aggregateMonthlyAdmissions(
+    ((academicRes.data || []) as any[]).map(row => ({ admission_date: row.admission_date }))
+  );
 
-  // 5. eFRRO Expiry Timeline
-  const expiryCounts: Record<string, { count: number; timestamp: number }> = {};
-  (snapshotRes.data || []).forEach(row => {
-    if (row.efrro_expiry && row.efrro_status !== "COMPLIANT") {
-      const date = new Date(row.efrro_expiry);
-      const label = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-      if (!expiryCounts[label]) {
-        expiryCounts[label] = { count: 0, timestamp: new Date(date.getFullYear(), date.getMonth(), 1).getTime() };
-      }
-      expiryCounts[label].count += 1;
-    }
-  });
-  const efrroExpiryTimeline = Object.entries(expiryCounts)
-    .sort((a, b) => a[1].timestamp - b[1].timestamp)
-    .map(([name, data]) => ({ name, value: data.count }));
+  // 5. eFRRO Expiry Timeline (Grouped strictly by Year + Month without timezone distortion)
+  const efrroExpiryTimeline = aggregateEfrroExpiryTimeline(
+    (snapshotRes.data || []).map(row => ({ efrro_expiry: row.efrro_expiry, efrro_status: row.efrro_status }))
+  );
 
   // 6. Compliance Distribution
   const complianceStatusLabels: Record<string, string> = {

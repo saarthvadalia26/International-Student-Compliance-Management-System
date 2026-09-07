@@ -192,6 +192,10 @@ async function runTestSuite() {
     expectedGraduation: "2028-06-30",
     admissionCategory: "iccr",
     iccrApplicationNumber: "ICCR-2026-BGD-101",
+    iccrScholarshipSchemeName: "Subhash Chandra Bose Scholarship Scheme",
+    admissionAcademicYear: "2026-2027",
+    lastEducationalQualification: "B.Tech Computer Science",
+    lastEducationalInstitution: "University of Dhaka",
     siiApplicationNumber: null, // Empty optional SII number
     phoneLocal: "+91 98765 43210",
     phoneHome: "+880 1712 345678",

@@ -3396,6 +3396,7 @@ export async function recordAcademicAdjustmentAction(
 
     revalidatePath(`/students/${studentId}`);
     revalidatePath(`/students`);
+    revalidatePath("/dashboard");
     return res;
   } catch (err: unknown) {
     const sanitized = sanitizeError(err, { action: "recordAcademicAdjustmentAction", route: `/students/${studentId}` });
