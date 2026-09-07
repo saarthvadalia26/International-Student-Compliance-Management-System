@@ -121,14 +121,6 @@ export class UserProfileService {
     }
 
     const existingMeta = user.user_metadata || {};
-    await supabase.auth.admin.updateUserById(userId, {
-      user_metadata: {
-        ...existingMeta,
-        full_name: cleanName,
-      },
-    });
-
-    // 2. Update public.user_profiles (with graceful fallback if migration not yet applied in live DB)
     const rawRole = (existingMeta.role as string | undefined)?.toLowerCase().trim();
     let role: AppRole = "staff";
     if (rawRole === "administrator" || rawRole === "admin") {
@@ -140,6 +132,17 @@ export class UserProfileService {
     ) {
       role = "student";
     }
+
+    await supabase.auth.admin.updateUserById(userId, {
+      app_metadata: {
+        ...user.app_metadata,
+        role,
+      },
+      user_metadata: {
+        ...existingMeta,
+        full_name: cleanName,
+      },
+    });
 
     try {
       const { error: profileError } = await supabase

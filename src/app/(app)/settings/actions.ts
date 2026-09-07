@@ -276,6 +276,9 @@ export async function createStaffAccountAction(data: {
     email: data.email,
     password: data.password,
     email_confirm: true,
+    app_metadata: {
+      role: "staff",
+    },
     user_metadata: {
       role: "staff",
       full_name: cleanName,
@@ -401,6 +404,10 @@ export async function promoteStaffToAdminAction(targetUserId: string): Promise<v
   const previousRole = (targetUser.user_metadata?.role as string) ?? "staff";
 
   const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+    app_metadata: {
+      ...targetUser.app_metadata,
+      role: "administrator",
+    },
     user_metadata: {
       ...targetUser.user_metadata,
       role: "administrator",
@@ -460,6 +467,10 @@ export async function demoteAdminToStaffAction(targetUserId: string): Promise<vo
   const previousRole = (targetUser.user_metadata?.role as string) ?? "administrator";
 
   const { error: updateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+    app_metadata: {
+      ...targetUser.app_metadata,
+      role: "staff",
+    },
     user_metadata: {
       ...targetUser.user_metadata,
       role: "staff",

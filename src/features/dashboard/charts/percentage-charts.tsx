@@ -422,7 +422,7 @@ export function TimelinePercentageDistribution({
               <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-foreground/80 rounded-full transition-all duration-300 group-hover:bg-foreground"
-                  style={{ width: `${Math.max(2, relativeWidth)}%` }}
+                  style={{ width: item.value > 0 ? `${Math.max(2, relativeWidth)}%` : "0%" }}
                   role="progressbar"
                   aria-valuenow={item.value}
                   aria-valuemin={0}

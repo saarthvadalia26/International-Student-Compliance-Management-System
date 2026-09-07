@@ -5,7 +5,7 @@ import { DashboardMetrics } from "@/domain/reports/types";
 import { SupabaseReportRepository } from "@/domain/reports/repositories/report.repository";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
 import { DEFAULT_FALLBACK_SCHOOLS } from "@/domain/schools/school.service";
-import { unstable_cache } from "next/cache";
+import { unstable_cache, revalidateTag, revalidatePath } from "next/cache";
 import { parseDateOnlyString } from "@/lib/utils/date";
 import { 
   aggregateMonthlyAdmissions, 
@@ -41,11 +41,41 @@ const getCachedAnalyticsCharts = unstable_cache(
 );
 
 export async function fetchAnalyticsCharts() {
-  return getCachedAnalyticsCharts();
+  try {
+    return await getCachedAnalyticsCharts();
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("incrementalCache missing")) {
+      return _fetchAnalyticsChartsInternal();
+    }
+    throw err;
+  }
+}
+
+/**
+ * Uncached server action for immediate, live client consumption.
+ * Fetches authoritative aggregation directly from PostgreSQL without cache delay.
+ */
+export async function fetchAnalyticsChartsLive() {
+  return _fetchAnalyticsChartsInternal();
+}
+
+/**
+ * Invalidate Next.js cache for dashboard charts and metrics upon database mutations.
+ */
+export async function revalidateDashboardData() {
+  try {
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard", "page");
+    revalidateTag("dashboard-charts", { expire: 0 });
+    revalidateTag("dashboard-metrics", { expire: 0 });
+  } catch (err) {
+    console.warn("[REVALIDATE_WARN] Failed to invalidate dashboard cache tags:", err);
+  }
 }
 
 // Internal (uncached) implementation
-async function _fetchAnalyticsChartsInternal() {
+export async function _fetchAnalyticsChartsInternal() {
   const supabase = getAdminSupabase();
 
   // Execute ALL queries in parallel (including reference_data and academic_programs)
@@ -56,7 +86,8 @@ async function _fetchAnalyticsChartsInternal() {
     notificationsRes,
     refDataRes,
     academicProgramsRes,
-    schoolsRes
+    schoolsRes,
+    studentsRes
   ] = await Promise.all([
     // 1. Group by nationality (active, non-deleted students only)
     supabase
@@ -101,13 +132,21 @@ async function _fetchAnalyticsChartsInternal() {
         return { data: DEFAULT_FALLBACK_SCHOOLS, error: null };
       }
       return res;
-    })
+    }),
+    // 8. Authoritative active student registrations for Admission Intake Distribution
+    supabase
+      .from("students")
+      .select("id, created_at")
+      .is("deleted_at", null)
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
   ]);
 
   if (countriesRes.error) throw new Error(`[DB_QUERY_FAILED] ${countriesRes.error.message}`);
   if (academicRes.error) throw new Error(`[DB_QUERY_FAILED] ${academicRes.error.message}`);
   if (snapshotRes.error) throw new Error(`[DB_QUERY_FAILED] ${snapshotRes.error.message}`);
   if (notificationsRes.error) throw new Error(`[DB_QUERY_FAILED] ${notificationsRes.error.message}`);
+  if (studentsRes.error) throw new Error(`[DB_QUERY_FAILED] ${studentsRes.error.message}`);
 
   const notifRows = notificationsRes.data || [];
 
@@ -245,9 +284,9 @@ async function _fetchAnalyticsChartsInternal() {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // 4. Monthly Admissions (Grouped strictly by Year + Month without timezone distortion)
+  // 4. Monthly Admissions (Grouped strictly by Year + Month of authoritative ISCMS registration)
   const monthlyAdmissions = aggregateMonthlyAdmissions(
-    ((academicRes.data || []) as any[]).map(row => ({ admission_date: row.admission_date }))
+    ((studentsRes.data || []) as any[]).map(row => ({ created_at: row.created_at }))
   );
 
   // 5. eFRRO Expiry Timeline (Grouped strictly by Year + Month without timezone distortion)

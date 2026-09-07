@@ -140,10 +140,20 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     [dispatchBufferedEvents]
   );
 
-  const initRealtimeChannel = React.useCallback(() => {
+  const initRealtimeChannel = React.useCallback(async () => {
     try {
       const supabase = getBrowserSupabase();
       
+      // Ensure current user's session JWT is configured for Realtime authorization
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          await supabase.realtime.setAuth(session.access_token);
+        }
+      } catch (authErr) {
+        console.warn("[REALTIME_AUTH_WARN] Could not retrieve session for realtime auth:", authErr);
+      }
+
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
@@ -161,7 +171,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       channel.subscribe((subStatus) => {
         if (subStatus === "SUBSCRIBED") {
           setStatus("connected");
-          setLastSyncedAt(new Date());
+          // NOTE: Do NOT set lastSyncedAt on subscription handshake.
+          // Last sync strictly represents the last time a relevant database mutation was received and processed.
           logConnectionAudit("Connection established", "Subscribed to global realtime channel");
         } else if (subStatus === "CLOSED") {
           setStatus("offline");
@@ -227,10 +238,23 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   );
 
   React.useEffect(() => {
+    const supabase = getBrowserSupabase();
+
     const timer = setTimeout(() => {
       initRealtimeChannel();
       initSessionControlChannel();
     }, 0);
+
+    // Dynamic Auth Token Synchronization
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (session?.access_token) {
+          try {
+            await supabase.realtime.setAuth(session.access_token);
+          } catch { /* best-effort */ }
+        }
+      }
+    );
 
     // Auto-reconnect handling on window focus / online event
     const handleOnline = () => {
@@ -244,8 +268,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     return () => {
       clearTimeout(timer);
       window.removeEventListener("online", handleOnline);
+      authSubscription?.unsubscribe();
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      const supabase = getBrowserSupabase();
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }

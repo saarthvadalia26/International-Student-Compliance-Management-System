@@ -10,6 +10,9 @@ import {
   TimelinePercentageDistribution,
   DataPoint
 } from "@/features/dashboard/charts";
+import { fetchAnalyticsChartsLive, revalidateDashboardData } from "@/app/(app)/dashboard/actions";
+import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
+import { useRouter } from "next/navigation";
 
 interface DashboardChartsProps {
   chartsData: {
@@ -23,7 +26,39 @@ interface DashboardChartsProps {
   };
 }
 
-export function DashboardCharts({ chartsData }: DashboardChartsProps) {
+export function DashboardCharts({ chartsData: initialChartsData }: DashboardChartsProps) {
+  const router = useRouter();
+  const [chartsData, setChartsData] = React.useState(initialChartsData);
+
+  // Synchronize state if parent server component streams fresh initial data
+  React.useEffect(() => {
+    setChartsData(initialChartsData);
+  }, [initialChartsData]);
+
+  // Live Re-aggregation on database mutations
+  const handleLiveChartRefresh = React.useCallback(async () => {
+    try {
+      console.log("[DASHBOARD_CHARTS_REALTIME] Mutation received. Re-aggregating from database...");
+      const freshData = await fetchAnalyticsChartsLive();
+      if (freshData) {
+        setChartsData(freshData);
+      }
+      // Revalidate server cache in background
+      await revalidateDashboardData();
+      router.refresh();
+    } catch (err) {
+      console.warn("[DASHBOARD_CHARTS_REALTIME] Live refetch warning:", err);
+    }
+  }, [router]);
+
+  // Subscribe to all tables that drive dashboard charts
+  useRealtimeSubscription({ table: "students", onEvent: handleLiveChartRefresh });
+  useRealtimeSubscription({ table: "student_personal", onEvent: handleLiveChartRefresh });
+  useRealtimeSubscription({ table: "student_academic", onEvent: handleLiveChartRefresh });
+  useRealtimeSubscription({ table: "student_snapshot", onEvent: handleLiveChartRefresh });
+  useRealtimeSubscription({ table: "academic_programs", onEvent: handleLiveChartRefresh });
+  useRealtimeSubscription({ table: "schools", onEvent: handleLiveChartRefresh });
+  useRealtimeSubscription({ table: "notifications", onEvent: handleLiveChartRefresh });
   const totalStudents = React.useMemo(() => {
     return chartsData.studentsByCountry.reduce((acc, curr) => acc + (curr.value || 0), 0);
   }, [chartsData.studentsByCountry]);
