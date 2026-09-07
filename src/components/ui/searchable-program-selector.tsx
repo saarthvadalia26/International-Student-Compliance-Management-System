@@ -18,6 +18,67 @@ interface SearchableProgramSelectorProps {
   className?: string;
 }
 
+function normalizeSearch(text?: string | null): string {
+  if (!text) return "";
+  return text
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\b([a-z])\s+(?=[a-z]\b)/g, "$1")
+    .replace(/[,-_()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function matchesProgram(query: string, prog: AcademicProgram): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const progName = (prog.programName || "").toLowerCase();
+  const progCode = (prog.programCode || "").toLowerCase();
+  const schoolName = (prog.schoolName || "").toLowerCase();
+  const level = (prog.academicLevel || "").toLowerCase();
+  const levelLabel = prog.academicLevel ? getAcademicLevelLabel(prog.academicLevel).toLowerCase() : "";
+
+  // 1. Direct substring match
+  if (
+    progName.includes(q) ||
+    progCode.includes(q) ||
+    schoolName.includes(q) ||
+    level.includes(q) ||
+    levelLabel.includes(q)
+  ) {
+    return true;
+  }
+
+  // 2. Normalized search (stripping periods, collapsing spaced initials like 'M. A.' -> 'ma')
+  const normQ = normalizeSearch(query);
+  const normName = normalizeSearch(prog.programName);
+  const normCode = normalizeSearch(prog.programCode);
+  const normSchool = normalizeSearch(prog.schoolName);
+
+  if (normName.includes(normQ) || normCode.includes(normQ) || normSchool.includes(normQ)) {
+    return true;
+  }
+
+  // 3. Spaceless match (e.g. 'm.a.' vs 'ma', 'bscfs')
+  const spacelessQ = normQ.replace(/\s+/g, "");
+  const spacelessName = normName.replace(/\s+/g, "");
+  if (spacelessQ && spacelessName.includes(spacelessQ)) {
+    return true;
+  }
+
+  // 4. Token-level match (all non-empty search words present in normalized name, code, or school)
+  const tokens = normQ.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1) {
+    const allTokensMatch = tokens.every(tok =>
+      normName.includes(tok) || normCode.includes(tok) || normSchool.includes(tok)
+    );
+    if (allTokensMatch) return true;
+  }
+
+  return false;
+}
+
 export function SearchableProgramSelector({
   id = "academic-program-selector",
   programs = [],
@@ -33,31 +94,35 @@ export function SearchableProgramSelector({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Resolve currently selected program object by id, code, or exact name
+  // Resolve currently selected program object by id, code, exact or normalized name (including base name before specialization)
   const selectedProgram = React.useMemo(() => {
     if (!value) return null;
     const valTrim = String(value).trim().toLowerCase();
-    return programs.find(p => 
+    const directMatch = programs.find(p => 
       p.id.toLowerCase() === valTrim ||
       (p.programCode && p.programCode.toLowerCase() === valTrim) ||
       p.programName.toLowerCase() === valTrim
-    ) || null;
+    );
+    if (directMatch) return directMatch;
+
+    const normVal = normalizeSearch(valTrim);
+    return programs.find(p => {
+      const pNorm = normalizeSearch(p.programName);
+      const pBaseNorm = normalizeSearch(p.programName.split("(")[0]);
+      const pCodeNorm = p.programCode ? normalizeSearch(p.programCode) : "";
+      return (
+        pNorm === normVal ||
+        pBaseNorm === normVal ||
+        pCodeNorm === normVal ||
+        pNorm.startsWith(normVal)
+      );
+    }) || null;
   }, [value, programs]);
 
-  // Filter programs based on multi-field query (Name, Code, Level, School)
+  // Filter programs based on multi-field query (Name, Code, Level, School) with normalization
   const filteredPrograms = React.useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return programs;
-
-    return programs.filter(p => {
-      const nameMatch = p.programName.toLowerCase().includes(q);
-      const codeMatch = p.programCode ? p.programCode.toLowerCase().includes(q) : false;
-      const levelMatch = p.academicLevel ? p.academicLevel.toLowerCase().includes(q) : false;
-      const levelLabelMatch = p.academicLevel ? getAcademicLevelLabel(p.academicLevel).toLowerCase().includes(q) : false;
-      const schoolMatch = p.schoolName ? p.schoolName.toLowerCase().includes(q) : false;
-
-      return nameMatch || codeMatch || levelMatch || levelLabelMatch || schoolMatch;
-    });
+    if (!search.trim()) return programs;
+    return programs.filter(p => matchesProgram(search, p));
   }, [programs, search]);
 
   // Click outside listener

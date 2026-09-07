@@ -17,7 +17,9 @@ import {
   MapPin,
   CheckCircle2,
   XCircle,
-  Users
+  Users,
+  Archive,
+  RotateCcw
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +37,8 @@ import {
   getAllAcademicProgramsAction, 
   createAcademicProgramAction, 
   updateAcademicProgramAction, 
-  deleteAcademicProgramAction 
+  deleteAcademicProgramAction,
+  toggleAcademicProgramStatusAction
 } from "@/app/(app)/settings/academic-programs-actions";
 import {
   getAllSchoolsAction,
@@ -121,6 +124,7 @@ export function AcademicProgramsTab() {
   const [formSemesterDuration, setFormSemesterDuration] = React.useState(6);
   const [formSemesterDurationUnit, setFormSemesterDurationUnit] = React.useState<SemesterDurationUnit>("months");
   const [formOrder, setFormOrder] = React.useState(1);
+  const [formActive, setFormActive] = React.useState(true);
   const [isSavingProgram, setIsSavingProgram] = React.useState(false);
 
   // School Form State
@@ -260,6 +264,7 @@ export function AcademicProgramsTab() {
     setFormSemesterDuration(6);
     setFormSemesterDurationUnit("months");
     setFormOrder(programs.length + 1);
+    setFormActive(true);
     setIsAddProgramOpen(true);
   };
 
@@ -275,7 +280,25 @@ export function AcademicProgramsTab() {
     setFormSemesterDuration(prog.semesterDuration || 6);
     setFormSemesterDurationUnit((prog.semesterDurationUnit as SemesterDurationUnit) || "months");
     setFormOrder(prog.displayOrder);
+    setFormActive(prog.isActive);
     setIsEditProgramOpen(true);
+  };
+
+  const handleToggleProgramStatus = async (prog: AcademicProgram) => {
+    try {
+      const nextActive = !prog.isActive;
+      const res = await toggleAcademicProgramStatusAction(prog.id, nextActive);
+      if (res.success) {
+        toast.success(nextActive ? "Program Activated" : "Program Archived", {
+          description: `"${prog.programName}" is now ${nextActive ? "active" : "archived"}.`
+        });
+        fetchData();
+      } else {
+        toast.error(res.error || "Failed to update program status.");
+      }
+    } catch {
+      toast.error("An unexpected error occurred while toggling program status.");
+    }
   };
 
   const handleOpenDeleteProgram = (prog: AcademicProgram) => {
@@ -326,7 +349,8 @@ export function AcademicProgramsTab() {
           totalSemesters: Number(formTotalSemesters),
           semesterDuration: Number(formSemesterDuration),
           semesterDurationUnit: formSemesterDurationUnit,
-          displayOrder: Number(formOrder)
+          displayOrder: Number(formOrder),
+          isActive: formActive
         });
         if (res.success) {
           toast.success("Academic Program Updated");
@@ -347,7 +371,8 @@ export function AcademicProgramsTab() {
           totalSemesters: Number(formTotalSemesters),
           semesterDuration: Number(formSemesterDuration),
           semesterDurationUnit: formSemesterDurationUnit,
-          displayOrder: Number(formOrder)
+          displayOrder: Number(formOrder),
+          isActive: formActive
         });
         if (res.success) {
           toast.success("Academic Program Created");
@@ -786,6 +811,7 @@ export function AcademicProgramsTab() {
                     <th className="py-2.5 px-3">School / Department</th>
                     <th className="py-2.5 px-3">Level</th>
                     <th className="py-2.5 px-3">Progression Structure</th>
+                    <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -812,8 +838,32 @@ export function AcademicProgramsTab() {
                           <span className="text-muted-foreground text-[10px]">({prog.semesterDuration || 6} {prog.semesterDurationUnit || "mo"}/sem)</span>
                         </div>
                       </td>
+                      <td className="py-2.5 px-3">
+                        {prog.isActive ? (
+                          <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            Archived
+                          </Badge>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleProgramStatus(prog)}
+                            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
+                            title={prog.isActive ? `Archive ${prog.programName}` : `Activate ${prog.programName}`}
+                          >
+                            {prog.isActive ? (
+                              <Archive className="h-3.5 w-3.5" />
+                            ) : (
+                              <RotateCcw className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            )}
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1154,6 +1204,18 @@ export function AcademicProgramsTab() {
                   className="text-xs h-9 rounded-xl font-mono"
                 />
               </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="programActiveCheck"
+                checked={formActive}
+                onChange={(e) => setFormActive(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <label htmlFor="programActiveCheck" className="text-xs font-medium text-foreground cursor-pointer">
+                Active (Available in student registration & editing dropdowns)
+              </label>
             </div>
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" size="sm" onClick={() => { setIsAddProgramOpen(false); setIsEditProgramOpen(false); }} className="text-xs h-9 rounded-xl">

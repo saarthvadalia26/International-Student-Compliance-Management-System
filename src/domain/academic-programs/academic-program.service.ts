@@ -283,7 +283,10 @@ export class AcademicProgramService {
       if (allPrograms && allPrograms.length > 0) {
         const normalizedTarget = normalizeText(query);
         const matched = allPrograms.find(p => {
-          if (p.program_name && normalizeText(p.program_name) === normalizedTarget) return true;
+          if (!p.program_name) return false;
+          const pNorm = normalizeText(p.program_name);
+          const pBaseNorm = normalizeText(p.program_name.split("(")[0]);
+          if (pNorm === normalizedTarget || pBaseNorm === normalizedTarget) return true;
           if (p.program_code && p.program_code.toUpperCase() === queryUpper) return true;
           if (aliasedCode && p.program_code && p.program_code.toUpperCase() === aliasedCode.toUpperCase()) return true;
           return false;
@@ -311,7 +314,9 @@ export class AcademicProgramService {
       if (p.programCode && (p.programCode.toLowerCase() === queryLower || p.programCode.toUpperCase() === queryUpper)) return true;
       if (p.programName.toLowerCase() === queryLower) return true;
       if (p.programCode && p.programCode.replace(/_/g, "-").toLowerCase() === queryLower.replace(/_/g, "-")) return true;
-      if (normalizeText(p.programName) === normalizedTarget) return true;
+      const pNorm = normalizeText(p.programName);
+      const pBaseNorm = normalizeText(p.programName.split("(")[0]);
+      if (pNorm === normalizedTarget || pBaseNorm === normalizedTarget) return true;
       if (aliasedCode && p.programCode && p.programCode.toUpperCase() === aliasedCode.toUpperCase()) return true;
       return false;
     });
