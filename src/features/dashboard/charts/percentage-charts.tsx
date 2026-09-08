@@ -61,6 +61,7 @@ export interface UpcomingExpiryByDocTypeData {
   passport: { critical15: number; expiring30: number; safe: number; expired: number };
   visa: { critical15: number; expiring30: number; safe: number; expired: number };
   efrro: { critical15: number; expiring30: number; safe: number; expired: number };
+  totalStudents?: number;
 }
 
 export interface DashboardChartsData {
@@ -1476,11 +1477,13 @@ export function AcademicHierarchyCard({
 // ============================================================================
 interface UpcomingExpiryByDocTypeCardProps {
   data?: UpcomingExpiryByDocTypeData;
+  totalStudents?: number;
   emptyMessage?: string;
 }
 
 export function UpcomingExpiryByDocTypeCard({
   data,
+  totalStudents,
   emptyMessage = "No upcoming document expiries recorded"
 }: UpcomingExpiryByDocTypeCardProps) {
   const docConfigs = [
@@ -1507,11 +1510,13 @@ export function UpcomingExpiryByDocTypeCard({
     }
   ];
 
+  const effectiveTotalStudents = totalStudents ?? data?.totalStudents ?? 0;
+
   const totalDocuments = docConfigs.reduce((sum, d) => {
     return sum + d.stats.critical15 + d.stats.expiring30 + d.stats.safe + d.stats.expired;
   }, 0);
 
-  if (totalDocuments === 0) {
+  if (totalDocuments === 0 && effectiveTotalStudents === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/60 gap-2">
         <Inbox className="h-7 w-7 stroke-[1.5]" />
@@ -1524,11 +1529,15 @@ export function UpcomingExpiryByDocTypeCard({
     <div className="space-y-3.5 w-full">
       {docConfigs.map((doc) => {
         const totalForDoc = doc.stats.critical15 + doc.stats.expiring30 + doc.stats.safe + doc.stats.expired;
+        const denominator = effectiveTotalStudents > 0 ? effectiveTotalStudents : totalForDoc;
         const upcoming30Only = Math.max(0, doc.stats.expiring30 - doc.stats.critical15);
-        const critPct = totalForDoc > 0 ? (doc.stats.critical15 / totalForDoc) * 100 : 0;
-        const warnPct = totalForDoc > 0 ? (upcoming30Only / totalForDoc) * 100 : 0;
-        const safePct = totalForDoc > 0 ? (doc.stats.safe / totalForDoc) * 100 : 0;
-        const expPct = totalForDoc > 0 ? (doc.stats.expired / totalForDoc) * 100 : 0;
+        const missingCount = Math.max(0, denominator - totalForDoc);
+
+        const critPct = denominator > 0 ? (doc.stats.critical15 / denominator) * 100 : 0;
+        const warnPct = denominator > 0 ? (upcoming30Only / denominator) * 100 : 0;
+        const safePct = denominator > 0 ? (doc.stats.safe / denominator) * 100 : 0;
+        const expPct = denominator > 0 ? (doc.stats.expired / denominator) * 100 : 0;
+        const missingPct = denominator > 0 ? (missingCount / denominator) * 100 : 0;
 
         return (
           <div
@@ -1544,7 +1553,9 @@ export function UpcomingExpiryByDocTypeCard({
                   {doc.label}
                 </span>
                 <span className="text-xs text-muted-foreground font-mono">
-                  {totalForDoc.toLocaleString()} managed
+                  {effectiveTotalStudents > 0
+                    ? `${totalForDoc.toLocaleString()} of ${effectiveTotalStudents.toLocaleString()} students (${calculatePercentage(totalForDoc, effectiveTotalStudents)})`
+                    : `${totalForDoc.toLocaleString()} managed`}
                 </span>
               </div>
 
@@ -1560,45 +1571,59 @@ export function UpcomingExpiryByDocTypeCard({
                     {upcoming30Only} upcoming (16–30d)
                   </span>
                 )}
-                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                  {doc.stats.safe} valid (31+d)
-                </span>
+                {doc.stats.safe > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    {doc.stats.safe} valid (31+d)
+                  </span>
+                )}
                 {doc.stats.expired > 0 && (
                   <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold">
                     {doc.stats.expired} expired
                   </span>
                 )}
+                {missingCount > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border border-zinc-500/30 font-medium">
+                    {missingCount} missing
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Proportional Segmented Progress Bar */}
-            <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden flex gap-0.5">
+            {/* Proportional Segmented Progress Bar relative to Total Students */}
+            <div className="h-2 w-full bg-muted/60 dark:bg-zinc-800/80 rounded-full overflow-hidden flex gap-0.5">
               {doc.stats.expired > 0 && (
                 <div
                   className="bg-rose-500 h-full rounded-full transition-all"
                   style={{ width: `${expPct}%` }}
-                  title={`Expired: ${doc.stats.expired}`}
+                  title={`Expired: ${doc.stats.expired} (${expPct.toFixed(1)}%)`}
                 />
               )}
               {doc.stats.critical15 > 0 && (
                 <div
                   className="bg-orange-500 h-full rounded-full transition-all"
                   style={{ width: `${critPct}%` }}
-                  title={`Critical (0-15d): ${doc.stats.critical15}`}
+                  title={`Critical (0-15d): ${doc.stats.critical15} (${critPct.toFixed(1)}%)`}
                 />
               )}
               {upcoming30Only > 0 && (
                 <div
                   className="bg-amber-500 h-full rounded-full transition-all"
                   style={{ width: `${warnPct}%` }}
-                  title={`Upcoming (16-30d): ${upcoming30Only}`}
+                  title={`Upcoming (16-30d): ${upcoming30Only} (${warnPct.toFixed(1)}%)`}
                 />
               )}
               {doc.stats.safe > 0 && (
                 <div
                   className="bg-emerald-500 h-full rounded-full transition-all"
                   style={{ width: `${safePct}%` }}
-                  title={`Valid (31+d): ${doc.stats.safe}`}
+                  title={`Valid (31+d): ${doc.stats.safe} (${safePct.toFixed(1)}%)`}
+                />
+              )}
+              {missingCount > 0 && (
+                <div
+                  className="bg-zinc-400/20 dark:bg-zinc-700/30 h-full rounded-full transition-all"
+                  style={{ width: `${missingPct}%` }}
+                  title={`Missing: ${missingCount} (${missingPct.toFixed(1)}%)`}
                 />
               )}
             </div>
@@ -1608,4 +1633,3 @@ export function UpcomingExpiryByDocTypeCard({
     </div>
   );
 }
-

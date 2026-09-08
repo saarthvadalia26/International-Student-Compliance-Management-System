@@ -482,7 +482,8 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
   const upcomingExpiryByDocType = {
     passport: { critical15: 0, expiring30: 0, safe: 0, expired: 0 },
     visa: { critical15: 0, expiring30: 0, safe: 0, expired: 0 },
-    efrro: { critical15: 0, expiring30: 0, safe: 0, expired: 0 }
+    efrro: { critical15: 0, expiring30: 0, safe: 0, expired: 0 },
+    totalStudents: totalActiveStudents
   };
 
   const complianceCategoryCounts: Record<string, number> = {

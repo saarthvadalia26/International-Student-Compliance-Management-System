@@ -268,6 +268,7 @@ export function DashboardCharts({ chartsData: initialChartsData }: DashboardChar
           >
             <UpcomingExpiryByDocTypeCard
               data={chartsData.upcomingExpiryByDocType}
+              totalStudents={chartsData.totalActiveStudents}
               emptyMessage="No upcoming document expiries recorded"
             />
           </ChartWrapper>
