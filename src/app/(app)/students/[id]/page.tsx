@@ -1202,13 +1202,13 @@ function StudentDetailsContent({ params }: PageProps) {
   const getComplianceHeaderBadge = (status: StudentProfile["complianceStatus"]) => {
     switch (status) {
       case "compliant":
-        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs px-2.5 py-0.5">Compliant</Badge>;
+        return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs px-2.5 py-0.5">Fully Compliant</Badge>;
       case "warning":
-        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs px-2.5 py-0.5">Warning / Expiring Soon</Badge>;
+        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs px-2.5 py-0.5">Expiring Soon</Badge>;
       case "expired":
         return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2.5 py-0.5">Expired Document</Badge>;
       default:
-        return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-xs px-2.5 py-0.5">Non-Compliant</Badge>;
+        return <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/25 text-xs px-2.5 py-0.5">Incomplete / Action Required</Badge>;
     }
   };
 

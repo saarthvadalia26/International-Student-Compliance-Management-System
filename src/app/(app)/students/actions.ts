@@ -18,6 +18,7 @@ import { StudentExcelExportService } from "@/domain/students/services/student-ex
 import { StudentExportFilterCriteria } from "@/domain/students/utils/student-filter.util";
 import { parseDateToISO, formatToDDMMYYYY } from "@/lib/utils/date";
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
+import { ComplianceCalculator } from "@/domain/compliance/services/compliance-calculator";
 
 const studentService = new StudentService();
 
@@ -549,12 +550,9 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         ? schoolsMap.get(academic.override_school_id.toLowerCase())!
         : progInfo.school;
 
-      // Map raw compliance status to UI badge enum
-      let mappedCompliance: StudentListItem["complianceStatus"] = "compliant";
-      const rawStatus = (snapshot?.compliance_status || "").toUpperCase();
-      if (rawStatus === "WARNING" || rawStatus === "PENDING_VERIFICATION") mappedCompliance = "warning";
-      else if (rawStatus === "EXPIRED") mappedCompliance = "expired";
-      else if (rawStatus === "MISSING" || rawStatus === "REJECTED") mappedCompliance = "non_compliant";
+      // Map raw compliance status to UI badge enum using authoritative ComplianceCalculator
+      const rawStatus = (snapshot?.compliance_status || "MISSING").toUpperCase();
+      const mappedCompliance: StudentListItem["complianceStatus"] = ComplianceCalculator.mapComplianceToBadge(rawStatus);
 
       const passportStatus = (snapshot?.passport_status || (snapshot?.passport_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
       const visaStatus = (snapshot?.visa_status || (snapshot?.visa_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
@@ -671,20 +669,9 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     const snapshot = record.student_snapshot?.[0] || record.student_snapshot || {};
     const bank = record.student_bank_details?.[0] || record.student_bank_details || null;
 
-    const hasValidFile = (row?: VersionDatabaseRow | null) => {
-      if (!row || !row.file_path) return false;
-      const fp = row.file_path.trim().toLowerCase();
-      return fp !== "" && fp !== "pending_upload" && fp !== "null";
-    };
-
     const activePassport = (record.passport_versions || []).find((p: VersionDatabaseRow) => p.is_active && !p.deleted_at);
-    const isPassportUploaded = hasValidFile(activePassport);
-
     const activeVisa = (record.visa_versions || []).find((v: VersionDatabaseRow) => v.is_active && !v.deleted_at);
-    const isVisaUploaded = hasValidFile(activeVisa);
-
     const activeEfrro = (record.efrro_versions || []).find((e: VersionDatabaseRow) => e.is_active && !e.deleted_at);
-    const isEfrroUploaded = hasValidFile(activeEfrro);
 
     const countryObj = personal?.nationality_code ? getCountryByCode(personal.nationality_code) : null;
 
@@ -856,13 +843,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       isCompleted: hasCourseConfig ? progression.isCompleted : false,
       isFinalSemester: hasCourseConfig ? progression.isFinalSemester : false,
       academicAdjustments: adjustments,
-      complianceStatus: (() => {
-        const raw = (snapshot?.compliance_status || "").toUpperCase();
-        if (raw === "WARNING" || raw === "PENDING_VERIFICATION") return "warning";
-        if (raw === "EXPIRED") return "expired";
-        if (raw === "MISSING" || raw === "REJECTED" || raw === "NOT_UPLOADED" || raw === "NOT_RECORDED") return "non_compliant";
-        return "compliant";
-      })(),
+      complianceStatus: ComplianceCalculator.mapComplianceToBadge(snapshot?.compliance_status),
       passport: {
         number: activePassport?.document_number || snapshot?.passport_number || "Not provided",
         issueDate: activePassport?.issue_date || snapshot?.passport_issue_date || "",
@@ -1622,12 +1603,30 @@ export async function addOriginalDocumentAction(
       return { success: false, error: `Database insert failed: ${insertErr?.message}` };
     }
 
-    // 4. Update student_snapshot with original document information
-    const diffDays = CalendarDateEngine.diffCalendarDays(cleanExpiry, CalendarDateEngine.getTodayISO());
-    const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
+    // 4. Update student_snapshot with original document information and recompute authoritative compliance
+    const { data: currentSnapshot } = await adminSupabase
+      .from("student_snapshot")
+      .select("*")
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    const pNum = documentType === "passport" ? cleanDocNum : (currentSnapshot?.passport_number || null);
+    const pExp = documentType === "passport" ? cleanExpiry : (currentSnapshot?.passport_expiry || null);
+    const vNum = documentType === "visa" ? cleanDocNum : (currentSnapshot?.visa_number || null);
+    const vExp = documentType === "visa" ? cleanExpiry : (currentSnapshot?.visa_expiry || null);
+    const eNum = documentType === "efrro" ? cleanDocNum : (currentSnapshot?.efrro_number || null);
+    const eExp = documentType === "efrro" ? cleanExpiry : (currentSnapshot?.efrro_expiry || null);
+
+    const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
+      passport: { number: pNum, expiry: pExp },
+      visa: { number: vNum, expiry: vExp },
+      efrro: { number: eNum, expiry: eExp }
+    });
 
     const snapshotUpdates: Record<string, unknown> = {
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      compliance_status: complianceResult.overallStatus,
+      compliance_score: complianceResult.complianceScore
     };
 
     if (documentType === "passport") {
@@ -1635,19 +1634,19 @@ export async function addOriginalDocumentAction(
       snapshotUpdates.passport_issue_date = cleanIssue;
       snapshotUpdates.passport_expiry = cleanExpiry;
       snapshotUpdates.passport_place_of_issue = placeOfIssue?.trim() || null;
-      snapshotUpdates.passport_status = calculatedDocStatus;
+      snapshotUpdates.passport_status = complianceResult.passport.status;
     } else if (documentType === "visa") {
       snapshotUpdates.visa_number = cleanDocNum;
       snapshotUpdates.visa_issue_date = cleanIssue;
       snapshotUpdates.visa_expiry = cleanExpiry;
       snapshotUpdates.visa_type = visaType?.trim() || "Student (S-1)";
-      snapshotUpdates.visa_status = calculatedDocStatus;
+      snapshotUpdates.visa_status = complianceResult.visa.status;
     } else {
       snapshotUpdates.efrro_number = cleanDocNum;
       snapshotUpdates.efrro_issue_date = cleanIssue;
       snapshotUpdates.efrro_expiry = cleanExpiry;
-      snapshotUpdates.efrro_status = calculatedDocStatus;
-      snapshotUpdates.days_until_efrro_expiry = diffDays;
+      snapshotUpdates.efrro_status = complianceResult.efrro.status;
+      snapshotUpdates.days_until_efrro_expiry = complianceResult.daysUntilEfrroExpiry;
     }
 
     await adminSupabase
@@ -2154,11 +2153,23 @@ export async function renewDocumentAction(
     }
 
     // 5. Update student_snapshot with new current document information
-    const diffDays = CalendarDateEngine.diffCalendarDays(cleanExpiry, CalendarDateEngine.getTodayISO());
-    const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
+    const pNum = documentType === "passport" ? cleanDocNum : (snapshot?.passport_number || null);
+    const pExp = documentType === "passport" ? cleanExpiry : (snapshot?.passport_expiry || null);
+    const vNum = documentType === "visa" ? cleanDocNum : (snapshot?.visa_number || null);
+    const vExp = documentType === "visa" ? cleanExpiry : (snapshot?.visa_expiry || null);
+    const eNum = documentType === "efrro" ? cleanDocNum : (snapshot?.efrro_number || null);
+    const eExp = documentType === "efrro" ? cleanExpiry : (snapshot?.efrro_expiry || null);
+
+    const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
+      passport: { number: pNum, expiry: pExp },
+      visa: { number: vNum, expiry: vExp },
+      efrro: { number: eNum, expiry: eExp }
+    });
 
     const snapshotUpdates: Record<string, unknown> = {
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      compliance_status: complianceResult.overallStatus,
+      compliance_score: complianceResult.complianceScore
     };
 
     if (documentType === "passport") {
@@ -2166,39 +2177,20 @@ export async function renewDocumentAction(
       snapshotUpdates.passport_issue_date = cleanIssue;
       snapshotUpdates.passport_expiry = cleanExpiry;
       snapshotUpdates.passport_place_of_issue = placeOfIssue?.trim() || null;
-      snapshotUpdates.passport_status = calculatedDocStatus;
+      snapshotUpdates.passport_status = complianceResult.passport.status;
     } else if (documentType === "visa") {
       snapshotUpdates.visa_number = cleanDocNum;
       snapshotUpdates.visa_issue_date = cleanIssue;
       snapshotUpdates.visa_expiry = cleanExpiry;
       snapshotUpdates.visa_type = visaType?.trim() || "Student (S-1)";
-      snapshotUpdates.visa_status = calculatedDocStatus;
+      snapshotUpdates.visa_status = complianceResult.visa.status;
     } else {
       snapshotUpdates.efrro_number = cleanDocNum;
       snapshotUpdates.efrro_issue_date = cleanIssue;
       snapshotUpdates.efrro_expiry = cleanExpiry;
-      snapshotUpdates.efrro_status = calculatedDocStatus;
-      snapshotUpdates.days_until_efrro_expiry = diffDays;
+      snapshotUpdates.efrro_status = complianceResult.efrro.status;
+      snapshotUpdates.days_until_efrro_expiry = complianceResult.daysUntilEfrroExpiry;
     }
-
-    const passStatus = documentType === "passport" ? calculatedDocStatus : (snapshot?.passport_status || "MISSING");
-    const visaStatus = documentType === "visa" ? calculatedDocStatus : (snapshot?.visa_status || "MISSING");
-    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (snapshot?.efrro_status || "MISSING");
-
-    let overallCompliance = "COMPLIANT";
-    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
-      overallCompliance = "EXPIRED";
-    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || efrroStatus === "REJECTED") {
-      overallCompliance = "REJECTED";
-    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING" || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || efrroStatus === "PENDING_VERIFICATION") {
-      overallCompliance = "WARNING";
-    } else if (passStatus === "MISSING" && visaStatus === "MISSING") {
-      overallCompliance = "WARNING";
-    }
-
-    const complianceScore = overallCompliance === "COMPLIANT" ? 100 : overallCompliance === "WARNING" ? 70 : overallCompliance === "EXPIRED" ? 10 : 0;
-    snapshotUpdates.compliance_status = overallCompliance;
-    snapshotUpdates.compliance_score = complianceScore;
 
     await adminSupabase
       .from("student_snapshot")
@@ -2476,14 +2468,23 @@ export async function correctDocumentMetadataAction(
       }
     }
 
-    // 3. Update student_snapshot
-    const now = new Date();
-    const expDateObj = new Date(cleanExpiry);
-    const diffDays = Math.round((expDateObj.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    const calculatedDocStatus = diffDays < 0 ? "EXPIRED" : diffDays <= 30 ? "WARNING" : "COMPLIANT";
+    const pNum = documentType === "passport" ? cleanDocNum : (currentSnapshot?.passport_number || null);
+    const pExp = documentType === "passport" ? cleanExpiry : (currentSnapshot?.passport_expiry || null);
+    const vNum = documentType === "visa" ? cleanDocNum : (currentSnapshot?.visa_number || null);
+    const vExp = documentType === "visa" ? cleanExpiry : (currentSnapshot?.visa_expiry || null);
+    const eNum = documentType === "efrro" ? cleanDocNum : (currentSnapshot?.efrro_number || null);
+    const eExp = documentType === "efrro" ? cleanExpiry : (currentSnapshot?.efrro_expiry || null);
+
+    const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
+      passport: { number: pNum, expiry: pExp },
+      visa: { number: vNum, expiry: vExp },
+      efrro: { number: eNum, expiry: eExp }
+    });
 
     const snapshotUpdates: Record<string, unknown> = {
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      compliance_status: complianceResult.overallStatus,
+      compliance_score: complianceResult.complianceScore
     };
 
     if (documentType === "passport") {
@@ -2491,39 +2492,20 @@ export async function correctDocumentMetadataAction(
       snapshotUpdates.passport_issue_date = cleanIssue;
       snapshotUpdates.passport_expiry = cleanExpiry;
       snapshotUpdates.passport_place_of_issue = cleanPlace;
-      snapshotUpdates.passport_status = calculatedDocStatus;
+      snapshotUpdates.passport_status = complianceResult.passport.status;
     } else if (documentType === "visa") {
       snapshotUpdates.visa_number = cleanDocNum;
       snapshotUpdates.visa_issue_date = cleanIssue;
       snapshotUpdates.visa_expiry = cleanExpiry;
       snapshotUpdates.visa_type = cleanVisaType;
-      snapshotUpdates.visa_status = calculatedDocStatus;
+      snapshotUpdates.visa_status = complianceResult.visa.status;
     } else {
       snapshotUpdates.efrro_number = cleanDocNum;
       snapshotUpdates.efrro_issue_date = cleanIssue;
       snapshotUpdates.efrro_expiry = cleanExpiry;
-      snapshotUpdates.efrro_status = calculatedDocStatus;
-      snapshotUpdates.days_until_efrro_expiry = diffDays;
+      snapshotUpdates.efrro_status = complianceResult.efrro.status;
+      snapshotUpdates.days_until_efrro_expiry = complianceResult.daysUntilEfrroExpiry;
     }
-
-    const passStatus = documentType === "passport" ? calculatedDocStatus : (currentSnapshot?.passport_status || "MISSING");
-    const visaStatus = documentType === "visa" ? calculatedDocStatus : (currentSnapshot?.visa_status || "MISSING");
-    const efrroStatus = documentType === "efrro" ? calculatedDocStatus : (currentSnapshot?.efrro_status || "MISSING");
-
-    let overallCompliance = "COMPLIANT";
-    if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
-      overallCompliance = "EXPIRED";
-    } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || efrroStatus === "REJECTED") {
-      overallCompliance = "REJECTED";
-    } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING" || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || efrroStatus === "PENDING_VERIFICATION") {
-      overallCompliance = "WARNING";
-    } else if (passStatus === "MISSING" && visaStatus === "MISSING") {
-      overallCompliance = "WARNING";
-    }
-
-    const complianceScore = overallCompliance === "COMPLIANT" ? 100 : overallCompliance === "WARNING" ? 70 : overallCompliance === "EXPIRED" ? 10 : 0;
-    snapshotUpdates.compliance_status = overallCompliance;
-    snapshotUpdates.compliance_score = complianceScore;
 
     await adminSupabase
       .from("student_snapshot")

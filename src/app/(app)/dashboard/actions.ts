@@ -127,7 +127,7 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
     // 2. Group by compliance and document expiries (active, non-deleted students only)
     supabase
       .from("student_snapshot")
-      .select("compliance_status, passport_expiry, visa_expiry, efrro_expiry, passport_status, visa_status, efrro_status, students!inner(id, status, deleted_at)")
+      .select("compliance_status, passport_number, passport_expiry, visa_number, visa_expiry, efrro_number, efrro_expiry, passport_status, visa_status, efrro_status, students!inner(id, status, deleted_at)")
       .is("students.deleted_at", null)
       .eq("students.status", "active"),
     // 3. Group by notification statuses
@@ -512,13 +512,23 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
     "Fully Compliant": 0,
     "Expiring Soon (30 Days)": 0,
     "Critical Expiry (15 Days)": 0,
-    "Expired Documents": 0
+    "Expired Documents": 0,
+    "Incomplete / Action Required": 0
   };
 
   (snapshotRes.data || []).forEach((row: any) => {
     const pDays = calcDays(row.passport_expiry);
     const vDays = calcDays(row.visa_expiry);
     const eDays = calcDays(row.efrro_expiry);
+
+    const pNum = (row.passport_number || "").trim();
+    const vNum = (row.visa_number || "").trim();
+    const eNum = (row.efrro_number || "").trim();
+
+    const pHasValidData = Boolean(pNum && row.passport_expiry && pDays !== null);
+    const vHasValidData = Boolean(vNum && row.visa_expiry && vDays !== null);
+    const eHasValidData = Boolean(eNum && row.efrro_expiry && eDays !== null);
+    const hasAllRequiredData = pHasValidData && vHasValidData && eHasValidData;
 
     // Document breakdown
     const evalDoc = (days: number | null, key: "passport" | "visa" | "efrro") => {
@@ -533,13 +543,15 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
     evalDoc(vDays, "visa");
     evalDoc(eDays, "efrro");
 
-    // Student compliance status categorization
+    // Student compliance status categorization with strict positive compliance requirement
     const sHasExpired = (pDays !== null && pDays < 0) || (vDays !== null && vDays < 0) || (eDays !== null && eDays < 0);
     const sHasCritical = (pDays !== null && pDays >= 0 && pDays <= 15) || (vDays !== null && vDays >= 0 && vDays <= 15) || (eDays !== null && eDays >= 0 && eDays <= 15);
     const sHasWarning = (pDays !== null && pDays > 15 && pDays <= 30) || (vDays !== null && vDays > 15 && vDays <= 30) || (eDays !== null && eDays > 15 && eDays <= 30);
 
     if (sHasExpired) {
       complianceCategoryCounts["Expired Documents"]++;
+    } else if (!hasAllRequiredData) {
+      complianceCategoryCounts["Incomplete / Action Required"]++;
     } else if (sHasCritical) {
       complianceCategoryCounts["Critical Expiry (15 Days)"]++;
     } else if (sHasWarning) {

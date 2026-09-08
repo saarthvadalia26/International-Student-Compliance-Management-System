@@ -11,6 +11,7 @@ import { AcademicProgramService } from "@/domain/academic-programs/academic-prog
 import { AcademicProgram } from "@/domain/academic-programs/types";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 import { parseDateToISO } from "@/lib/utils/date";
+import { ComplianceCalculator } from "@/domain/compliance/services/compliance-calculator";
 
 export interface IStudentRepository {
   createStudent(input: RegisterStudentInput, actorId: string | null): Promise<FullStudentProfile>;
@@ -342,44 +343,19 @@ export class SupabaseStudentRepository implements IStudentRepository {
       const efrroIssue = this.formatDate(input.efrroIssueDate);
       const efrroNum = input.efrroNumber?.trim() || null;
 
-      let daysUntilEfrro: number | null = null;
-      if (efrroExp) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const exp = new Date(efrroExp);
-        exp.setHours(0, 0, 0, 0);
-        daysUntilEfrro = Math.round((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      }
+      // 8. Calculate initial document and compliance statuses using authoritative ComplianceCalculator
+      const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
+        passport: { number: passportNum, expiry: passportExp },
+        visa: { number: visaNum, expiry: visaExp },
+        efrro: { number: efrroNum, expiry: efrroExp }
+      });
 
-      // 8. Calculate initial document and compliance statuses based on supplied metadata
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const calcStatus = (num: string | null, exp: string | null): string => {
-        if (!num || !num.trim() || !exp || !exp.trim()) return "MISSING";
-        const expDate = new Date(exp);
-        expDate.setHours(0, 0, 0, 0);
-        if (isNaN(expDate.getTime())) return "MISSING";
-        const diff = Math.round((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (diff < 0) return "EXPIRED";
-        if (diff <= 30) return "WARNING";
-        return "COMPLIANT";
-      };
-
-      const passportStatus = calcStatus(passportNum, passportExp);
-      const visaStatus = calcStatus(visaNum, visaExp);
-      const efrroStatus = calcStatus(efrroNum, efrroExp);
-
-      let overallCompliance = "COMPLIANT";
-      if (passportStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
-        overallCompliance = "EXPIRED";
-      } else if (passportStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING") {
-        overallCompliance = "WARNING";
-      } else if (passportStatus === "MISSING" && visaStatus === "MISSING") {
-        overallCompliance = "WARNING";
-      }
-
-      const complianceScore = overallCompliance === "COMPLIANT" ? 100 : overallCompliance === "WARNING" ? 70 : overallCompliance === "EXPIRED" ? 10 : 0;
+      const passportStatus = complianceResult.passport.status;
+      const visaStatus = complianceResult.visa.status;
+      const efrroStatus = complianceResult.efrro.status;
+      const overallCompliance = complianceResult.overallStatus;
+      const complianceScore = complianceResult.complianceScore;
+      const daysUntilEfrro = complianceResult.daysUntilEfrroExpiry;
 
       // Insert student_snapshot row for instant compliance and directory queries
       await supabase.from("student_snapshot").insert({

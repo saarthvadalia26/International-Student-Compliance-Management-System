@@ -367,7 +367,7 @@ export default function StudentListPage() {
       );
     }
 
-    if (rawStatus === "COMPLIANT" || mappedStatus === "compliant") {
+    if (rawStatus === "COMPLIANT" && mappedStatus === "compliant") {
       return (
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 whitespace-nowrap shadow-2xs">
           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -377,9 +377,9 @@ export default function StudentListPage() {
     }
 
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md bg-muted text-muted-foreground border border-border/50 whitespace-nowrap shadow-2xs">
-        <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span>Not Recorded</span>
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap shadow-2xs">
+        <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+        <span>Incomplete</span>
       </span>
     );
   };
@@ -562,7 +562,7 @@ export default function StudentListPage() {
                 <SelectContent>
                   <SelectItem value="all">All Compliance Statuses</SelectItem>
                   <SelectItem value="compliant">Fully Compliant</SelectItem>
-                  <SelectItem value="missing">Documents Missing</SelectItem>
+                  <SelectItem value="missing">Incomplete / Action Required</SelectItem>
                   <SelectItem value="warning">Expiring Soon (30 Days)</SelectItem>
                   <SelectItem value="critical">Expired / Non-Compliant</SelectItem>
                 </SelectContent>

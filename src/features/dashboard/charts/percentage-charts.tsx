@@ -224,7 +224,19 @@ interface ComplianceBreakdownProps {
 }
 
 // Status mapping with standardized labels and descriptions
-const COMPLIANCE_STATUS_ORDER = ["FULLY COMPLIANT", "COMPLIANT", "EXPIRING SOON (30 DAYS)", "WARNING", "CRITICAL EXPIRES (15 DAYS)", "CRITICAL", "EXPIRED DOCUMENTS", "EXPIRED"];
+const COMPLIANCE_STATUS_ORDER = [
+  "FULLY COMPLIANT",
+  "COMPLIANT",
+  "EXPIRING SOON (30 DAYS)",
+  "WARNING",
+  "CRITICAL EXPIRES (15 DAYS)",
+  "CRITICAL",
+  "EXPIRED DOCUMENTS",
+  "EXPIRED",
+  "INCOMPLETE / ACTION REQUIRED",
+  "ACTION REQUIRED",
+  "INCOMPLETE"
+];
 
 export function ComplianceDistributionBreakdown({
   data,
@@ -255,6 +267,9 @@ export function ComplianceDistributionBreakdown({
     const upper = name.toUpperCase();
     if (upper.includes("COMPLIANT")) {
       return { bar: "bg-emerald-500", dot: "bg-emerald-500", badge: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20" };
+    }
+    if (upper.includes("INCOMPLETE") || upper.includes("ACTION REQUIRED")) {
+      return { bar: "bg-amber-500", dot: "bg-amber-500", badge: "text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/25" };
     }
     if (upper.includes("WARNING")) {
       return { bar: "bg-amber-500", dot: "bg-amber-500", badge: "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20" };

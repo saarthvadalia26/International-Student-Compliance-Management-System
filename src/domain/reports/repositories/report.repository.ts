@@ -188,14 +188,20 @@ export class SupabaseReportRepository implements IReportRepository {
       const vDays = calcDays(s.visa_expiry);
       const eDays = calcDays(s.efrro_expiry);
 
+      const pNum = (s.passport_number || "").trim();
+      const vNum = (s.visa_number || "").trim();
+      const eNum = (s.efrro_number || "").trim();
+
+      const pHasValidData = Boolean(pNum && s.passport_expiry && pDays !== null);
+      const vHasValidData = Boolean(vNum && s.visa_expiry && vDays !== null);
+      const eHasValidData = Boolean(eNum && s.efrro_expiry && eDays !== null);
+
       let sHasExpired = false;
       let sHasCritical = false;
       let sHas30 = false;
-      let hasValidDoc = false;
 
       // Passport evaluation
       if (pDays !== null) {
-        hasValidDoc = true;
         if (pDays < 0) {
           sHasExpired = true;
           expiredDocs++;
@@ -218,7 +224,6 @@ export class SupabaseReportRepository implements IReportRepository {
 
       // Visa evaluation
       if (vDays !== null) {
-        hasValidDoc = true;
         if (vDays < 0) {
           sHasExpired = true;
           expiredDocs++;
@@ -241,7 +246,6 @@ export class SupabaseReportRepository implements IReportRepository {
 
       // eFRRO evaluation
       if (eDays !== null) {
-        hasValidDoc = true;
         if (eDays < 0) {
           sHasExpired = true;
           expiredDocs++;
@@ -266,8 +270,14 @@ export class SupabaseReportRepository implements IReportRepository {
       if (sHasCritical) studentCritical15Count++;
       if (sHas30) studentExpiring30Count++;
 
-      // Fully compliant: student has at least one recorded valid document and no expired, critical, or warning issues
-      if (hasValidDoc && !sHasExpired && !sHas30) {
+      // Fully compliant: POSITIVE COMPLIANCE. All 3 required documents (Passport, Visa, eFRRO)
+      // must be positively present, valid, and have > 30 days remaining.
+      // Absence of compliance data must never be interpreted as proof of compliance.
+      const isFullyCompliant = 
+        pHasValidData && vHasValidData && eHasValidData &&
+        !sHasExpired && !sHas30;
+
+      if (isFullyCompliant) {
         fullyCompliantCount++;
       }
     });

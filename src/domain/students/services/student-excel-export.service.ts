@@ -19,6 +19,7 @@ import {
 } from "../utils/student-filter.util";
 import type { User } from "@supabase/supabase-js";
 import { requireAdministrator } from "@/lib/auth/permissions";
+import { ComplianceCalculator } from "@/domain/compliance/services/compliance-calculator";
 
 interface DatabaseVersionRow {
   id?: string;
@@ -102,8 +103,9 @@ export class StudentExcelExportService {
    * Helper: Formats compliance status string.
    */
   private static formatComplianceStatus(status?: string | null): string {
-    if (!status) return "COMPLIANT";
+    if (!status) return "INCOMPLETE";
     const upper = status.toUpperCase().trim();
+    if (upper === "MISSING") return "INCOMPLETE";
     return upper;
   }
 
@@ -258,12 +260,9 @@ export class StudentExcelExportService {
         ? schoolsMap.get(academic.override_school_id.toLowerCase())!
         : progInfo.school;
 
-      // Map raw compliance status to UI badge enum
-      let mappedCompliance = "compliant";
-      const rawStatus = (snapshot?.compliance_status || "").toUpperCase();
-      if (rawStatus === "WARNING" || rawStatus === "PENDING_VERIFICATION") mappedCompliance = "warning";
-      else if (rawStatus === "EXPIRED") mappedCompliance = "expired";
-      else if (rawStatus === "MISSING" || rawStatus === "REJECTED") mappedCompliance = "non_compliant";
+      // Map raw compliance status to UI badge enum using authoritative ComplianceCalculator
+      const rawStatus = (snapshot?.compliance_status || "MISSING").toUpperCase();
+      const mappedCompliance = ComplianceCalculator.mapComplianceToBadge(rawStatus);
 
       const passportNumber = activePassport?.document_number || snapshot?.passport_number || "";
       const visaNumber = activeVisa?.document_number || snapshot?.visa_number || "";
