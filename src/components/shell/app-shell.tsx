@@ -69,8 +69,8 @@ export function AppShell({ children }: AppShellProps) {
         {/* Header + Content Container */}
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header onMenuOpen={() => setIsMobileSidebarOpen(true)} />
-          <main className="flex-1 overflow-y-auto bg-muted/20 p-4 md:p-6 transition-all duration-200">
-            <div className="max-w-[1600px] w-full mx-auto">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/20 p-4 md:p-6 transition-all duration-200">
+            <div className="max-w-[1600px] w-full mx-auto min-w-0">
               {children}
             </div>
           </main>

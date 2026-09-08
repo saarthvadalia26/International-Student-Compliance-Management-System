@@ -62,11 +62,11 @@ export function DashboardCharts({ chartsData: initialChartsData }: DashboardChar
   }, [chartsData.notificationSuccessRate]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 min-w-0 max-w-full">
       {/* -------------------------------------------------------------------------
           SECTION 1: Core Institutional Compliance & Dispatch Health
           ------------------------------------------------------------------------- */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 min-w-0">
         <ChartWrapper
           title="Overall Document Compliance Distribution"
           description="Verification status across active international student body"
@@ -111,7 +111,7 @@ export function DashboardCharts({ chartsData: initialChartsData }: DashboardChar
       {/* -------------------------------------------------------------------------
           SECTION 3: LEVEL 2 & 3 — Demographic & Regional Analytics (Chart + Table)
           ------------------------------------------------------------------------- */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 min-w-0">
         <CompleteDistributionAnalyticsCard
           title="International Students by Country of Origin"
           description="Ranked percentage share, sovereign nations, and student counts by nationality"
@@ -142,7 +142,7 @@ export function DashboardCharts({ chartsData: initialChartsData }: DashboardChar
       {/* -------------------------------------------------------------------------
           SECTION 4: LEVEL 2 & 3 — Academic Program & Faculty Distribution (Chart + Table)
           ------------------------------------------------------------------------- */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 min-w-0">
         <CompleteDistributionAnalyticsCard
           title="Student Enrollment by Academic School"
           description={`Distribution of international enrollments across ${Branding.shortName} academic faculties`}
@@ -182,7 +182,7 @@ export function DashboardCharts({ chartsData: initialChartsData }: DashboardChar
       {/* -------------------------------------------------------------------------
           SECTION 6: Operational Timelines (Upcoming Expiries & Admissions)
           ------------------------------------------------------------------------- */}
-      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 min-w-0">
         <ChartWrapper
           title="Upcoming eFRRO Expiry Timeline"
           description="Monthly distribution and concentration of permits requiring renewal"

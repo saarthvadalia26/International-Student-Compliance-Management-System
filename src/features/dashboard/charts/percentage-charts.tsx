@@ -561,19 +561,19 @@ export function AnalyticsExecutiveSummaryStrip({
   ];
 
   return (
-    <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3", className)}>
+    <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 min-w-0 max-w-full", className)}>
       {items.map((item, idx) => {
         const Icon = item.icon;
         return (
           <div
             key={idx}
-            className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:shadow-md hover:border-border"
+            className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:shadow-md hover:border-border min-w-0 overflow-hidden"
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="flex items-center justify-between gap-1.5 min-w-0">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
                 {item.title}
               </span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40 shrink-0 whitespace-nowrap">
                 {item.badge}
               </span>
             </div>
@@ -581,7 +581,7 @@ export function AnalyticsExecutiveSummaryStrip({
               <div className="text-2xl font-bold font-mono tracking-tight text-foreground">
                 {item.value}
               </div>
-              <div className="p-2 rounded-lg bg-muted/50 text-muted-foreground">
+              <div className="p-2 rounded-lg bg-muted/50 text-muted-foreground shrink-0">
                 <Icon className="h-4 w-4" />
               </div>
             </div>
@@ -665,31 +665,31 @@ export function CompleteDistributionAnalyticsCard({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md",
+        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md min-w-0 max-w-full overflow-hidden",
         className
       )}
     >
       {/* Title & Metadata Badges */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-3 border-b border-border/40">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-border/40">
+        <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+        <div className="flex items-center flex-wrap gap-1.5 shrink-0">
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40 whitespace-nowrap">
             {totalInDataset.toLocaleString()} Total {unit}
           </span>
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40 whitespace-nowrap">
             {data.length} {distinctCountLabel}
           </span>
         </div>
       </div>
 
-      {/* Toolbar: Search, Sort, View Toggle */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 py-3">
+      {/* Toolbar: Full-width Search on Row 1, Controls on Row 2 */}
+      <div className="flex flex-col gap-2.5 py-3">
         {/* Search Input */}
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <div className="relative w-full min-w-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
@@ -699,8 +699,9 @@ export function CompleteDistributionAnalyticsCard({
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"
               title="Clear search"
             >
               <X className="h-3 w-3" />
@@ -708,13 +709,13 @@ export function CompleteDistributionAnalyticsCard({
           )}
         </div>
 
-        {/* Sort & Mode Toggles */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="relative flex items-center">
+        {/* Controls Row: Sort on left, Mode Toggle on right */}
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="h-8 text-xs rounded-md border border-border/60 bg-background/50 text-foreground px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+              className="h-7 text-xs rounded-md border border-border/60 bg-background/50 text-foreground px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
             >
               <option value="count_desc">Highest Count (Desc)</option>
               <option value="count_asc">Lowest Count (Asc)</option>
@@ -723,14 +724,14 @@ export function CompleteDistributionAnalyticsCard({
             </select>
           </div>
 
-          <div className="flex items-center rounded-md border border-border/60 p-0.5 bg-muted/30">
+          <div className="flex items-center rounded-md border border-border/60 p-0.5 bg-muted/30 shrink-0">
             <button
               type="button"
               onClick={() => setViewMode("chart")}
               className={cn(
                 "flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded transition-all",
                 viewMode === "chart"
-                  ? "bg-background text-foreground shadow-xs"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
               title="View visual distribution chart"
@@ -744,7 +745,7 @@ export function CompleteDistributionAnalyticsCard({
               className={cn(
                 "flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded transition-all",
                 viewMode === "table"
-                  ? "bg-background text-foreground shadow-xs"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
               title="View complete data table"
@@ -757,7 +758,7 @@ export function CompleteDistributionAnalyticsCard({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-[220px]">
+      <div className="flex-1 min-h-[220px] min-w-0">
         {data.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
             <Inbox className="h-7 w-7 stroke-[1.5]" />
@@ -776,43 +777,43 @@ export function CompleteDistributionAnalyticsCard({
           </div>
         ) : viewMode === "chart" ? (
           /* Visual Chart View: Scrollable list of 100% complete items */
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             {/* Context bar */}
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground pb-1 font-medium">
-              <span>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground pb-1 font-medium min-w-0">
+              <span className="truncate mr-2">
                 Displaying {sortedData.length} of {data.length} {distinctCountLabel.toLowerCase()}
                 {searchQuery && ` (filtered: ${filteredTotal} ${unit} · ${filteredPercentage})`}
               </span>
-              <span>100% Cohort Distribution</span>
+              <span className="shrink-0 whitespace-nowrap">100% Cohort</span>
             </div>
 
-            <div className="max-h-[380px] overflow-y-auto pr-1.5 space-y-2.5 custom-scrollbar">
+            <div className="max-h-[380px] overflow-y-auto overflow-x-hidden pr-1.5 space-y-2.5 custom-scrollbar">
               {sortedData.map((item, idx) => {
                 const pctNumber = totalInDataset > 0 ? (item.value / totalInDataset) * 100 : 0;
                 const pctFormatted = calculatePercentage(item.value, totalInDataset, 1);
 
                 return (
-                  <div key={idx} className="space-y-1 group">
-                    <div className="flex items-center justify-between text-xs gap-2">
+                  <div key={idx} className="space-y-1.5 group min-w-0">
+                    <div className="flex items-center justify-between text-xs gap-2 min-w-0">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="text-[11px] font-mono font-medium text-muted-foreground/80 w-5 shrink-0">
                           #{idx + 1}
                         </span>
-                        <span className="font-medium text-foreground break-words leading-tight" title={item.name}>
+                        <span className="font-medium text-foreground truncate" title={item.name}>
                           {item.name}
                         </span>
                         {(item.secondaryLabel || item.code) && (
-                          <span className="text-[10px] text-muted-foreground font-mono shrink-0 px-1.5 py-0.2 rounded bg-muted/40 border border-border/30">
+                          <span className="text-[10px] text-muted-foreground font-mono shrink-0 px-1.5 py-0.5 rounded bg-muted/40 border border-border/30 whitespace-nowrap">
                             {item.secondaryLabel || item.code}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0 text-right">
-                        <span className="text-xs font-semibold text-foreground font-mono">
+                      <div className="flex items-center gap-1.5 shrink-0 text-right font-mono">
+                        <span className="text-xs font-semibold text-foreground">
                           {pctFormatted}
                         </span>
-                        <span className="text-[11px] text-muted-foreground font-sans">
+                        <span className="text-[11px] text-muted-foreground font-sans whitespace-nowrap">
                           ({item.value.toLocaleString()} {unit})
                         </span>
                       </div>
@@ -836,25 +837,25 @@ export function CompleteDistributionAnalyticsCard({
           </div>
         ) : (
           /* Data Table View: Complete, accessible tabular representation */
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground pb-1 font-medium">
-              <span>
+          <div className="space-y-2 min-w-0">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground pb-1 font-medium min-w-0">
+              <span className="truncate mr-2">
                 Showing {sortedData.length} of {data.length} records
                 {searchQuery && ` (filtered: ${filteredTotal} ${unit} · ${filteredPercentage})`}
               </span>
-              <span>Reconciled to {totalInDataset.toLocaleString()} Total {unit}</span>
+              <span className="shrink-0 whitespace-nowrap">Reconciled to {totalInDataset.toLocaleString()} Total</span>
             </div>
 
-            <div className="max-h-[380px] overflow-y-auto border border-border/40 rounded-lg">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-muted/40 sticky top-0 border-b border-border/40 text-muted-foreground font-medium">
+            <div className="max-h-[380px] overflow-auto border border-border/40 rounded-lg">
+              <table className="w-full min-w-[500px] text-left text-xs border-collapse">
+                <thead className="bg-muted/40 sticky top-0 z-10 border-b border-border/40 text-muted-foreground font-medium">
                   <tr>
-                    <th className="py-2 px-3 w-12 text-center font-mono">#</th>
+                    <th className="py-2 px-3 w-10 text-center font-mono">#</th>
                     <th className="py-2 px-3">{categoryColumnHeader}</th>
-                    <th className="py-2 px-3 w-32">{secondaryColumnHeader}</th>
-                    <th className="py-2 px-3 w-28 text-right">Students</th>
-                    <th className="py-2 px-3 w-24 text-right">Share (%)</th>
-                    <th className="py-2 px-3 w-28 hidden sm:table-cell">Distribution</th>
+                    <th className="py-2 px-3 w-28">{secondaryColumnHeader}</th>
+                    <th className="py-2 px-3 w-24 text-right">Students</th>
+                    <th className="py-2 px-3 w-20 text-right">Share (%)</th>
+                    <th className="py-2 px-3 w-28 hidden md:table-cell">Distribution</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/20">
@@ -868,18 +869,20 @@ export function CompleteDistributionAnalyticsCard({
                           {idx + 1}
                         </td>
                         <td className="py-2 px-3 font-medium text-foreground">
-                          {item.name}
+                          <span className="truncate block max-w-[200px]" title={item.name}>
+                            {item.name}
+                          </span>
                         </td>
-                        <td className="py-2 px-3 text-muted-foreground font-mono text-[11px]">
+                        <td className="py-2 px-3 text-muted-foreground font-mono text-[11px] whitespace-nowrap">
                           {item.secondaryLabel || item.code || "—"}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono font-semibold text-foreground">
+                        <td className="py-2 px-3 text-right font-mono font-semibold text-foreground whitespace-nowrap">
                           {item.value.toLocaleString()}
                         </td>
-                        <td className="py-2 px-3 text-right font-mono font-medium text-foreground">
+                        <td className="py-2 px-3 text-right font-mono font-medium text-foreground whitespace-nowrap">
                           {pctFormatted}
                         </td>
-                        <td className="py-2 px-3 hidden sm:table-cell">
+                        <td className="py-2 px-3 hidden md:table-cell">
                           <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
                             <div
                               className="h-full bg-foreground/80 rounded-full"
@@ -891,18 +894,18 @@ export function CompleteDistributionAnalyticsCard({
                     );
                   })}
                 </tbody>
-                <tfoot className="bg-muted/50 border-t border-border/60 font-semibold text-foreground sticky bottom-0">
+                <tfoot className="bg-muted/50 border-t border-border/60 font-semibold text-foreground sticky bottom-0 z-10">
                   <tr>
                     <td colSpan={3} className="py-2.5 px-3">
                       Total Represented ({sortedData.length} categories)
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono">
+                    <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                       {filteredTotal.toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono">
+                    <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                       {filteredPercentage}
                     </td>
-                    <td className="py-2.5 px-3 hidden sm:table-cell">
+                    <td className="py-2.5 px-3 hidden md:table-cell">
                       <div className="h-1.5 w-full bg-foreground rounded-full" />
                     </td>
                   </tr>
@@ -1037,13 +1040,13 @@ export function AcademicHierarchyCard({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md",
+        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md min-w-0 max-w-full overflow-hidden",
         className
       )}
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-3 border-b border-border/40">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-border/40">
+        <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold tracking-tight text-foreground">
             Course-Level Academic Hierarchy & Enrollment Distribution
           </h3>
@@ -1051,20 +1054,20 @@ export function AcademicHierarchyCard({
             Institutional structural breakdown: Academic School → Degree Level → Canonical Course
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+        <div className="flex items-center flex-wrap gap-1.5 shrink-0">
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40 whitespace-nowrap">
             {totalInDataset.toLocaleString()} Total Students
           </span>
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40 whitespace-nowrap">
             {schools.length} Schools
           </span>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 py-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 py-3 min-w-0">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
@@ -1074,8 +1077,9 @@ export function AcademicHierarchyCard({
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"
               title="Clear search"
             >
               <X className="h-3 w-3" />
@@ -1083,7 +1087,7 @@ export function AcademicHierarchyCard({
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center flex-wrap justify-between sm:justify-end gap-2 shrink-0">
           {viewMode === "tree" && (
             <div className="flex items-center gap-1">
               <button
@@ -1103,14 +1107,14 @@ export function AcademicHierarchyCard({
             </div>
           )}
 
-          <div className="flex items-center rounded-md border border-border/60 p-0.5 bg-muted/30">
+          <div className="flex items-center rounded-md border border-border/60 p-0.5 bg-muted/30 shrink-0">
             <button
               type="button"
               onClick={() => setViewMode("tree")}
               className={cn(
                 "flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded transition-all",
                 viewMode === "tree"
-                  ? "bg-background text-foreground shadow-xs"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
               title="View hierarchical tree structure"
@@ -1124,7 +1128,7 @@ export function AcademicHierarchyCard({
               className={cn(
                 "flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded transition-all",
                 viewMode === "matrix"
-                  ? "bg-background text-foreground shadow-xs"
+                  ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
               title="View tabular course matrix"
@@ -1137,7 +1141,7 @@ export function AcademicHierarchyCard({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-h-[250px]">
+      <div className="flex-1 min-h-[250px] min-w-0">
         {schools.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
             <Inbox className="h-7 w-7 stroke-[1.5]" />
@@ -1156,7 +1160,7 @@ export function AcademicHierarchyCard({
           </div>
         ) : viewMode === "tree" ? (
           /* Tree View */
-          <div className="max-h-[460px] overflow-y-auto pr-1.5 space-y-3 custom-scrollbar">
+          <div className="max-h-[460px] overflow-y-auto overflow-x-hidden pr-1.5 space-y-3 custom-scrollbar">
             {filteredSchools.map((school, sIdx) => {
               const isExpanded = expandedSchools[school.schoolName] ?? true;
 
@@ -1170,7 +1174,7 @@ export function AcademicHierarchyCard({
                     onClick={() => toggleSchool(school.schoolName)}
                     className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/30 select-none transition-colors"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                       ) : (
@@ -1181,13 +1185,13 @@ export function AcademicHierarchyCard({
                         {school.schoolName}
                       </span>
                       {school.schoolCode && (
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border/40 shrink-0">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border/40 shrink-0 whitespace-nowrap">
                           {school.schoolCode}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="flex items-center gap-2.5 shrink-0 whitespace-nowrap">
                       <span className="text-xs font-mono font-bold text-foreground">
                         {school.percentageOfTotal.toFixed(1)}%
                       </span>
@@ -1203,14 +1207,14 @@ export function AcademicHierarchyCard({
                       {school.levels.map((levelNode, lIdx) => (
                         <div key={lIdx} className="space-y-1.5 pl-3 border-l-2 border-border/60">
                           {/* Level Sub-Header */}
-                          <div className="flex items-center justify-between text-xs py-1 text-muted-foreground font-medium">
-                            <div className="flex items-center gap-2">
-                              <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-foreground font-semibold">{levelNode.level}</span>
+                          <div className="flex items-center justify-between text-xs py-1 text-muted-foreground font-medium min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                              <GraduationCap className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              <span className="text-foreground font-semibold truncate">{levelNode.level}</span>
                             </div>
-                            <div className="flex items-center gap-2 font-mono text-[11px]">
+                            <div className="flex items-center gap-2 font-mono text-[11px] shrink-0 whitespace-nowrap">
                               <span>{levelNode.studentCount} students</span>
-                              <span className="text-muted-foreground/70">
+                              <span className="text-muted-foreground/70 hidden sm:inline">
                                 ({levelNode.percentageOfSchool.toFixed(1)}% of school)
                               </span>
                             </div>
@@ -1221,27 +1225,30 @@ export function AcademicHierarchyCard({
                             {levelNode.courses.map((course, cIdx) => (
                               <div
                                 key={cIdx}
-                                className="p-2 rounded bg-card/60 border border-border/30 hover:border-border/60 transition-all space-y-1"
+                                className="p-2 rounded bg-card/60 border border-border/30 hover:border-border/60 transition-all space-y-1 min-w-0"
                               >
-                                <div className="flex items-center justify-between text-xs gap-2">
+                                <div className="flex items-center justify-between text-xs gap-2 min-w-0">
                                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                     <span className="h-1.5 w-1.5 rounded-full bg-foreground/60 shrink-0" />
                                     <span className="font-medium text-foreground truncate" title={course.name}>
                                       {course.name}
                                     </span>
                                     {course.code && (
-                                      <span className="text-[10px] font-mono text-muted-foreground shrink-0 px-1 rounded bg-muted/40">
+                                      <span className="text-[10px] font-mono text-muted-foreground shrink-0 px-1 rounded bg-muted/40 whitespace-nowrap">
                                         {course.code}
                                       </span>
                                     )}
                                   </div>
 
                                   <div className="flex items-center gap-2 shrink-0 font-mono text-right">
-                                    <span className="font-semibold text-foreground">
+                                    <span className="font-semibold text-foreground whitespace-nowrap">
                                       {course.studentCount} std
                                     </span>
-                                    <span className="text-[10px] text-muted-foreground">
+                                    <span className="text-[10px] text-muted-foreground hidden sm:inline whitespace-nowrap">
                                       ({course.percentageOfSchool.toFixed(1)}% school · {course.percentageOfTotal.toFixed(1)}% total)
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground sm:hidden whitespace-nowrap">
+                                      ({course.percentageOfTotal.toFixed(1)}%)
                                     </span>
                                   </div>
                                 </div>
@@ -1265,10 +1272,10 @@ export function AcademicHierarchyCard({
           </div>
         ) : (
           /* Tabular Matrix View */
-          <div className="space-y-2">
-            <div className="max-h-[460px] overflow-y-auto border border-border/40 rounded-lg">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-muted/40 sticky top-0 border-b border-border/40 text-muted-foreground font-medium">
+          <div className="space-y-2 min-w-0">
+            <div className="max-h-[460px] overflow-auto border border-border/40 rounded-lg">
+              <table className="w-full min-w-[640px] text-left text-xs border-collapse">
+                <thead className="bg-muted/40 sticky top-0 z-10 border-b border-border/40 text-muted-foreground font-medium">
                   <tr>
                     <th className="py-2 px-3">School / Faculty</th>
                     <th className="py-2 px-3 w-36">Degree Level</th>
@@ -1282,43 +1289,45 @@ export function AcademicHierarchyCard({
                   {flattenedCourses.map((row, idx) => (
                     <tr key={idx} className="hover:bg-muted/30 transition-colors">
                       <td className="py-2 px-3 font-medium text-foreground">
-                        {row.schoolName}
+                        <span className="truncate block max-w-[200px]" title={row.schoolName}>
+                          {row.schoolName}
+                        </span>
                       </td>
-                      <td className="py-2 px-3 text-muted-foreground font-mono text-[11px]">
+                      <td className="py-2 px-3 text-muted-foreground font-mono text-[11px] whitespace-nowrap">
                         {row.level}
                       </td>
                       <td className="py-2 px-3 text-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <span>{row.courseName}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="truncate" title={row.courseName}>{row.courseName}</span>
                           {row.courseCode && (
-                            <span className="text-[10px] font-mono text-muted-foreground px-1 rounded bg-muted/40">
+                            <span className="text-[10px] font-mono text-muted-foreground px-1 rounded bg-muted/40 shrink-0 whitespace-nowrap">
                               {row.courseCode}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-2 px-3 text-right font-mono font-semibold text-foreground">
+                      <td className="py-2 px-3 text-right font-mono font-semibold text-foreground whitespace-nowrap">
                         {row.studentCount}
                       </td>
-                      <td className="py-2 px-3 text-right font-mono text-muted-foreground">
+                      <td className="py-2 px-3 text-right font-mono text-muted-foreground whitespace-nowrap">
                         {row.percentageOfSchool.toFixed(1)}%
                       </td>
-                      <td className="py-2 px-3 text-right font-mono font-medium text-foreground">
+                      <td className="py-2 px-3 text-right font-mono font-medium text-foreground whitespace-nowrap">
                         {row.percentageOfTotal.toFixed(1)}%
                       </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-muted/50 border-t border-border/60 font-semibold text-foreground sticky bottom-0">
+                <tfoot className="bg-muted/50 border-t border-border/60 font-semibold text-foreground sticky bottom-0 z-10">
                   <tr>
                     <td colSpan={3} className="py-2.5 px-3">
                       Total Represented ({flattenedCourses.length} courses)
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono">
+                    <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                       {totalFilteredStudents}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono">—</td>
-                    <td className="py-2.5 px-3 text-right font-mono">
+                    <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">—</td>
+                    <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                       {calculatePercentage(totalFilteredStudents, totalInDataset, 1)}
                     </td>
                   </tr>

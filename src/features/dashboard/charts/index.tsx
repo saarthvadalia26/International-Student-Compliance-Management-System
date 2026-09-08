@@ -66,7 +66,7 @@ export function ChartWrapper({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md",
+        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md min-w-0 max-w-full overflow-hidden",
         className
       )}
       {...props}

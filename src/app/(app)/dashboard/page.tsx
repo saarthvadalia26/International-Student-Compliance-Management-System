@@ -41,7 +41,7 @@ function ChartsSkeleton() {
 
 export default function DashboardPage() {
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in min-w-0 max-w-full">
       {/* Event-driven Realtime listener for dynamic metrics updates without full page reloads */}
       <RealtimeDashboardListener />
 
