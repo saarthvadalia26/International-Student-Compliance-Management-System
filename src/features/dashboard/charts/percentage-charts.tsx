@@ -57,6 +57,12 @@ export interface AcademicHierarchySchoolNode {
   levels: AcademicHierarchyLevelNode[];
 }
 
+export interface UpcomingExpiryByDocTypeData {
+  passport: { critical15: number; expiring30: number; safe: number; expired: number };
+  visa: { critical15: number; expiring30: number; safe: number; expired: number };
+  efrro: { critical15: number; expiring30: number; safe: number; expired: number };
+}
+
 export interface DashboardChartsData {
   totalActiveStudents: number;
   distinctCountriesCount: number;
@@ -74,6 +80,7 @@ export interface DashboardChartsData {
 
   monthlyAdmissions: DataPoint[];
   efrroExpiryTimeline: DataPoint[];
+  upcomingExpiryByDocType?: UpcomingExpiryByDocTypeData;
   complianceDistribution: DataPoint[];
   notificationSuccessRate: DataPoint[];
 }
@@ -217,7 +224,7 @@ interface ComplianceBreakdownProps {
 }
 
 // Status mapping with standardized labels and descriptions
-const COMPLIANCE_STATUS_ORDER = ["COMPLIANT", "WARNING", "CRITICAL", "EXPIRED", "PENDING_REVIEW", "INCOMPLETE", "MISSING"];
+const COMPLIANCE_STATUS_ORDER = ["FULLY COMPLIANT", "COMPLIANT", "EXPIRING SOON (30 DAYS)", "WARNING", "CRITICAL EXPIRES (15 DAYS)", "CRITICAL", "EXPIRED DOCUMENTS", "EXPIRED"];
 
 export function ComplianceDistributionBreakdown({
   data,
@@ -1448,3 +1455,142 @@ export function AcademicHierarchyCard({
     </div>
   );
 }
+
+// ============================================================================
+// 8. Upcoming Expiry by Document Type Visualization
+// ============================================================================
+interface UpcomingExpiryByDocTypeCardProps {
+  data?: UpcomingExpiryByDocTypeData;
+  emptyMessage?: string;
+}
+
+export function UpcomingExpiryByDocTypeCard({
+  data,
+  emptyMessage = "No upcoming document expiries recorded"
+}: UpcomingExpiryByDocTypeCardProps) {
+  const docConfigs = [
+    {
+      key: "passport" as const,
+      label: "Passport",
+      badgeClass: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30",
+      accentBorder: "border-l-blue-500",
+      stats: data?.passport || { critical15: 0, expiring30: 0, safe: 0, expired: 0 }
+    },
+    {
+      key: "visa" as const,
+      label: "Entry Visa",
+      badgeClass: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30",
+      accentBorder: "border-l-purple-500",
+      stats: data?.visa || { critical15: 0, expiring30: 0, safe: 0, expired: 0 }
+    },
+    {
+      key: "efrro" as const,
+      label: "eFRRO / Permit",
+      badgeClass: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+      accentBorder: "border-l-amber-500",
+      stats: data?.efrro || { critical15: 0, expiring30: 0, safe: 0, expired: 0 }
+    }
+  ];
+
+  const totalDocuments = docConfigs.reduce((sum, d) => {
+    return sum + d.stats.critical15 + d.stats.expiring30 + d.stats.safe + d.stats.expired;
+  }, 0);
+
+  if (totalDocuments === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/60 gap-2">
+        <Inbox className="h-7 w-7 stroke-[1.5]" />
+        <span className="text-xs">{emptyMessage}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3.5 w-full">
+      {docConfigs.map((doc) => {
+        const totalForDoc = doc.stats.critical15 + doc.stats.expiring30 + doc.stats.safe + doc.stats.expired;
+        const upcoming30Only = Math.max(0, doc.stats.expiring30 - doc.stats.critical15);
+        const critPct = totalForDoc > 0 ? (doc.stats.critical15 / totalForDoc) * 100 : 0;
+        const warnPct = totalForDoc > 0 ? (upcoming30Only / totalForDoc) * 100 : 0;
+        const safePct = totalForDoc > 0 ? (doc.stats.safe / totalForDoc) * 100 : 0;
+        const expPct = totalForDoc > 0 ? (doc.stats.expired / totalForDoc) * 100 : 0;
+
+        return (
+          <div
+            key={doc.key}
+            className={cn(
+              "p-3.5 rounded-lg border border-border/50 bg-card/60 hover:bg-card transition-all border-l-4 space-y-2.5 shadow-xs",
+              doc.accentBorder
+            )}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border", doc.badgeClass)}>
+                  {doc.label}
+                </span>
+                <span className="text-xs text-muted-foreground font-mono">
+                  {totalForDoc.toLocaleString()} managed
+                </span>
+              </div>
+
+              {/* Status Pills */}
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium">
+                {doc.stats.critical15 > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 font-semibold">
+                    {doc.stats.critical15} critical (0–15d)
+                  </span>
+                )}
+                {upcoming30Only > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                    {upcoming30Only} upcoming (16–30d)
+                  </span>
+                )}
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                  {doc.stats.safe} valid (31+d)
+                </span>
+                {doc.stats.expired > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold">
+                    {doc.stats.expired} expired
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Proportional Segmented Progress Bar */}
+            <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden flex gap-0.5">
+              {doc.stats.expired > 0 && (
+                <div
+                  className="bg-rose-500 h-full rounded-full transition-all"
+                  style={{ width: `${expPct}%` }}
+                  title={`Expired: ${doc.stats.expired}`}
+                />
+              )}
+              {doc.stats.critical15 > 0 && (
+                <div
+                  className="bg-orange-500 h-full rounded-full transition-all"
+                  style={{ width: `${critPct}%` }}
+                  title={`Critical (0-15d): ${doc.stats.critical15}`}
+                />
+              )}
+              {upcoming30Only > 0 && (
+                <div
+                  className="bg-amber-500 h-full rounded-full transition-all"
+                  style={{ width: `${warnPct}%` }}
+                  title={`Upcoming (16-30d): ${upcoming30Only}`}
+                />
+              )}
+              {doc.stats.safe > 0 && (
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all"
+                  style={{ width: `${safePct}%` }}
+                  title={`Valid (31+d): ${doc.stats.safe}`}
+                />
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+

@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ACADEMIC_LEVEL_OPTIONS, normalizeAcademicLevel } from "@/domain/academic-programs/academic-level";
 import { matchStudentFilters, StudentExportFilterCriteria } from "@/domain/students/utils/student-filter.util";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 import { useUserRole } from "@/hooks/use-user-role";
 import { getStudentsListAction, exportStudentsExcelAction, StudentListItem } from "@/app/(app)/students/actions";
@@ -62,9 +62,21 @@ function formatDateDisplay(d?: string | null): string {
 
 export default function StudentListPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAdministrator } = useUserRole();
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [complianceFilter, setComplianceFilter] = React.useState<string>("all");
+
+  const initialCompliance = (searchParams.get("compliance") || searchParams.get("status") || "all").toLowerCase();
+  const [complianceFilter, setComplianceFilter] = React.useState<string>(
+    ["compliant", "warning", "critical", "expired", "missing"].includes(initialCompliance) ? initialCompliance : "all"
+  );
+
+  React.useEffect(() => {
+    const p = (searchParams.get("compliance") || searchParams.get("status") || "").toLowerCase();
+    if (p && ["compliant", "warning", "critical", "expired", "missing"].includes(p)) {
+      setComplianceFilter(p);
+    }
+  }, [searchParams]);
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
   const [academicLevelFilter, setAcademicLevelFilter] = React.useState<string>("all");
   const [campusFilter, setCampusFilter] = React.useState<string>("all");

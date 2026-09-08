@@ -29,6 +29,12 @@ export async function fetchDashboardMetrics(): Promise<DashboardMetrics> {
   return getCachedDashboardMetrics();
 }
 
+export async function fetchDashboardDrilldownAction(
+  category: import("@/domain/reports/types").ComplianceDrilldownCategory
+): Promise<import("@/domain/reports/types").ComplianceDrilldownResponse> {
+  return reportRepo.getDashboardDrilldown(category);
+}
+
 // =====================================================================
 // Cached Analytics Charts (revalidates every 60 seconds)
 // =====================================================================
@@ -118,10 +124,10 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
         }
         return res;
       }),
-    // 2. Group by compliance and efrro expiry (active, non-deleted students only)
+    // 2. Group by compliance and document expiries (active, non-deleted students only)
     supabase
       .from("student_snapshot")
-      .select("compliance_status, efrro_expiry, efrro_status, students!inner(id, status, deleted_at)")
+      .select("compliance_status, passport_expiry, visa_expiry, efrro_expiry, passport_status, visa_status, efrro_status, students!inner(id, status, deleted_at)")
       .is("students.deleted_at", null)
       .eq("students.status", "active"),
     // 3. Group by notification statuses
@@ -477,28 +483,80 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
     activeStudents.map(row => ({ created_at: row.created_at }))
   );
 
-  // eFRRO Expiry Timeline
-  const efrroExpiryTimeline = aggregateEfrroExpiryTimeline(
-    (snapshotRes.data || []).map(row => ({ efrro_expiry: row.efrro_expiry, efrro_status: row.efrro_status }))
-  );
+  // Authoritative date reference
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayTime = today.getTime();
 
-  // Compliance Distribution
-  const complianceStatusLabels: Record<string, string> = {
-    COMPLIANT: "Fully Compliant",
-    WARNING: "Expiring Soon (30 Days)",
-    CRITICAL: "Critical Expiry (15 Days)",
-    EXPIRED: "Expired Documents",
-    PENDING_REVIEW: "Pending Verification",
-    INCOMPLETE: "Incomplete Profile",
-    MISSING: "Documents Missing"
+  const calcDays = (expStr?: string | null): number | null => {
+    if (!expStr) return null;
+    const parts = parseDateOnlyString(String(expStr));
+    if (!parts) {
+      const d = new Date(expStr);
+      if (isNaN(d.getTime())) return null;
+      const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      return Math.round((target - todayTime) / (1000 * 60 * 60 * 24));
+    }
+    const target = new Date(parts.year, parts.month - 1, parts.day).getTime();
+    return Math.round((target - todayTime) / (1000 * 60 * 60 * 24));
   };
-  const complianceCounts: Record<string, number> = {};
-  (snapshotRes.data || []).forEach(row => {
-    const rawStatus = (row.compliance_status || "MISSING").toUpperCase();
-    const label = complianceStatusLabels[rawStatus] || rawStatus;
-    complianceCounts[label] = (complianceCounts[label] || 0) + 1;
+
+  // Unified Upcoming Expiry by Document Type
+  const upcomingExpiryByDocType = {
+    passport: { critical15: 0, expiring30: 0, safe: 0, expired: 0 },
+    visa: { critical15: 0, expiring30: 0, safe: 0, expired: 0 },
+    efrro: { critical15: 0, expiring30: 0, safe: 0, expired: 0 }
+  };
+
+  const complianceCategoryCounts: Record<string, number> = {
+    "Fully Compliant": 0,
+    "Expiring Soon (30 Days)": 0,
+    "Critical Expiry (15 Days)": 0,
+    "Expired Documents": 0
+  };
+
+  (snapshotRes.data || []).forEach((row: any) => {
+    const pDays = calcDays(row.passport_expiry);
+    const vDays = calcDays(row.visa_expiry);
+    const eDays = calcDays(row.efrro_expiry);
+
+    // Document breakdown
+    const evalDoc = (days: number | null, key: "passport" | "visa" | "efrro") => {
+      if (days === null) return;
+      if (days < 0) upcomingExpiryByDocType[key].expired++;
+      else if (days <= 15) upcomingExpiryByDocType[key].critical15++;
+      else if (days <= 30) upcomingExpiryByDocType[key].expiring30++;
+      else upcomingExpiryByDocType[key].safe++;
+    };
+
+    evalDoc(pDays, "passport");
+    evalDoc(vDays, "visa");
+    evalDoc(eDays, "efrro");
+
+    // Student compliance status categorization
+    const sHasExpired = (pDays !== null && pDays < 0) || (vDays !== null && vDays < 0) || (eDays !== null && eDays < 0);
+    const sHasCritical = (pDays !== null && pDays >= 0 && pDays <= 15) || (vDays !== null && vDays >= 0 && vDays <= 15) || (eDays !== null && eDays >= 0 && eDays <= 15);
+    const sHasWarning = (pDays !== null && pDays > 15 && pDays <= 30) || (vDays !== null && vDays > 15 && vDays <= 30) || (eDays !== null && eDays > 15 && eDays <= 30);
+
+    if (sHasExpired) {
+      complianceCategoryCounts["Expired Documents"]++;
+    } else if (sHasCritical) {
+      complianceCategoryCounts["Critical Expiry (15 Days)"]++;
+    } else if (sHasWarning) {
+      complianceCategoryCounts["Expiring Soon (30 Days)"]++;
+    } else {
+      complianceCategoryCounts["Fully Compliant"]++;
+    }
   });
-  const complianceDistribution = Object.entries(complianceCounts).map(([name, value]) => ({ name, value }));
+
+  const complianceDistribution = Object.entries(complianceCategoryCounts)
+    .filter(([, value]) => value > 0)
+    .map(([name, value]) => ({ name, value }));
+
+  // eFRRO Expiry Timeline (preserved for timeline view)
+  const efrroExpiryTimeline = aggregateEfrroExpiryTimeline(
+    (snapshotRes.data || []).map(row => ({ efrro_expiry: (row as any).efrro_expiry, efrro_status: (row as any).efrro_status }))
+  );
 
   // Notification Success Rate
   let sent = 0;
@@ -529,6 +587,7 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
 
     monthlyAdmissions,
     efrroExpiryTimeline,
+    upcomingExpiryByDocType,
     complianceDistribution,
     notificationSuccessRate
   };

@@ -373,9 +373,9 @@ export class SupabaseStudentRepository implements IStudentRepository {
       let overallCompliance = "COMPLIANT";
       if (passportStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
         overallCompliance = "EXPIRED";
-      } else if (passportStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
-        overallCompliance = "MISSING";
       } else if (passportStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING") {
+        overallCompliance = "WARNING";
+      } else if (passportStatus === "MISSING" && visaStatus === "MISSING") {
         overallCompliance = "WARNING";
       }
 

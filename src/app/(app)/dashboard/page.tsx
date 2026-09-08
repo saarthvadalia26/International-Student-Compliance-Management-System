@@ -49,7 +49,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="font-h1 tracking-tight text-foreground text-2xl font-bold">Operational Compliance Dashboard</h1>
         <p className="font-caption text-xs text-muted-foreground mt-1">
-          {Branding.shortName} International Student Cell administrative tracking overview. eFRRO alert thresholds and document verifications.
+          {Branding.shortName} International Student Cell administrative tracking overview. Authoritative compliance status across Passport, Visa, and eFRRO permits.
         </p>
       </div>
 

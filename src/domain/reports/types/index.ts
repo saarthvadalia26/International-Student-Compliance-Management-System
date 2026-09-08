@@ -1,14 +1,77 @@
 export type ComplianceStatus = "COMPLIANT" | "WARNING" | "EXPIRED" | "PENDING_VERIFICATION" | "REJECTED" | "MISSING";
 
+export type ComplianceDocumentType = "passport" | "visa" | "efrro";
+
 export interface DashboardMetrics {
   totalStudents: number;
   fullyCompliantStudents: number;
-  efrroExpiring30Days: number;
-  efrroExpiring15Days: number;
-  efrroExpired: number;
-  pendingEfrroVerification: number;
+  expiringIn30Days: number;
+  criticalIn15Days: number;
+  expiredDocuments: number;
+  renewalsRecorded: number;
   notificationsSentToday: number;
-  failedNotificationsToday: number;
+  failedNotifications: number;
+  failedNotificationsToday?: number;
+
+  // Detailed breakdown metadata
+  documentCounts?: {
+    expiringIn30DaysDocs: number;
+    criticalIn15DaysDocs: number;
+    expiredDocs: number;
+  };
+  notificationsByChannel?: {
+    email: number;
+    whatsapp: number;
+  };
+  renewalsByDocType?: {
+    passport: number;
+    visa: number;
+    efrro: number;
+  };
+  expiringByDocType?: {
+    passport: { critical15: number; expiring30: number; expired: number; valid: number };
+    visa: { critical15: number; expiring30: number; expired: number; valid: number };
+    efrro: { critical15: number; expiring30: number; expired: number; valid: number };
+  };
+}
+
+export type ComplianceDrilldownCategory =
+  | "expiring_30"
+  | "critical_15"
+  | "expired"
+  | "renewals"
+  | "failed_notifications";
+
+export interface ComplianceDrilldownItem {
+  id: string;
+  studentId: string;
+  studentName: string;
+  registrationNumber: string;
+  documentType?: "passport" | "visa" | "efrro";
+  documentNumber?: string | null;
+  expiryDate?: string | null;
+  issueDate?: string | null;
+  daysRemaining?: number | null;
+  daysExpired?: number | null;
+  status?: string;
+  versionLabel?: string;
+  recordedAt?: string;
+  channel?: "email" | "whatsapp" | string;
+  failureReason?: string | null;
+  retryCount?: number;
+  timestamp?: string;
+}
+
+export interface ComplianceDrilldownResponse {
+  category: ComplianceDrilldownCategory;
+  title: string;
+  totalCount: number;
+  items: ComplianceDrilldownItem[];
+  byDocType?: {
+    passport: number;
+    visa: number;
+    efrro: number;
+  };
 }
 
 export interface StudentReportRow {

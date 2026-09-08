@@ -1,6 +1,8 @@
 import { IReportRepository } from "../repositories/report.repository";
 import { 
   DashboardMetrics, 
+  ComplianceDrilldownCategory,
+  ComplianceDrilldownResponse,
   ReportFilters, 
   ReportPagination, 
   StudentReportRow, 
@@ -23,6 +25,13 @@ export class ReportingService {
    */
   async getDashboardMetrics(): Promise<DashboardMetrics> {
     return this.repository.getDashboardMetrics();
+  }
+
+  /**
+   * Retrieves detailed student and document drill-down items for an operational dashboard card.
+   */
+  async getDashboardDrilldown(category: ComplianceDrilldownCategory): Promise<ComplianceDrilldownResponse> {
+    return this.repository.getDashboardDrilldown(category);
   }
 
   /**

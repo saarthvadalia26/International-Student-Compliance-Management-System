@@ -7,11 +7,15 @@ import {
   NotificationReportRow, 
   AuditReportRow, 
   DashboardMetrics,
+  ComplianceDrilldownCategory,
+  ComplianceDrilldownResponse,
+  ComplianceDrilldownItem,
   PaginatedResult
 } from "../types";
 import { ReportMapper } from "../mappers";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
 import { LEGACY_PROGRAM_ALIASES, DEFAULT_FALLBACK_PROGRAMS } from "@/domain/academic-programs/academic-program.service";
+import { parseDateOnlyString } from "@/lib/utils/date";
 
 // =========================================================================
 // Reusable Select Fragments (Canonical Table Hierarchy: students as Root)
@@ -71,6 +75,7 @@ const CONTACT_FIELDS = `
 
 export interface IReportRepository {
   getDashboardMetrics(): Promise<DashboardMetrics>;
+  getDashboardDrilldown(category: ComplianceDrilldownCategory): Promise<ComplianceDrilldownResponse>;
   getStudentReport(filters: ReportFilters, pagination: ReportPagination, sortBy?: string, sortOrder?: "asc" | "desc"): Promise<PaginatedResult<StudentReportRow>>;
   getEfrroReport(filters: ReportFilters, pagination: ReportPagination, sortBy?: string, sortOrder?: "asc" | "desc"): Promise<PaginatedResult<EfrroReportRow>>;
   getNotificationReport(filters: ReportFilters, pagination: ReportPagination, sortBy?: string, sortOrder?: "asc" | "desc"): Promise<PaginatedResult<NotificationReportRow>>;
@@ -82,68 +87,519 @@ export class SupabaseReportRepository implements IReportRepository {
   async getDashboardMetrics(): Promise<DashboardMetrics> {
     const supabase = getAdminSupabase();
 
-    console.log("[REPORT_REPOSITORY] Querying metrics for operational dashboard...");
-    
-    // Execute dashboard count queries in parallel for efficiency
+    console.log("[REPORT_REPOSITORY] Querying unified metrics for operational dashboard...");
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayTime = today.getTime();
+    const thirtyDaysAgo = new Date(todayTime - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Execute queries in parallel
     const [
-      totalRes,
-      compliantRes,
-      expiring30Res,
-      expiring15Res,
-      expiredRes,
-      pendingEfrroRes,
+      studentsRes,
+      snapshotRes,
       sentTodayRes,
-      failedTodayRes
+      failedNotifRes,
+      pRenewalsRes,
+      vRenewalsRes,
+      eRenewalsRes,
+      auditRenewalsRes
     ] = await Promise.all([
-      // Total active students
-      supabase.from("student_snapshot").select("student_id", { count: "exact", head: true }),
-      // Fully compliant (Passport, Visa, and eFRRO are COMPLIANT)
-      supabase.from("student_snapshot").select("student_id", { count: "exact", head: true })
-        .eq("compliance_status", "COMPLIANT"),
-      // eFRRO Expiring (30 days)
-      supabase.from("student_snapshot").select("student_id", { count: "exact", head: true })
-        .eq("efrro_status", "WARNING")
-        .lte("days_until_efrro_expiry", 30)
-        .gt("days_until_efrro_expiry", 15),
-      // eFRRO Expiring (15 days)
-      supabase.from("student_snapshot").select("student_id", { count: "exact", head: true })
-        .eq("efrro_status", "WARNING")
-        .lte("days_until_efrro_expiry", 15)
-        .gt("days_until_efrro_expiry", 0),
-      // eFRRO Expired
-      supabase.from("student_snapshot").select("student_id", { count: "exact", head: true })
-        .eq("efrro_status", "EXPIRED"),
-      // Pending eFRRO Verification
-      supabase.from("student_snapshot").select("student_id", { count: "exact", head: true })
-        .eq("efrro_status", "PENDING_VERIFICATION"),
-      // Notifications Sent Today
-      supabase.from(NOTIFICATION_TABLE_NAME).select("id", { count: "exact", head: true })
-        .eq("status", "sent")
-        .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
-      // Notifications Failed Today
-      supabase.from(NOTIFICATION_TABLE_NAME).select("id", { count: "exact", head: true })
-        .eq("status", "failed")
-        .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+      // Total active non-deleted students
+      supabase.from("students").select("id", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .eq("status", "active"),
+      // Authoritative snapshots of active non-deleted students
+      supabase.from("student_snapshot").select(`
+        student_id,
+        passport_number,
+        passport_expiry,
+        passport_status,
+        visa_number,
+        visa_expiry,
+        visa_status,
+        efrro_number,
+        efrro_expiry,
+        efrro_status,
+        compliance_status,
+        students!inner(id, status, deleted_at)
+      `)
+        .is("students.deleted_at", null)
+        .eq("students.status", "active"),
+      // Notifications sent today (Email + WhatsApp)
+      supabase.from(NOTIFICATION_TABLE_NAME).select("id, channel")
+        .in("status", ["sent", "delivered"])
+        .gte("created_at", new Date(todayTime).toISOString()),
+      // Failed notifications requiring attention
+      supabase.from(NOTIFICATION_TABLE_NAME).select("id, channel, status")
+        .in("status", ["failed", "bounced"]),
+      // Document renewals recorded in last 30 days
+      supabase.from("passport_versions").select("id", { count: "exact", head: true })
+        .gt("version_number", 1)
+        .is("deleted_at", null)
+        .gte("created_at", thirtyDaysAgo),
+      supabase.from("visa_versions").select("id", { count: "exact", head: true })
+        .gt("version_number", 1)
+        .is("deleted_at", null)
+        .gte("created_at", thirtyDaysAgo),
+      supabase.from("efrro_versions").select("id", { count: "exact", head: true })
+        .gt("version_number", 1)
+        .is("deleted_at", null)
+        .gte("created_at", thirtyDaysAgo),
+      supabase.from("audit_log").select("id, filters_applied", { count: "exact" })
+        .eq("action", "DOCUMENT_RENEWED")
+        .gte("timestamp", thirtyDaysAgo)
     ]);
 
-    const totalStudents = totalRes.count || 0;
-    const fullyCompliant = compliantRes.count || 0;
-    const expiring30 = expiring30Res.count || 0;
-    const expiring15 = expiring15Res.count || 0;
-    const expired = expiredRes.count || 0;
-    const pendingEfrro = pendingEfrroRes.count || 0;
-    const sentToday = sentTodayRes.count || 0;
-    const failedToday = failedTodayRes.count || 0;
+    const totalStudents = studentsRes.count || 0;
+    const snapshots = snapshotRes.data || [];
+
+    // Helper: calculate integer days remaining from YYYY-MM-DD
+    const calcDays = (expStr?: string | null): number | null => {
+      if (!expStr) return null;
+      const parts = parseDateOnlyString(String(expStr));
+      if (!parts) {
+        const d = new Date(expStr);
+        if (isNaN(d.getTime())) return null;
+        const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        return Math.round((target - todayTime) / (1000 * 60 * 60 * 24));
+      }
+      const target = new Date(parts.year, parts.month - 1, parts.day).getTime();
+      return Math.round((target - todayTime) / (1000 * 60 * 60 * 24));
+    };
+
+    let fullyCompliantCount = 0;
+    let studentExpiring30Count = 0;
+    let studentCritical15Count = 0;
+    let studentExpiredCount = 0;
+
+    let expiring30Docs = 0;
+    let critical15Docs = 0;
+    let expiredDocs = 0;
+
+    const expiringByDocType = {
+      passport: { critical15: 0, expiring30: 0, expired: 0, valid: 0 },
+      visa: { critical15: 0, expiring30: 0, expired: 0, valid: 0 },
+      efrro: { critical15: 0, expiring30: 0, expired: 0, valid: 0 }
+    };
+
+    snapshots.forEach((s: any) => {
+      const pDays = calcDays(s.passport_expiry);
+      const vDays = calcDays(s.visa_expiry);
+      const eDays = calcDays(s.efrro_expiry);
+
+      let sHasExpired = false;
+      let sHasCritical = false;
+      let sHas30 = false;
+      let hasValidDoc = false;
+
+      // Passport evaluation
+      if (pDays !== null) {
+        hasValidDoc = true;
+        if (pDays < 0) {
+          sHasExpired = true;
+          expiredDocs++;
+          expiringByDocType.passport.expired++;
+        } else if (pDays <= 15) {
+          sHasCritical = true;
+          sHas30 = true;
+          critical15Docs++;
+          expiring30Docs++;
+          expiringByDocType.passport.critical15++;
+          expiringByDocType.passport.expiring30++;
+        } else if (pDays <= 30) {
+          sHas30 = true;
+          expiring30Docs++;
+          expiringByDocType.passport.expiring30++;
+        } else {
+          expiringByDocType.passport.valid++;
+        }
+      }
+
+      // Visa evaluation
+      if (vDays !== null) {
+        hasValidDoc = true;
+        if (vDays < 0) {
+          sHasExpired = true;
+          expiredDocs++;
+          expiringByDocType.visa.expired++;
+        } else if (vDays <= 15) {
+          sHasCritical = true;
+          sHas30 = true;
+          critical15Docs++;
+          expiring30Docs++;
+          expiringByDocType.visa.critical15++;
+          expiringByDocType.visa.expiring30++;
+        } else if (vDays <= 30) {
+          sHas30 = true;
+          expiring30Docs++;
+          expiringByDocType.visa.expiring30++;
+        } else {
+          expiringByDocType.visa.valid++;
+        }
+      }
+
+      // eFRRO evaluation
+      if (eDays !== null) {
+        hasValidDoc = true;
+        if (eDays < 0) {
+          sHasExpired = true;
+          expiredDocs++;
+          expiringByDocType.efrro.expired++;
+        } else if (eDays <= 15) {
+          sHasCritical = true;
+          sHas30 = true;
+          critical15Docs++;
+          expiring30Docs++;
+          expiringByDocType.efrro.critical15++;
+          expiringByDocType.efrro.expiring30++;
+        } else if (eDays <= 30) {
+          sHas30 = true;
+          expiring30Docs++;
+          expiringByDocType.efrro.expiring30++;
+        } else {
+          expiringByDocType.efrro.valid++;
+        }
+      }
+
+      if (sHasExpired) studentExpiredCount++;
+      if (sHasCritical) studentCritical15Count++;
+      if (sHas30) studentExpiring30Count++;
+
+      // Fully compliant: student has at least one recorded valid document and no expired, critical, or warning issues
+      if (hasValidDoc && !sHasExpired && !sHas30) {
+        fullyCompliantCount++;
+      }
+    });
+
+    // Notification channel breakdown
+    let sentEmail = 0;
+    let sentWhatsApp = 0;
+    (sentTodayRes.data || []).forEach((n: any) => {
+      const ch = (n.channel || "").toLowerCase();
+      if (ch.includes("whatsapp")) sentWhatsApp++;
+      else sentEmail++;
+    });
+
+    // Renewals counts
+    const pRen = pRenewalsRes.count || 0;
+    const vRen = vRenewalsRes.count || 0;
+    const eRen = eRenewalsRes.count || 0;
+    const versionRenewalsTotal = pRen + vRen + eRen;
+    const auditRenewalsTotal = auditRenewalsRes.count || 0;
+    const renewalsRecorded = Math.max(versionRenewalsTotal, auditRenewalsTotal);
+
+    const renewalsByDocType = {
+      passport: pRen,
+      visa: vRen,
+      efrro: eRen
+    };
+
+    if (versionRenewalsTotal === 0 && auditRenewalsTotal > 0 && auditRenewalsRes.data) {
+      auditRenewalsRes.data.forEach((a: any) => {
+        const docType = (a.filters_applied?.documentType || "").toLowerCase();
+        if (docType === "passport") renewalsByDocType.passport++;
+        else if (docType === "visa") renewalsByDocType.visa++;
+        else if (docType === "efrro") renewalsByDocType.efrro++;
+      });
+    }
+
+    const sentToday = sentTodayRes.data?.length || 0;
+    const failedNotifications = failedNotifRes.data?.length || 0;
 
     return {
       totalStudents,
-      fullyCompliantStudents: fullyCompliant,
-      efrroExpiring30Days: expiring30,
-      efrroExpiring15Days: expiring15,
-      efrroExpired: expired,
-      pendingEfrroVerification: pendingEfrro,
+      fullyCompliantStudents: fullyCompliantCount,
+      expiringIn30Days: studentExpiring30Count,
+      criticalIn15Days: studentCritical15Count,
+      expiredDocuments: studentExpiredCount,
+      renewalsRecorded,
       notificationsSentToday: sentToday,
-      failedNotificationsToday: failedToday
+      failedNotifications,
+      failedNotificationsToday: failedNotifications,
+
+      documentCounts: {
+        expiringIn30DaysDocs: expiring30Docs,
+        criticalIn15DaysDocs: critical15Docs,
+        expiredDocs
+      },
+      notificationsByChannel: {
+        email: sentEmail,
+        whatsapp: sentWhatsApp
+      },
+      renewalsByDocType,
+      expiringByDocType
+    };
+  }
+
+  async getDashboardDrilldown(category: ComplianceDrilldownCategory): Promise<ComplianceDrilldownResponse> {
+    const supabase = getAdminSupabase();
+    const cat = String(category).replace(/-/g, "_") as ComplianceDrilldownCategory;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayTime = today.getTime();
+    const thirtyDaysAgo = new Date(todayTime - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const calcDays = (expStr?: string | null): number | null => {
+      if (!expStr) return null;
+      const parts = parseDateOnlyString(String(expStr));
+      if (!parts) {
+        const d = new Date(expStr);
+        if (isNaN(d.getTime())) return null;
+        const target = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        return Math.round((target - todayTime) / (1000 * 60 * 60 * 24));
+      }
+      const target = new Date(parts.year, parts.month - 1, parts.day).getTime();
+      return Math.round((target - todayTime) / (1000 * 60 * 60 * 24));
+    };
+
+    if (cat === "renewals") {
+      const [pRes, vRes, eRes, auditRes, studentsRes] = await Promise.all([
+        supabase.from("passport_versions")
+          .select("id, student_id, version_number, document_number, issue_date, expiry_date, created_at")
+          .gt("version_number", 1)
+          .is("deleted_at", null)
+          .gte("created_at", thirtyDaysAgo),
+        supabase.from("visa_versions")
+          .select("id, student_id, version_number, document_number, issue_date, expiry_date, created_at")
+          .gt("version_number", 1)
+          .is("deleted_at", null)
+          .gte("created_at", thirtyDaysAgo),
+        supabase.from("efrro_versions")
+          .select("id, student_id, version_number, document_number, issue_date, expiry_date, created_at")
+          .gt("version_number", 1)
+          .is("deleted_at", null)
+          .gte("created_at", thirtyDaysAgo),
+        supabase.from("audit_log")
+          .select("id, timestamp, filters_applied")
+          .eq("action", "DOCUMENT_RENEWED")
+          .gte("timestamp", thirtyDaysAgo)
+          .order("timestamp", { ascending: false }),
+        supabase.from("students")
+          .select("id, registration_number, student_personal(full_name)")
+          .is("deleted_at", null)
+      ]);
+
+      const studentMap = new Map<string, { name: string; regNo: string }>();
+      (studentsRes.data || []).forEach((s: any) => {
+        studentMap.set(s.id, {
+          name: s.student_personal?.full_name || "Unknown Student",
+          regNo: s.registration_number || "—"
+        });
+      });
+
+      const items: ComplianceDrilldownItem[] = [];
+      const seenIds = new Set<string>();
+
+      const addVersionRows = (rows: any[] | null, docType: "passport" | "visa" | "efrro") => {
+        (rows || []).forEach(r => {
+          seenIds.add(r.id);
+          const sInfo = studentMap.get(r.student_id);
+          items.push({
+            id: r.id,
+            studentId: r.student_id,
+            studentName: sInfo?.name || "Unknown Student",
+            registrationNumber: sInfo?.regNo || "—",
+            documentType: docType,
+            documentNumber: r.document_number,
+            issueDate: r.issue_date,
+            expiryDate: r.expiry_date,
+            versionLabel: `Renewal ${r.version_number - 1}`,
+            recordedAt: r.created_at
+          });
+        });
+      };
+
+      addVersionRows(pRes.data, "passport");
+      addVersionRows(vRes.data, "visa");
+      addVersionRows(eRes.data, "efrro");
+
+      (auditRes.data || []).forEach((a: any) => {
+        const filters = a.filters_applied || {};
+        const sId = filters.studentId;
+        const sInfo = studentMap.get(sId);
+        const rawDocType = String(filters.documentType || "passport").toLowerCase();
+        const docType: "passport" | "visa" | "efrro" =
+          rawDocType === "visa" ? "visa" : rawDocType === "efrro" ? "efrro" : "passport";
+        const vNum = filters.newVersionNumber || 2;
+        const vLabel = filters.newVersionLabel || `Renewal ${vNum - 1}`;
+        
+        if (!seenIds.has(a.id)) {
+          items.push({
+            id: a.id,
+            studentId: sId,
+            studentName: sInfo?.name || "Unknown Student",
+            registrationNumber: sInfo?.regNo || "—",
+            documentType: docType,
+            documentNumber: filters.documentNumber || null,
+            issueDate: filters.issueDate || null,
+            expiryDate: filters.expiryDate || null,
+            versionLabel: vLabel,
+            recordedAt: a.timestamp
+          });
+        }
+      });
+
+      items.sort((a, b) => new Date(b.recordedAt || 0).getTime() - new Date(a.recordedAt || 0).getTime());
+
+      const byDocType = {
+        passport: items.filter(i => i.documentType === "passport").length,
+        visa: items.filter(i => i.documentType === "visa").length,
+        efrro: items.filter(i => i.documentType === "efrro").length
+      };
+
+      return {
+        category: "renewals",
+        title: "Recent Document Renewals (Last 30 Days)",
+        totalCount: items.length,
+        items,
+        byDocType
+      };
+    }
+
+    if (cat === "failed_notifications") {
+      const { data: notifRows } = await supabase
+        .from(NOTIFICATION_TABLE_NAME)
+        .select(`
+          id,
+          student_id,
+          document_type,
+          channel,
+          status,
+          retry_count,
+          created_at,
+          notification_context,
+          students(registration_number, student_personal(full_name))
+        `)
+        .in("status", ["failed", "bounced"])
+        .order("created_at", { ascending: false });
+
+      const items: ComplianceDrilldownItem[] = (notifRows || []).map((n: any) => {
+        const s = n.students;
+        const ctx = n.notification_context || {};
+        return {
+          id: n.id,
+          studentId: n.student_id,
+          studentName: s?.student_personal?.full_name || "Unknown Student",
+          registrationNumber: s?.registration_number || "—",
+          documentType: n.document_type,
+          channel: n.channel,
+          status: n.status,
+          retryCount: n.retry_count,
+          failureReason: ctx.error_message || ctx.failure_reason || ctx.reason || "Dispatch delivery failure",
+          timestamp: n.created_at
+        };
+      });
+
+      const byDocType = {
+        passport: items.filter(i => i.documentType === "passport").length,
+        visa: items.filter(i => i.documentType === "visa").length,
+        efrro: items.filter(i => i.documentType === "efrro").length
+      };
+
+      return {
+        category: "failed_notifications",
+        title: "Failed Notification Dispatches",
+        totalCount: items.length,
+        items,
+        byDocType
+      };
+    }
+
+    // Otherwise: expiring_30, critical_15, expired
+    const { data: students } = await supabase
+      .from("students")
+      .select(`
+        id,
+        registration_number,
+        student_personal(full_name),
+        student_snapshot(
+          passport_number,
+          passport_expiry,
+          passport_status,
+          visa_number,
+          visa_expiry,
+          visa_status,
+          efrro_number,
+          efrro_expiry,
+          efrro_status
+        )
+      `)
+      .is("deleted_at", null)
+      .eq("status", "active");
+
+    const items: ComplianceDrilldownItem[] = [];
+
+    (students || []).forEach((st: any) => {
+      const snap = st.student_snapshot;
+      if (!snap) return;
+
+      const sName = st.student_personal?.full_name || "Unknown Student";
+      const regNo = st.registration_number || "—";
+
+      const checkAndAdd = (
+        docType: "passport" | "visa" | "efrro",
+        docNum?: string | null,
+        expStr?: string | null
+      ) => {
+        if (!expStr) return;
+        const days = calcDays(expStr);
+        if (days === null) return;
+
+        let matches = false;
+        if (cat === "expired" && days < 0) {
+          matches = true;
+        } else if (cat === "critical_15" && days >= 0 && days <= 15) {
+          matches = true;
+        } else if (cat === "expiring_30" && days >= 0 && days <= 30) {
+          matches = true;
+        }
+
+        if (matches) {
+          items.push({
+            id: `${st.id}-${docType}`,
+            studentId: st.id,
+            studentName: sName,
+            registrationNumber: regNo,
+            documentType: docType,
+            documentNumber: docNum || "—",
+            expiryDate: expStr,
+            daysRemaining: days >= 0 ? days : null,
+            daysExpired: days < 0 ? Math.abs(days) : null,
+            status: days < 0 ? "EXPIRED" : days <= 15 ? "CRITICAL" : "WARNING"
+          });
+        }
+      };
+
+      checkAndAdd("passport", snap.passport_number, snap.passport_expiry);
+      checkAndAdd("visa", snap.visa_number, snap.visa_expiry);
+      checkAndAdd("efrro", snap.efrro_number, snap.efrro_expiry);
+    });
+
+    if (cat === "expired") {
+      items.sort((a, b) => (b.daysExpired || 0) - (a.daysExpired || 0));
+    } else {
+      items.sort((a, b) => (a.daysRemaining || 0) - (b.daysRemaining || 0));
+    }
+
+    const byDocType = {
+      passport: items.filter(i => i.documentType === "passport").length,
+      visa: items.filter(i => i.documentType === "visa").length,
+      efrro: items.filter(i => i.documentType === "efrro").length
+    };
+
+    const titleMap: Record<string, string> = {
+      expiring_30: "Documents Expiring in 30 Days",
+      critical_15: "Critical Expiries (Within 15 Days)",
+      expired: "Expired Compliance Documents"
+    };
+
+    return {
+      category,
+      title: titleMap[category] || "Compliance Drill-down",
+      totalCount: items.length,
+      items,
+      byDocType
     };
   }
 
@@ -722,3 +1178,5 @@ export class SupabaseReportRepository implements IReportRepository {
     }
   }
 }
+
+export const reportRepository = new SupabaseReportRepository();

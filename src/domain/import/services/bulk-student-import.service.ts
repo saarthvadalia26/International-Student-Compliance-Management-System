@@ -1436,9 +1436,9 @@ export class BulkStudentImportService {
         let overallCompliance = "COMPLIANT";
         if (passStatus === "EXPIRED" || visaStatus === "EXPIRED" || efrroStatus === "EXPIRED") {
           overallCompliance = "EXPIRED";
-        } else if (passStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
-          overallCompliance = "MISSING";
         } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING") {
+          overallCompliance = "WARNING";
+        } else if (passStatus === "MISSING" && visaStatus === "MISSING") {
           overallCompliance = "WARNING";
         }
 

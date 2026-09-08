@@ -10,6 +10,7 @@ import {
   AnalyticsExecutiveSummaryStrip,
   CompleteDistributionAnalyticsCard,
   AcademicHierarchyCard,
+  UpcomingExpiryByDocTypeCard,
   DashboardChartsData
 } from "@/features/dashboard/charts";
 import { fetchAnalyticsChartsLive, revalidateDashboardData } from "@/app/(app)/dashboard/actions";
@@ -261,14 +262,13 @@ export function DashboardCharts({ chartsData: initialChartsData }: DashboardChar
 
         <div className="grid gap-5 sm:gap-6 grid-cols-1 lg:grid-cols-2 min-w-0">
           <ChartWrapper
-            title="Upcoming eFRRO Expiry Timeline"
-            description="Monthly distribution and concentration of permits requiring renewal"
-            isEmpty={chartsData.efrroExpiryTimeline.length === 0}
+            title="Upcoming Expiry by Document Type"
+            description="Workload distribution across Passport, Visa, and eFRRO permits"
+            isEmpty={!chartsData.upcomingExpiryByDocType}
           >
-            <TimelinePercentageDistribution
-              data={chartsData.efrroExpiryTimeline}
-              metricLabel="Expiring Permits"
-              emptyMessage="No upcoming eFRRO expiries recorded in near-term milestones"
+            <UpcomingExpiryByDocTypeCard
+              data={chartsData.upcomingExpiryByDocType}
+              emptyMessage="No upcoming document expiries recorded"
             />
           </ChartWrapper>
 

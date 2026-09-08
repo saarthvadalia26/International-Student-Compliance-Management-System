@@ -2190,9 +2190,9 @@ export async function renewDocumentAction(
       overallCompliance = "EXPIRED";
     } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || efrroStatus === "REJECTED") {
       overallCompliance = "REJECTED";
-    } else if (passStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
-      overallCompliance = "MISSING";
     } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING" || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || efrroStatus === "PENDING_VERIFICATION") {
+      overallCompliance = "WARNING";
+    } else if (passStatus === "MISSING" && visaStatus === "MISSING") {
       overallCompliance = "WARNING";
     }
 
@@ -2515,9 +2515,9 @@ export async function correctDocumentMetadataAction(
       overallCompliance = "EXPIRED";
     } else if (passStatus === "REJECTED" || visaStatus === "REJECTED" || efrroStatus === "REJECTED") {
       overallCompliance = "REJECTED";
-    } else if (passStatus === "MISSING" || visaStatus === "MISSING" || efrroStatus === "MISSING") {
-      overallCompliance = "MISSING";
     } else if (passStatus === "WARNING" || visaStatus === "WARNING" || efrroStatus === "WARNING" || passStatus === "PENDING_VERIFICATION" || visaStatus === "PENDING_VERIFICATION" || efrroStatus === "PENDING_VERIFICATION") {
+      overallCompliance = "WARNING";
+    } else if (passStatus === "MISSING" && visaStatus === "MISSING") {
       overallCompliance = "WARNING";
     }
 
