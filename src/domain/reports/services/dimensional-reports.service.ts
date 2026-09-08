@@ -159,6 +159,7 @@ export class DimensionalReportsService {
       schoolName: string;
       fundingType: string;
       fundingDisplay: string;
+      fundingSubLabel?: string;
       academicYear: string;
       complianceStatus: string;
       passportDays: number | null;
@@ -167,6 +168,39 @@ export class DimensionalReportsService {
       visaValid: boolean;
       efrroDays: number | null;
       efrroValid: boolean;
+    }
+
+    function parseScholarshipScheme(rawScheme?: string | null): { code: string; subLabel: string } {
+      if (!rawScheme) return { code: "ICCR-SCHOLARSHIP", subLabel: "ICCR Scholarship" };
+      const cleaned = rawScheme.replace(/^"|"$/g, "").trim();
+      const lower = cleaned.toLowerCase();
+
+      if (lower.includes("africa")) {
+        return { code: "ICCR-AFRICA", subLabel: cleaned };
+      } else if (lower.includes("suborno")) {
+        return { code: "ICCR-SUBORNO", subLabel: cleaned };
+      } else if (lower.includes("atal") || lower.includes("abvgss") || lower.includes("general scholarship")) {
+        return { code: "ICCR-ABVGSS", subLabel: cleaned };
+      } else if (lower.includes("sushma") || lower.includes("silver jubilee")) {
+        return { code: "ICCR-SUSHMA", subLabel: cleaned };
+      } else if (lower.includes("mekong")) {
+        return { code: "ICCR-MEKONG", subLabel: cleaned };
+      } else if (lower.includes("ambedkar") || lower.includes("bhutan")) {
+        return { code: "ICCR-AMBEDKAR", subLabel: cleaned };
+      } else if (lower.includes("kushok") || lower.includes("mongolia")) {
+        return { code: "ICCR-KUSHOK", subLabel: cleaned };
+      } else if (lower.includes("radhakrishnan") || lower.includes("cultural exchange")) {
+        return { code: "ICCR-RADHAKRISHNAN", subLabel: cleaned };
+      } else if (lower.includes("maldives")) {
+        return { code: "ICCR-MALDIVES", subLabel: cleaned };
+      }
+
+      const matchParen = cleaned.match(/\(([A-Z0-9\s-]+)\)/);
+      if (matchParen && matchParen[1] && matchParen[1].length <= 10) {
+        return { code: `ICCR-${matchParen[1].trim()}`, subLabel: cleaned };
+      }
+
+      return { code: cleaned.slice(0, 18).toUpperCase(), subLabel: cleaned };
     }
 
     const processedStudents: ProcessedStudent[] = rawStudents.map((st) => {
@@ -200,10 +234,17 @@ export class DimensionalReportsService {
       // Funding
       const rawFunding = (academic?.fee_payment_category || "").trim().toLowerCase();
       let fundingDisplay = "Not Specified";
+      let fundingSubLabel: string | undefined = undefined;
+
       if (rawFunding === "scholarship") {
-        fundingDisplay = academic?.iccr_scholarship_scheme_name
-          ? `Scholarship (${academic.iccr_scholarship_scheme_name.replace(/^"|"$/g, "").slice(0, 32)}...)`
-          : "Scholarship";
+        if (academic?.iccr_scholarship_scheme_name) {
+          const parsed = parseScholarshipScheme(academic.iccr_scholarship_scheme_name);
+          fundingDisplay = parsed.code;
+          fundingSubLabel = parsed.subLabel;
+        } else {
+          fundingDisplay = "ICCR-SCHOLARSHIP";
+          fundingSubLabel = "ICCR Scholarship Scheme";
+        }
       } else if (rawFunding === "self_financed" || rawFunding === "self") {
         fundingDisplay = "Self Financed";
       } else if (rawFunding) {
@@ -272,6 +313,7 @@ export class DimensionalReportsService {
         schoolName,
         fundingType: rawFunding,
         fundingDisplay,
+        fundingSubLabel,
         academicYear,
         complianceStatus: calculatedCompliance,
         passportDays: pDays,
@@ -433,18 +475,21 @@ export class DimensionalReportsService {
       .sort((a, b) => b.studentCount - a.studentCount);
 
     // 9. Aggregate Dimension 5: Scholarship / Funding Type-wise
-    const fundingMap = new Map<string, number>();
+    const fundingMap = new Map<string, { count: number; subLabel?: string }>();
     filteredStudents.forEach((s) => {
       const key = s.fundingDisplay;
-      fundingMap.set(key, (fundingMap.get(key) || 0) + 1);
+      const existing = fundingMap.get(key) || { count: 0, subLabel: s.fundingSubLabel };
+      existing.count++;
+      fundingMap.set(key, existing);
     });
 
     const fundingReport: DimensionRow[] = Array.from(fundingMap.entries())
-      .map(([key, count]) => ({
+      .map(([key, data]) => ({
         key,
         label: key,
-        studentCount: count,
-        percentage: calcPct(count),
+        subLabel: data.subLabel,
+        studentCount: data.count,
+        percentage: calcPct(data.count),
       }))
       .sort((a, b) => b.studentCount - a.studentCount);
 
