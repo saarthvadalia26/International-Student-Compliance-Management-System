@@ -1547,43 +1547,43 @@ export function UpcomingExpiryByDocTypeCard({
               doc.accentBorder
             )}
           >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border", doc.badgeClass)}>
+            <div className="flex items-center justify-between gap-2.5 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 shrink">
+                <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border shrink-0", doc.badgeClass)}>
                   {doc.label}
                 </span>
-                <span className="text-xs text-muted-foreground font-mono">
+                <span className="text-xs text-muted-foreground font-mono truncate">
                   {effectiveTotalStudents > 0
-                    ? `${totalForDoc.toLocaleString()} of ${effectiveTotalStudents.toLocaleString()} students (${calculatePercentage(totalForDoc, effectiveTotalStudents)})`
+                    ? `${totalForDoc.toLocaleString()} / ${effectiveTotalStudents.toLocaleString()} (${calculatePercentage(totalForDoc, effectiveTotalStudents)})`
                     : `${totalForDoc.toLocaleString()} managed`}
                 </span>
               </div>
 
-              {/* Status Pills */}
-              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-medium">
+              {/* Status Pills — Horizontally aligned on same line, anchored to right */}
+              <div className="flex items-center justify-end gap-1.5 shrink-0 flex-nowrap text-[10px] font-medium ml-auto">
+                {missingCount > 0 && (
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border border-zinc-500/30 font-medium whitespace-nowrap min-w-[64px] text-center">
+                    {missingCount} missing
+                  </span>
+                )}
+                {doc.stats.expired > 0 && (
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold whitespace-nowrap">
+                    {doc.stats.expired} expired
+                  </span>
+                )}
                 {doc.stats.critical15 > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 font-semibold">
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/30 font-semibold whitespace-nowrap">
                     {doc.stats.critical15} critical (0–15d)
                   </span>
                 )}
                 {upcoming30Only > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap">
                     {upcoming30Only} upcoming (16–30d)
                   </span>
                 )}
                 {doc.stats.safe > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 whitespace-nowrap min-w-[92px] text-center">
                     {doc.stats.safe} valid (31+d)
-                  </span>
-                )}
-                {doc.stats.expired > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-bold">
-                    {doc.stats.expired} expired
-                  </span>
-                )}
-                {missingCount > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border border-zinc-500/30 font-medium">
-                    {missingCount} missing
                   </span>
                 )}
               </div>
