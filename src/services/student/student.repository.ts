@@ -295,12 +295,23 @@ export class SupabaseStudentRepository implements IStudentRepository {
 
       // 6. Optional: Insert into student_embassy table if provided
       let embassyData = null;
-      if (input.embassyName && input.embassyName.trim()) {
+      const hasAnyEmbassyData = Boolean(
+        input.embassyName?.trim() ||
+        input.embassyAddress?.trim() ||
+        input.embassyCity?.trim() ||
+        input.embassyCountry?.trim() ||
+        input.embassyPhone?.trim() ||
+        input.embassyEmail?.trim() ||
+        input.embassyWebsite?.trim() ||
+        input.embassyContactPerson?.trim()
+      );
+
+      if (hasAnyEmbassyData) {
         const { data: embResult } = await supabase
           .from("student_embassy")
           .insert({
             student_id: studentId,
-            embassy_name: input.embassyName.trim(),
+            embassy_name: input.embassyName?.trim() || "Not Specified",
             address: input.embassyAddress?.trim() || "Not Specified",
             city: input.embassyCity?.trim() || null,
             country: input.embassyCountry?.trim() || null,
@@ -1065,39 +1076,54 @@ export class SupabaseStudentRepository implements IStudentRepository {
         .eq("student_id", id)
         .maybeSingle();
 
-      const embassyPayload: Record<string, unknown> = {
-        updated_at: new Date().toISOString(),
-        updated_by: actorId
-      };
-      if (input.embassyName !== undefined) embassyPayload.embassy_name = input.embassyName ? input.embassyName.trim() : null;
-      if (input.embassyAddress !== undefined) embassyPayload.address = input.embassyAddress ? input.embassyAddress.trim() : null;
-      if (input.embassyCity !== undefined) embassyPayload.city = input.embassyCity ? input.embassyCity.trim() : null;
-      if (input.embassyCountry !== undefined) embassyPayload.country = input.embassyCountry ? input.embassyCountry.trim() : null;
-      if (input.embassyPhone !== undefined) embassyPayload.phone = input.embassyPhone ? input.embassyPhone.trim() : null;
-      if (input.embassyEmail !== undefined) embassyPayload.email = input.embassyEmail ? input.embassyEmail.trim().toLowerCase() : null;
-      if (input.embassyWebsite !== undefined) embassyPayload.website = input.embassyWebsite ? input.embassyWebsite.trim() : null;
-      if (input.embassyContactPerson !== undefined) embassyPayload.contact_person = input.embassyContactPerson ? input.embassyContactPerson.trim() : null;
+      const hasAnyMeaningfulValue = Boolean(
+        (input.embassyName !== undefined && input.embassyName && input.embassyName.trim()) ||
+        (input.embassyAddress !== undefined && input.embassyAddress && input.embassyAddress.trim()) ||
+        (input.embassyCity !== undefined && input.embassyCity && input.embassyCity.trim()) ||
+        (input.embassyCountry !== undefined && input.embassyCountry && input.embassyCountry.trim()) ||
+        (input.embassyPhone !== undefined && input.embassyPhone && input.embassyPhone.trim()) ||
+        (input.embassyEmail !== undefined && input.embassyEmail && input.embassyEmail.trim()) ||
+        (input.embassyWebsite !== undefined && input.embassyWebsite && input.embassyWebsite.trim()) ||
+        (input.embassyContactPerson !== undefined && input.embassyContactPerson && input.embassyContactPerson.trim())
+      );
 
-      if (existingEmbassy) {
-        if (Object.keys(embassyPayload).length > 2) {
-          await supabase
-            .from("student_embassy")
-            .update(embassyPayload)
-            .eq("student_id", id);
-        }
-      } else if (input.embassyName && input.embassyName.trim()) {
+      // If existingEmbassy exists and all provided embassy fields are cleared/empty
+      if (existingEmbassy && !hasAnyMeaningfulValue) {
+        await supabase
+          .from("student_embassy")
+          .delete()
+          .eq("student_id", id);
+      } else if (existingEmbassy) {
+        const embassyPayload: Record<string, unknown> = {
+          updated_at: new Date().toISOString(),
+          updated_by: actorId
+        };
+        if (input.embassyName !== undefined) embassyPayload.embassy_name = input.embassyName && input.embassyName.trim() ? input.embassyName.trim() : "Not Specified";
+        if (input.embassyAddress !== undefined) embassyPayload.address = input.embassyAddress && input.embassyAddress.trim() ? input.embassyAddress.trim() : "Not Specified";
+        if (input.embassyCity !== undefined) embassyPayload.city = input.embassyCity && input.embassyCity.trim() ? input.embassyCity.trim() : null;
+        if (input.embassyCountry !== undefined) embassyPayload.country = input.embassyCountry && input.embassyCountry.trim() ? input.embassyCountry.trim() : null;
+        if (input.embassyPhone !== undefined) embassyPayload.phone = input.embassyPhone && input.embassyPhone.trim() ? input.embassyPhone.trim() : null;
+        if (input.embassyEmail !== undefined) embassyPayload.email = input.embassyEmail && input.embassyEmail.trim() ? input.embassyEmail.trim().toLowerCase() : null;
+        if (input.embassyWebsite !== undefined) embassyPayload.website = input.embassyWebsite && input.embassyWebsite.trim() ? input.embassyWebsite.trim() : null;
+        if (input.embassyContactPerson !== undefined) embassyPayload.contact_person = input.embassyContactPerson && input.embassyContactPerson.trim() ? input.embassyContactPerson.trim() : null;
+
+        await supabase
+          .from("student_embassy")
+          .update(embassyPayload)
+          .eq("student_id", id);
+      } else if (hasAnyMeaningfulValue) {
         await supabase
           .from("student_embassy")
           .insert({
             student_id: id,
-            embassy_name: input.embassyName.trim(),
-            address: input.embassyAddress?.trim() || "Not Specified",
-            city: input.embassyCity?.trim() || null,
-            country: input.embassyCountry?.trim() || null,
-            phone: input.embassyPhone?.trim() || null,
-            email: input.embassyEmail?.trim() || null,
-            website: input.embassyWebsite?.trim() || null,
-            contact_person: input.embassyContactPerson?.trim() || null,
+            embassy_name: input.embassyName && input.embassyName.trim() ? input.embassyName.trim() : "Not Specified",
+            address: input.embassyAddress && input.embassyAddress.trim() ? input.embassyAddress.trim() : "Not Specified",
+            city: input.embassyCity && input.embassyCity.trim() ? input.embassyCity.trim() : null,
+            country: input.embassyCountry && input.embassyCountry.trim() ? input.embassyCountry.trim() : null,
+            phone: input.embassyPhone && input.embassyPhone.trim() ? input.embassyPhone.trim() : null,
+            email: input.embassyEmail && input.embassyEmail.trim() ? input.embassyEmail.trim().toLowerCase() : null,
+            website: input.embassyWebsite && input.embassyWebsite.trim() ? input.embassyWebsite.trim() : null,
+            contact_person: input.embassyContactPerson && input.embassyContactPerson.trim() ? input.embassyContactPerson.trim() : null,
             created_by: actorId,
             updated_by: actorId
           });

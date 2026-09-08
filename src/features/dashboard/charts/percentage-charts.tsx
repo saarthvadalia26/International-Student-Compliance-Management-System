@@ -2,12 +2,76 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Inbox } from "lucide-react";
+import { 
+  Inbox, 
+  Search, 
+  ArrowUpDown, 
+  Table, 
+  BarChart2, 
+  ChevronDown, 
+  ChevronRight, 
+  Users, 
+  Globe, 
+  Building2, 
+  GraduationCap, 
+  Landmark, 
+  Layers, 
+  X,
+  ListTree
+} from "lucide-react";
 
 export interface DataPoint {
   name: string;
   value: number;
   secondaryLabel?: string;
+  code?: string;
+  meta?: Record<string, any>;
+}
+
+export interface AcademicHierarchyCourseNode {
+  name: string;
+  code?: string;
+  studentCount: number;
+  percentageOfSchool: number;
+  percentageOfTotal: number;
+}
+
+export interface AcademicHierarchyLevelNode {
+  level: string;
+  studentCount: number;
+  percentageOfSchool: number;
+  percentageOfTotal: number;
+  courses: AcademicHierarchyCourseNode[];
+}
+
+export interface AcademicHierarchySchoolNode {
+  schoolId?: string;
+  schoolName: string;
+  schoolCode?: string;
+  studentCount: number;
+  percentageOfTotal: number;
+  levels: AcademicHierarchyLevelNode[];
+}
+
+export interface DashboardChartsData {
+  totalActiveStudents: number;
+  distinctCountriesCount: number;
+  distinctSchoolsCount: number;
+  distinctProgramsCount: number;
+  distinctCampusesCount: number;
+
+  studentsByCountry: DataPoint[];
+  studentsBySchool: DataPoint[];
+  studentsByProgram: DataPoint[];
+  studentsByCourse: DataPoint[];
+  studentsByCampus: DataPoint[];
+
+  academicHierarchy: AcademicHierarchySchoolNode[];
+
+  monthlyAdmissions: DataPoint[];
+  efrroExpiryTimeline: DataPoint[];
+  complianceDistribution: DataPoint[];
+  notificationSuccessRate: DataPoint[];
 }
 
 /**
@@ -433,6 +497,836 @@ export function TimelinePercentageDistribution({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 5. Executive Summary Metric Strip (Level 1 Institutional Roster Overview)
+// ============================================================================
+interface AnalyticsExecutiveSummaryStripProps {
+  totalStudents: number;
+  distinctCountries: number;
+  distinctSchools: number;
+  distinctPrograms: number;
+  distinctCampuses: number;
+  className?: string;
+}
+
+export function AnalyticsExecutiveSummaryStrip({
+  totalStudents,
+  distinctCountries,
+  distinctSchools,
+  distinctPrograms,
+  distinctCampuses,
+  className
+}: AnalyticsExecutiveSummaryStripProps) {
+  const items = [
+    {
+      title: "Total Enrolled",
+      value: totalStudents.toLocaleString(),
+      subtitle: "Active international students",
+      icon: Users,
+      badge: "100% Roster"
+    },
+    {
+      title: "Countries Represented",
+      value: distinctCountries.toLocaleString(),
+      subtitle: "Sovereign global nations",
+      icon: Globe,
+      badge: "Demographics"
+    },
+    {
+      title: "Academic Schools",
+      value: distinctSchools.toLocaleString(),
+      subtitle: "Active university faculties",
+      icon: Building2,
+      badge: "Faculties"
+    },
+    {
+      title: "Degree Programs",
+      value: distinctPrograms.toLocaleString(),
+      subtitle: "Active enrolled courses",
+      icon: GraduationCap,
+      badge: "Curriculum"
+    },
+    {
+      title: "NFSU Campuses",
+      value: distinctCampuses.toLocaleString(),
+      subtitle: "Enrolled campus locations",
+      icon: Landmark,
+      badge: "Campuses"
+    }
+  ];
+
+  return (
+    <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3", className)}>
+      {items.map((item, idx) => {
+        const Icon = item.icon;
+        return (
+          <div
+            key={idx}
+            className="flex flex-col justify-between rounded-xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm transition-all hover:shadow-md hover:border-border"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {item.title}
+              </span>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+                {item.badge}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <div className="text-2xl font-bold font-mono tracking-tight text-foreground">
+                {item.value}
+              </div>
+              <div className="p-2 rounded-lg bg-muted/50 text-muted-foreground">
+                <Icon className="h-4 w-4" />
+              </div>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
+              {item.subtitle}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================================
+// 6. Complete Distribution Analytics Card (Visual Chart + Complete Table)
+// ============================================================================
+interface CompleteDistributionAnalyticsCardProps {
+  title: string;
+  description: string;
+  unit?: string;
+  data: DataPoint[];
+  totalStudents: number;
+  distinctCountLabel?: string;
+  searchPlaceholder?: string;
+  categoryColumnHeader?: string;
+  secondaryColumnHeader?: string;
+  emptyMessage?: string;
+  className?: string;
+}
+
+export function CompleteDistributionAnalyticsCard({
+  title,
+  description,
+  unit = "students",
+  data,
+  totalStudents,
+  distinctCountLabel = "Represented",
+  searchPlaceholder = "Search categories...",
+  categoryColumnHeader = "Category",
+  secondaryColumnHeader = "Identifier / Code",
+  emptyMessage = "No student records available",
+  className
+}: CompleteDistributionAnalyticsCardProps) {
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [viewMode, setViewMode] = React.useState<"chart" | "table">("chart");
+  const [sortBy, setSortBy] = React.useState<"count_desc" | "count_asc" | "name_asc" | "name_desc">("count_desc");
+
+  const totalInDataset = totalStudents > 0
+    ? totalStudents
+    : data.reduce((acc, curr) => acc + (curr.value || 0), 0);
+
+  // Filter items
+  const filteredData = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter(item => {
+      const nameMatch = item.name.toLowerCase().includes(q);
+      const codeMatch = item.code ? item.code.toLowerCase().includes(q) : false;
+      const secMatch = item.secondaryLabel ? item.secondaryLabel.toLowerCase().includes(q) : false;
+      return nameMatch || codeMatch || secMatch;
+    });
+  }, [data, searchQuery]);
+
+  // Sort items
+  const sortedData = React.useMemo(() => {
+    return [...filteredData].sort((a, b) => {
+      if (sortBy === "count_desc") return b.value - a.value;
+      if (sortBy === "count_asc") return a.value - b.value;
+      if (sortBy === "name_asc") return a.name.localeCompare(b.name);
+      if (sortBy === "name_desc") return b.name.localeCompare(a.name);
+      return b.value - a.value;
+    });
+  }, [filteredData, sortBy]);
+
+  const filteredTotal = React.useMemo(() => {
+    return filteredData.reduce((acc, curr) => acc + (curr.value || 0), 0);
+  }, [filteredData]);
+
+  const filteredPercentage = calculatePercentage(filteredTotal, totalInDataset, 1);
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md",
+        className
+      )}
+    >
+      {/* Title & Metadata Badges */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-3 border-b border-border/40">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+            {totalInDataset.toLocaleString()} Total {unit}
+          </span>
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+            {data.length} {distinctCountLabel}
+          </span>
+        </div>
+      </div>
+
+      {/* Toolbar: Search, Sort, View Toggle */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 py-3">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="w-full h-8 pl-8 pr-7 text-xs rounded-md border border-border/60 bg-background/50 text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+              title="Clear search"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Sort & Mode Toggles */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="relative flex items-center">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="h-8 text-xs rounded-md border border-border/60 bg-background/50 text-foreground px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+            >
+              <option value="count_desc">Highest Count (Desc)</option>
+              <option value="count_asc">Lowest Count (Asc)</option>
+              <option value="name_asc">Name (A → Z)</option>
+              <option value="name_desc">Name (Z → A)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center rounded-md border border-border/60 p-0.5 bg-muted/30">
+            <button
+              type="button"
+              onClick={() => setViewMode("chart")}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                viewMode === "chart"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="View visual distribution chart"
+            >
+              <BarChart2 className="h-3.5 w-3.5" />
+              <span>Chart</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                viewMode === "table"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="View complete data table"
+            >
+              <Table className="h-3.5 w-3.5" />
+              <span>Table</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-h-[220px]">
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
+            <Inbox className="h-7 w-7 stroke-[1.5]" />
+            <span className="text-xs">{emptyMessage}</span>
+          </div>
+        ) : sortedData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
+            <Search className="h-7 w-7 stroke-[1.5]" />
+            <span className="text-xs">No matching categories found for &quot;{searchQuery}&quot;</span>
+            <button
+              onClick={() => setSearchQuery("")}
+              className="text-xs text-primary underline underline-offset-2 hover:opacity-80"
+            >
+              Clear search filter
+            </button>
+          </div>
+        ) : viewMode === "chart" ? (
+          /* Visual Chart View: Scrollable list of 100% complete items */
+          <div className="space-y-3">
+            {/* Context bar */}
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground pb-1 font-medium">
+              <span>
+                Displaying {sortedData.length} of {data.length} {distinctCountLabel.toLowerCase()}
+                {searchQuery && ` (filtered: ${filteredTotal} ${unit} · ${filteredPercentage})`}
+              </span>
+              <span>100% Cohort Distribution</span>
+            </div>
+
+            <div className="max-h-[380px] overflow-y-auto pr-1.5 space-y-2.5 custom-scrollbar">
+              {sortedData.map((item, idx) => {
+                const pctNumber = totalInDataset > 0 ? (item.value / totalInDataset) * 100 : 0;
+                const pctFormatted = calculatePercentage(item.value, totalInDataset, 1);
+
+                return (
+                  <div key={idx} className="space-y-1 group">
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-[11px] font-mono font-medium text-muted-foreground/80 w-5 shrink-0">
+                          #{idx + 1}
+                        </span>
+                        <span className="font-medium text-foreground break-words leading-tight" title={item.name}>
+                          {item.name}
+                        </span>
+                        {(item.secondaryLabel || item.code) && (
+                          <span className="text-[10px] text-muted-foreground font-mono shrink-0 px-1.5 py-0.2 rounded bg-muted/40 border border-border/30">
+                            {item.secondaryLabel || item.code}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 text-right">
+                        <span className="text-xs font-semibold text-foreground font-mono">
+                          {pctFormatted}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground font-sans">
+                          ({item.value.toLocaleString()} {unit})
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="h-2 w-full bg-muted/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-foreground/80 rounded-full transition-all duration-300 group-hover:bg-foreground"
+                        style={{ width: `${Math.min(100, Math.max(1.5, pctNumber))}%` }}
+                        role="progressbar"
+                        aria-valuenow={item.value}
+                        aria-valuemin={0}
+                        aria-valuemax={totalInDataset}
+                        aria-label={`${item.name}: ${pctFormatted}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* Data Table View: Complete, accessible tabular representation */
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground pb-1 font-medium">
+              <span>
+                Showing {sortedData.length} of {data.length} records
+                {searchQuery && ` (filtered: ${filteredTotal} ${unit} · ${filteredPercentage})`}
+              </span>
+              <span>Reconciled to {totalInDataset.toLocaleString()} Total {unit}</span>
+            </div>
+
+            <div className="max-h-[380px] overflow-y-auto border border-border/40 rounded-lg">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-muted/40 sticky top-0 border-b border-border/40 text-muted-foreground font-medium">
+                  <tr>
+                    <th className="py-2 px-3 w-12 text-center font-mono">#</th>
+                    <th className="py-2 px-3">{categoryColumnHeader}</th>
+                    <th className="py-2 px-3 w-32">{secondaryColumnHeader}</th>
+                    <th className="py-2 px-3 w-28 text-right">Students</th>
+                    <th className="py-2 px-3 w-24 text-right">Share (%)</th>
+                    <th className="py-2 px-3 w-28 hidden sm:table-cell">Distribution</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {sortedData.map((item, idx) => {
+                    const pctNumber = totalInDataset > 0 ? (item.value / totalInDataset) * 100 : 0;
+                    const pctFormatted = calculatePercentage(item.value, totalInDataset, 1);
+
+                    return (
+                      <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                        <td className="py-2 px-3 text-center font-mono text-[11px] text-muted-foreground">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2 px-3 font-medium text-foreground">
+                          {item.name}
+                        </td>
+                        <td className="py-2 px-3 text-muted-foreground font-mono text-[11px]">
+                          {item.secondaryLabel || item.code || "—"}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono font-semibold text-foreground">
+                          {item.value.toLocaleString()}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono font-medium text-foreground">
+                          {pctFormatted}
+                        </td>
+                        <td className="py-2 px-3 hidden sm:table-cell">
+                          <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-foreground/80 rounded-full"
+                              style={{ width: `${Math.min(100, Math.max(2, pctNumber))}%` }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-muted/50 border-t border-border/60 font-semibold text-foreground sticky bottom-0">
+                  <tr>
+                    <td colSpan={3} className="py-2.5 px-3">
+                      Total Represented ({sortedData.length} categories)
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      {filteredTotal.toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      {filteredPercentage}
+                    </td>
+                    <td className="py-2.5 px-3 hidden sm:table-cell">
+                      <div className="h-1.5 w-full bg-foreground rounded-full" />
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 7. Academic Hierarchy Card (School -> Degree Level -> Course)
+// ============================================================================
+interface AcademicHierarchyCardProps {
+  schools: AcademicHierarchySchoolNode[];
+  totalStudents: number;
+  emptyMessage?: string;
+  className?: string;
+}
+
+export function AcademicHierarchyCard({
+  schools,
+  totalStudents,
+  emptyMessage = "No academic hierarchy records found",
+  className
+}: AcademicHierarchyCardProps) {
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [viewMode, setViewMode] = React.useState<"tree" | "matrix">("tree");
+  const [expandedSchools, setExpandedSchools] = React.useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    schools.forEach(s => { initial[s.schoolName] = true; });
+    return initial;
+  });
+
+  const totalInDataset = totalStudents > 0
+    ? totalStudents
+    : schools.reduce((acc, curr) => acc + curr.studentCount, 0);
+
+  const toggleSchool = (schoolName: string) => {
+    setExpandedSchools(prev => ({
+      ...prev,
+      [schoolName]: !prev[schoolName]
+    }));
+  };
+
+  const expandAll = () => {
+    const next: Record<string, boolean> = {};
+    schools.forEach(s => { next[s.schoolName] = true; });
+    setExpandedSchools(next);
+  };
+
+  const collapseAll = () => {
+    setExpandedSchools({});
+  };
+
+  // Filter hierarchy based on search query
+  const filteredSchools = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return schools;
+
+    return schools
+      .map(school => {
+        const schoolMatch = school.schoolName.toLowerCase().includes(q) ||
+          (school.schoolCode ? school.schoolCode.toLowerCase().includes(q) : false);
+
+        const filteredLevels = school.levels
+          .map(lvl => {
+            const levelMatch = lvl.level.toLowerCase().includes(q);
+            const filteredCourses = lvl.courses.filter(c =>
+              c.name.toLowerCase().includes(q) || (c.code ? c.code.toLowerCase().includes(q) : false)
+            );
+
+            if (levelMatch || filteredCourses.length > 0) {
+              return {
+                ...lvl,
+                courses: levelMatch ? lvl.courses : filteredCourses
+              };
+            }
+            return null;
+          })
+          .filter(Boolean) as AcademicHierarchyLevelNode[];
+
+        if (schoolMatch || filteredLevels.length > 0) {
+          return {
+            ...school,
+            levels: schoolMatch ? school.levels : filteredLevels
+          };
+        }
+        return null;
+      })
+      .filter(Boolean) as AcademicHierarchySchoolNode[];
+  }, [schools, searchQuery]);
+
+  // Flattened matrix items for table view
+  const flattenedCourses = React.useMemo(() => {
+    const items: Array<{
+      schoolName: string;
+      schoolCode?: string;
+      level: string;
+      courseName: string;
+      courseCode?: string;
+      studentCount: number;
+      percentageOfSchool: number;
+      percentageOfTotal: number;
+    }> = [];
+
+    filteredSchools.forEach(school => {
+      school.levels.forEach(lvl => {
+        lvl.courses.forEach(course => {
+          items.push({
+            schoolName: school.schoolName,
+            schoolCode: school.schoolCode,
+            level: lvl.level,
+            courseName: course.name,
+            courseCode: course.code,
+            studentCount: course.studentCount,
+            percentageOfSchool: course.percentageOfSchool,
+            percentageOfTotal: course.percentageOfTotal
+          });
+        });
+      });
+    });
+
+    return items;
+  }, [filteredSchools]);
+
+  const totalFilteredStudents = flattenedCourses.reduce((sum, c) => sum + c.studentCount, 0);
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md",
+        className
+      )}
+    >
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-3 border-b border-border/40">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight text-foreground">
+            Course-Level Academic Hierarchy & Enrollment Distribution
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Institutional structural breakdown: Academic School → Degree Level → Canonical Course
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+            {totalInDataset.toLocaleString()} Total Students
+          </span>
+          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40">
+            {schools.length} Schools
+          </span>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 py-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search school, level, or course..."
+            className="w-full h-8 pl-8 pr-7 text-xs rounded-md border border-border/60 bg-background/50 text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+              title="Clear search"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {viewMode === "tree" && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={expandAll}
+                className="px-2 py-1 text-[11px] font-medium rounded border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+              >
+                Expand All
+              </button>
+              <button
+                type="button"
+                onClick={collapseAll}
+                className="px-2 py-1 text-[11px] font-medium rounded border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+              >
+                Collapse All
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center rounded-md border border-border/60 p-0.5 bg-muted/30">
+            <button
+              type="button"
+              onClick={() => setViewMode("tree")}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                viewMode === "tree"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="View hierarchical tree structure"
+            >
+              <ListTree className="h-3.5 w-3.5" />
+              <span>Tree</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("matrix")}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded transition-all",
+                viewMode === "matrix"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              title="View tabular course matrix"
+            >
+              <Table className="h-3.5 w-3.5" />
+              <span>Matrix</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 min-h-[250px]">
+        {schools.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
+            <Inbox className="h-7 w-7 stroke-[1.5]" />
+            <span className="text-xs">{emptyMessage}</span>
+          </div>
+        ) : filteredSchools.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/60 gap-2">
+            <Search className="h-7 w-7 stroke-[1.5]" />
+            <span className="text-xs">No matching hierarchy nodes found for &quot;{searchQuery}&quot;</span>
+            <button
+              onClick={() => setSearchQuery("")}
+              className="text-xs text-primary underline underline-offset-2 hover:opacity-80"
+            >
+              Clear search filter
+            </button>
+          </div>
+        ) : viewMode === "tree" ? (
+          /* Tree View */
+          <div className="max-h-[460px] overflow-y-auto pr-1.5 space-y-3 custom-scrollbar">
+            {filteredSchools.map((school, sIdx) => {
+              const isExpanded = expandedSchools[school.schoolName] ?? true;
+
+              return (
+                <div
+                  key={sIdx}
+                  className="rounded-lg border border-border/50 bg-muted/15 overflow-hidden transition-all"
+                >
+                  {/* Tier 1: School Header */}
+                  <div
+                    onClick={() => toggleSchool(school.schoolName)}
+                    className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/30 select-none transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      )}
+                      <Building2 className="h-4 w-4 text-primary shrink-0" />
+                      <span className="font-semibold text-xs text-foreground truncate">
+                        {school.schoolName}
+                      </span>
+                      {school.schoolCode && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border/40 shrink-0">
+                          {school.schoolCode}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <span className="text-xs font-mono font-bold text-foreground">
+                        {school.percentageOfTotal.toFixed(1)}%
+                      </span>
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        ({school.studentCount} students)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tier 2 & 3: Levels & Courses */}
+                  {isExpanded && (
+                    <div className="px-3 pb-3 pt-1 space-y-3 border-t border-border/30 bg-background/40">
+                      {school.levels.map((levelNode, lIdx) => (
+                        <div key={lIdx} className="space-y-1.5 pl-3 border-l-2 border-border/60">
+                          {/* Level Sub-Header */}
+                          <div className="flex items-center justify-between text-xs py-1 text-muted-foreground font-medium">
+                            <div className="flex items-center gap-2">
+                              <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-foreground font-semibold">{levelNode.level}</span>
+                            </div>
+                            <div className="flex items-center gap-2 font-mono text-[11px]">
+                              <span>{levelNode.studentCount} students</span>
+                              <span className="text-muted-foreground/70">
+                                ({levelNode.percentageOfSchool.toFixed(1)}% of school)
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Courses within Level */}
+                          <div className="space-y-1.5 pl-3">
+                            {levelNode.courses.map((course, cIdx) => (
+                              <div
+                                key={cIdx}
+                                className="p-2 rounded bg-card/60 border border-border/30 hover:border-border/60 transition-all space-y-1"
+                              >
+                                <div className="flex items-center justify-between text-xs gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-foreground/60 shrink-0" />
+                                    <span className="font-medium text-foreground truncate" title={course.name}>
+                                      {course.name}
+                                    </span>
+                                    {course.code && (
+                                      <span className="text-[10px] font-mono text-muted-foreground shrink-0 px-1 rounded bg-muted/40">
+                                        {course.code}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0 font-mono text-right">
+                                    <span className="font-semibold text-foreground">
+                                      {course.studentCount} std
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      ({course.percentageOfSchool.toFixed(1)}% school · {course.percentageOfTotal.toFixed(1)}% total)
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="h-1 w-full bg-muted/50 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-foreground/70 rounded-full"
+                                    style={{ width: `${Math.min(100, Math.max(2, (course.studentCount / totalInDataset) * 100))}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Tabular Matrix View */
+          <div className="space-y-2">
+            <div className="max-h-[460px] overflow-y-auto border border-border/40 rounded-lg">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-muted/40 sticky top-0 border-b border-border/40 text-muted-foreground font-medium">
+                  <tr>
+                    <th className="py-2 px-3">School / Faculty</th>
+                    <th className="py-2 px-3 w-36">Degree Level</th>
+                    <th className="py-2 px-3">Course / Program</th>
+                    <th className="py-2 px-3 w-24 text-right">Students</th>
+                    <th className="py-2 px-3 w-24 text-right">% School</th>
+                    <th className="py-2 px-3 w-24 text-right">% Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/20">
+                  {flattenedCourses.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                      <td className="py-2 px-3 font-medium text-foreground">
+                        {row.schoolName}
+                      </td>
+                      <td className="py-2 px-3 text-muted-foreground font-mono text-[11px]">
+                        {row.level}
+                      </td>
+                      <td className="py-2 px-3 text-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <span>{row.courseName}</span>
+                          {row.courseCode && (
+                            <span className="text-[10px] font-mono text-muted-foreground px-1 rounded bg-muted/40">
+                              {row.courseCode}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-semibold text-foreground">
+                        {row.studentCount}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono text-muted-foreground">
+                        {row.percentageOfSchool.toFixed(1)}%
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-medium text-foreground">
+                        {row.percentageOfTotal.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-muted/50 border-t border-border/60 font-semibold text-foreground sticky bottom-0">
+                  <tr>
+                    <td colSpan={3} className="py-2.5 px-3">
+                      Total Represented ({flattenedCourses.length} courses)
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      {totalFilteredStudents}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono">—</td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      {calculatePercentage(totalFilteredStudents, totalInDataset, 1)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -9,7 +9,7 @@
  * without hardcoded lists or penalizing non-applicable conditional tracks.
  */
 
-export type ProfileSectionId = "identity" | "academic" | "contact" | "family" | "emergency" | "bank" | "immigration";
+export type ProfileSectionId = "identity" | "academic" | "contact" | "family" | "emergency" | "bank" | "immigration" | "consular";
 
 export interface ProfileSectionEvaluation {
   id: ProfileSectionId;
@@ -110,6 +110,29 @@ export interface StudentProfileEvaluationData {
   efrroNumber?: string | null;
   efrroExpiry?: string | Date | null;
   efrroStatus?: string | null;
+
+  // Consular & Embassy Information
+  embassy?: {
+    name?: string | null;
+    embassy_name?: string | null;
+    embassyName?: string | null;
+    address?: string | null;
+    city?: string | null;
+    country?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    website?: string | null;
+    contactPerson?: string | null;
+    contact_person?: string | null;
+  } | null;
+  embassyName?: string | null;
+  embassyAddress?: string | null;
+  embassyCity?: string | null;
+  embassyCountry?: string | null;
+  embassyPhone?: string | null;
+  embassyEmail?: string | null;
+  embassyWebsite?: string | null;
+  embassyContactPerson?: string | null;
 }
 
 /**
@@ -134,13 +157,14 @@ export interface CompletenessSectionMetadata {
 }
 
 export const PROFILE_SECTIONS_CONFIG: CompletenessSectionMetadata[] = [
-  { id: "identity", title: "Personal Identity", weight: 20 },
-  { id: "academic", title: "Academic & Admission", weight: 20 },
+  { id: "identity", title: "Personal Identity", weight: 15 },
+  { id: "academic", title: "Academic & Admission", weight: 15 },
   { id: "contact", title: "Contact Coordinates", weight: 15 },
   { id: "family", title: "Family Coordinates", weight: 10 },
   { id: "emergency", title: "Emergency Contact", weight: 10 },
   { id: "bank", title: "Bank Details", weight: 10 },
-  { id: "immigration", title: "Legal & Immigration", weight: 15 }
+  { id: "immigration", title: "Legal & Immigration", weight: 15 },
+  { id: "consular", title: "Consular & Embassy Information", weight: 10 }
 ];
 
 export const PROFILE_FIELDS_CONFIG: CompletenessFieldMetadata[] = [
@@ -381,6 +405,44 @@ export const PROFILE_FIELDS_CONFIG: CompletenessFieldMetadata[] = [
     sectionId: "immigration",
     sectionTitle: "Legal & Immigration",
     getValue: (d) => d.efrroExpiry
+  },
+
+  // 8. Consular & Embassy Information (Weight: 10%)
+  {
+    key: "consularInfo",
+    label: "Consular & Embassy Information",
+    sectionId: "consular",
+    sectionTitle: "Consular & Embassy Information",
+    getValue: (d) => {
+      const emb = d.embassy;
+      const candidates = [
+        emb?.name,
+        (emb as Record<string, unknown> | undefined)?.embassy_name,
+        (emb as Record<string, unknown> | undefined)?.embassyName,
+        d.embassyName,
+        emb?.address,
+        d.embassyAddress,
+        emb?.city,
+        d.embassyCity,
+        emb?.country,
+        d.embassyCountry,
+        emb?.phone,
+        d.embassyPhone,
+        emb?.email,
+        d.embassyEmail,
+        emb?.website,
+        d.embassyWebsite,
+        emb?.contactPerson,
+        (emb as Record<string, unknown> | undefined)?.contact_person,
+        d.embassyContactPerson
+      ];
+      for (const val of candidates) {
+        if (ProfileCompletionEngine.isPresent(val)) {
+          return val;
+        }
+      }
+      return null;
+    }
   }
 ];
 

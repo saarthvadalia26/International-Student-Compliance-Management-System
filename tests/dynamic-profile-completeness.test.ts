@@ -44,10 +44,10 @@ test("Test 1 — Completely empty student: Detects all applicable missing profil
   assert.ok(result.missingItems.includes("Father Name"), "Father name missing");
   assert.ok(result.missingItems.includes("Passport Number"), "Passport missing");
   assert.ok(result.missingItems.includes("Visa Number"), "Visa missing");
-  assert.ok(result.missingItems.includes("eFRRO Number"), "eFRRO missing");
+  assert.ok(result.missingItems.includes("Consular & Embassy Information"), "Consular & Embassy missing");
 
   // Check section counts
-  assert.equal(result.sections.length, 7, "Must contain all 7 sections");
+  assert.equal(result.sections.length, 8, "Must contain all 8 sections");
 });
 
 // --------------------------------------------------------------------------
@@ -107,7 +107,9 @@ test("Test 3 & 4 — Bank Details lifecycle: Appears when missing, disappears wh
     visaNumber: "V556677",
     visaExpiry: "2028-08-01",
     efrroNumber: "E998811",
-    efrroExpiry: "2027-08-01"
+    efrroExpiry: "2027-08-01",
+    embassyName: "Embassy of Pakistan",
+    embassyAddress: "Chanakyapuri, New Delhi"
   };
 
   // Test 3: Bank Details missing
@@ -240,7 +242,9 @@ test("Test 8 — 100% completed profile: Displays 'Complete Profile (100%)' with
     visaNumber: "V98765432",
     visaExpiry: "2028-08-01",
     efrroNumber: "FRRO998877",
-    efrroExpiry: "2027-08-01"
+    efrroExpiry: "2027-08-01",
+    embassyName: "Embassy of the Russian Federation",
+    embassyAddress: "Shantipath, Chanakyapuri, New Delhi"
   });
 
   assert.equal(full.percentage, 100, "Percentage should be 100%");
@@ -323,6 +327,100 @@ test("Test 13 — System fields exclusion: Internal metadata columns never appea
   for (const item of result.missingItems) {
     assert.ok(!bannedKeywords.includes(item.toLowerCase()), `Banned system field '${item}' must not appear in missingItems`);
   }
+});
+
+// --------------------------------------------------------------------------
+// TEST 14 — Consular & Embassy Information Lifecycle
+// --------------------------------------------------------------------------
+test("Test 14 — Consular & Embassy Information lifecycle: Detected when missing, cleared when provided, restored when emptied", () => {
+  const baseStudent = {
+    fullName: "Amir Khan",
+    nationalityCode: "AFG",
+    dateOfBirth: "2000-01-15",
+    gender: "male",
+    maritalStatus: "single",
+    bloodGroup: "O+",
+    registrationNumber: "NFSU/2026/CYBER/10",
+    programCode: "MSC_CYBER",
+    admissionDate: "2026-08-01",
+    expectedGraduation: "2028-06-30",
+    admissionCategory: "direct",
+    admissionAcademicYear: "2026-2027",
+    lastEducationalQualification: "Bachelor of Science",
+    lastEducationalInstitution: "Kabul University",
+    email: "amir.khan@example.com",
+    phoneHome: "+93-70-123456",
+    permanentAddress: "Kabul, Afghanistan",
+    presentAddress: "Campus Hostel Block A",
+    fatherName: "Rahim Khan",
+    motherName: "Zainab Khan",
+    emergencyContactName: "Rahim Khan",
+    emergencyContactPhone: "+93-70-123456",
+    bankDetails: {
+      bankName: "State Bank of India",
+      accountNumber: "123456789012"
+    },
+    passportNumber: "AF1234567",
+    passportExpiry: "2030-01-01",
+    visaNumber: "IN9876543",
+    visaExpiry: "2028-08-01",
+    efrroNumber: "FRRO123456",
+    efrroExpiry: "2027-08-01"
+  };
+
+  // 1. Without consular info -> must identify Consular & Embassy Information as pending
+  const withoutConsular = ProfileCompletionEngine.evaluate({
+    ...baseStudent,
+    embassyName: null,
+    embassyAddress: null
+  });
+  assert.ok(withoutConsular.missingItems.includes("Consular & Embassy Information"), "Must report missing Consular & Embassy Information");
+  const consularSecWithout = withoutConsular.sections.find(s => s.id === "consular");
+  assert.equal(consularSecWithout?.percentage, 0, "Consular section must be 0% when missing");
+  assert.ok(withoutConsular.percentage < 100, "Overall score must be less than 100% when consular info is missing");
+
+  // 2. With consular info -> must remove Consular & Embassy Information from pending
+  const withConsular = ProfileCompletionEngine.evaluate({
+    ...baseStudent,
+    embassyName: "Embassy of Afghanistan",
+    embassyAddress: "Plot No. 5/50-E, Shantipath, Chanakyapuri, New Delhi",
+    embassyCity: "New Delhi",
+    embassyCountry: "India",
+    embassyPhone: "+91-11-2410-0970",
+    embassyEmail: "delhi@mfa.af",
+    embassyWebsite: "https://newdelhi.mfa.af"
+  });
+  assert.ok(!withConsular.missingItems.includes("Consular & Embassy Information"), "Consular & Embassy Information must disappear from missingItems once completed");
+  const consularSecWith = withConsular.sections.find(s => s.id === "consular");
+  assert.equal(consularSecWith?.percentage, 100, "Consular section must reach 100%");
+  assert.equal(withConsular.percentage, 100, "Profile reaches 100% when all sections including consular are complete");
+
+  // 3. Reverse test: staff clears all optional consular fields -> must identify section as pending again
+  const clearedConsular = ProfileCompletionEngine.evaluate({
+    ...withConsular,
+    embassy: {
+      name: "Not Specified",
+      address: "Not Specified",
+      city: "",
+      country: "",
+      phone: "",
+      email: "",
+      website: "",
+      contactPerson: ""
+    },
+    embassyName: "",
+    embassyAddress: "",
+    embassyCity: "",
+    embassyCountry: "",
+    embassyPhone: "",
+    embassyEmail: "",
+    embassyWebsite: "",
+    embassyContactPerson: ""
+  });
+  assert.ok(clearedConsular.missingItems.includes("Consular & Embassy Information"), "Clearing consular values must cause it to be pending again");
+  const consularSecCleared = clearedConsular.sections.find(s => s.id === "consular");
+  assert.equal(consularSecCleared?.percentage, 0, "Consular section returns to 0% after clearing");
+  assert.ok(clearedConsular.percentage < 100, "Overall score decreases when consular info is cleared");
 });
 
 console.log("\n============================================================");

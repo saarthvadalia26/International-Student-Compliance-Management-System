@@ -12,6 +12,7 @@
  * 8. Bulk Import Auto-mapping & Row Validation with expanded fields
  */
 
+import "./test-preload";
 import { 
   calculateAge, 
   formatAgeDisplay, 
@@ -314,7 +315,9 @@ async function runTestSuite() {
     visaNumber: "V9876543",
     visaExpiry: "2028-08-01",
     efrroNumber: "E555555",
-    efrroExpiry: "2027-01-01"
+    efrroExpiry: "2027-01-01",
+    embassyName: "Embassy of Nepal",
+    embassyAddress: "Barakhamba Road, New Delhi"
   });
 
   assert(bareProfile.percentage < fullProfile.percentage, `Profile completion score increases: ${bareProfile.percentage}% -> ${fullProfile.percentage}%`);

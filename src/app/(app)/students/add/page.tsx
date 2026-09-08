@@ -17,7 +17,8 @@ import {
   Users,
   Landmark,
   Award,
-  MapPin
+  MapPin,
+  Building
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
@@ -141,7 +142,16 @@ const FIELD_METADATA: Record<string, FieldMeta> = {
   bankName: { tab: "documents", elementId: "bankName", label: "Bank Name" },
   accountNumber: { tab: "documents", elementId: "accountNumber", label: "Account Number" },
   ifscCode: { tab: "documents", elementId: "ifscCode", label: "IFSC Code" },
-  branchAddress: { tab: "documents", elementId: "branchAddress", label: "Branch Address" }
+  branchAddress: { tab: "documents", elementId: "branchAddress", label: "Branch Address" },
+
+  embassyName: { tab: "contact", elementId: "embassyName", label: "Consulate / Embassy Name" },
+  embassyContactPerson: { tab: "contact", elementId: "embassyContactPerson", label: "Diplomatic Liaison / Contact Person" },
+  embassyAddress: { tab: "contact", elementId: "embassyAddress", label: "Embassy / Consulate Address" },
+  embassyCity: { tab: "contact", elementId: "embassyCity", label: "Consular City" },
+  embassyCountry: { tab: "contact", elementId: "embassyCountry", label: "Consular Country" },
+  embassyPhone: { tab: "contact", elementId: "embassyPhone", label: "Consular Phone Number" },
+  embassyEmail: { tab: "contact", elementId: "embassyEmail", label: "Consular Email" },
+  embassyWebsite: { tab: "contact", elementId: "embassyWebsite", label: "Official Consular Website" }
 };
 
 import { parseDateToISO } from "@/lib/utils/date";
@@ -284,7 +294,17 @@ export default function StudentRegistrationPage() {
     bankName: "",
     accountNumber: "",
     ifscCode: "",
-    branchAddress: ""
+    branchAddress: "",
+
+    // Consular & Embassy (Optional)
+    embassyName: "",
+    embassyContactPerson: "",
+    embassyAddress: "",
+    embassyCity: "",
+    embassyCountry: "",
+    embassyPhone: "",
+    embassyEmail: "",
+    embassyWebsite: ""
   });
 
   // Calculate error counts per tab
@@ -535,7 +555,17 @@ export default function StudentRegistrationPage() {
       bankName: formData.bankName?.trim() || undefined,
       accountNumber: formData.accountNumber?.trim() || undefined,
       ifscCode: formData.ifscCode?.trim() || undefined,
-      branchAddress: formData.branchAddress?.trim() || undefined
+      branchAddress: formData.branchAddress?.trim() || undefined,
+
+      // Consular & Embassy (Optional)
+      embassyName: formData.embassyName?.trim() || undefined,
+      embassyContactPerson: formData.embassyContactPerson?.trim() || undefined,
+      embassyAddress: formData.embassyAddress?.trim() || undefined,
+      embassyCity: formData.embassyCity?.trim() || undefined,
+      embassyCountry: formData.embassyCountry?.trim() || undefined,
+      embassyPhone: formData.embassyPhone?.trim() || undefined,
+      embassyEmail: formData.embassyEmail?.trim() || undefined,
+      embassyWebsite: formData.embassyWebsite?.trim() || undefined
     };
 
     const result = RegisterStudentValidationSchema.safeParse(validationPayload);
@@ -1790,6 +1820,176 @@ export default function StudentRegistrationPage() {
                           {validationErrors.relationshipEmail}
                         </p>
                       )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* 4. Consular & Embassy Information */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Building className="h-4 w-4 text-primary shrink-0" />
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Consular & Embassy Information (Optional)</h3>
+                      <p className="text-[11px] text-muted-foreground font-caption">Diplomatic mission and consular representation coordinates for repatriation, legal liaisons, and consular notifications.</p>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-border/60 bg-muted/10 space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="embassyName">
+                          Consulate / Embassy Name
+                        </label>
+                        <Input
+                          id="embassyName"
+                          placeholder="e.g. Embassy of Germany / Consulate General"
+                          value={formData.embassyName}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.embassyName ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                        {validationErrors.embassyName && (
+                          <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                            {validationErrors.embassyName}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="embassyContactPerson">
+                          Diplomatic Liaison / Contact Person
+                        </label>
+                        <Input
+                          id="embassyContactPerson"
+                          placeholder="e.g. First Secretary / Consular Officer"
+                          value={formData.embassyContactPerson}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.embassyContactPerson ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                        {validationErrors.embassyContactPerson && (
+                          <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                            {validationErrors.embassyContactPerson}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-medium text-foreground" htmlFor="embassyAddress">
+                          Embassy / Consulate Address
+                        </label>
+                        <Textarea
+                          id="embassyAddress"
+                          placeholder="Street address, diplomatic enclave, postal details..."
+                          value={formData.embassyAddress}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`min-h-16 text-sm ${validationErrors.embassyAddress ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                        {validationErrors.embassyAddress && (
+                          <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                            {validationErrors.embassyAddress}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="embassyCity">
+                          City
+                        </label>
+                        <Input
+                          id="embassyCity"
+                          placeholder="e.g. New Delhi / Mumbai"
+                          value={formData.embassyCity}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.embassyCity ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                        {validationErrors.embassyCity && (
+                          <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                            {validationErrors.embassyCity}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="embassyCountry">
+                          Country
+                        </label>
+                        <Input
+                          id="embassyCountry"
+                          placeholder="e.g. Germany"
+                          value={formData.embassyCountry}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.embassyCountry ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                        {validationErrors.embassyCountry && (
+                          <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                            {validationErrors.embassyCountry}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="embassyPhone">
+                          Consular Phone Number
+                        </label>
+                        <Input
+                          id="embassyPhone"
+                          placeholder="e.g. +91 11 4419 9199"
+                          value={formData.embassyPhone}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.embassyPhone ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                        {validationErrors.embassyPhone && (
+                          <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                            {validationErrors.embassyPhone}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-foreground" htmlFor="embassyEmail">
+                          Consular Email
+                        </label>
+                        <Input
+                          id="embassyEmail"
+                          type="email"
+                          placeholder="e.g. consular@embassy.de"
+                          value={formData.embassyEmail}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.embassyEmail ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                        {validationErrors.embassyEmail && (
+                          <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                            {validationErrors.embassyEmail}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-medium text-foreground" htmlFor="embassyWebsite">
+                          Official Consular Website
+                        </label>
+                        <Input
+                          id="embassyWebsite"
+                          placeholder="e.g. https://india.diplo.de"
+                          value={formData.embassyWebsite}
+                          onChange={handleInputChange}
+                          disabled={isSubmitting}
+                          className={`h-10 text-sm ${validationErrors.embassyWebsite ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                        />
+                        {validationErrors.embassyWebsite && (
+                          <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                            {validationErrors.embassyWebsite}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

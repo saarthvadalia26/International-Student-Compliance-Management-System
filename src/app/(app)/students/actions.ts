@@ -666,7 +666,8 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
     const academic = record.student_academic?.[0] || record.student_academic;
     const relationships = record.student_relationships || [];
     const primaryContact = relationships[0] || {};
-    const embassy = record.student_embassy?.[0] || record.student_embassy || {};
+    const embassyRaw = record.student_embassy?.[0] || record.student_embassy || null;
+    const embassy = embassyRaw && !embassyRaw.deleted_at ? embassyRaw : null;
     const snapshot = record.student_snapshot?.[0] || record.student_snapshot || {};
     const bank = record.student_bank_details?.[0] || record.student_bank_details || null;
 
@@ -940,14 +941,14 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         email: primaryContact.email || ""
       },
       embassy: {
-        name: embassy.embassy_name || "Not Specified",
-        phone: embassy.phone || "",
-        email: embassy.email || "",
-        address: embassy.address || "Not Specified",
-        city: embassy.city || "",
-        country: embassy.country || "",
-        website: embassy.website || "",
-        contactPerson: embassy.contact_person || ""
+        name: embassy?.embassy_name || "Not Specified",
+        phone: embassy?.phone || "",
+        email: embassy?.email || "",
+        address: embassy?.address || "Not Specified",
+        city: embassy?.city || "",
+        country: embassy?.country || "",
+        website: embassy?.website || "",
+        contactPerson: embassy?.contact_person || ""
       },
       bankDetails: bank ? {
         id: bank.id,

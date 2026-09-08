@@ -4,6 +4,7 @@
  * profile completion scoring, Excel bulk import progressive tolerance, and unassigned status handling.
  */
 
+import "./test-preload";
 import { RegisterStudentValidationSchema, UpdateStudentValidationSchema } from "../src/services/validation/student-validation";
 import { ProfileCompletionEngine } from "../src/domain/students/services/profile-completion.service";
 import { BulkStudentImportService } from "../src/domain/import/services/bulk-student-import.service";
@@ -229,7 +230,7 @@ async function runTestSuite() {
     admissionDate: "2026-08-01"
   });
   assert(
-    day5Eval.percentage >= 25 && day5Eval.percentage < 75,
+    day5Eval.percentage >= 20 && day5Eval.percentage < 75,
     `Day 5 student has partial score (Actual: ${day5Eval.percentage}%)`
   );
   assert(
@@ -270,7 +271,9 @@ async function runTestSuite() {
     visaNumber: "V98765432",
     visaExpiry: "2028-08-01",
     efrroNumber: "FRRO998877",
-    efrroExpiry: "2027-08-01"
+    efrroExpiry: "2027-08-01",
+    embassyName: "Embassy of Russia",
+    embassyAddress: "New Delhi"
   });
   assert(
     completeEval.percentage === 100,

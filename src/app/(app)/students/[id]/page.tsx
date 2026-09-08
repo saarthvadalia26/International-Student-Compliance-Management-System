@@ -957,6 +957,15 @@ export default function StudentDetailsPage({ params }: PageProps) {
       emergencyContactName: student.emergencyContact?.name,
       emergencyContactPhone: student.emergencyContact?.phone,
       bankDetails: student.bankDetails,
+      embassy: student.embassy,
+      embassyName: student.embassy?.name,
+      embassyAddress: student.embassy?.address,
+      embassyCity: student.embassy?.city,
+      embassyCountry: student.embassy?.country,
+      embassyPhone: student.embassy?.phone,
+      embassyEmail: student.embassy?.email,
+      embassyWebsite: student.embassy?.website,
+      embassyContactPerson: student.embassy?.contactPerson,
       passportNumber: student.passport?.number,
       passportExpiry: student.passport?.expiryDate,
       visaNumber: student.visa?.number,
@@ -1070,14 +1079,14 @@ export default function StudentDetailsPage({ params }: PageProps) {
         currentSemester: Number(editForm.currentSemester) || 1,
         academicStatus: editForm.academicStatus,
         status: editForm.status,
-        embassyName: editForm.embassyName.trim() || undefined,
-        embassyAddress: editForm.embassyAddress.trim() || undefined,
-        embassyCity: editForm.embassyCity.trim() || undefined,
-        embassyCountry: editForm.embassyCountry.trim() || undefined,
-        embassyPhone: editForm.embassyPhone.trim() || undefined,
-        embassyEmail: editForm.embassyEmail.trim() || undefined,
-        embassyWebsite: editForm.embassyWebsite.trim() || undefined,
-        embassyContactPerson: editForm.embassyContactPerson.trim() || undefined,
+        embassyName: editForm.embassyName?.trim() || null,
+        embassyAddress: editForm.embassyAddress?.trim() || null,
+        embassyCity: editForm.embassyCity?.trim() || null,
+        embassyCountry: editForm.embassyCountry?.trim() || null,
+        embassyPhone: editForm.embassyPhone?.trim() || null,
+        embassyEmail: editForm.embassyEmail?.trim() || null,
+        embassyWebsite: editForm.embassyWebsite?.trim() || null,
+        embassyContactPerson: editForm.embassyContactPerson?.trim() || null,
 
         // Bank Details
         bankName: editForm.bankName?.trim() || null,
@@ -2449,6 +2458,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 </span>
               </div>
 
+              {student.embassy?.contactPerson && (
+                <div className="space-y-0.5">
+                  <span className="text-muted-foreground block font-caption">Diplomatic Liaison</span>
+                  <span className="font-medium text-foreground block">{student.embassy.contactPerson}</span>
+                </div>
+              )}
+
               <div className="space-y-0.5">
                 <span className="text-muted-foreground block font-caption">Embassy Address</span>
                 <span className="font-medium text-foreground block leading-normal">
@@ -3459,15 +3475,27 @@ export default function StudentDetailsPage({ params }: PageProps) {
                 <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">Consular & Embassy Information</h4>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground" htmlFor="embassyName">Consulate / Embassy Name</label>
-                <Input 
-                  id="embassyName" 
-                  value={editForm.embassyName} 
-                  onChange={handleFormChange} 
-                  placeholder="e.g. Embassy of Germany / Consulate General"
-                  className="h-9 text-sm" 
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="embassyName">Consulate / Embassy Name</label>
+                  <Input 
+                    id="embassyName" 
+                    value={editForm.embassyName} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. Embassy of Germany / Consulate General"
+                    className="h-9 text-sm" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground" htmlFor="embassyContactPerson">Diplomatic Liaison / Contact Person</label>
+                  <Input 
+                    id="embassyContactPerson" 
+                    value={editForm.embassyContactPerson} 
+                    onChange={handleFormChange} 
+                    placeholder="e.g. First Secretary / Consular Officer"
+                    className="h-9 text-sm" 
+                  />
+                </div>
               </div>
 
               <div className="space-y-1.5">
