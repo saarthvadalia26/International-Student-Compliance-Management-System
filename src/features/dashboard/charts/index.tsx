@@ -66,18 +66,18 @@ export function ChartWrapper({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border border-border/60 bg-card p-5 text-card-foreground shadow-sm transition-all hover:shadow-md min-w-0 max-w-full overflow-hidden",
+        "flex flex-col rounded-2xl border border-border/70 bg-card/90 p-5 sm:p-6 text-card-foreground shadow-sm backdrop-blur-md transition-all duration-200 hover:shadow-lg hover:border-border min-w-0 max-w-full overflow-hidden",
         className
       )}
       {...props}
     >
-      <div className="mb-4 flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
-          {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 border-b border-border/40 pb-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm sm:text-base font-semibold tracking-tight text-foreground">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>}
         </div>
         {populationBadge && (
-          <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/40 shrink-0">
+          <span className="text-[10px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-muted/70 text-muted-foreground border border-border/50 shrink-0 self-start sm:self-auto whitespace-nowrap">
             {populationBadge}
           </span>
         )}
