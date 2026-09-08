@@ -117,12 +117,12 @@ export function DimensionCard({
     : renewalRows.reduce((acc, r) => acc + r.renewalCount, 0);
 
   return (
-    <Card className="flex flex-col border border-border/70 bg-card shadow-xs transition-shadow hover:shadow-sm">
+    <Card className="flex flex-col border border-border/70 bg-card shadow-xs transition-shadow hover:shadow-sm overflow-hidden w-full">
       <CardHeader className="pb-3 border-b border-border/40">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1 min-h-[44px] flex flex-col justify-center">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base font-semibold text-foreground tracking-tight">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 min-w-0">
+          <div className="space-y-1 min-h-[44px] flex flex-col justify-center min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <CardTitle className="text-base font-semibold text-foreground tracking-tight truncate">
                 {title}
               </CardTitle>
               <Badge variant="secondary" className="text-[11px] font-normal px-2 py-0.5 shrink-0">
@@ -139,9 +139,9 @@ export function DimensionCard({
           </div>
 
           {/* Action Toolbar */}
-          <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-start lg:self-auto">
             {/* View Mode Switch */}
-            <div className="flex items-center rounded-md border border-border/60 bg-muted/40 p-0.5">
+            <div className="flex items-center rounded-md border border-border/60 bg-muted/40 p-0.5 shrink-0">
               <Button
                 variant={viewMode === "chart" ? "secondary" : "ghost"}
                 size="sm"
@@ -170,7 +170,7 @@ export function DimensionCard({
               size="sm"
               onClick={handleExportChart}
               disabled={isChartExporting}
-              className="h-7 px-2 text-xs gap-1 border-border/60 hover:bg-muted"
+              className="h-7 px-2.5 text-xs gap-1.5 border-border/60 hover:bg-muted shrink-0"
               title="Download high-resolution chart PNG"
             >
               {isChartExporting ? (
@@ -178,7 +178,7 @@ export function DimensionCard({
               ) : (
                 <ImageIcon className="h-3 w-3 text-muted-foreground" />
               )}
-              <span className="hidden sm:inline">PNG</span>
+              <span className="text-[11px] font-medium">PNG</span>
             </Button>
 
             {/* Excel Export */}
@@ -187,7 +187,7 @@ export function DimensionCard({
               size="sm"
               onClick={() => onExportExcel(dimension)}
               disabled={isExcelExporting}
-              className="h-7 px-2 text-xs gap-1 border-emerald-600/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+              className="h-7 px-2.5 text-xs gap-1.5 border-emerald-600/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 shrink-0"
               title="Download dimensional Excel (.xlsx)"
             >
               {isExcelExporting ? (
@@ -195,7 +195,7 @@ export function DimensionCard({
               ) : (
                 <FileSpreadsheet className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
               )}
-              <span className="hidden sm:inline">Excel</span>
+              <span className="text-[11px] font-medium">Excel</span>
             </Button>
           </div>
         </div>
