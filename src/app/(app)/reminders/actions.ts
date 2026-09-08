@@ -382,7 +382,7 @@ export async function saveNotificationTemplate(payload: {
         .from("notification_templates")
         .select("*")
         .eq("id", payload.id)
-        .single();
+        .maybeSingle();
       beforeState = existing || null;
     }
 
@@ -607,7 +607,7 @@ export async function deleteNotificationTemplate(id: string, actorEmail?: string
         .from("notification_templates")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
       await supabase
         .from("notification_templates")

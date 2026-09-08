@@ -205,7 +205,7 @@ export class SchoolService {
       .update(payload)
       .eq("id", trimmedId)
       .select("*")
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       throw new Error(`Failed updating school: ${error?.message || "Database update failure"}`);

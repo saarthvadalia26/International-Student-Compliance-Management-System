@@ -335,6 +335,47 @@ export default function StudentListPage() {
     return filteredStudents.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredStudents, currentPage, itemsPerPage]);
 
+  // Helper to determine exact missing required documents for a student
+  const getMissingDocuments = (student: Student): string[] => {
+    if (student.missingDocuments && student.missingDocuments.length > 0) {
+      return student.missingDocuments;
+    }
+
+    const missing: string[] = [];
+
+    const isPassportMissing =
+      student.passport?.status === "MISSING" ||
+      !student.passport?.number ||
+      student.passport.number.trim().toLowerCase() === "not provided" ||
+      student.passport.number.trim() === "" ||
+      !student.passport?.expiry;
+    if (isPassportMissing) {
+      missing.push("Passport");
+    }
+
+    const isVisaMissing =
+      student.visa?.status === "MISSING" ||
+      !student.visa?.number ||
+      student.visa.number.trim().toLowerCase() === "not provided" ||
+      student.visa.number.trim() === "" ||
+      !student.visa?.expiry;
+    if (isVisaMissing) {
+      missing.push("Visa");
+    }
+
+    const isEfrroMissing =
+      student.efrro?.status === "MISSING" ||
+      !student.efrro?.number ||
+      student.efrro.number.trim().toLowerCase() === "not provided" ||
+      student.efrro.number.trim() === "" ||
+      !student.efrro?.expiry;
+    if (isEfrroMissing) {
+      missing.push("eFRRO");
+    }
+
+    return missing;
+  };
+
   // Overall compliance badge renderer
   const renderOverallComplianceBadge = (student: Student) => {
     const rawStatus = (student.rawComplianceStatus || "").toUpperCase();
@@ -367,6 +408,15 @@ export default function StudentListPage() {
       );
     }
 
+    if (rawStatus === "REJECTED") {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/25 whitespace-nowrap shadow-2xs">
+          <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 shrink-0" />
+          <span>Rejected</span>
+        </span>
+      );
+    }
+
     if (rawStatus === "COMPLIANT" && mappedStatus === "compliant") {
       return (
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 whitespace-nowrap shadow-2xs">
@@ -376,10 +426,32 @@ export default function StudentListPage() {
       );
     }
 
+    // Determine missing documents to show exact missing permit instead of generic "Incomplete"
+    const missingDocs = getMissingDocuments(student);
+    let badgeText = "Missing Documents";
+    let tooltipText = "";
+
+    if (missingDocs.length === 1) {
+      badgeText = `Missing ${missingDocs[0]}`;
+      tooltipText = `Missing required document: ${missingDocs[0]}`;
+    } else if (missingDocs.length === 2) {
+      badgeText = `Missing ${missingDocs[0]} & ${missingDocs[1]}`;
+      tooltipText = `Missing required documents: ${missingDocs[0]} and ${missingDocs[1]}`;
+    } else if (missingDocs.length === 3) {
+      badgeText = "Missing Passport, Visa & eFRRO";
+      tooltipText = "Missing all required documents: Passport, Visa, and eFRRO";
+    } else {
+      badgeText = "Incomplete";
+      tooltipText = "Required compliance documents are incomplete";
+    }
+
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap shadow-2xs">
+      <span 
+        title={tooltipText}
+        className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap shadow-2xs"
+      >
         <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-        <span>Incomplete</span>
+        <span>{badgeText}</span>
       </span>
     );
   };
@@ -562,7 +634,7 @@ export default function StudentListPage() {
                 <SelectContent>
                   <SelectItem value="all">All Compliance Statuses</SelectItem>
                   <SelectItem value="compliant">Fully Compliant</SelectItem>
-                  <SelectItem value="missing">Incomplete / Action Required</SelectItem>
+                  <SelectItem value="missing">Missing Documents / Incomplete</SelectItem>
                   <SelectItem value="warning">Expiring Soon (30 Days)</SelectItem>
                   <SelectItem value="critical">Expired / Non-Compliant</SelectItem>
                 </SelectContent>

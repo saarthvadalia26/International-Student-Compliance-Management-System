@@ -182,7 +182,7 @@ export class ScholarshipSchemeService {
       .from("scholarship_schemes")
       .select("id, name")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
     if (fetchErr || !scheme) {
       throw new Error("Scholarship scheme not found.");

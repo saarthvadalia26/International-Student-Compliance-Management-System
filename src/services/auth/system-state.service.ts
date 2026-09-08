@@ -116,7 +116,7 @@ export const systemStateService = {
 
     memoryCache = {
       result,
-      expiresAt: now + CACHE_TTL_MS,
+      expiresAt: now + (result.isInitialized ? 60000 : CACHE_TTL_MS),
     };
 
     return result;

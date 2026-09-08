@@ -463,7 +463,7 @@ export class AcademicProgramService {
       .update(payload)
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       throw new Error(`Failed to update program: ${error?.message || "Unknown error"}`);

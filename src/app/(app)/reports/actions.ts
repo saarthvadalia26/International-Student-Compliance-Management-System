@@ -2,7 +2,7 @@
 
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireAdministrator, requireInternalUser } from "@/lib/auth/permissions";
+import { requireAdministrator } from "@/lib/auth/permissions";
 import { SupabaseReportRepository } from "@/domain/reports/repositories/report.repository";
 import { ReportingService } from "@/domain/reports/services/report.service";
 import { ReportFilters, ReportPagination } from "@/domain/reports/types";
@@ -136,7 +136,7 @@ export async function unmaskIdentifier(
       .eq("student_id", studentId)
       .eq("is_active", true)
       .is("deleted_at", null)
-      .single();
+      .maybeSingle();
     docNumber = data?.document_number || "N/A";
   } else if (documentType === "visa") {
     const { data } = await supabase
@@ -145,7 +145,7 @@ export async function unmaskIdentifier(
       .eq("student_id", studentId)
       .eq("is_active", true)
       .is("deleted_at", null)
-      .single();
+      .maybeSingle();
     docNumber = data?.document_number || "N/A";
   } else if (documentType === "efrro") {
     const { data } = await supabase
@@ -154,7 +154,7 @@ export async function unmaskIdentifier(
       .eq("student_id", studentId)
       .eq("is_active", true)
       .is("deleted_at", null)
-      .single();
+      .maybeSingle();
     docNumber = data?.document_number || "N/A";
   }
 

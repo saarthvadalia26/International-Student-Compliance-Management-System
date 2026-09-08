@@ -207,7 +207,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
       const resolvedScholarshipScheme = input.scholarshipSchemeName ? input.scholarshipSchemeName.trim() : (input.iccrScholarshipSchemeName ? input.iccrScholarshipSchemeName.trim() : null);
       const joiningDateFormatted = this.formatDate(input.joiningDate);
 
-      let { data: academicData, error: academicError } = await supabase
+      const { data: academicData, error: academicError } = await supabase
         .from("student_academic")
         .insert({
           student_id: studentId,
@@ -239,31 +239,6 @@ export class SupabaseStudentRepository implements IStudentRepository {
         })
         .select()
         .single();
-
-      if (academicError && (academicError.message?.includes("override_school_id") || academicError.message?.includes("iccr_application_number"))) {
-        const retry = await supabase
-          .from("student_academic")
-          .insert({
-            student_id: studentId,
-            program_id: programIdVal,
-            program_code: programCodeVal,
-            admission_date: admFormatted,
-            joining_date: joiningDateFormatted,
-            expected_graduation: expGradFormatted,
-            current_semester: calculatedSemester,
-            academic_status: "good_standing",
-            admission_category: input.admissionCategory || null,
-            admission_category_other: input.admissionCategory === "other" ? (input.admissionCategoryOther?.trim() || null) : (input.admissionCategoryOther?.trim() || null),
-            sii_application_number: resolvedSiiNo,
-            nfsu_campus: resolvedNfsuCampus,
-            created_by: actorId,
-            updated_by: actorId
-          })
-          .select()
-          .single();
-        academicData = retry.data;
-        academicError = retry.error;
-      }
 
       if (academicError || !academicData) {
         throw new Error(`Failed to create academic record: ${academicError?.message || "Unknown database error"}`);
@@ -973,15 +948,8 @@ export class SupabaseStudentRepository implements IStudentRepository {
       academicUpdates.updated_at = new Date().toISOString();
       academicUpdates.updated_by = actorId;
       const { error: updateErr } = await supabase.from("student_academic").update(academicUpdates).eq("student_id", id);
-      if (updateErr && (updateErr.message?.includes("override_school_id") || updateErr.message?.includes("iccr_application_number"))) {
-        if (updateErr.message.includes("iccr_application_number")) {
-          delete academicUpdates.iccr_application_number;
-        }
-        if (updateErr.message.includes("override_school_id")) {
-          delete academicUpdates.override_school_id;
-          delete academicUpdates.school_override_reason;
-        }
-        await supabase.from("student_academic").update(academicUpdates).eq("student_id", id);
+      if (updateErr) {
+        throw new Error(`Failed to update academic record: ${updateErr.message}`);
       }
     }
 

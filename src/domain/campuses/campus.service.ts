@@ -182,7 +182,7 @@ export class CampusService {
       .from("campuses")
       .select("id, name")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
     if (fetchErr || !campus) {
       throw new Error("Campus not found.");

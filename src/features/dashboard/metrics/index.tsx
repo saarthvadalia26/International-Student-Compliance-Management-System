@@ -28,6 +28,7 @@ interface MetricsProps {
 
 export function DashboardMetricsGrid({ metrics }: MetricsProps) {
   const [activeDrilldown, setActiveDrilldown] = React.useState<ComplianceDrilldownCategory | null>(null);
+  const [activeHref, setActiveHref] = React.useState<string | null>(null);
 
   const cards = [
     {
@@ -37,7 +38,7 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
       icon: Users,
       iconClassName: "text-zinc-600 bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300",
       href: "/students",
-      drilldownCategory: null as ComplianceDrilldownCategory | null
+      drilldownCategory: "total_students" as ComplianceDrilldownCategory
     },
     {
       title: "Fully Compliant",
@@ -46,7 +47,7 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
       icon: ShieldCheck,
       iconClassName: "text-emerald-600 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400",
       href: "/students?compliance=COMPLIANT",
-      drilldownCategory: null as ComplianceDrilldownCategory | null
+      drilldownCategory: "compliant" as ComplianceDrilldownCategory
     },
     {
       title: "Expiring in 30 Days",
@@ -99,7 +100,7 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
       icon: Bell,
       iconClassName: "text-indigo-600 bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-400",
       href: "/reports/notifications",
-      drilldownCategory: null as ComplianceDrilldownCategory | null
+      drilldownCategory: "notifications_today" as ComplianceDrilldownCategory
     },
     {
       title: "Failed Notifications",
@@ -107,7 +108,7 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
       description: "Alert dispatch failures",
       icon: AlertCircle,
       iconClassName: "text-red-600 bg-red-100 dark:bg-red-950/40 dark:text-red-400",
-      href: null,
+      href: "/reports/notifications",
       drilldownCategory: "failed_notifications" as ComplianceDrilldownCategory
     }
   ];
@@ -117,12 +118,14 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {cards.map((card, i) => {
           const Icon = card.icon;
-          const cardContent = (
+          return (
             <Card
+              key={i}
               className="border border-border/50 bg-card hover:shadow-md hover:border-primary/30 transition-all shadow-sm cursor-pointer group relative overflow-hidden"
               onClick={() => {
                 if (card.drilldownCategory) {
                   setActiveDrilldown(card.drilldownCategory);
+                  setActiveHref(card.href);
                 }
               }}
             >
@@ -145,24 +148,18 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
               </CardContent>
             </Card>
           );
-
-          if (card.href) {
-            return (
-              <Link key={i} href={card.href} className="block outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg">
-                {cardContent}
-              </Link>
-            );
-          }
-
-          return <div key={i}>{cardContent}</div>;
         })}
       </div>
 
       {/* Interactive Compliance Drill-Down Dialog */}
       <ComplianceDrilldownDialog
         isOpen={Boolean(activeDrilldown)}
-        onClose={() => setActiveDrilldown(null)}
+        onClose={() => {
+          setActiveDrilldown(null);
+          setActiveHref(null);
+        }}
         category={activeDrilldown}
+        destinationHref={activeHref}
       />
     </>
   );

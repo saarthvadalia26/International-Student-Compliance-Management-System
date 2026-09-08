@@ -772,28 +772,32 @@ export async function factoryResetAction(password: string): Promise<FactoryReset
     deletedCounts,
   });
 
-  // 4. Truncate operational tables in dependency order (children first)
-  const tablesToTruncate = [
-    "notification_delivery_log",
-    "efrro_versions",
-    "visa_versions",
-    "passport_versions",
-    "student_snapshot",
-    "students",
-    "audit_log",
-    "system_config",
+  // 4. Truncate operational tables in dependency order (children first) using authoritative PKs
+  const tablesToTruncate: Array<{ table: string; pk: string }> = [
+    { table: "notification_delivery_log", pk: "id" },
+    { table: "notifications", pk: "id" },
+    { table: "efrro_versions", pk: "id" },
+    { table: "visa_versions", pk: "id" },
+    { table: "passport_versions", pk: "id" },
+    { table: "student_relationships", pk: "id" },
+    { table: "student_embassy", pk: "id" },
+    { table: "student_academic", pk: "student_id" },
+    { table: "student_contact", pk: "student_id" },
+    { table: "student_personal", pk: "student_id" },
+    { table: "student_snapshot", pk: "student_id" },
+    { table: "students", pk: "id" },
+    { table: "audit_log", pk: "id" },
+    { table: "system_config", pk: "key" },
   ];
 
-  for (const table of tablesToTruncate) {
+  for (const { table, pk } of tablesToTruncate) {
     try {
-      await adminClient.from(table).delete().gte("id", "00000000-0000-0000-0000-000000000000");
-    } catch {
-      // Some tables may use integer IDs — try numeric fallback
-      try {
-        await adminClient.from(table).delete().gte("id", 0);
-      } catch {
-        // Table might be empty or have different schema — continue
+      const { error: delErr } = await adminClient.from(table).delete().not(pk, "is", null);
+      if (delErr) {
+        console.warn(`[FACTORY_RESET] Non-fatal truncation warning for table ${table}:`, delErr.message);
       }
+    } catch (truncErr) {
+      console.warn(`[FACTORY_RESET] Truncation error for table ${table}:`, truncErr);
     }
   }
 

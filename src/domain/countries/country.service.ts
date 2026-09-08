@@ -204,7 +204,7 @@ export class CountryService {
       .from("countries")
       .select("*")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
     if (fetchErr || !existing) {
       throw new Error(`Country with ID ${id} not found.`);

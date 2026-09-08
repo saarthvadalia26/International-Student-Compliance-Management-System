@@ -124,10 +124,10 @@ export class SupabaseComplianceDocumentRepository implements IComplianceDocument
       .update(updatePayload)
       .eq("id", id)
       .select("*")
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      throw new Error(`[DB_UPDATE_FAILED] ${error.message}`);
+    if (error || !data) {
+      throw new Error(`[DB_UPDATE_FAILED] ${error?.message || "Record not found"}`);
     }
 
     return DocumentMapper.toDomain(data);

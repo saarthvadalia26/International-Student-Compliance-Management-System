@@ -66,6 +66,7 @@ export interface StudentListItem {
   rawComplianceStatus: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION" | "REJECTED";
   complianceScore: number;
   academicStatus: "good_standing" | "probation" | "suspended";
+  missingDocuments?: string[];
 }
 
 export interface StudentDocumentDetail {
@@ -558,6 +559,17 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       const visaStatus = (snapshot?.visa_status || (snapshot?.visa_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
       const efrroStatus = (snapshot?.efrro_status || (snapshot?.efrro_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
 
+      const missingDocuments: string[] = [];
+      if (passportStatus === "MISSING" || !snapshot?.passport_number || snapshot.passport_number === "Not provided" || !snapshot?.passport_expiry) {
+        missingDocuments.push("Passport");
+      }
+      if (visaStatus === "MISSING" || !snapshot?.visa_number || snapshot.visa_number === "Not provided" || !snapshot?.visa_expiry) {
+        missingDocuments.push("Visa");
+      }
+      if (efrroStatus === "MISSING" || !snapshot?.efrro_number || snapshot.efrro_number === "Not provided" || !snapshot?.efrro_expiry) {
+        missingDocuments.push("eFRRO");
+      }
+
       return {
         id: r.id,
         fullName: personal?.full_name || "Unknown Student",
@@ -597,6 +609,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         rawComplianceStatus: (rawStatus || "MISSING") as any,
         complianceScore: snapshot?.compliance_score ?? (mappedCompliance === "compliant" ? 100 : 0),
         academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing",
+        missingDocuments,
         admissionCategory: academic?.admission_category || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
         siiApplicationNumber: academic?.sii_application_number || null,
@@ -1294,7 +1307,7 @@ export async function updateDocumentVerificationAction(
         .from(tableName)
         .select("*")
         .eq("id", targetVersionId)
-        .single();
+        .maybeSingle();
 
       const docExpiry = (approvedDoc?.expiry_date || metadata?.expiryDate)?.split("T")[0];
       const docIssue = (approvedDoc?.issue_date || metadata?.issueDate)?.split("T")[0];

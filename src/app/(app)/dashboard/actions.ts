@@ -106,24 +106,7 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
       `)
       .is("deleted_at", null)
       .eq("status", "active")
-      .order("created_at", { ascending: true })
-      .then(async (res) => {
-        if (res.error && (res.error.message.includes("override_school_id") || res.error.message.includes("nfsu_campus"))) {
-          return supabase
-            .from("students")
-            .select(`
-              id,
-              created_at,
-              status,
-              student_personal(nationality_code, full_name),
-              student_academic(program_id, program_code, admission_date)
-            `)
-            .is("deleted_at", null)
-            .eq("status", "active")
-            .order("created_at", { ascending: true });
-        }
-        return res;
-      }),
+      .order("created_at", { ascending: true }),
     // 2. Group by compliance and document expiries (active, non-deleted students only)
     supabase
       .from("student_snapshot")
@@ -136,25 +119,19 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
     supabase.from("reference_data").select("code, display_name, category"),
     // 5. Canonical academic programs master data
     supabase.from("academic_programs").select("id, program_name, program_code, school_name, academic_level"),
-    // 6. Canonical schools master data (fallback to default if pending migration)
-    supabase.from("schools").select("id, name, code").then((res) => {
-      if (res.error) {
-        return { data: DEFAULT_FALLBACK_SCHOOLS, error: null };
-      }
-      return res;
-    }),
-    // 7. Canonical campuses master data (fallback to empty if pending migration)
-    supabase.from("campuses").select("id, name, code, location, is_active").then((res) => {
-      if (res.error) {
-        return { data: [], error: null };
-      }
-      return res;
-    })
+    // 6. Canonical schools master data
+    supabase.from("schools").select("id, name, code"),
+    // 7. Canonical campuses master data
+    supabase.from("campuses").select("id, name, code, location, is_active")
   ]);
 
   if (studentsRes.error) throw new Error(`[DB_QUERY_FAILED] ${studentsRes.error.message}`);
   if (snapshotRes.error) throw new Error(`[DB_QUERY_FAILED] ${snapshotRes.error.message}`);
   if (notificationsRes.error) throw new Error(`[DB_QUERY_FAILED] ${notificationsRes.error.message}`);
+  if (refDataRes.error) throw new Error(`[DB_QUERY_FAILED] ${refDataRes.error.message}`);
+  if (academicProgramsRes.error) throw new Error(`[DB_QUERY_FAILED] ${academicProgramsRes.error.message}`);
+  if (schoolsRes.error) throw new Error(`[DB_QUERY_FAILED] ${schoolsRes.error.message}`);
+  if (campusesRes.error) throw new Error(`[DB_QUERY_FAILED] ${campusesRes.error.message}`);
 
   const activeStudents = (studentsRes.data || []) as any[];
   const totalActiveStudents = activeStudents.length;

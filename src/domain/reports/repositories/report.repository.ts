@@ -102,8 +102,7 @@ export class SupabaseReportRepository implements IReportRepository {
       failedNotifRes,
       pRenewalsRes,
       vRenewalsRes,
-      eRenewalsRes,
-      auditRenewalsRes
+      eRenewalsRes
     ] = await Promise.all([
       // Total active non-deleted students
       supabase.from("students").select("id", { count: "exact", head: true })
@@ -133,7 +132,7 @@ export class SupabaseReportRepository implements IReportRepository {
       // Failed notifications requiring attention
       supabase.from(NOTIFICATION_TABLE_NAME).select("id, channel, status")
         .in("status", ["failed", "bounced"]),
-      // Document renewals recorded in last 30 days
+      // Document renewals recorded in last 30 days (version_number > 1 strictly)
       supabase.from("passport_versions").select("id", { count: "exact", head: true })
         .gt("version_number", 1)
         .is("deleted_at", null)
@@ -145,10 +144,7 @@ export class SupabaseReportRepository implements IReportRepository {
       supabase.from("efrro_versions").select("id", { count: "exact", head: true })
         .gt("version_number", 1)
         .is("deleted_at", null)
-        .gte("created_at", thirtyDaysAgo),
-      supabase.from("audit_log").select("id, filters_applied", { count: "exact" })
-        .eq("action", "DOCUMENT_RENEWED")
-        .gte("timestamp", thirtyDaysAgo)
+        .gte("created_at", thirtyDaysAgo)
     ]);
 
     const totalStudents = studentsRes.count || 0;
@@ -291,28 +287,19 @@ export class SupabaseReportRepository implements IReportRepository {
       else sentEmail++;
     });
 
-    // Renewals counts
+    // Authoritative Renewals counts:
+    // Only actual document versions where version_number > 1.
+    // Original documents (version_number <= 1) contribute exactly 0 renewals.
     const pRen = pRenewalsRes.count || 0;
     const vRen = vRenewalsRes.count || 0;
     const eRen = eRenewalsRes.count || 0;
-    const versionRenewalsTotal = pRen + vRen + eRen;
-    const auditRenewalsTotal = auditRenewalsRes.count || 0;
-    const renewalsRecorded = Math.max(versionRenewalsTotal, auditRenewalsTotal);
+    const renewalsRecorded = pRen + vRen + eRen;
 
     const renewalsByDocType = {
       passport: pRen,
       visa: vRen,
       efrro: eRen
     };
-
-    if (versionRenewalsTotal === 0 && auditRenewalsTotal > 0 && auditRenewalsRes.data) {
-      auditRenewalsRes.data.forEach((a: any) => {
-        const docType = (a.filters_applied?.documentType || "").toLowerCase();
-        if (docType === "passport") renewalsByDocType.passport++;
-        else if (docType === "visa") renewalsByDocType.visa++;
-        else if (docType === "efrro") renewalsByDocType.efrro++;
-      });
-    }
 
     const sentToday = sentTodayRes.data?.length || 0;
     const failedNotifications = failedNotifRes.data?.length || 0;
@@ -364,7 +351,7 @@ export class SupabaseReportRepository implements IReportRepository {
     };
 
     if (cat === "renewals") {
-      const [pRes, vRes, eRes, auditRes, studentsRes] = await Promise.all([
+      const [pRes, vRes, eRes, studentsRes] = await Promise.all([
         supabase.from("passport_versions")
           .select("id, student_id, version_number, document_number, issue_date, expiry_date, created_at")
           .gt("version_number", 1)
@@ -380,11 +367,6 @@ export class SupabaseReportRepository implements IReportRepository {
           .gt("version_number", 1)
           .is("deleted_at", null)
           .gte("created_at", thirtyDaysAgo),
-        supabase.from("audit_log")
-          .select("id, timestamp, filters_applied")
-          .eq("action", "DOCUMENT_RENEWED")
-          .gte("timestamp", thirtyDaysAgo)
-          .order("timestamp", { ascending: false }),
         supabase.from("students")
           .select("id, registration_number, student_personal(full_name)")
           .is("deleted_at", null)
@@ -399,11 +381,13 @@ export class SupabaseReportRepository implements IReportRepository {
       });
 
       const items: ComplianceDrilldownItem[] = [];
-      const seenIds = new Set<string>();
 
       const addVersionRows = (rows: any[] | null, docType: "passport" | "visa" | "efrro") => {
         (rows || []).forEach(r => {
-          seenIds.add(r.id);
+          const verNum = Number(r.version_number);
+          // Strictly exclude any non-renewal versions (Original is verNum <= 1)
+          if (!verNum || verNum <= 1) return;
+
           const sInfo = studentMap.get(r.student_id);
           items.push({
             id: r.id,
@@ -414,7 +398,7 @@ export class SupabaseReportRepository implements IReportRepository {
             documentNumber: r.document_number,
             issueDate: r.issue_date,
             expiryDate: r.expiry_date,
-            versionLabel: `Renewal ${r.version_number - 1}`,
+            versionLabel: `Renewal ${verNum - 1}`,
             recordedAt: r.created_at
           });
         });
@@ -423,32 +407,6 @@ export class SupabaseReportRepository implements IReportRepository {
       addVersionRows(pRes.data, "passport");
       addVersionRows(vRes.data, "visa");
       addVersionRows(eRes.data, "efrro");
-
-      (auditRes.data || []).forEach((a: any) => {
-        const filters = a.filters_applied || {};
-        const sId = filters.studentId;
-        const sInfo = studentMap.get(sId);
-        const rawDocType = String(filters.documentType || "passport").toLowerCase();
-        const docType: "passport" | "visa" | "efrro" =
-          rawDocType === "visa" ? "visa" : rawDocType === "efrro" ? "efrro" : "passport";
-        const vNum = filters.newVersionNumber || 2;
-        const vLabel = filters.newVersionLabel || `Renewal ${vNum - 1}`;
-        
-        if (!seenIds.has(a.id)) {
-          items.push({
-            id: a.id,
-            studentId: sId,
-            studentName: sInfo?.name || "Unknown Student",
-            registrationNumber: sInfo?.regNo || "—",
-            documentType: docType,
-            documentNumber: filters.documentNumber || null,
-            issueDate: filters.issueDate || null,
-            expiryDate: filters.expiryDate || null,
-            versionLabel: vLabel,
-            recordedAt: a.timestamp
-          });
-        }
-      });
 
       items.sort((a, b) => new Date(b.recordedAt || 0).getTime() - new Date(a.recordedAt || 0).getTime());
 
@@ -510,6 +468,124 @@ export class SupabaseReportRepository implements IReportRepository {
       return {
         category: "failed_notifications",
         title: "Failed Notification Dispatches",
+        totalCount: items.length,
+        items,
+        byDocType
+      };
+    }
+
+    if (cat === "notifications_today") {
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+      const { data: notifRows } = await supabase
+        .from(NOTIFICATION_TABLE_NAME)
+        .select(`
+          id,
+          student_id,
+          document_type,
+          channel,
+          status,
+          retry_count,
+          created_at,
+          notification_context,
+          students(registration_number, student_personal(full_name))
+        `)
+        .gte("created_at", todayStart)
+        .order("created_at", { ascending: false });
+
+      const items: ComplianceDrilldownItem[] = (notifRows || []).map((n: any) => {
+        const s = n.students;
+        return {
+          id: n.id,
+          studentId: n.student_id,
+          studentName: s?.student_personal?.full_name || "Unknown Student",
+          registrationNumber: s?.registration_number || "—",
+          documentType: n.document_type,
+          channel: n.channel,
+          status: n.status,
+          retryCount: n.retry_count,
+          timestamp: n.created_at
+        };
+      });
+
+      const byDocType = {
+        passport: items.filter(i => i.documentType === "passport").length,
+        visa: items.filter(i => i.documentType === "visa").length,
+        efrro: items.filter(i => i.documentType === "efrro").length
+      };
+
+      return {
+        category: "notifications_today",
+        title: "Notifications Dispatched Today",
+        totalCount: items.length,
+        items,
+        byDocType
+      };
+    }
+
+    if (cat === "total_students" || cat === "compliant") {
+      const { data: students } = await supabase
+        .from("students")
+        .select(`
+          id,
+          registration_number,
+          student_personal(full_name, nationality),
+          academic_programs(name),
+          student_snapshot(
+            passport_number,
+            passport_expiry,
+            passport_status,
+            visa_number,
+            visa_expiry,
+            visa_status,
+            efrro_number,
+            efrro_expiry,
+            efrro_status,
+            overall_compliance_status
+          )
+        `)
+        .is("deleted_at", null)
+        .eq("status", "active");
+
+      const items: ComplianceDrilldownItem[] = [];
+
+      (students || []).forEach((st: any) => {
+        const snap = st.student_snapshot;
+        const compStatus = snap?.overall_compliance_status || "NON_COMPLIANT";
+        if (cat === "compliant" && compStatus !== "COMPLIANT") {
+          return;
+        }
+
+        const sName = st.student_personal?.full_name || "Unknown Student";
+        const regNo = st.registration_number || "—";
+        const program = st.academic_programs?.name || null;
+        const nationality = st.student_personal?.nationality || null;
+
+        items.push({
+          id: st.id,
+          studentId: st.id,
+          studentName: sName,
+          registrationNumber: regNo,
+          complianceStatus: compStatus,
+          academicProgram: program,
+          nationality: nationality,
+          passportExpiry: snap?.passport_expiry || null,
+          visaExpiry: snap?.visa_expiry || null,
+          efrroExpiry: snap?.efrro_expiry || null,
+          status: compStatus
+        });
+      });
+
+      items.sort((a, b) => a.studentName.localeCompare(b.studentName));
+
+      const byDocType = {
+        passport: items.filter(i => Boolean(i.passportExpiry)).length,
+        visa: items.filter(i => Boolean(i.visaExpiry)).length,
+        efrro: items.filter(i => Boolean(i.efrroExpiry)).length
+      };
+
+      return {
+        category: cat,
+        title: cat === "compliant" ? "Fully Compliant Students" : "All Active International Students",
         totalCount: items.length,
         items,
         byDocType
@@ -688,36 +764,6 @@ export class SupabaseReportRepository implements IReportRepository {
     data = initialRes.data;
     error = initialRes.error;
     count = initialRes.count;
-
-    if (error && error.message?.includes("override_school_id")) {
-      const fallbackAcademicFields = `
-        student_academic(
-          program_id,
-          program_code,
-          expected_graduation
-        )
-      `;
-      let fallbackQuery = supabase
-        .from("students")
-        .select(`
-          ${STUDENT_FIELDS},
-          ${SNAPSHOT_FIELDS},
-          ${PERSONAL_FIELDS},
-          ${fallbackAcademicFields},
-          ${CONTACT_FIELDS}
-        `, { count: "exact" });
-
-      if (filters.complianceStatus) fallbackQuery = fallbackQuery.eq("student_snapshot.compliance_status", filters.complianceStatus);
-      if (filters.country) fallbackQuery = fallbackQuery.eq("student_personal.nationality_code", filters.country);
-      if (filters.gender) fallbackQuery = fallbackQuery.eq("student_personal.gender", filters.gender);
-      if (filters.course) fallbackQuery = fallbackQuery.eq("student_academic.program_code", filters.course);
-      fallbackQuery = fallbackQuery.range(from, to);
-
-      const retry = await fallbackQuery;
-      data = retry.data;
-      error = retry.error;
-      count = retry.count;
-    }
 
     if (error) {
       throw new Error(`[DB_QUERY_FAILED] ${error.message}`);

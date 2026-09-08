@@ -49,7 +49,24 @@ export class ComplianceEngine implements IComplianceEngine {
     const daysToVisaExpiry = getDaysRemaining(visa.expiryDate);
     const daysToEfrroExpiry = efrro ? getDaysRemaining(efrro.expiryDate) : undefined;
 
-    // 1. Critical: Any document is expired or rejected
+    // 1. Missing Required Document Check: Passport, Visa, and eFRRO are mandatory.
+    // Invariant: Missing or failed compliance data can NEVER evaluate to compliant.
+    const isPassportMissing = !passport || !passport.number || !passport.expiryDate;
+    const isVisaMissing = !visa || !visa.number || !visa.expiryDate;
+    const isEfrroMissing = !efrro || !efrro.number || !efrro.expiryDate;
+
+    if (isPassportMissing || isVisaMissing || isEfrroMissing) {
+      return {
+        studentId,
+        complianceStatus: "non_compliant",
+        daysToPassportExpiry,
+        daysToVisaExpiry,
+        daysToEfrroExpiry,
+        lastCalculatedAt: now
+      };
+    }
+
+    // 2. Critical: Any document is expired or rejected
     const hasExpiredDocument = 
       daysToPassportExpiry < 0 || 
       daysToVisaExpiry < 0 || 
@@ -71,7 +88,7 @@ export class ComplianceEngine implements IComplianceEngine {
       };
     }
 
-    // 2. Warning: Any document is near expiry (< 30 days) OR pending verification
+    // 3. Warning: Any document is near expiry (<= 30 days) OR pending verification
     const hasUrgentExpiry =
       daysToPassportExpiry <= 30 ||
       daysToVisaExpiry <= 30 ||
@@ -93,7 +110,7 @@ export class ComplianceEngine implements IComplianceEngine {
       };
     }
 
-    // 3. Healthy: All valid, verified, and > 30 days remaining
+    // 4. Healthy: All valid, verified, and > 30 days remaining
     return {
       studentId,
       complianceStatus: "compliant",

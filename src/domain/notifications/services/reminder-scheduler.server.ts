@@ -32,7 +32,7 @@ export class ReminderSchedulerServer {
         efrro_versions(id, version_number, is_active, document_number, expiry_date, verification_status, file_path, deleted_at)
       `)
       .eq("id", studentId)
-      .single();
+      .maybeSingle();
 
     if (sErr || !student) {
       return { queuedCount: 0, errors: [`Failed to load student: ${sErr?.message || "Not found"}`] };

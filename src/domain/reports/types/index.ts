@@ -36,10 +36,13 @@ export interface DashboardMetrics {
 }
 
 export type ComplianceDrilldownCategory =
+  | "total_students"
+  | "compliant"
   | "expiring_30"
   | "critical_15"
   | "expired"
   | "renewals"
+  | "notifications_today"
   | "failed_notifications";
 
 export interface ComplianceDrilldownItem {
@@ -54,6 +57,12 @@ export interface ComplianceDrilldownItem {
   daysRemaining?: number | null;
   daysExpired?: number | null;
   status?: string;
+  complianceStatus?: string;
+  nationality?: string | null;
+  academicProgram?: string | null;
+  passportExpiry?: string | null;
+  visaExpiry?: string | null;
+  efrroExpiry?: string | null;
   versionLabel?: string;
   recordedAt?: string;
   channel?: "email" | "whatsapp" | string;

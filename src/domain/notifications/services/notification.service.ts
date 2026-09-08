@@ -281,7 +281,7 @@ export class QueueProcessor {
             .from("notification_templates")
             .select("*")
             .eq("id", alert.templateId)
-            .single();
+            .maybeSingle();
 
           if (tData) {
             const isInactive = tData.status === "INACTIVE" || tData.status === "DRAFT" || tData.status === "ARCHIVED" || tData.is_active === false;
