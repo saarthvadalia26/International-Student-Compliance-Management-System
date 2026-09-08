@@ -244,6 +244,7 @@ export function DimensionCard({
                             }
                           />
                           <Tooltip
+                            cursor={{ fill: "rgba(255, 255, 255, 0.04)" }}
                             content={({ active, payload }) => {
                               if (active && payload && payload.length) {
                                 const p = payload[0].payload as DimensionRow;
@@ -304,6 +305,7 @@ export function DimensionCard({
                         />
                         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                         <Tooltip
+                          cursor={{ fill: "rgba(255, 255, 255, 0.04)" }}
                           content={({ active, payload }) => {
                             if (active && payload && payload.length) {
                               const p = payload[0].payload as DimensionRow;
@@ -357,6 +359,7 @@ export function DimensionCard({
                   <XAxis dataKey="documentType" tick={{ fontSize: 12, fontWeight: 500 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip
+                    cursor={{ fill: "rgba(255, 255, 255, 0.04)" }}
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length) {
                         return (
@@ -406,6 +409,7 @@ export function DimensionCard({
                   <XAxis dataKey="documentType" tick={{ fontSize: 12, fontWeight: 500 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                   <Tooltip
+                    cursor={{ fill: "rgba(255, 255, 255, 0.04)" }}
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length) {
                         return (
