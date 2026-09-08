@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { 
   ArrowLeft, 
   Globe, 
@@ -236,13 +237,64 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+const VALID_SUBTABS = ["personal", "academic", "contact", "documents", "bank"] as const;
+type SubTabType = (typeof VALID_SUBTABS)[number];
+
 export default function StudentDetailsPage({ params }: PageProps) {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center py-24 space-y-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <h2 className="text-sm font-medium text-muted-foreground">Loading student profile...</h2>
+        </div>
+      }
+    >
+      <StudentDetailsContent params={params} />
+    </React.Suspense>
+  );
+}
+
+function StudentDetailsContent({ params }: PageProps) {
   const resolvedParams = React.use(params);
   const studentId = resolvedParams.id;
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const renewParam = searchParams.get("renew");
   
   const [student, setStudent] = React.useState<StudentProfile | undefined>(undefined);
   const [isLoadingStudent, setIsLoadingStudent] = React.useState(true);
-  const [activeSubTab, setActiveSubTab] = React.useState<"personal" | "academic" | "contact" | "documents" | "bank">("personal");
+  
+  const [activeSubTab, setActiveSubTab] = React.useState<SubTabType>(() => {
+    if (tabParam && (VALID_SUBTABS as readonly string[]).includes(tabParam)) {
+      return tabParam as SubTabType;
+    }
+    return "personal";
+  });
+
+  // Keep activeSubTab in sync if the URL query parameter changes
+  React.useEffect(() => {
+    if (tabParam && (VALID_SUBTABS as readonly string[]).includes(tabParam)) {
+      setActiveSubTab(tabParam as SubTabType);
+    } else if (!tabParam) {
+      setActiveSubTab("personal");
+    }
+  }, [tabParam]);
+
+  // Tab switcher that also keeps the URL query parameter cleanly in sync
+  const handleTabChange = React.useCallback((tab: SubTabType) => {
+    setActiveSubTab(tab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (tab === "personal") {
+        url.searchParams.delete("tab");
+      } else {
+        url.searchParams.set("tab", tab);
+      }
+      url.searchParams.delete("renew");
+      window.history.replaceState(null, "", url.pathname + url.search);
+    }
+  }, []);
 
   // Helper to verify if document number is valid (not placeholder/empty)
   const hasValidDocumentNumber = React.useCallback((docNum?: string | null): boolean => {
@@ -436,6 +488,13 @@ export default function StudentDetailsPage({ params }: PageProps) {
     setRenewErrors({});
     setRenewDialogOpen(true);
   };
+
+  // Auto-open renew dialog if renew query param is specified and student is loaded
+  React.useEffect(() => {
+    if (student && renewParam && (renewParam === "passport" || renewParam === "visa" || renewParam === "efrro")) {
+      handleOpenRenewDialog(renewParam as "passport" | "visa" | "efrro");
+    }
+  }, [student, renewParam]);
 
   const handleOpenHistoryDialog = async (docType: "passport" | "visa" | "efrro") => {
     setHistoryDocType(docType);
@@ -1353,7 +1412,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               icon={User}
               title="Personal Identity"
               isActive={activeSubTab === "personal"}
-              onClick={() => setActiveSubTab("personal")}
+              onClick={() => handleTabChange("personal")}
               variant="segmented"
               size="sm"
             />
@@ -1361,7 +1420,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               icon={GraduationCap}
               title="Academic Profile"
               isActive={activeSubTab === "academic"}
-              onClick={() => setActiveSubTab("academic")}
+              onClick={() => handleTabChange("academic")}
               variant="segmented"
               size="sm"
             />
@@ -1369,7 +1428,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               icon={Phone}
               title="Contact & Guardian"
               isActive={activeSubTab === "contact"}
-              onClick={() => setActiveSubTab("contact")}
+              onClick={() => handleTabChange("contact")}
               variant="segmented"
               size="sm"
             />
@@ -1377,7 +1436,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               icon={FileText}
               title="Compliance Documents"
               isActive={activeSubTab === "documents"}
-              onClick={() => setActiveSubTab("documents")}
+              onClick={() => handleTabChange("documents")}
               variant="segmented"
               size="sm"
             />
@@ -1385,7 +1444,7 @@ export default function StudentDetailsPage({ params }: PageProps) {
               icon={Landmark}
               title="Bank Details"
               isActive={activeSubTab === "bank"}
-              onClick={() => setActiveSubTab("bank")}
+              onClick={() => handleTabChange("bank")}
               variant="segmented"
               size="sm"
             />

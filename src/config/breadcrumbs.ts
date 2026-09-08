@@ -122,10 +122,21 @@ export function getRouteMetadata(pathname: string, searchParams?: URLSearchParam
     ];
 
     if (segments.length >= 2 && segments[1] !== "add") {
-      items.push({ label: "Student Details", isCurrent: true });
+      const tab = searchParams?.get("tab");
+      let pageTitle = "Student Details";
+      if (tab === "documents") {
+        pageTitle = "Compliance Documents";
+      } else if (tab === "academic") {
+        pageTitle = "Academic Profile";
+      } else if (tab === "contact") {
+        pageTitle = "Contact & Guardian";
+      } else if (tab === "bank") {
+        pageTitle = "Bank Details";
+      }
+      items.push({ label: pageTitle, isCurrent: true });
       return {
         section: "Workspace",
-        pageTitle: "Student Details",
+        pageTitle,
         breadcrumbs: items,
       };
     }

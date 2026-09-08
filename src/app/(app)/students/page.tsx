@@ -926,7 +926,7 @@ export default function StudentListPage() {
                                   <Link href={`/students/${student.id}`} />
                                 }
                               >
-                                <Eye className="mr-2 h-3.5 w-3.5 text-primary" /> View Full Profile
+                                <Eye className="mr-2 h-3.5 w-3.5 text-primary" /> View Student Profile
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-xs cursor-pointer"
@@ -1020,12 +1020,45 @@ export default function StudentListPage() {
                         </Badge>
                       )}
                     </div>
-                    <Link href={`/students/${student.id}`} passHref>
-                      <Button size="sm" variant="outline" className="h-8 text-xs px-3 gap-1 border-primary/30 text-primary hover:bg-primary/5">
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>View Profile</span>
-                      </Button>
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <Link href={`/students/${student.id}`} passHref>
+                        <Button size="sm" variant="outline" className="h-8 text-xs px-3 gap-1 border-primary/30 text-primary hover:bg-primary/5">
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>View Profile</span>
+                        </Button>
+                      </Link>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger render={
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/80">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        } />
+                        <DropdownMenuContent align="end" className="w-[170px]">
+                          <DropdownMenuLabel className="text-xs font-semibold">Student Options</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-xs cursor-pointer"
+                            render={
+                              <Link href={`/students/${student.id}`} />
+                            }
+                          >
+                            <Eye className="mr-2 h-3.5 w-3.5 text-primary" /> View Student Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-xs cursor-pointer"
+                            render={
+                              <Link href={`/students/${student.id}?tab=documents`} />
+                            }
+                          >
+                            <FileSpreadsheet className="mr-2 h-3.5 w-3.5 text-emerald-600" /> Renew Documents
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-xs cursor-pointer text-destructive focus:text-destructive">
+                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Archive Student
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </div>
               ))}
