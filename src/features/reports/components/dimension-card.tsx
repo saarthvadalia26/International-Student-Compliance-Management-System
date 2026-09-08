@@ -120,12 +120,12 @@ export function DimensionCard({
     <Card className="flex flex-col border border-border/70 bg-card shadow-xs transition-shadow hover:shadow-sm">
       <CardHeader className="pb-3 border-b border-border/40">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
+          <div className="space-y-1 min-h-[44px] flex flex-col justify-center">
             <div className="flex items-center gap-2">
               <CardTitle className="text-base font-semibold text-foreground tracking-tight">
                 {title}
               </CardTitle>
-              <Badge variant="secondary" className="text-[11px] font-normal px-2 py-0.5">
+              <Badge variant="secondary" className="text-[11px] font-normal px-2 py-0.5 shrink-0">
                 {isRenewals
                   ? `${itemCount} Renewals`
                   : isDocStatus
@@ -133,7 +133,7 @@ export function DimensionCard({
                   : `${itemCount} Categories`}
               </Badge>
             </div>
-            <CardDescription className="text-xs text-muted-foreground">
+            <CardDescription className="text-xs text-muted-foreground line-clamp-2">
               {description}
             </CardDescription>
           </div>

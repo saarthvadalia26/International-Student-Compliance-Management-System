@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import {
   DimensionalReportsData,
   DimensionReportFilters,
@@ -174,104 +175,121 @@ export function ReportsWorkspace({ initialData }: ReportsWorkspaceProps) {
 
       {/* ── KPI OVERVIEW CARDS ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        {/* Total Cohort */}
-        <Card className="p-3 border-border/70 bg-card shadow-2xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
-            <Users className="h-3.5 w-3.5 text-primary" />
-            <span>Total Students</span>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold font-mono text-foreground">
-              {overview.totalStudents}
-            </span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Matching active filters</p>
-        </Card>
+        {[
+          {
+            id: "students",
+            label: "Total Students",
+            value: overview.totalStudents,
+            subValue: null,
+            caption: "Matching active filters",
+            icon: Users,
+            iconColor: "text-blue-600 dark:text-blue-400",
+            iconBg: "bg-blue-500/10",
+          },
+          {
+            id: "countries",
+            label: "Countries",
+            value: overview.totalCountries,
+            subValue: null,
+            caption: "Sovereign nationalities",
+            icon: Globe,
+            iconColor: "text-indigo-600 dark:text-indigo-400",
+            iconBg: "bg-indigo-500/10",
+          },
+          {
+            id: "campuses",
+            label: "NFSU Campuses",
+            value: overview.totalCampuses,
+            subValue: null,
+            caption: "University campuses",
+            icon: Building2,
+            iconColor: "text-cyan-600 dark:text-cyan-400",
+            iconBg: "bg-cyan-500/10",
+          },
+          {
+            id: "schools",
+            label: "Schools",
+            value: overview.totalSchools,
+            subValue: null,
+            caption: "Academic schools",
+            icon: School,
+            iconColor: "text-purple-600 dark:text-purple-400",
+            iconBg: "bg-purple-500/10",
+          },
+          {
+            id: "programs",
+            label: "Programs",
+            value: overview.totalPrograms,
+            subValue: null,
+            caption: "Degree programs",
+            icon: GraduationCap,
+            iconColor: "text-amber-600 dark:text-amber-400",
+            iconBg: "bg-amber-500/10",
+          },
+          {
+            id: "compliant",
+            label: "Fully Compliant",
+            value: overview.totalFullyCompliant,
+            subValue: `(${compliantPct}%)`,
+            caption: "Valid > 30 days",
+            icon: ShieldCheck,
+            iconColor: "text-emerald-600 dark:text-emerald-400",
+            iconBg: "bg-emerald-500/10",
+          },
+          {
+            id: "renewals",
+            label: "Renewals",
+            value: overview.totalRenewals,
+            subValue: null,
+            caption: "Extensions (v > 1)",
+            icon: RefreshCw,
+            iconColor: "text-rose-600 dark:text-rose-400",
+            iconBg: "bg-rose-500/10",
+          },
+        ].map((kpi) => {
+          const Icon = kpi.icon;
+          return (
+            <Card
+              key={kpi.id}
+              className="p-3 border-border/70 bg-card shadow-2xs flex flex-col justify-between h-full min-h-[124px]"
+            >
+              {/* Header: Fixed height for exact horizontal alignment */}
+              <div className="flex items-center gap-2 h-9 min-h-[36px]">
+                <div
+                  className={cn(
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border/30",
+                    kpi.iconBg,
+                    kpi.iconColor
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground leading-snug line-clamp-2">
+                  {kpi.label}
+                </span>
+              </div>
 
-        {/* Countries */}
-        <Card className="p-3 border-border/70 bg-card shadow-2xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
-            <Globe className="h-3.5 w-3.5 text-blue-500" />
-            <span>Countries</span>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold font-mono text-foreground">
-              {overview.totalCountries}
-            </span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Sovereign nationalities</p>
-        </Card>
+              {/* Value Row: Fixed height, baseline aligned for identical number level */}
+              <div className="my-1 flex items-baseline gap-1.5 h-7">
+                <span className="text-2xl font-bold font-mono text-foreground tracking-tight">
+                  {kpi.value}
+                </span>
+                {kpi.subValue && (
+                  <span className="text-xs font-mono text-muted-foreground font-normal">
+                    {kpi.subValue}
+                  </span>
+                )}
+              </div>
 
-        {/* Campuses */}
-        <Card className="p-3 border-border/70 bg-card shadow-2xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
-            <Building2 className="h-3.5 w-3.5 text-cyan-500" />
-            <span>NFSU Campuses</span>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold font-mono text-foreground">
-              {overview.totalCampuses}
-            </span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">University campuses</p>
-        </Card>
-
-        {/* Schools */}
-        <Card className="p-3 border-border/70 bg-card shadow-2xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
-            <School className="h-3.5 w-3.5 text-purple-500" />
-            <span>Schools</span>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold font-mono text-foreground">
-              {overview.totalSchools}
-            </span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Academic schools</p>
-        </Card>
-
-        {/* Programs */}
-        <Card className="p-3 border-border/70 bg-card shadow-2xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
-            <GraduationCap className="h-3.5 w-3.5 text-amber-500" />
-            <span>Programs</span>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold font-mono text-foreground">
-              {overview.totalPrograms}
-            </span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Enrolled degree programs</p>
-        </Card>
-
-        {/* Fully Compliant */}
-        <Card className="p-3 border-border/70 bg-card shadow-2xs">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-            <span>Fully Compliant</span>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-              {overview.totalFullyCompliant}
-            </span>
-            <span className="text-xs text-muted-foreground font-mono">({compliantPct}%)</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Valid &gt; 30 days</p>
-        </Card>
-
-        {/* Renewals */}
-        <Card className="p-3 border-border/70 bg-card shadow-2xs col-span-2 sm:col-span-1">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium">
-            <RefreshCw className="h-3.5 w-3.5 text-indigo-500" />
-            <span>Renewals</span>
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold font-mono text-indigo-600 dark:text-indigo-400">
-              {overview.totalRenewals}
-            </span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Historical extensions (v &gt; 1)</p>
-        </Card>
+              {/* Caption: Fixed height, top aligned */}
+              <div className="h-6 flex items-start">
+                <p className="text-[10px] text-muted-foreground leading-tight line-clamp-2">
+                  {kpi.caption}
+                </p>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
       {/* ── GLOBAL FILTER BAR ──────────────────────────────────────────────── */}
