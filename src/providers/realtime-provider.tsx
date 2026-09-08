@@ -63,7 +63,12 @@ const MONITORED_TABLES = [
   "student_contact_audit",
   "upload_audit_log",
   "document_lifecycle_audit_log",
-  "student_activity_log"
+  "student_activity_log",
+  "schools",
+  "campuses",
+  "scholarship_schemes",
+  "user_profiles",
+  "countries"
 ];
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
@@ -155,7 +160,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        const prevChannel = channelRef.current;
+        channelRef.current = null;
+        await supabase.removeChannel(prevChannel);
       }
 
       let channel = supabase.channel("iscms_global_realtime_sync");
@@ -194,10 +201,12 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // ── Session Control Broadcast Channel ───────────────────────────────────────
   // Listens for emergency_logout and global_signout broadcast events.
   // On receipt, immediately signs out and redirects every connected tab.
-  const initSessionControlChannel = React.useCallback(() => {
+  const initSessionControlChannel = React.useCallback(async () => {
     const supabase = getBrowserSupabase();
     if (sessionControlChannelRef.current) {
-      supabase.removeChannel(sessionControlChannelRef.current);
+      const prev = sessionControlChannelRef.current;
+      sessionControlChannelRef.current = null;
+      await supabase.removeChannel(prev);
     }
 
     const ch = supabase
@@ -219,20 +228,41 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       .on("broadcast", { event: "global_signout" }, async () => {
         logConnectionAudit("Received global_signout broadcast — redirecting");
         router.push("/login");
-      })
-      .subscribe();
+      });
+
+    ch.subscribe((subStatus) => {
+      if (subStatus === "SUBSCRIBED") {
+        logConnectionAudit("Session control channel active");
+      }
+    });
 
     sessionControlChannelRef.current = ch;
   }, [logConnectionAudit, router]);
 
   const broadcastSessionLogout = React.useCallback(
-    (type: "global_signout" | "emergency_logout") => {
-      const supabase = getBrowserSupabase();
-      supabase.channel("iscms_session_control").send({
-        type: "broadcast",
-        event: type,
-        payload: { timestamp: new Date().toISOString() },
-      });
+    async (type: "global_signout" | "emergency_logout") => {
+      try {
+        const payload = { timestamp: new Date().toISOString() };
+        // Reuse the existing subscribed session control channel if available
+        if (sessionControlChannelRef.current) {
+          await sessionControlChannelRef.current.send({
+            type: "broadcast",
+            event: type,
+            payload,
+          });
+        } else {
+          const supabase = getBrowserSupabase();
+          const tempCh = supabase.channel("iscms_session_control");
+          tempCh.subscribe(async (status) => {
+            if (status === "SUBSCRIBED") {
+              await tempCh.send({ type: "broadcast", event: type, payload });
+              await supabase.removeChannel(tempCh);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("[REALTIME_BROADCAST_ERROR] Failed to send broadcast logout:", err);
+      }
     },
     []
   );
@@ -271,10 +301,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       authSubscription?.unsubscribe();
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+        const ch = channelRef.current;
+        channelRef.current = null;
+        supabase.removeChannel(ch);
       }
       if (sessionControlChannelRef.current) {
-        supabase.removeChannel(sessionControlChannelRef.current);
+        const sCh = sessionControlChannelRef.current;
+        sessionControlChannelRef.current = null;
+        supabase.removeChannel(sCh);
       }
     };
   }, [initRealtimeChannel, initSessionControlChannel, logConnectionAudit]);
