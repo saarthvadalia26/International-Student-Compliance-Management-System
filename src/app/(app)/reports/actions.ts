@@ -2,16 +2,24 @@
 
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { requireAdministrator } from "@/lib/auth/permissions";
+import { requireAdministrator, UnauthorizedError } from "@/lib/auth/permissions";
 import { SupabaseReportRepository } from "@/domain/reports/repositories/report.repository";
 import { ReportingService } from "@/domain/reports/services/report.service";
-import { ReportFilters, ReportPagination } from "@/domain/reports/types";
+import { DimensionalReportsService } from "@/domain/reports/services/dimensional-reports.service";
+import { DimensionalExcelService } from "@/domain/reports/services/dimensional-excel.service";
+import {
+  ReportFilters,
+  ReportPagination,
+  DimensionReportFilters,
+  ExportableDimensionType,
+  DimensionalReportsData,
+} from "@/domain/reports/types";
 import { headers as getHeaders } from "next/headers";
 import { Branding } from "@/config/branding";
 
-
 const reportRepo = new SupabaseReportRepository();
 const reportService = new ReportingService(reportRepo);
+const dimensionalService = new DimensionalReportsService();
 
 // Helper to resolve request IP and User Agent for audit logs
 async function getRequestMetadata() {
@@ -29,13 +37,68 @@ async function getAdminUser() {
   const supabase = await getServerSupabase();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
-    if (process.env.NODE_ENV === "development") {
-      return { id: "dev-admin", email: "admin@iscms.internal" };
-    }
-    throw new Error("Unauthorized: Please log in as an Administrator.");
+    throw new UnauthorizedError("Unauthorized: Please log in as an Administrator.");
   }
   requireAdministrator(user);
   return user;
+}
+
+/**
+ * Fetches unified dimensional reporting data across all 10 student and compliance dimensions.
+ * Strictly restricted to Administrators.
+ */
+export async function getDimensionalReportsAction(
+  filters?: DimensionReportFilters
+): Promise<DimensionalReportsData> {
+  await getAdminUser();
+  return dimensionalService.getDimensionalReports(filters);
+}
+
+/**
+ * Generates and downloads Excel (.xlsx) workbooks for individual dimensions or unified multi-sheet workbooks.
+ * Records secure audit logs for every generated file.
+ * Strictly restricted to Administrators.
+ */
+export async function exportDimensionalReportExcelAction(
+  dimension: ExportableDimensionType | "all",
+  filters?: DimensionReportFilters
+): Promise<{ success: boolean; base64: string; fileName: string; mimeType: string }> {
+  const user = await getAdminUser();
+  const data = await dimensionalService.getDimensionalReports(filters);
+
+  let exportResult: { buffer: Buffer; fileName: string; mimeType: string };
+  if (dimension === "all") {
+    exportResult = DimensionalExcelService.exportAllDimensionsExcel(data);
+  } else {
+    exportResult = DimensionalExcelService.exportSingleDimensionExcel(dimension, data);
+  }
+
+  const { ip, userAgent } = await getRequestMetadata();
+  const actorId = user.id;
+  const actorEmail = user.email || Branding.supportEmail;
+
+  await reportService.logAuditAction(
+    actorId,
+    actorEmail,
+    "REPORT_EXPORTED",
+    `reports/dimensional/${dimension}`,
+    null,
+    {
+      dimension,
+      fileName: exportResult.fileName,
+      appliedFilters: filters,
+      totalStudents: data.overview.totalStudents,
+    },
+    ip,
+    userAgent
+  );
+
+  return {
+    success: true,
+    base64: exportResult.buffer.toString("base64"),
+    fileName: exportResult.fileName,
+    mimeType: exportResult.mimeType,
+  };
 }
 
 export async function fetchStudentReport(

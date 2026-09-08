@@ -25,7 +25,7 @@ export const USER_ROLES = {
 /** Normalizes the raw role string from user_metadata to a canonical AppRole */
 export function getAppRole(user: User | null | undefined): AppRole | null {
   if (!user) return null;
-  const raw = (user.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+  const raw = ((user.app_metadata?.role || user.user_metadata?.role) as string | undefined)?.toLowerCase().trim();
   if (raw === USER_ROLES.ADMINISTRATOR || raw === "admin") return USER_ROLES.ADMINISTRATOR;
   if (raw === USER_ROLES.STAFF) return USER_ROLES.STAFF;
   if (raw === USER_ROLES.STUDENT) return USER_ROLES.STUDENT;

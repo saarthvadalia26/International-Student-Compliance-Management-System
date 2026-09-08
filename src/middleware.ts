@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Extract and normalize user role
-  const rawRole = (user?.user_metadata?.role as string | undefined)?.toLowerCase().trim();
+  const rawRole = ((user?.app_metadata?.role || user?.user_metadata?.role) as string | undefined)?.toLowerCase().trim();
   const isAdministrator = rawRole === "administrator" || rawRole === "admin";
 
   // ── Single Authoritative Setup & Auth Routing Authority for Non-API Requests ──
