@@ -340,10 +340,10 @@ export default function StudentListPage() {
     if (missingDocs.length > 0) {
       return (
         <span 
-          className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap"
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap shadow-2xs"
           title={`Missing required documentation: ${missingDocs.join(", ")}`}
         >
-          <AlertTriangle className="h-3 w-3 text-rose-600 dark:text-rose-400 shrink-0" />
+          <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
           <span>Missing: {missingDocs.join(", ")}</span>
         </span>
       );
@@ -351,44 +351,44 @@ export default function StudentListPage() {
 
     if (rawStatus === "EXPIRED" || mappedStatus === "expired") {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/25 whitespace-nowrap">
-          <XCircle className="h-3 w-3 text-red-600 dark:text-red-400 shrink-0" />
-          Expired
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/25 whitespace-nowrap shadow-2xs">
+          <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 shrink-0" />
+          <span>Expired</span>
         </span>
       );
     }
 
     if (rawStatus === "WARNING" || mappedStatus === "warning") {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap">
-          <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
-          Expiring Soon
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/25 whitespace-nowrap shadow-2xs">
+          <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span>Expiring Soon</span>
         </span>
       );
     }
 
     if (rawStatus === "PENDING_VERIFICATION") {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/25 whitespace-nowrap">
-          <Clock className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
-          Pending Review
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/25 whitespace-nowrap shadow-2xs">
+          <Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span>Pending Review</span>
         </span>
       );
     }
 
     if (rawStatus === "COMPLIANT" || mappedStatus === "compliant") {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 whitespace-nowrap">
-          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          Fully Compliant
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 whitespace-nowrap shadow-2xs">
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span>Fully Compliant</span>
         </span>
       );
     }
 
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap">
-        <AlertTriangle className="h-3 w-3 text-rose-600 dark:text-rose-400 shrink-0" />
-        Documents Missing
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap shadow-2xs">
+        <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+        <span>Documents Missing</span>
       </span>
     );
   };
@@ -396,13 +396,13 @@ export default function StudentListPage() {
   const getAcademicStatusBadge = (status: Student["academicStatus"]) => {
     switch (status) {
       case "good_standing":
-        return <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400 font-normal text-[10px] px-2 py-0.5 whitespace-nowrap">Good Standing</Badge>;
+        return <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400 font-medium text-[10px] px-2.5 py-0.5 whitespace-nowrap">Good Standing</Badge>;
       case "probation":
-        return <Badge variant="secondary" className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20 font-normal text-[10px] px-2 py-0.5 whitespace-nowrap">Probation</Badge>;
+        return <Badge variant="secondary" className="bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20 font-medium text-[10px] px-2.5 py-0.5 whitespace-nowrap">Probation</Badge>;
       case "suspended":
-        return <Badge variant="destructive" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20 font-normal text-[10px] px-2 py-0.5 whitespace-nowrap">Suspended</Badge>;
+        return <Badge variant="destructive" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20 font-medium text-[10px] px-2.5 py-0.5 whitespace-nowrap">Suspended</Badge>;
       default:
-        return <Badge variant="outline" className="text-[10px] px-2 py-0.5 whitespace-nowrap">Unknown</Badge>;
+        return <Badge variant="outline" className="text-[10px] px-2.5 py-0.5 whitespace-nowrap">Unknown</Badge>;
     }
   };
 
@@ -781,15 +781,15 @@ export default function StudentListPage() {
           <div>
             {/* Desktop Full-Density Administrative Table (>= 1024px) */}
             <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px]">
+              <table className="w-full text-left border-collapse min-w-[1060px]">
                 <thead>
                   <tr className="bg-muted/50 border-b border-border/70 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    <th scope="col" className="py-3 px-4 font-semibold">1. Student</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">2. Academic Info</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">3. Campus</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">4. Compliance</th>
-                    <th scope="col" className="py-3 px-3 font-semibold">5. Status</th>
-                    <th scope="col" className="py-3 px-4 font-semibold text-right">6. Actions</th>
+                    <th scope="col" className="py-3.5 px-4 font-semibold w-[26%] min-w-[220px]">1. Student</th>
+                    <th scope="col" className="py-3.5 px-4 font-semibold w-[24%] min-w-[200px]">2. Academic Info</th>
+                    <th scope="col" className="py-3.5 px-4 font-semibold w-[18%] min-w-[180px]">3. Campus</th>
+                    <th scope="col" className="py-3.5 px-4 font-semibold w-[18%] min-w-[190px]">4. Compliance</th>
+                    <th scope="col" className="py-3.5 px-4 font-semibold w-[14%] min-w-[130px]">5. Status</th>
+                    <th scope="col" className="py-3.5 px-4 font-semibold text-right w-[110px] min-w-[110px]">6. Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40 text-xs">
@@ -799,12 +799,12 @@ export default function StudentListPage() {
                       className="hover:bg-muted/30 transition-colors group"
                     >
                       {/* 1. Student Identity */}
-                      <td className="py-3 px-4 align-top">
+                      <td className="py-3.5 px-4 align-top">
                         <div className="flex items-start gap-3 min-w-0">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold text-xs font-display border border-primary/20 mt-0.5">
                             {student.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                           </div>
-                          <div className="space-y-1 min-w-0 max-w-[200px]">
+                          <div className="space-y-1 min-w-0 max-w-[210px]">
                             <Link 
                               href={`/students/${student.id}`} 
                               className="text-xs font-bold text-foreground hover:text-primary transition-colors block truncate group-hover:text-primary leading-tight"
@@ -835,8 +835,8 @@ export default function StudentListPage() {
                       </td>
 
                       {/* 2. Academic Info */}
-                      <td className="py-3 px-3 align-top">
-                        <div className="space-y-1 min-w-0 max-w-[190px]">
+                      <td className="py-3.5 px-4 align-top">
+                        <div className="space-y-1 min-w-0 max-w-[200px]">
                           <div 
                             className="text-xs font-semibold text-foreground leading-snug line-clamp-2" 
                             title={student.programName}
@@ -864,11 +864,15 @@ export default function StudentListPage() {
                       </td>
 
                       {/* 3. NFSU Campus */}
-                      <td className="py-3 px-3 align-top">
-                        <div className="min-w-0 max-w-[130px]">
+                      <td className="py-3.5 px-4 align-top">
+                        <div className="min-w-0">
                           {student.nfsuCampus ? (
-                            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-medium">
-                              <Building2 className="h-3 w-3 mr-1 shrink-0" />
+                            <Badge 
+                              variant="secondary" 
+                              className="text-[10px] px-2.5 py-0.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20 font-medium inline-flex items-center gap-1.5 max-w-full shrink min-w-0"
+                              title={student.nfsuCampus}
+                            >
+                              <Building2 className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{student.nfsuCampus}</span>
                             </Badge>
                           ) : (
@@ -880,19 +884,21 @@ export default function StudentListPage() {
                       </td>
 
                       {/* 4. Overall Compliance */}
-                      <td className="py-3 px-3 align-top">
-                        <div>
+                      <td className="py-3.5 px-4 align-top">
+                        <div className="min-w-0">
                           {renderOverallComplianceBadge(student)}
                         </div>
                       </td>
 
                       {/* 5. Academic Standing */}
-                      <td className="py-3 px-3 align-top">
-                        {getAcademicStatusBadge(student.academicStatus)}
+                      <td className="py-3.5 px-4 align-top">
+                        <div className="min-w-0">
+                          {getAcademicStatusBadge(student.academicStatus)}
+                        </div>
                       </td>
 
                       {/* 6. Actions */}
-                      <td className="py-3 px-4 align-top text-right">
+                      <td className="py-3.5 px-4 align-top text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <Link href={`/students/${student.id}`} passHref>
                             <Button 
