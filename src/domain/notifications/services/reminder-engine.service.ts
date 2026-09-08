@@ -60,7 +60,7 @@ export interface DocumentInfoParam {
   issueDate?: string | null;
   expiryDate?: string | null;
   isUploaded?: boolean;
-  verificationStatus?: "not_uploaded" | "pending" | "verified" | "rejected";
+  verificationStatus?: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
 }
 
 import { CalendarDateEngine } from "./calendar-date";
@@ -77,8 +77,8 @@ export class ExpiryReminderEngine {
     documentNumber: string;
     expiryDate: string | null | undefined;
     expectedGraduationDate?: string | null | undefined;
-    isUploaded: boolean;
-    verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
+    isUploaded?: boolean;
+    verificationStatus?: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
     existingNotifications: RawNotificationRecord[];
     customRules?: ReminderRuleConfig[];
     todayISO?: string;
@@ -401,7 +401,7 @@ export class ExpiryReminderEngine {
       expiryDate: params.passport?.expiryDate,
       expectedGraduationDate: gradDate,
       isUploaded: params.passport?.isUploaded || false,
-      verificationStatus: params.passport?.verificationStatus || "not_uploaded",
+      verificationStatus: params.passport?.verificationStatus || "not_recorded",
       existingNotifications: params.notifications,
       customRules: params.customRules?.passport,
       todayISO: today
@@ -414,7 +414,7 @@ export class ExpiryReminderEngine {
       expiryDate: params.visa?.expiryDate,
       expectedGraduationDate: gradDate,
       isUploaded: params.visa?.isUploaded || false,
-      verificationStatus: params.visa?.verificationStatus || "not_uploaded",
+      verificationStatus: params.visa?.verificationStatus || "not_recorded",
       existingNotifications: params.notifications,
       customRules: params.customRules?.visa,
       todayISO: today
@@ -427,7 +427,7 @@ export class ExpiryReminderEngine {
       expiryDate: params.efrro?.expiryDate,
       expectedGraduationDate: gradDate,
       isUploaded: params.efrro?.isUploaded || false,
-      verificationStatus: params.efrro?.verificationStatus || "not_uploaded",
+      verificationStatus: params.efrro?.verificationStatus || "not_recorded",
       existingNotifications: params.notifications,
       customRules: params.customRules?.efrro,
       todayISO: today

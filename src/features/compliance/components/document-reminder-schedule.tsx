@@ -102,9 +102,9 @@ export function getReminderStatusBadge(status: string, statusLabel?: string): Re
       return (
         <Badge 
           variant="outline" 
-          className="text-[9px] px-1.5 py-0.5 h-5 text-muted-foreground border-border/60"
+          className="text-[9px] px-1.5 py-0.5 h-5 text-muted-foreground border-border/60 bg-muted/10 font-medium"
         >
-          Not Available
+          {statusLabel || "Inactive"}
         </Badge>
       );
     case "NOT_DUE":
@@ -236,48 +236,28 @@ export function DocumentReminderSchedule({
           ) : (
             <div className="space-y-3.5 w-full min-w-0 box-border">
               {/* Active Source Expiry Date Banner */}
-              <div className={`p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 w-full min-w-0 box-border ${activeDocTheme.bannerClass}`}>
-                <div className="space-y-0.5 min-w-0 flex-1">
-                  <span className={`text-[10px] uppercase tracking-wider font-semibold font-caption block truncate ${activeDocTheme.bannerTitleClass}`}>
+              <div className={`p-3 rounded-lg border space-y-1.5 w-full min-w-0 box-border ${activeDocTheme.bannerClass}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className={`text-[10px] uppercase tracking-wider font-bold font-caption ${activeDocTheme.bannerTitleClass}`}>
                     Active {docTitle} Expiry
                   </span>
-                  <div className="text-xs font-semibold text-foreground flex items-center gap-1.5 font-mono">
-                    <Calendar className={`h-3.5 w-3.5 shrink-0 ${activeDocTheme.bannerIconClass}`} />
-                    <span className="truncate">{currentDoc.expiryDateFormatted}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {currentDoc.isExpired ? (
+                      <Badge variant="destructive" className="text-[10px] h-5 font-semibold">Expired</Badge>
+                    ) : (
+                      <Badge variant="outline" className={`text-[10px] h-5 font-mono font-medium ${activeDocTheme.badgeClass}`}>
+                        {currentDoc.daysRemaining} days left
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="text-[9px] h-5 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 font-medium flex items-center gap-1">
+                      <MessageSquare className="h-2.5 w-2.5" /> WhatsApp
+                    </Badge>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                  {/* Physical Document State Badge */}
-                  {!currentDoc.isUploaded || currentDoc.verificationStatus === "not_uploaded" ? (
-                    <Badge variant="outline" className="text-[9px] h-5 font-medium text-muted-foreground border-border/60 bg-muted/20 whitespace-nowrap">
-                      Document Not Uploaded
-                    </Badge>
-                  ) : currentDoc.verificationStatus === "pending" ? (
-                    <Badge variant="outline" className="text-[9px] h-5 font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30 whitespace-nowrap">
-                      Document Pending Verification
-                    </Badge>
-                  ) : currentDoc.verificationStatus === "verified" ? (
-                    <Badge variant="outline" className="text-[9px] h-5 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30 whitespace-nowrap">
-                      Document Verified
-                    </Badge>
-                  ) : currentDoc.verificationStatus === "rejected" ? (
-                    <Badge variant="destructive" className="text-[9px] h-5 font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 whitespace-nowrap">
-                      Document Rejected
-                    </Badge>
-                  ) : null}
-
-                  {currentDoc.isExpired ? (
-                    <Badge variant="destructive" className="text-[10px] h-5 font-semibold whitespace-nowrap">Expired</Badge>
-                  ) : (
-                    <Badge variant="outline" className={`text-[10px] h-5 font-mono font-medium whitespace-nowrap ${activeDocTheme.badgeClass}`}>
-                      {currentDoc.daysRemaining} days left
-                    </Badge>
-                  )}
-                  
-                  <Badge variant="outline" className="text-[9px] h-5 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 font-medium flex items-center gap-1 whitespace-nowrap">
-                    <MessageSquare className="h-2.5 w-2.5" /> WhatsApp
-                  </Badge>
+                <div className="text-sm font-bold text-foreground flex items-center gap-2 font-mono">
+                  <Calendar className={`h-4 w-4 shrink-0 ${activeDocTheme.bannerIconClass}`} />
+                  <span>{currentDoc.expiryDateFormatted}</span>
                 </div>
               </div>
 
@@ -338,193 +318,97 @@ export function DocumentReminderSchedule({
                 </div>
               )}
 
-              {/* Metadata Tracking Notice when physical document copy has not been uploaded */}
-              {!currentDoc.isUploaded && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 sm:px-3 sm:py-2.5 rounded-md bg-muted/30 border border-border/50 text-[11px] text-muted-foreground w-full min-w-0 box-border">
-                  <div className="flex items-start sm:items-center gap-1.5 min-w-0 flex-1">
-                    <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5 sm:mt-0" />
-                    <span className="leading-relaxed break-words text-[11px]">
-                      The system tracks when the {docTitle.toLowerCase()} expires, but the physical document has not yet been uploaded.
-                    </span>
-                  </div>
-                  <Badge variant="outline" className={`text-[9px] font-semibold shrink-0 self-start sm:self-auto ${activeDocTheme.badgeClass}`}>
-                    Metadata Tracking
-                  </Badge>
-                </div>
-              )}
-
-              {/* 4A. DESKTOP/TABLET TABLE VIEW (Visible when container has sufficient width >= 512px / @lg) */}
-              <div className="hidden @lg:block rounded-lg border border-border/60 overflow-hidden bg-card w-full max-w-full min-w-0 box-border">
-                <div className="w-full overflow-x-auto">
-                  <table className="w-full text-[11px] text-left min-w-[440px]">
-                    <thead className="bg-muted/40 text-[10px] text-muted-foreground uppercase border-b border-border/50">
-                      <tr>
-                        <th className="py-2.5 px-3 font-semibold">Reminder</th>
-                        <th className="py-2.5 px-2.5 font-semibold">Trigger</th>
-                        <th className="py-2.5 px-2.5 font-semibold">Scheduled Date</th>
-                        <th className="py-2.5 px-3 font-semibold text-right">Status & Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/30">
-                      {currentDoc.schedule.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="py-6 text-center text-xs text-muted-foreground">
-                            No reminder milestones configured for this document.
-                          </td>
-                        </tr>
-                      ) : (
-                        currentDoc.schedule.map((item: ReminderScheduleItem) => {
-                          const isDue = item.status === "DUE";
-                          const isCurrentDispatching = isDispatchingReminderId === item.ruleId;
-
-                          return (
-                            <tr key={item.ruleId} className="hover:bg-muted/20 transition-colors">
-                              <td className="py-2.5 px-3 min-w-0">
-                                <span className="font-semibold text-foreground block leading-tight">
-                                  {item.ruleName}
-                                </span>
-                                <span className="text-[9px] text-muted-foreground font-caption flex items-center gap-1 mt-0.5">
-                                  <MessageSquare className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" /> via WhatsApp
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-2.5 text-muted-foreground whitespace-nowrap">
-                                {item.thresholdDays} days before expiry
-                              </td>
-                              <td className="py-2.5 px-2.5 font-medium text-foreground whitespace-nowrap font-mono">
-                                {item.scheduledDate || <span className="text-muted-foreground font-normal font-sans">N/A</span>}
-                              </td>
-                              <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {getReminderStatusBadge(item.status, item.statusLabel)}
-                                  {isDue && (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => onOpenDispatch(selectedDocType, item.thresholdDays, item.ruleId, item.ruleName)}
-                                      disabled={isCurrentDispatching}
-                                      className={`h-6 px-2 text-[10px] cursor-pointer font-medium ${activeDocTheme.buttonOutlineClass}`}
-                                      title="Dispatch WhatsApp notification now"
-                                      aria-label={`Dispatch ${item.ruleName} WhatsApp notification`}
-                                    >
-                                      {isCurrentDispatching ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                      ) : (
-                                        <span className="flex items-center gap-1">
-                                          <Send className="h-2.5 w-2.5" />
-                                          <span>Dispatch</span>
-                                        </span>
-                                      )}
-                                    </Button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* 4B. MOBILE/COMPACT CARD PRESENTATION (Active on mobile viewports and narrow sidebar containers < @lg) */}
-              <div className="block @lg:hidden space-y-2.5 w-full min-w-0 max-w-full box-border">
+              {/* 4. UNIFIED STREAMLINED MILESTONES TIMETABLE */}
+              <div className="rounded-xl border border-border/70 bg-card overflow-hidden shadow-2xs divide-y divide-border/40 w-full min-w-0 box-border">
                 {currentDoc.schedule.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-muted-foreground rounded-lg border border-border/50 bg-muted/10">
+                  <div className="p-4 text-center text-xs text-muted-foreground">
                     No reminder milestones configured for this document.
                   </div>
                 ) : (
                   currentDoc.schedule.map((item: ReminderScheduleItem) => {
                     const isDue = item.status === "DUE";
+                    const isDispatched = item.status === "DISPATCHED";
                     const isCurrentDispatching = isDispatchingReminderId === item.ruleId;
+                    const isInactive = item.status === "NOT_APPLICABLE" || currentDoc.isAfterGraduation;
 
                     return (
                       <div 
                         key={item.ruleId} 
-                        className="p-3 sm:p-3.5 rounded-lg border border-border/60 bg-muted/15 space-y-2.5 w-full min-w-0 max-w-full box-border shadow-2xs"
+                        className={`p-2.5 sm:p-3 transition-colors flex items-center justify-between gap-2.5 w-full min-w-0 ${
+                          isDue 
+                            ? "bg-amber-500/10 dark:bg-amber-500/15" 
+                            : isDispatched
+                            ? "bg-emerald-500/5 dark:bg-emerald-500/10"
+                            : isInactive
+                            ? "bg-muted/10 opacity-75 hover:opacity-100"
+                            : "hover:bg-muted/20"
+                        }`}
                       >
-                        {/* 1. Reminder Name & Header */}
-                        <div className="flex items-start justify-between gap-2 min-w-0">
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-semibold text-foreground text-xs leading-snug break-words">
-                              {item.ruleName}
-                            </h4>
+                        {/* Left: Milestone node dot + Rule Name & Trigger details */}
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          {/* Visual Badge Indicator */}
+                          <div className={`h-7 w-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold font-mono ${
+                            isDue 
+                              ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 animate-pulse"
+                              : isDispatched
+                              ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/40"
+                              : isInactive
+                              ? "bg-muted/50 text-muted-foreground border border-border/50"
+                              : "bg-primary/10 text-primary border border-primary/25"
+                          }`}>
+                            {isDispatched ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                            ) : item.status === "FAILED" ? (
+                              <XCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                            ) : (
+                              <span>{item.thresholdDays}d</span>
+                            )}
                           </div>
-                          <div className="shrink-0">
-                            {getReminderStatusBadge(item.status, item.statusLabel)}
+
+                          {/* Title & Metadata */}
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <h4 className="font-semibold text-foreground text-xs leading-tight truncate">
+                                {item.ruleName}
+                              </h4>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-caption min-w-0 flex-wrap">
+                              <span className="font-mono font-medium text-foreground/90 flex items-center gap-1">
+                                <Calendar className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                                {item.scheduledDate || "N/A"}
+                              </span>
+                              <span>•</span>
+                              <span className="truncate">{item.thresholdDays} days before expiry</span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* 2 & 3. Trigger & Scheduled Date Grid */}
-                        <div className="grid grid-cols-1 min-[340px]:grid-cols-2 gap-2 text-[11px] pt-1.5 border-t border-border/30">
-                          <div className="space-y-0.5 min-w-0">
-                            <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground block">
-                              Trigger
-                            </span>
-                            <span className="text-xs text-foreground font-medium block break-words">
-                              {item.thresholdDays} days before expiry
-                            </span>
-                          </div>
-
-                          <div className="space-y-0.5 min-w-0">
-                            <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground flex items-center gap-1">
-                              <Calendar className="h-3 w-3 text-muted-foreground shrink-0" /> Scheduled
-                            </span>
-                            <span className="text-xs font-mono font-semibold text-foreground block break-words">
-                              {item.scheduledDate || <span className="text-muted-foreground font-normal font-sans">N/A</span>}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* 4 & 5. Channel & Delivery Details */}
-                        <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-border/30 min-w-0">
-                          <div className="space-y-0.5 min-w-0">
-                            <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground block">
-                              Channel
-                            </span>
-                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 truncate">
-                              <MessageSquare className="h-3 w-3 shrink-0" /> WhatsApp
-                            </span>
-                          </div>
-
-                          <div className="space-y-0.5 text-right min-w-0">
-                            <span className="text-[10px] uppercase font-caption font-semibold tracking-wider text-muted-foreground block">
-                              Status
-                            </span>
-                            <span className="text-xs text-muted-foreground font-medium block truncate">
-                              {item.statusLabel || (isDue ? "Due Now" : "Scheduled")}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* 6. Action Button (Touch friendly with full width) */}
-                        {isDue && (
-                          <div className="pt-2 border-t border-border/30">
+                        {/* Right: Status badge & Action */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {getReminderStatusBadge(item.status, item.statusLabel)}
+                          
+                          {isDue && (
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
                               onClick={() => onOpenDispatch(selectedDocType, item.thresholdDays, item.ruleId, item.ruleName)}
                               disabled={isCurrentDispatching}
-                              className={`w-full h-8 text-xs font-semibold cursor-pointer justify-center shadow-2xs ${activeDocTheme.buttonOutlineClass}`}
+                              className={`h-6 px-2 text-[10px] cursor-pointer font-semibold ${activeDocTheme.buttonOutlineClass}`}
                               title="Dispatch WhatsApp notification now"
                               aria-label={`Dispatch ${item.ruleName} WhatsApp notification`}
                             >
                               {isCurrentDispatching ? (
-                                <span className="flex items-center gap-1.5">
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  <span>Dispatching Alert...</span>
-                                </span>
+                                <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
-                                <span className="flex items-center gap-1.5">
-                                  <Send className="h-3.5 w-3.5" />
-                                  <span>Dispatch Reminder Alert</span>
+                                <span className="flex items-center gap-1">
+                                  <Send className="h-2.5 w-2.5" />
+                                  <span>Dispatch</span>
                                 </span>
                               )}
                             </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     );
                   })

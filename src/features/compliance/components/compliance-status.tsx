@@ -46,12 +46,11 @@ export function ComplianceStatusBadge({ status }: BadgeProps): React.JSX.Element
           <HelpCircle className="h-3.5 w-3.5" /> Metadata Available
         </Badge>
       );
-    case "NOT_UPLOADED":
     case "MISSING":
     default:
       return (
         <Badge variant="outline" className="border-border/60 text-muted-foreground px-2 py-0.5 rounded-md flex items-center gap-1.5 w-fit">
-          <HelpCircle className="h-3.5 w-3.5" /> Not Uploaded
+          <HelpCircle className="h-3.5 w-3.5" /> Not Recorded
         </Badge>
       );
   }

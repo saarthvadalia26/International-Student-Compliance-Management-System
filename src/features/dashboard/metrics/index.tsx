@@ -10,7 +10,6 @@ import {
   XCircle, 
   CheckCircle, 
   Bell, 
-  FileText,
   UserPlus,
   Search,
   LayoutGrid
@@ -63,7 +62,7 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
     {
       title: "Pending eFRRO Verification",
       value: metrics.pendingEfrroVerification,
-      description: "Submissions awaiting approval",
+      description: "Staff renewals awaiting review",
       icon: CheckCircle,
       iconClassName: "text-blue-600 bg-blue-100 dark:bg-blue-950/40 dark:text-blue-400",
     },
@@ -80,13 +79,6 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
       description: "Alert dispatch failures",
       icon: AlertTriangle,
       iconClassName: "text-red-600 bg-red-100 dark:bg-red-950/40 dark:text-red-400",
-    },
-    {
-      title: "Pending Upload Reviews",
-      value: metrics.pendingUploadReviews,
-      description: "Awaiting compliance audits",
-      icon: FileText,
-      iconClassName: "text-violet-600 bg-violet-100 dark:bg-violet-950/40 dark:text-violet-400",
     }
   ];
 
@@ -143,9 +135,9 @@ export function DashboardQuickActions() {
       adminOnly: true
     },
     {
-      title: "Review Pending Uploads",
+      title: "eFRRO Verification Queue",
       href: "/reports/efrro?efrroStatus=pending",
-      icon: FileText,
+      icon: CheckCircle,
       variant: "secondary" as const,
       adminOnly: true
     },

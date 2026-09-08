@@ -94,19 +94,19 @@ export class ReminderSchedulerServer {
         number: activePassport?.document_number || snapshot?.passport_number || "",
         expiryDate: passportExpiry,
         isUploaded: Boolean(activePassport?.file_path),
-        verificationStatus: (activePassport?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
+        verificationStatus: (activePassport?.verification_status as "not_recorded" | "pending" | "verified" | "rejected") || "not_recorded"
       },
       visa: {
         number: activeVisa?.document_number || snapshot?.visa_number || "",
         expiryDate: visaExpiry,
         isUploaded: Boolean(activeVisa?.file_path),
-        verificationStatus: (activeVisa?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
+        verificationStatus: (activeVisa?.verification_status as "not_recorded" | "pending" | "verified" | "rejected") || "not_recorded"
       },
       efrro: {
         number: activeEfrro?.document_number || snapshot?.efrro_number || "",
         expiryDate: efrroExpiry,
         isUploaded: Boolean(activeEfrro?.file_path),
-        verificationStatus: (activeEfrro?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || "not_uploaded"
+        verificationStatus: (activeEfrro?.verification_status as "not_recorded" | "pending" | "verified" | "rejected") || "not_recorded"
       },
       notifications,
       customRules: dbRules && dbRules.length > 0 ? customRules : undefined

@@ -864,7 +864,7 @@ export class BulkStudentImportService {
           field: "passport_number",
           fieldLabel: "Passport",
           value: "Not Provided",
-          warning: "Passport metadata not provided. Physical document copy pending upload."
+          warning: "Passport metadata not provided in spreadsheet. Document not recorded."
         });
         warningsBreakdown.passportExpiryMissing++;
       } else {
@@ -927,7 +927,7 @@ export class BulkStudentImportService {
           field: "visa_number",
           fieldLabel: "Visa",
           value: "Not Provided",
-          warning: "Visa metadata not provided. Physical document copy pending upload."
+          warning: "Visa metadata not provided in spreadsheet. Document not recorded."
         });
         warningsBreakdown.visaExpiryMissing++;
       } else {
@@ -1737,7 +1737,7 @@ export class BulkStudentImportService {
 
       if (passDocCount && passDocCount > 0) {
         throw new Error(
-          `Cannot rollback batch: ${passDocCount} student(s) in this batch have already uploaded actual compliance document files. Manual review is required.`
+          `Cannot rollback batch: ${passDocCount} student(s) in this batch already have active document records with attached files. Manual review is required.`
         );
       }
 

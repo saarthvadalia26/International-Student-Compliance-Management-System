@@ -163,15 +163,13 @@ export default function NotificationReportPage() {
                 <th className="p-3 font-semibold text-muted-foreground">Retries</th>
                 <th className="p-3 font-semibold text-muted-foreground">Last Attempt</th>
                 <th className="p-3 font-semibold text-muted-foreground">Next Retry</th>
-                <th className="p-3 font-semibold text-muted-foreground">Link Generated</th>
-                <th className="p-3 font-semibold text-muted-foreground">Uploaded</th>
                 <th className="p-3 font-semibold text-muted-foreground">Verification</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="p-8 text-center">
+                  <td colSpan={10} className="p-8 text-center">
                     <div className="flex justify-center items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading notification logs...
@@ -180,7 +178,7 @@ export default function NotificationReportPage() {
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={10} className="p-8 text-center text-muted-foreground">
                     No notification logs matched filters.
                   </td>
                 </tr>
@@ -211,16 +209,6 @@ export default function NotificationReportPage() {
                     </td>
                     <td className="p-3 text-muted-foreground">
                       {row.nextRetryAt ? formatDateTime(row.nextRetryAt) : "N/A"}
-                    </td>
-                    <td className="p-3">
-                      <span className="capitalize px-1.5 py-0.5 rounded-full text-[10px] bg-zinc-100 dark:bg-zinc-800 text-muted-foreground">
-                        {row.uploadLinkGenerated ? "Yes" : "No"}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <span className="capitalize px-1.5 py-0.5 rounded-full text-[10px] bg-zinc-100 dark:bg-zinc-800 text-muted-foreground">
-                        {row.documentUploaded ? "Yes" : "No"}
-                      </span>
                     </td>
                     <td className="p-3">
                       <span className="capitalize px-1.5 py-0.5 rounded-full text-[10px] bg-zinc-100 dark:bg-zinc-800 text-muted-foreground">

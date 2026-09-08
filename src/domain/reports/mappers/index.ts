@@ -94,8 +94,6 @@ export class ReportMapper {
         retryCount: 0,
         lastAttemptAt: null,
         nextRetryAt: null,
-        uploadLinkGenerated: false,
-        documentUploaded: false,
         verificationStatus: null,
       };
     }
@@ -110,8 +108,6 @@ export class ReportMapper {
       retryCount: row.retry_count || 0,
       lastAttemptAt: row.last_attempt_at ? new Date(row.last_attempt_at) : null,
       nextRetryAt: row.next_retry_at ? new Date(row.next_retry_at) : null,
-      uploadLinkGenerated: !!row.upload_link_generated,
-      documentUploaded: !!row.document_uploaded,
       verificationStatus: row.verification_status || null,
     };
   }

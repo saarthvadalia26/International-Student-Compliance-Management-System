@@ -9,7 +9,6 @@ export interface DashboardMetrics {
   pendingEfrroVerification: number;
   notificationsSentToday: number;
   failedNotificationsToday: number;
-  pendingUploadReviews: number;
 }
 
 export interface StudentReportRow {
@@ -57,8 +56,6 @@ export interface NotificationReportRow {
   retryCount: number;
   lastAttemptAt: Date | null;
   nextRetryAt: Date | null;
-  uploadLinkGenerated: boolean;
-  documentUploaded: boolean;
   verificationStatus: string | null;
 }
 

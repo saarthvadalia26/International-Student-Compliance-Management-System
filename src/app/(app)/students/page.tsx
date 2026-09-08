@@ -323,31 +323,10 @@ export default function StudentListPage() {
     return filteredStudents.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredStudents, currentPage, itemsPerPage]);
 
-  // Overall compliance badge renderer showing specific missing documents
+  // Overall compliance badge renderer
   const renderOverallComplianceBadge = (student: Student) => {
     const rawStatus = (student.rawComplianceStatus || "").toUpperCase();
     const mappedStatus = student.complianceStatus;
-
-    // Check specific missing documents
-    const isMissingNumber = (num?: string | null, status?: string | null) =>
-      !num || !num.trim() || num === "Not provided" || num === "Pending" || status === "MISSING";
-
-    const missingDocs: string[] = [];
-    if (isMissingNumber(student.passport?.number, student.passport?.status)) missingDocs.push("Passport");
-    if (isMissingNumber(student.visa?.number, student.visa?.status)) missingDocs.push("Visa");
-    if (isMissingNumber(student.efrro?.number, student.efrro?.status)) missingDocs.push("eFRRO");
-
-    if (missingDocs.length > 0) {
-      return (
-        <span 
-          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap shadow-2xs"
-          title={`Missing required documentation: ${missingDocs.join(", ")}`}
-        >
-          <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-          <span>Missing: {missingDocs.join(", ")}</span>
-        </span>
-      );
-    }
 
     if (rawStatus === "EXPIRED" || mappedStatus === "expired") {
       return (
@@ -386,9 +365,9 @@ export default function StudentListPage() {
     }
 
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/25 whitespace-nowrap shadow-2xs">
-        <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-        <span>Documents Missing</span>
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md bg-muted text-muted-foreground border border-border/50 whitespace-nowrap shadow-2xs">
+        <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <span>Not Recorded</span>
       </span>
     );
   };

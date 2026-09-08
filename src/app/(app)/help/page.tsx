@@ -13,16 +13,16 @@ export default function HelpPage() {
       a: "The system automatically aggregates student passport, visa, and eFRRO validity fields into a cached student_snapshot record. High-performance indexes evaluate warning thresholds (e.g. 30 and 15 days pre-expiry) to determine real-time dashboard statistics."
     },
     {
-      q: "How can I verify a student's newly uploaded eFRRO document?",
-      a: "Navigate to the eFRRO Review Queue from the sidebar or click 'Direct Review Link' inside the alert context. You can preview the uploaded PDF document inline and choose to Approve or Reject the submission."
+      q: "How do I record and verify a renewed compliance document?",
+      a: "When a student emails their renewed document to the International Student Office, staff records the renewal directly on the student's profile (creating Version N+1). Authorized administrators can preview attached files inline and approve or reject the renewal."
     },
     {
       q: "Where can I track PII unmasking actions?",
       a: "Sensitive data (Passport, Visa, and eFRRO numbers) are masked by default. Clicking the eye toggle triggers a secure API log that registers a UNMASK_PII event in the audit_log database, identifying the admin and time of access."
     },
     {
-      q: "What file validation sizes are enforced for students?",
-      a: "The student upload renewal page permits PDF and image document formats (JPEG/PNG), with the upper file size limit configured centrally by the institution administrator (default: 10MB). Duplicated files are automatically rejected using cryptographic SHA-256 checksum comparisons."
+      q: "What file formats and sizes are supported for document attachments?",
+      a: "Staff document renewal attachments support PDF and image formats (JPEG/PNG), with the upper file size limit configured centrally by the institution administrator (default: 10MB). Duplicate document files are automatically prevented using cryptographic SHA-256 checksum comparisons."
     }
   ];
 

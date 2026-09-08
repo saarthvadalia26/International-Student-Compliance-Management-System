@@ -76,7 +76,7 @@ export interface StudentDocumentDetail {
   versionNumber?: number | null;
   versionLabel?: string | null;
   renewalCount?: number;
-  verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
+  verificationStatus: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
   hasUploadedDocument: boolean;
   uploadedAt?: string | null;
   verifiedAt?: string | null;
@@ -730,21 +730,6 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       createdAt: a.created_at
     }));
 
-    // Retrieve active early upload authorizations for this student
-    const nowIso = new Date().toISOString();
-    const { data: authorizationsData } = await adminSupabase
-      .from("student_document_upload_authorizations")
-      .select("*")
-      .eq("student_id", studentId)
-      .eq("status", "active")
-      .lte("valid_from", nowIso)
-      .gte("valid_until", nowIso)
-      .order("created_at", { ascending: false });
-
-    const activePassportAuth = (authorizationsData || []).find(a => a.document_type === "passport");
-    const activeVisaAuth = (authorizationsData || []).find(a => a.document_type === "visa");
-    const activeEfrroAuth = (authorizationsData || []).find(a => a.document_type === "efrro");
-
     const totalSemesters = Number(progData?.totalSemesters) || 8;
     const semesterDuration = Number(progData?.semesterDuration) || 6;
     const semesterDurationUnit = progData?.semesterDurationUnit || "months";
@@ -875,7 +860,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         const raw = (snapshot?.compliance_status || "").toUpperCase();
         if (raw === "WARNING" || raw === "PENDING_VERIFICATION") return "warning";
         if (raw === "EXPIRED") return "expired";
-        if (raw === "MISSING" || raw === "REJECTED" || raw === "NOT_UPLOADED") return "non_compliant";
+        if (raw === "MISSING" || raw === "REJECTED" || raw === "NOT_UPLOADED" || raw === "NOT_RECORDED") return "non_compliant";
         return "compliant";
       })(),
       passport: {
@@ -886,7 +871,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         versionNumber: activePassport?.version_number ?? (passportVersions.length > 0 ? 1 : null),
         versionLabel: activePassport ? getVersionLabel(activePassport.version_number) : (passportVersions.length > 0 ? "Original" : null),
         renewalCount: passportRenewalCount,
-        verificationStatus: activePassport ? (activePassport.verification_status || "verified") : "not_uploaded",
+        verificationStatus: activePassport ? (activePassport.verification_status || "verified") : "not_recorded",
         hasUploadedDocument: Boolean(activePassport?.file_path),
         uploadedAt: activePassport?.created_at || null,
         verifiedAt: activePassport?.verified_at || null,
@@ -905,7 +890,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         versionNumber: activeVisa?.version_number ?? (visaVersions.length > 0 ? 1 : null),
         versionLabel: activeVisa ? getVersionLabel(activeVisa.version_number) : (visaVersions.length > 0 ? "Original" : null),
         renewalCount: visaRenewalCount,
-        verificationStatus: activeVisa ? (activeVisa.verification_status || "verified") : "not_uploaded",
+        verificationStatus: activeVisa ? (activeVisa.verification_status || "verified") : "not_recorded",
         hasUploadedDocument: Boolean(activeVisa?.file_path),
         uploadedAt: activeVisa?.created_at || null,
         verifiedAt: activeVisa?.verified_at || null,
@@ -923,7 +908,7 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         versionNumber: activeEfrro?.version_number ?? (efrroVersions.length > 0 ? 1 : null),
         versionLabel: activeEfrro ? getVersionLabel(activeEfrro.version_number) : (efrroVersions.length > 0 ? "Original" : null),
         renewalCount: efrroRenewalCount,
-        verificationStatus: activeEfrro ? (activeEfrro.verification_status || "verified") : "not_uploaded",
+        verificationStatus: activeEfrro ? (activeEfrro.verification_status || "verified") : "not_recorded",
         hasUploadedDocument: Boolean(activeEfrro?.file_path),
         uploadedAt: activeEfrro?.created_at || null,
         verifiedAt: activeEfrro?.verified_at || null,
@@ -1101,7 +1086,7 @@ export async function getDocumentVersionsAction(
 
     if (error) {
       console.error(`[GET_DOC_VERSIONS_ERROR] ${tableName}:`, error);
-      return { success: false, versions: [], status: "NOT_UPLOADED", error: error.message };
+      return { success: false, versions: [], status: "NOT_RECORDED", error: error.message };
     }
 
     // Filter out rows without genuine physical uploaded file paths
@@ -1137,7 +1122,7 @@ export async function getDocumentVersionsAction(
       return {
         success: true,
         versions: [],
-        status: hasMetadata ? "METADATA_ONLY" : "NOT_UPLOADED",
+        status: hasMetadata ? "METADATA_ONLY" : "NOT_RECORDED",
         metadata: hasMetadata ? {
           documentNumber: docNum || null,
           issueDate: docIssue || null,
@@ -1167,7 +1152,7 @@ export async function getDocumentVersionsAction(
     }));
 
     // Derive compliance status
-    let status = "NOT_UPLOADED";
+    let status = "NOT_RECORDED";
     const activeDoc = versions.find(v => v.isActive) || versions[0];
     if (activeDoc) {
       if (activeDoc.verificationStatus === "rejected") {
@@ -1197,7 +1182,7 @@ export async function getDocumentVersionsAction(
     return {
       success: false,
       versions: [],
-      status: "NOT_UPLOADED",
+      status: "NOT_RECORDED",
       error: err instanceof Error ? err.message : "Failed to load document records."
     };
   }
@@ -2778,19 +2763,19 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
         number: activePassport?.document_number || snapshot?.passport_number || "",
         expiryDate: passportExpiry,
         isUploaded: isPassportUp,
-        verificationStatus: (activePassport?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isPassportUp ? "pending" : "not_uploaded")
+        verificationStatus: (activePassport?.verification_status as "not_recorded" | "pending" | "verified" | "rejected") || "not_recorded"
       },
       visa: {
         number: activeVisa?.document_number || snapshot?.visa_number || "",
         expiryDate: visaExpiry,
         isUploaded: isVisaUp,
-        verificationStatus: (activeVisa?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isVisaUp ? "pending" : "not_uploaded")
+        verificationStatus: (activeVisa?.verification_status as "not_recorded" | "pending" | "verified" | "rejected") || "not_recorded"
       },
       efrro: {
         number: activeEfrro?.document_number || snapshot?.efrro_number || "",
         expiryDate: efrroExpiry,
         isUploaded: isEfrroUp,
-        verificationStatus: (activeEfrro?.verification_status as "not_uploaded" | "pending" | "verified" | "rejected") || (isEfrroUp ? "pending" : "not_uploaded")
+        verificationStatus: (activeEfrro?.verification_status as "not_recorded" | "pending" | "verified" | "rejected") || "not_recorded"
       },
       notifications,
       customRules: dbRules && dbRules.length > 0 ? customRules : undefined

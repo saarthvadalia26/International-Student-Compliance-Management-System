@@ -106,7 +106,7 @@ export interface StudentDocument {
   versionNumber?: number | null;
   versionLabel?: string | null;
   renewalCount?: number;
-  verificationStatus: "not_uploaded" | "pending" | "verified" | "rejected";
+  verificationStatus: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
   hasUploadedDocument: boolean;
   uploadedAt?: string | null;
   verifiedAt?: string | null;
@@ -1281,106 +1281,142 @@ function StudentDetailsContent({ params }: PageProps) {
       {/* Profile Completion Progress Card */}
       {profileCompletion && (
         profileCompletion.percentage === 100 ? (
-          <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 text-foreground shadow-xs animate-fade-in flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="space-y-1.5 flex-1 min-w-0">
+          <div className="p-4 sm:p-4.5 rounded-xl border border-emerald-500/30 bg-card text-card-foreground shadow-xs animate-fade-in flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-2 flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="outline" className="text-xs px-2.5 py-0.5 font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                <Badge variant="outline" className="text-xs px-2.5 py-0.5 font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">
                   Complete Profile (100%)
                 </Badge>
-                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   Profile Complete
                 </span>
               </div>
-              <div className="w-full bg-muted/60 dark:bg-zinc-800 h-2 rounded-full overflow-hidden max-w-md">
-                <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: "100%" }} />
+              <div className="flex items-center gap-3 w-full max-w-md">
+                <div className="flex-1 bg-muted/80 dark:bg-muted/40 h-2 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: "100%" }} />
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">100%</span>
               </div>
             </div>
 
             <Button 
               size="sm" 
               variant="outline" 
-              className="text-xs border-emerald-500/40 hover:bg-emerald-500/10 shrink-0 text-emerald-700 dark:text-emerald-300"
+              className="h-8 text-xs font-medium border-border/80 hover:bg-muted/60 bg-background text-foreground shadow-2xs shrink-0 flex items-center gap-1.5 cursor-pointer"
               onClick={openEditDialog}
             >
-              <Edit3 className="h-3.5 w-3.5 mr-1.5 text-emerald-600 dark:text-emerald-400" />
-              Edit Profile
+              <Edit3 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Edit Profile</span>
             </Button>
           </div>
         ) : (
-          <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-950/20 text-foreground shadow-xs animate-fade-in flex flex-col gap-3">
+          <div className="p-4 sm:p-4.5 rounded-xl border border-border/80 bg-card text-card-foreground shadow-xs animate-fade-in flex flex-col gap-3.5">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="space-y-1.5 flex-1 min-w-0">
+              <div className="space-y-2 flex-1 min-w-0 w-full">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-xs px-2.5 py-0.5 font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                  <Badge variant="outline" className={`text-xs px-2.5 py-0.5 font-semibold ${
+                    profileCompletion.percentage >= 80
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
+                      : profileCompletion.percentage >= 40
+                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                      : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
+                  }`}>
                     Complete Profile ({profileCompletion.percentage}%)
                   </Badge>
-                  <span className="text-xs font-medium text-foreground">
+                  <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
                     Progressive Registration Active
                   </span>
                 </div>
-                {/* Progress bar */}
-                <div className="w-full bg-muted/60 dark:bg-zinc-800 h-2 rounded-full overflow-hidden max-w-md">
-                  <div 
-                    className={`h-full transition-all duration-500 ${
-                      profileCompletion.percentage >= 80 
-                        ? "bg-emerald-500" 
-                        : profileCompletion.percentage >= 40 
-                          ? "bg-amber-500" 
-                          : "bg-rose-500"
-                    }`}
-                    style={{ width: `${profileCompletion.percentage}%` }}
-                  />
+
+                {/* Progress bar with percentage number */}
+                <div className="flex items-center gap-3 w-full max-w-md">
+                  <div className="flex-1 bg-muted/80 dark:bg-muted/40 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        profileCompletion.percentage >= 80 
+                          ? "bg-gradient-to-r from-emerald-500 to-teal-500" 
+                          : profileCompletion.percentage >= 40 
+                            ? "bg-gradient-to-r from-amber-500 to-amber-400" 
+                            : "bg-gradient-to-r from-rose-500 to-rose-400"
+                      }`}
+                      style={{ width: `${profileCompletion.percentage}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono font-bold text-foreground/80 shrink-0">
+                    {profileCompletion.percentage}%
+                  </span>
                 </div>
               </div>
 
               <Button 
                 size="sm" 
                 variant="outline" 
-                className="text-xs border-amber-500/40 hover:bg-amber-500/10 shrink-0"
+                className="h-8 text-xs font-medium border-border/80 hover:bg-muted/60 bg-background text-foreground shadow-2xs shrink-0 flex items-center gap-1.5 cursor-pointer"
                 onClick={openEditDialog}
               >
-                <Edit3 className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" />
-                Complete Profile
+                <Edit3 className={`h-3.5 w-3.5 shrink-0 ${
+                  profileCompletion.percentage >= 80
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : profileCompletion.percentage >= 40
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-rose-600 dark:text-rose-400"
+                }`} />
+                <span>Complete Profile</span>
               </Button>
             </div>
 
             {profileCompletion.missingItems.length > 0 && (
-              <div className="space-y-1 pt-1 border-t border-amber-500/15">
-                <div className="text-[11px] text-muted-foreground font-caption leading-relaxed flex flex-wrap items-center gap-1.5">
-                  <span className="font-semibold text-foreground/80">Pending Information:</span>{" "}
-                  {(!showAllPending && profileCompletion.missingItems.length > 4) ? (
-                    <>
-                      <span>{profileCompletion.missingItems.slice(0, 4).join(" · ")}</span>
+              <div className="pt-2.5 border-t border-border/50 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1 shrink-0 mr-0.5">
+                  <Clock className="h-3 w-3 text-muted-foreground/70" />
+                  Pending Information:
+                </span>
+                {(!showAllPending && profileCompletion.missingItems.length > 4) ? (
+                  <>
+                    {profileCompletion.missingItems.slice(0, 4).map((item, idx) => (
+                      <span 
+                        key={idx}
+                        className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-md bg-muted/60 dark:bg-muted/30 border border-border/60 text-foreground/80"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                    <button 
+                      type="button"
+                      onClick={() => setShowAllPending(true)}
+                      className="inline-flex items-center gap-0.5 font-semibold text-primary underline underline-offset-2 ml-1 cursor-pointer hover:opacity-80 text-[11px]"
+                    >
+                      +{profileCompletion.missingItems.length - 4} more
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {profileCompletion.missingItems.map((item, idx) => (
+                      <span 
+                        key={idx}
+                        className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-md bg-muted/60 dark:bg-muted/30 border border-border/60 text-foreground/80"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                    {profileCompletion.missingItems.length > 4 && (
                       <button 
                         type="button"
-                        onClick={() => setShowAllPending(true)}
+                        onClick={() => setShowAllPending(false)}
                         className="inline-flex items-center gap-0.5 font-semibold text-primary underline underline-offset-2 ml-1 cursor-pointer hover:opacity-80 text-[11px]"
                       >
-                        +{profileCompletion.missingItems.length - 4} more
-                        <ChevronDown className="h-3 w-3" />
+                        Show less
+                        <ChevronUp className="h-3 w-3" />
                       </button>
-                    </>
-                  ) : (
-                    <>
-                      <span>{profileCompletion.missingItems.join(" · ")}.</span>
-                      {profileCompletion.missingItems.length > 4 && (
-                        <button 
-                          type="button"
-                          onClick={() => setShowAllPending(false)}
-                          className="inline-flex items-center gap-0.5 font-semibold text-primary underline underline-offset-2 ml-1 cursor-pointer hover:opacity-80 text-[11px]"
-                        >
-                          Show less
-                          <ChevronUp className="h-3 w-3" />
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
+                    )}
+                  </>
+                )}
 
                 {/* Detailed breakdown by section when expanded */}
                 {showAllPending && profileCompletion.sections.some(s => s.missingFields.length > 0) && (
-                  <div className="mt-2.5 p-3 rounded-lg bg-background/80 dark:bg-zinc-900/60 border border-border/60 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs animate-fade-in">
+                  <div className="w-full mt-2 p-3 rounded-lg bg-muted/20 border border-border/60 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs animate-fade-in">
                     {profileCompletion.sections.filter(s => s.missingFields.length > 0).map(sec => (
                       <div key={sec.id} className="space-y-1">
                         <div className="font-semibold text-[11px] text-foreground flex items-center justify-between">

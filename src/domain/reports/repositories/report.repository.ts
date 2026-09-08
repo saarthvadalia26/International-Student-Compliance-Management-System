@@ -93,10 +93,7 @@ export class SupabaseReportRepository implements IReportRepository {
       expiredRes,
       pendingEfrroRes,
       sentTodayRes,
-      failedTodayRes,
-      passportPendingRes,
-      visaPendingRes,
-      efrroPendingRes
+      failedTodayRes
     ] = await Promise.all([
       // Total active students
       supabase.from("student_snapshot").select("student_id", { count: "exact", head: true }),
@@ -126,20 +123,7 @@ export class SupabaseReportRepository implements IReportRepository {
       // Notifications Failed Today
       supabase.from(NOTIFICATION_TABLE_NAME).select("id", { count: "exact", head: true })
         .eq("status", "failed")
-        .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
-      // Pending reviews for Passport, Visa, and eFRRO active versions
-      supabase.from("passport_versions").select("id", { count: "exact", head: true })
-        .eq("is_active", true)
-        .eq("verification_status", "pending")
-        .is("deleted_at", null),
-      supabase.from("visa_versions").select("id", { count: "exact", head: true })
-        .eq("is_active", true)
-        .eq("verification_status", "pending")
-        .is("deleted_at", null),
-      supabase.from("efrro_versions").select("id", { count: "exact", head: true })
-        .eq("is_active", true)
-        .eq("verification_status", "pending")
-        .is("deleted_at", null)
+        .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
     ]);
 
     const totalStudents = totalRes.count || 0;
@@ -150,9 +134,6 @@ export class SupabaseReportRepository implements IReportRepository {
     const pendingEfrro = pendingEfrroRes.count || 0;
     const sentToday = sentTodayRes.count || 0;
     const failedToday = failedTodayRes.count || 0;
-    const passportPending = passportPendingRes.count || 0;
-    const visaPending = visaPendingRes.count || 0;
-    const efrroPending = efrroPendingRes.count || 0;
 
     return {
       totalStudents,
@@ -162,8 +143,7 @@ export class SupabaseReportRepository implements IReportRepository {
       efrroExpired: expired,
       pendingEfrroVerification: pendingEfrro,
       notificationsSentToday: sentToday,
-      failedNotificationsToday: failedToday,
-      pendingUploadReviews: passportPending + visaPending + efrroPending
+      failedNotificationsToday: failedToday
     };
   }
 
