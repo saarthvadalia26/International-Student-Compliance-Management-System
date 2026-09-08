@@ -38,6 +38,7 @@ import { fetchDashboardDrilldownAction } from "@/app/(app)/dashboard/actions";
 import { getDocumentBadgeClass } from "@/features/compliance/constants/document-theme";
 import { formatDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
+import { CountryFlag } from "@/components/ui/country-flag";
 
 interface ComplianceDrilldownDialogProps {
   isOpen: boolean;
@@ -57,6 +58,7 @@ export function ComplianceDrilldownDialog({
   const [searchQuery, setSearchQuery] = React.useState("");
   const [selectedDocType, setSelectedDocType] = React.useState<string>("all");
   const [selectedChannel, setSelectedChannel] = React.useState<string>("all");
+  const [selectedStudentFilter, setSelectedStudentFilter] = React.useState<"all" | "compliant" | "missing">("all");
 
   const loadData = React.useCallback(async (cat: ComplianceDrilldownCategory) => {
     setIsLoading(true);
@@ -75,6 +77,7 @@ export function ComplianceDrilldownDialog({
       setSearchQuery("");
       setSelectedDocType("all");
       setSelectedChannel("all");
+      setSelectedStudentFilter("all");
       loadData(category);
     } else {
       setData(null);
@@ -94,6 +97,13 @@ export function ComplianceDrilldownDialog({
       if (selectedChannel !== "all" && item.channel?.toLowerCase() !== selectedChannel) {
         return false;
       }
+      // Student status filter (for student list categories)
+      if (selectedStudentFilter === "compliant" && item.complianceStatus !== "COMPLIANT") {
+        return false;
+      }
+      if (selectedStudentFilter === "missing" && item.complianceStatus === "COMPLIANT") {
+        return false;
+      }
       // Search query filter
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
@@ -102,10 +112,24 @@ export function ComplianceDrilldownDialog({
       const matchDoc = item.documentNumber?.toLowerCase().includes(q);
       const matchReason = item.failureReason?.toLowerCase().includes(q);
       const matchProg = item.academicProgram?.toLowerCase().includes(q);
-      const matchNat = item.nationality?.toLowerCase().includes(q);
-      return matchName || matchReg || matchDoc || matchReason || matchProg || matchNat;
+      const matchNat =
+        (item.nationality && item.nationality.toLowerCase().includes(q)) ||
+        (item.nationalityCode && item.nationalityCode.toLowerCase().includes(q)) ||
+        (item.nationalityDemonym && item.nationalityDemonym.toLowerCase().includes(q));
+      const matchStatus = item.complianceStatus?.toLowerCase().includes(q);
+      const matchMissing = item.missingDocuments?.some((d) => d.toLowerCase().includes(q));
+      return (
+        matchName ||
+        matchReg ||
+        matchDoc ||
+        matchReason ||
+        matchProg ||
+        matchNat ||
+        matchStatus ||
+        matchMissing
+      );
     });
-  }, [items, selectedDocType, selectedChannel, searchQuery]);
+  }, [items, selectedDocType, selectedChannel, selectedStudentFilter, searchQuery]);
 
   if (!category) return null;
 
@@ -354,6 +378,53 @@ export function ComplianceDrilldownDialog({
                     )}
                   >
                     eFRRO ({data.byDocType.efrro})
+                  </Button>
+                </>
+              )}
+
+              {/* Student List Compliance Filter Chips */}
+              {isStudentListCategory && items && (
+                <>
+                  <Button
+                    size="sm"
+                    variant={selectedStudentFilter === "all" ? "default" : "outline"}
+                    onClick={() => setSelectedStudentFilter("all")}
+                    className={cn(
+                      "h-8 text-xs px-3 rounded-full transition-all",
+                      selectedStudentFilter === "all"
+                        ? "shadow-xs"
+                        : "border-border/60 hover:bg-muted/60 text-muted-foreground"
+                    )}
+                  >
+                    All ({items.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={selectedStudentFilter === "compliant" ? "default" : "outline"}
+                    onClick={() => setSelectedStudentFilter("compliant")}
+                    className={cn(
+                      "h-8 text-xs px-3 rounded-full transition-all gap-1.5",
+                      selectedStudentFilter === "compliant"
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                        : "border-border/60 hover:bg-muted/60 text-muted-foreground"
+                    )}
+                  >
+                    <ShieldCheck className="h-3 w-3" />
+                    Compliant ({items.filter((i) => i.complianceStatus === "COMPLIANT").length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={selectedStudentFilter === "missing" ? "default" : "outline"}
+                    onClick={() => setSelectedStudentFilter("missing")}
+                    className={cn(
+                      "h-8 text-xs px-3 rounded-full transition-all gap-1.5",
+                      selectedStudentFilter === "missing"
+                        ? "bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+                        : "border-border/60 hover:bg-muted/60 text-muted-foreground"
+                    )}
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    Action Required ({items.filter((i) => i.complianceStatus !== "COMPLIANT").length})
                   </Button>
                 </>
               )}
@@ -638,7 +709,7 @@ export function ComplianceDrilldownDialog({
                                 "text-[11px] font-semibold px-2 py-0.5 uppercase tracking-wide gap-1",
                                 item.complianceStatus === "COMPLIANT"
                                   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                                  : item.complianceStatus === "INCOMPLETE"
+                                  : item.complianceStatus === "INCOMPLETE" || item.complianceStatus === "MISSING"
                                   ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
                                   : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
                               )}
@@ -648,15 +719,22 @@ export function ComplianceDrilldownDialog({
                               ) : (
                                 <AlertTriangle className="h-3 w-3" />
                               )}
-                              {item.complianceStatus || "NON_COMPLIANT"}
+                              {item.complianceStatus === "COMPLIANT"
+                                ? "Compliant"
+                                : item.missingDocuments && item.missingDocuments.length > 0
+                                ? `Missing ${item.missingDocuments.join(", ")}`
+                                : item.complianceStatus || "NON_COMPLIANT"}
                             </Badge>
                           </td>
                           <td className="py-3 px-4">
                             <div className="text-xs text-foreground font-medium truncate max-w-[190px]">
                               {item.academicProgram || "Academic Program"}
                             </div>
-                            <div className="text-[10px] text-muted-foreground mt-0.5">
-                              {item.nationality || "International"}
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
+                              {item.nationalityCode && (
+                                <CountryFlag countryCode={item.nationalityCode} size="sm" />
+                              )}
+                              <span className="truncate">{item.nationality || "International"}</span>
                             </div>
                           </td>
                           <td className="py-3 px-4">

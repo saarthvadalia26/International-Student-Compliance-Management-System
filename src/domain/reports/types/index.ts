@@ -59,6 +59,9 @@ export interface ComplianceDrilldownItem {
   status?: string;
   complianceStatus?: string;
   nationality?: string | null;
+  nationalityCode?: string | null;
+  nationalityDemonym?: string | null;
+  missingDocuments?: string[];
   academicProgram?: string | null;
   passportExpiry?: string | null;
   visaExpiry?: string | null;

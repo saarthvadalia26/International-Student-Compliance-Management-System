@@ -16,6 +16,7 @@ import { ReportMapper } from "../mappers";
 import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
 import { LEGACY_PROGRAM_ALIASES, DEFAULT_FALLBACK_PROGRAMS } from "@/domain/academic-programs/academic-program.service";
 import { parseDateOnlyString } from "@/lib/utils/date";
+import { getCountryByCode } from "@/utils/countries";
 
 // =========================================================================
 // Reusable Select Fragments (Canonical Table Hierarchy: students as Root)
@@ -523,42 +524,92 @@ export class SupabaseReportRepository implements IReportRepository {
     }
 
     if (cat === "total_students" || cat === "compliant") {
-      const { data: students } = await supabase
-        .from("students")
-        .select(`
-          id,
-          registration_number,
-          student_personal(full_name, nationality),
-          academic_programs(name),
-          student_snapshot(
-            passport_number,
-            passport_expiry,
-            passport_status,
-            visa_number,
-            visa_expiry,
-            visa_status,
-            efrro_number,
-            efrro_expiry,
-            efrro_status,
-            overall_compliance_status
-          )
-        `)
-        .is("deleted_at", null)
-        .eq("status", "active");
+      const [studentsRes, progRes] = await Promise.all([
+        supabase
+          .from("students")
+          .select(`
+            id,
+            registration_number,
+            status,
+            student_personal(full_name, nationality_code),
+            student_academic(program_id, program_code),
+            student_snapshot(
+              passport_number,
+              passport_expiry,
+              passport_status,
+              visa_number,
+              visa_expiry,
+              visa_status,
+              efrro_number,
+              efrro_expiry,
+              efrro_status,
+              compliance_status
+            )
+          `)
+          .is("deleted_at", null)
+          .eq("status", "active"),
+        supabase
+          .from("academic_programs")
+          .select("id, program_name, program_code")
+      ]);
+
+      if (studentsRes.error) {
+        console.error("[GET_DASHBOARD_DRILLDOWN_STUDENTS_ERROR]", studentsRes.error);
+      }
+
+      const progMap = new Map<string, string>();
+      (progRes.data || []).forEach((p: any) => {
+        if (p.id) progMap.set(p.id.toLowerCase(), p.program_name);
+        if (p.program_code) {
+          progMap.set(p.program_code.toLowerCase(), p.program_name);
+          progMap.set(p.program_code.replace(/_/g, "-").toLowerCase(), p.program_name);
+          progMap.set(p.program_code.replace(/-/g, "_").toLowerCase(), p.program_name);
+        }
+      });
+
+      // Also map known legacy aliases
+      Object.entries(LEGACY_PROGRAM_ALIASES).forEach(([alias, targetCode]) => {
+        const targetName = progMap.get(targetCode.toLowerCase());
+        if (targetName) {
+          progMap.set(alias.toLowerCase(), targetName);
+        }
+      });
 
       const items: ComplianceDrilldownItem[] = [];
 
-      (students || []).forEach((st: any) => {
-        const snap = st.student_snapshot;
-        const compStatus = snap?.overall_compliance_status || "NON_COMPLIANT";
-        if (cat === "compliant" && compStatus !== "COMPLIANT") {
+      (studentsRes.data || []).forEach((st: any) => {
+        const p = Array.isArray(st.student_personal) ? st.student_personal[0] : st.student_personal;
+        const a = Array.isArray(st.student_academic) ? st.student_academic[0] : st.student_academic;
+        const snap = Array.isArray(st.student_snapshot) ? st.student_snapshot[0] : st.student_snapshot;
+
+        const compStatus = snap?.compliance_status || "NON_COMPLIANT";
+
+        const missingDocs: string[] = [];
+        if (snap?.passport_status === "MISSING" || !snap?.passport_number) missingDocs.push("Passport");
+        if (snap?.visa_status === "MISSING" || !snap?.visa_number) missingDocs.push("Visa");
+        if (snap?.efrro_status === "MISSING" || !snap?.efrro_number) missingDocs.push("eFRRO");
+
+        const isFullyCompliant = compStatus === "COMPLIANT" && missingDocs.length === 0;
+
+        if (cat === "compliant" && !isFullyCompliant) {
           return;
         }
 
-        const sName = st.student_personal?.full_name || "Unknown Student";
+        const sName = p?.full_name || "Unknown Student";
         const regNo = st.registration_number || "—";
-        const program = st.academic_programs?.name || null;
-        const nationality = st.student_personal?.nationality || null;
+        const progId = a?.program_id || "";
+        const progCode = a?.program_code || "";
+        const program = 
+          (progId && progMap.get(progId.toLowerCase())) ||
+          (progCode && progMap.get(progCode.toLowerCase())) ||
+          (progCode && progMap.get(progCode.replace(/_/g, "-").toLowerCase())) ||
+          progCode ||
+          null;
+
+        const natCode = p?.nationality_code || null;
+        const country = natCode ? getCountryByCode(natCode) : null;
+        const nationality = country?.name || natCode || null;
+        const nationalityDemonym = country?.nationality || null;
 
         items.push({
           id: st.id,
@@ -566,8 +617,11 @@ export class SupabaseReportRepository implements IReportRepository {
           studentName: sName,
           registrationNumber: regNo,
           complianceStatus: compStatus,
+          missingDocuments: missingDocs,
           academicProgram: program,
-          nationality: nationality,
+          nationality,
+          nationalityCode: natCode,
+          nationalityDemonym,
           passportExpiry: snap?.passport_expiry || null,
           visaExpiry: snap?.visa_expiry || null,
           efrroExpiry: snap?.efrro_expiry || null,
@@ -598,7 +652,7 @@ export class SupabaseReportRepository implements IReportRepository {
       .select(`
         id,
         registration_number,
-        student_personal(full_name),
+        student_personal(full_name, nationality_code),
         student_snapshot(
           passport_number,
           passport_expiry,
@@ -617,11 +671,16 @@ export class SupabaseReportRepository implements IReportRepository {
     const items: ComplianceDrilldownItem[] = [];
 
     (students || []).forEach((st: any) => {
-      const snap = st.student_snapshot;
+      const snap = Array.isArray(st.student_snapshot) ? st.student_snapshot[0] : st.student_snapshot;
       if (!snap) return;
 
-      const sName = st.student_personal?.full_name || "Unknown Student";
+      const p = Array.isArray(st.student_personal) ? st.student_personal[0] : st.student_personal;
+      const sName = p?.full_name || "Unknown Student";
       const regNo = st.registration_number || "—";
+      const natCode = p?.nationality_code || null;
+      const country = natCode ? getCountryByCode(natCode) : null;
+      const nationality = country?.name || natCode || null;
+      const nationalityDemonym = country?.nationality || null;
 
       const checkAndAdd = (
         docType: "passport" | "visa" | "efrro",
@@ -652,7 +711,10 @@ export class SupabaseReportRepository implements IReportRepository {
             expiryDate: expStr,
             daysRemaining: days >= 0 ? days : null,
             daysExpired: days < 0 ? Math.abs(days) : null,
-            status: days < 0 ? "EXPIRED" : days <= 15 ? "CRITICAL" : "WARNING"
+            status: days < 0 ? "EXPIRED" : days <= 15 ? "CRITICAL" : "WARNING",
+            nationality,
+            nationalityCode: natCode,
+            nationalityDemonym
           });
         }
       };
