@@ -211,61 +211,138 @@ export function DimensionCard({
                   <div className="text-center text-xs text-muted-foreground">
                     No students match current filter criteria.
                   </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={standardRows.slice(0, 15)}
-                      margin={{ top: 12, right: 16, left: -12, bottom: standardRows.length > 6 ? 48 : 20 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
-                      <XAxis
-                        dataKey="label"
-                        tick={{ fontSize: 11 }}
-                        interval={0}
-                        angle={standardRows.length > 6 ? -30 : 0}
-                        textAnchor={standardRows.length > 6 ? "end" : "middle"}
-                        height={standardRows.length > 6 ? 56 : 24}
-                      />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const p = payload[0].payload as DimensionRow;
-                            return (
-                              <div className="rounded-lg border border-border bg-popover p-2.5 shadow-md text-xs space-y-1">
-                                <p className="font-semibold text-foreground">{p.label}</p>
-                                {p.subLabel && (
-                                  <p className="text-muted-foreground text-[11px]">{p.subLabel}</p>
-                                )}
-                                <div className="flex items-center justify-between gap-4 pt-1 border-t border-border/50">
-                                  <span className="text-muted-foreground">Students:</span>
-                                  <span className="font-mono font-bold text-foreground">
-                                    {p.studentCount}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-between gap-4">
-                                  <span className="text-muted-foreground">Share:</span>
-                                  <span className="font-mono font-bold text-primary">
-                                    {p.percentage.toFixed(2)}%
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar dataKey="studentCount" radius={[4, 4, 0, 0]}>
-                        {standardRows.slice(0, 15).map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={BAR_COLORS[index % BAR_COLORS.length]}
+                ) : (() => {
+                  const useHorizontalBars =
+                    dimension === "country" ||
+                    dimension === "school" ||
+                    dimension === "program" ||
+                    dimension === "funding" ||
+                    dimension === "campus" ||
+                    dimension === "compliance" ||
+                    standardRows.some((r) => r.label.length > 14);
+
+                  const displayRows = standardRows.slice(0, 10);
+
+                  if (useHorizontalBars) {
+                    return (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          layout="vertical"
+                          data={displayRows}
+                          margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.15} />
+                          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                          <YAxis
+                            type="category"
+                            dataKey="label"
+                            width={160}
+                            tick={{ fontSize: 11 }}
+                            interval={0}
+                            tickFormatter={(val) =>
+                              val && val.length > 22 ? `${val.slice(0, 21)}…` : val
+                            }
                           />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (active && payload && payload.length) {
+                                const p = payload[0].payload as DimensionRow;
+                                return (
+                                  <div className="rounded-lg border border-border bg-popover p-2.5 shadow-md text-xs space-y-1">
+                                    <p className="font-semibold text-foreground">{p.label}</p>
+                                    {p.subLabel && (
+                                      <p className="text-muted-foreground text-[11px]">{p.subLabel}</p>
+                                    )}
+                                    <div className="flex items-center justify-between gap-4 pt-1 border-t border-border/50">
+                                      <span className="text-muted-foreground">Students:</span>
+                                      <span className="font-mono font-bold text-foreground">
+                                        {p.studentCount}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4">
+                                      <span className="text-muted-foreground">Share:</span>
+                                      <span className="font-mono font-bold text-primary">
+                                        {p.percentage.toFixed(2)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Bar dataKey="studentCount" radius={[0, 4, 4, 0]} barSize={18}>
+                            {displayRows.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={BAR_COLORS[index % BAR_COLORS.length]}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+
+                  return (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={displayRows}
+                        margin={{ top: 12, right: 16, left: -12, bottom: 20 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fontSize: 11 }}
+                          interval={0}
+                          angle={0}
+                          textAnchor="middle"
+                          height={28}
+                          tickFormatter={(val) =>
+                            val && val.length > 16 ? `${val.slice(0, 15)}…` : val
+                          }
+                        />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const p = payload[0].payload as DimensionRow;
+                              return (
+                                <div className="rounded-lg border border-border bg-popover p-2.5 shadow-md text-xs space-y-1">
+                                  <p className="font-semibold text-foreground">{p.label}</p>
+                                  {p.subLabel && (
+                                    <p className="text-muted-foreground text-[11px]">{p.subLabel}</p>
+                                  )}
+                                  <div className="flex items-center justify-between gap-4 pt-1 border-t border-border/50">
+                                    <span className="text-muted-foreground">Students:</span>
+                                    <span className="font-mono font-bold text-foreground">
+                                      {p.studentCount}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span className="text-muted-foreground">Share:</span>
+                                    <span className="font-mono font-bold text-primary">
+                                      {p.percentage.toFixed(2)}%
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="studentCount" radius={[4, 4, 0, 0]} barSize={32}>
+                          {displayRows.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={BAR_COLORS[index % BAR_COLORS.length]}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
               </>
             )}
 
