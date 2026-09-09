@@ -25,7 +25,8 @@ import {
   Search,
   Filter,
   Check,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -1268,8 +1269,9 @@ export default function BulkStudentImportPage() {
             </CardHeader>
             <CardContent>
               {isLoadingHistory ? (
-                <div className="py-16 text-center text-xs text-muted-foreground animate-pulse">
-                  Loading import batch history...
+                <div className="py-16 flex flex-col items-center justify-center gap-3 text-xs text-muted-foreground animate-fade-in">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <span>Loading import batch history...</span>
                 </div>
               ) : historyBatches.length === 0 ? (
                 <div className="py-16 text-center space-y-2">

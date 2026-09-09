@@ -1215,19 +1215,11 @@ function StudentDetailsContent({ params }: PageProps) {
 
   if (isLoadingStudent) {
     return (
-      <div className="space-y-6 animate-fade-in w-full max-w-full min-w-0">
-        <div className="flex items-center gap-4 border-b border-border/50 pb-5">
-          <Skeleton className="h-14 w-14 rounded-full shrink-0" />
-          <div className="space-y-2 flex-1 min-w-0">
-            <Skeleton className="h-6 w-56" />
-            <Skeleton className="h-4 w-36" />
-          </div>
-          <Skeleton className="h-9 w-28 rounded-lg shrink-0 hidden sm:block" />
-        </div>
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
+      <div className="flex flex-col items-center justify-center py-28 space-y-4 animate-fade-in">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <div className="text-center space-y-1">
+          <p className="text-sm font-semibold text-foreground">Loading student profile...</p>
+          <p className="text-xs text-muted-foreground">Retrieving authoritative student documents and compliance history</p>
         </div>
       </div>
     );

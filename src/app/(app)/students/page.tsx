@@ -792,27 +792,12 @@ export default function StudentListPage() {
       <Card className="border border-border/70 shadow-sm overflow-hidden rounded-xl bg-card">
         {/* Loading State */}
         {isLoading ? (
-          <div className="p-4 space-y-3 animate-fade-in">
-            <div className="flex items-center gap-3 px-2 py-1 pb-3 border-b border-border/40">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-28 ml-auto" />
+          <div className="py-24 text-center animate-fade-in">
+            <div className="flex flex-col items-center justify-center text-muted-foreground space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="font-semibold text-sm text-foreground">Loading international student records...</p>
+              <p className="text-xs text-muted-foreground">Synchronizing Passport, Visa, and eFRRO compliance statuses</p>
             </div>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between gap-4 p-3 border-b border-border/30">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-9 w-9 rounded-full" />
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-4 w-36" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </div>
-                <Skeleton className="h-4 w-24 hidden md:block" />
-                <Skeleton className="h-4 w-28 hidden sm:block" />
-                <Skeleton className="h-6 w-20 rounded-full" />
-                <Skeleton className="h-7 w-7 rounded-md" />
-              </div>
-            ))}
           </div>
         ) : loadError ? (
           /* Error State with Retry */

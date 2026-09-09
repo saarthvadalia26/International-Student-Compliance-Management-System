@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Suspense } from "react";
+import { Loader2 } from "lucide-react";
 import { DashboardQuickActions } from "@/features/dashboard/metrics";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Branding } from "@/config/branding";
 import MetricsWrapper from "@/features/dashboard/metrics/metrics-wrapper";
 import ChartsWrapper from "@/features/dashboard/charts/charts-wrapper";
@@ -18,23 +18,21 @@ import { RealtimeDashboardListener } from "@/features/dashboard/components/realt
  * so repeat navigations within that window are near-instant.
  */
 
-// Skeleton fallbacks for streaming sections
+// Spinner loading fallbacks for streaming sections
 function MetricsSkeleton() {
   return (
-    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {Array.from({ length: 9 }).map((_, i) => (
-        <Skeleton key={i} className="h-[100px] w-full rounded-lg" />
-      ))}
+    <div className="flex flex-col items-center justify-center py-14 space-y-3 rounded-xl border border-border/40 bg-card/40 animate-fade-in">
+      <Loader2 className="h-7 w-7 animate-spin text-primary" />
+      <span className="text-xs text-muted-foreground font-medium">Loading compliance metrics...</span>
     </div>
   );
 }
 
 function ChartsSkeleton() {
   return (
-    <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Skeleton key={i} className="h-[300px] w-full rounded-lg" />
-      ))}
+    <div className="flex flex-col items-center justify-center py-16 space-y-3 rounded-xl border border-border/40 bg-card/40 animate-fade-in">
+      <Loader2 className="h-7 w-7 animate-spin text-primary" />
+      <span className="text-xs text-muted-foreground font-medium">Loading analytics charts...</span>
     </div>
   );
 }

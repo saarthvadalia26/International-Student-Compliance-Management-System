@@ -28,7 +28,8 @@ import {
   ArrowUpRight,
   X,
   MessageSquare,
-  Mail
+  Mail,
+  Loader2
 } from "lucide-react";
 import { 
   ComplianceDrilldownCategory, 
@@ -480,26 +481,9 @@ export function ComplianceDrilldownDialog({
         {/* Content Table Container */}
         <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0 bg-background/50">
           {isLoading ? (
-            /* Skeleton Loading State */
-            <div className="p-6 space-y-3">
-              {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-3.5 rounded-xl border border-border/40 bg-card/60 animate-pulse gap-4"
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="h-9 w-9 rounded-full bg-muted/70 shrink-0" />
-                    <div className="space-y-1.5 flex-1 max-w-sm">
-                      <div className="h-3.5 bg-muted/80 rounded w-48" />
-                      <div className="h-2.5 bg-muted/50 rounded w-28" />
-                    </div>
-                  </div>
-                  <div className="h-6 w-20 bg-muted/60 rounded-full shrink-0" />
-                  <div className="h-4 w-24 bg-muted/50 rounded shrink-0 hidden sm:block" />
-                  <div className="h-6 w-28 bg-muted/60 rounded-full shrink-0" />
-                  <div className="h-7 w-20 bg-muted/70 rounded shrink-0" />
-                </div>
-              ))}
+            <div className="py-20 flex flex-col items-center justify-center gap-3 text-muted-foreground animate-fade-in">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="text-xs font-medium text-foreground">Loading compliance records...</span>
             </div>
           ) : filteredItems.length === 0 ? (
             /* Empty State */
