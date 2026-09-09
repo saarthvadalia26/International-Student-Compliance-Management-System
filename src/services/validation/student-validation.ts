@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 import { parseDateToISO } from "@/lib/utils/date";
 
 export const RegisterStudentValidationSchema = z.object({
@@ -185,6 +186,9 @@ export const RegisterStudentValidationSchema = z.object({
   message: "Visa expiration date must be strictly after the issue date",
   path: ["visaExpiry"]
 }).refine((data) => {
+  if (data.nationalityCode && !isEfrroApplicable(data.nationalityCode)) {
+    return true;
+  }
   if (data.efrroIssueDate && data.efrroExpiry && data.efrroIssueDate.trim() && data.efrroExpiry.trim()) {
     const ei = parseDateToISO(data.efrroIssueDate);
     const ee = parseDateToISO(data.efrroExpiry);
@@ -196,6 +200,7 @@ export const RegisterStudentValidationSchema = z.object({
 }, {
   message: "eFRRO expiration date must be strictly after the issue date",
   path: ["efrroExpiry"]
+
 }).refine((data) => {
   if (data.admissionDate && data.expectedGraduation && data.admissionDate.trim() && data.expectedGraduation.trim()) {
     const ad = parseDateToISO(data.admissionDate);

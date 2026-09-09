@@ -17,6 +17,7 @@ import { NOTIFICATION_TABLE_NAME } from "@/domain/notifications/config";
 import { LEGACY_PROGRAM_ALIASES, DEFAULT_FALLBACK_PROGRAMS } from "@/domain/academic-programs/academic-program.service";
 import { parseDateOnlyString } from "@/lib/utils/date";
 import { getCountryByCode } from "@/utils/countries";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 
 // =========================================================================
 // Reusable Select Fragments (Canonical Table Hierarchy: students as Root)
@@ -122,7 +123,12 @@ export class SupabaseReportRepository implements IReportRepository {
         efrro_expiry,
         efrro_status,
         compliance_status,
-        students!inner(id, status, deleted_at)
+        students!inner(
+          id,
+          status,
+          deleted_at,
+          student_personal(nationality_code)
+        )
       `)
         .is("students.deleted_at", null)
         .eq("students.status", "active"),
@@ -181,17 +187,23 @@ export class SupabaseReportRepository implements IReportRepository {
     };
 
     snapshots.forEach((s: any) => {
+      const pers = Array.isArray(s.students?.student_personal)
+        ? s.students?.student_personal[0]
+        : s.students?.student_personal;
+      const nationalityCode = pers?.nationality_code || null;
+      const isEfrroApp = isEfrroApplicable(nationalityCode);
+
       const pDays = calcDays(s.passport_expiry);
       const vDays = calcDays(s.visa_expiry);
-      const eDays = calcDays(s.efrro_expiry);
+      const eDays = isEfrroApp ? calcDays(s.efrro_expiry) : null;
 
       const pNum = (s.passport_number || "").trim();
       const vNum = (s.visa_number || "").trim();
-      const eNum = (s.efrro_number || "").trim();
+      const eNum = isEfrroApp ? (s.efrro_number || "").trim() : "";
 
       const pHasValidData = Boolean(pNum && s.passport_expiry && pDays !== null);
       const vHasValidData = Boolean(vNum && s.visa_expiry && vDays !== null);
-      const eHasValidData = Boolean(eNum && s.efrro_expiry && eDays !== null);
+      const eHasValidData = isEfrroApp ? Boolean(eNum && s.efrro_expiry && eDays !== null) : true;
 
       let sHasExpired = false;
       let sHasCritical = false;
@@ -241,8 +253,8 @@ export class SupabaseReportRepository implements IReportRepository {
         }
       }
 
-      // eFRRO evaluation
-      if (eDays !== null) {
+      // eFRRO evaluation (only if applicable to nationality)
+      if (isEfrroApp && eDays !== null) {
         if (eDays < 0) {
           sHasExpired = true;
           expiredDocs++;
@@ -267,8 +279,9 @@ export class SupabaseReportRepository implements IReportRepository {
       if (sHasCritical) studentCritical15Count++;
       if (sHas30) studentExpiring30Count++;
 
-      // Fully compliant: POSITIVE COMPLIANCE. All 3 required documents (Passport, Visa, eFRRO)
-      // must be positively present, valid, and have > 30 days remaining.
+      // Fully compliant: POSITIVE COMPLIANCE.
+      // If eFRRO is applicable: All 3 required documents (Passport, Visa, eFRRO) must be positively present, valid, and have > 30 days remaining.
+      // If eFRRO is NOT applicable (Indian nationals): Passport and Visa must be positively present, valid, and have > 30 days remaining.
       // Absence of compliance data must never be interpreted as proof of compliance.
       const isFullyCompliant = 
         pHasValidData && vHasValidData && eHasValidData &&
@@ -582,13 +595,23 @@ export class SupabaseReportRepository implements IReportRepository {
         const a = Array.isArray(st.student_academic) ? st.student_academic[0] : st.student_academic;
         const snap = Array.isArray(st.student_snapshot) ? st.student_snapshot[0] : st.student_snapshot;
 
-        const compStatus = snap?.compliance_status || "NON_COMPLIANT";
+        const natCode = p?.nationality_code || null;
+        const isEfrroApp = isEfrroApplicable(natCode);
 
         const missingDocs: string[] = [];
         if (snap?.passport_status === "MISSING" || !snap?.passport_number) missingDocs.push("Passport");
         if (snap?.visa_status === "MISSING" || !snap?.visa_number) missingDocs.push("Visa");
-        if (snap?.efrro_status === "MISSING" || !snap?.efrro_number) missingDocs.push("eFRRO");
+        if (isEfrroApp && (snap?.efrro_status === "MISSING" || !snap?.efrro_number)) missingDocs.push("eFRRO");
 
+        // Positive compliance calculation respecting nationality:
+        let compStatus = snap?.compliance_status || "NON_COMPLIANT";
+        if (!isEfrroApp) {
+          const pValid = snap?.passport_number && snap?.passport_expiry && (snap.passport_status === "VALID" || snap.passport_status === "COMPLIANT");
+          const vValid = snap?.visa_number && snap?.visa_expiry && (snap.visa_status === "VALID" || snap.visa_status === "COMPLIANT");
+          if (pValid && vValid && missingDocs.length === 0) {
+            compStatus = "COMPLIANT";
+          }
+        }
         const isFullyCompliant = compStatus === "COMPLIANT" && missingDocs.length === 0;
 
         if (cat === "compliant" && !isFullyCompliant) {
@@ -606,7 +629,6 @@ export class SupabaseReportRepository implements IReportRepository {
           progCode ||
           null;
 
-        const natCode = p?.nationality_code || null;
         const country = natCode ? getCountryByCode(natCode) : null;
         const nationality = country?.name || natCode || null;
         const nationalityDemonym = country?.nationality || null;
@@ -624,7 +646,7 @@ export class SupabaseReportRepository implements IReportRepository {
           nationalityDemonym,
           passportExpiry: snap?.passport_expiry || null,
           visaExpiry: snap?.visa_expiry || null,
-          efrroExpiry: snap?.efrro_expiry || null,
+          efrroExpiry: isEfrroApp ? (snap?.efrro_expiry || null) : null,
           status: compStatus
         });
       });
@@ -721,7 +743,9 @@ export class SupabaseReportRepository implements IReportRepository {
 
       checkAndAdd("passport", snap.passport_number, snap.passport_expiry);
       checkAndAdd("visa", snap.visa_number, snap.visa_expiry);
-      checkAndAdd("efrro", snap.efrro_number, snap.efrro_expiry);
+      if (isEfrroApplicable(natCode)) {
+        checkAndAdd("efrro", snap.efrro_number, snap.efrro_expiry);
+      }
     });
 
     if (cat === "expired") {
@@ -1093,18 +1117,19 @@ export class SupabaseReportRepository implements IReportRepository {
       const studentNotifs = lastNotifications.filter(n => n.student_id === row.id);
       const lastNotif = studentNotifs[0];
 
+      const isEfrroApp = isEfrroApplicable(personal?.nationality_code);
       return ReportMapper.toEfrroReportRow({
         student_id: row.id,
         registration_number: row.registration_number,
         full_name: personal?.full_name,
-        efrro_number: snapshot?.efrro_number,
-        efrro_expiry: snapshot?.efrro_expiry,
-        days_until_efrro_expiry: snapshot?.days_until_efrro_expiry,
-        efrro_status: snapshot?.efrro_status,
-        reminder_rule: lastNotif ? lastNotif.trigger_source : null,
-        reminder_sent: studentNotifs.length > 0,
-        last_reminder_sent_at: lastNotif ? lastNotif.created_at : null,
-        verification_status: activeVer ? activeVer.verification_status : null,
+        efrro_number: isEfrroApp ? snapshot?.efrro_number : null,
+        efrro_expiry: isEfrroApp ? snapshot?.efrro_expiry : null,
+        days_until_efrro_expiry: isEfrroApp ? snapshot?.days_until_efrro_expiry : null,
+        efrro_status: !isEfrroApp ? "NOT_APPLICABLE" : (snapshot?.efrro_status || "MISSING"),
+        reminder_rule: isEfrroApp && lastNotif ? lastNotif.trigger_source : null,
+        reminder_sent: isEfrroApp ? studentNotifs.length > 0 : false,
+        last_reminder_sent_at: isEfrroApp && lastNotif ? lastNotif.created_at : null,
+        verification_status: isEfrroApp ? (activeVer ? activeVer.verification_status : null) : "not_applicable",
         reviewer_name: activeVer && activeVer.verified_by ? "Compliance Officer" : null,
         reviewed_at: activeVer ? activeVer.verified_at : null,
       });

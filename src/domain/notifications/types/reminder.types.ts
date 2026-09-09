@@ -31,7 +31,7 @@ export interface DocumentReminderGroup {
   expiryDate: string | null;
   expiryDateFormatted: string;
   isUploaded?: boolean;
-  verificationStatus?: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
+  verificationStatus?: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded" | "not_applicable";
   daysRemaining: number | null;
   isExpired: boolean;
   isAfterGraduation: boolean;

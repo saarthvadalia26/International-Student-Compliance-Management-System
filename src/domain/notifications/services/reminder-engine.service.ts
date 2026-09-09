@@ -4,6 +4,7 @@ import {
   StudentReminderScheduleResponse 
 } from "../types/reminder.types";
 import { formatDate } from "@/lib/utils/date";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 
 export interface ReminderRuleConfig {
   id: string;
@@ -60,7 +61,7 @@ export interface DocumentInfoParam {
   issueDate?: string | null;
   expiryDate?: string | null;
   isUploaded?: boolean;
-  verificationStatus?: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
+  verificationStatus?: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded" | "not_applicable";
 }
 
 import { CalendarDateEngine } from "./calendar-date";
@@ -78,7 +79,7 @@ export class ExpiryReminderEngine {
     expiryDate: string | null | undefined;
     expectedGraduationDate?: string | null | undefined;
     isUploaded?: boolean;
-    verificationStatus?: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
+    verificationStatus?: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded" | "not_applicable";
     existingNotifications: RawNotificationRecord[];
     customRules?: ReminderRuleConfig[];
     todayISO?: string;
@@ -380,6 +381,7 @@ export class ExpiryReminderEngine {
   static calculateStudentReminders(params: {
     studentId: string;
     expectedGraduationDate?: string | null;
+    nationality?: string | null;
     passport?: DocumentInfoParam | null;
     visa?: DocumentInfoParam | null;
     efrro?: DocumentInfoParam | null;
@@ -420,18 +422,51 @@ export class ExpiryReminderEngine {
       todayISO: today
     });
 
-    const efrroGroup = this.calculateDocumentReminders({
-      documentType: "efrro",
-      documentTitle: "eFRRO / Residential Permit",
-      documentNumber: params.efrro?.number || "",
-      expiryDate: params.efrro?.expiryDate,
-      expectedGraduationDate: gradDate,
-      isUploaded: params.efrro?.isUploaded || false,
-      verificationStatus: params.efrro?.verificationStatus || "not_recorded",
-      existingNotifications: params.notifications,
-      customRules: params.customRules?.efrro,
-      todayISO: today
-    });
+    const isEfrroApp = isEfrroApplicable(params.nationality);
+    const efrroRules = (params.customRules?.efrro && params.customRules.efrro.length > 0)
+      ? params.customRules.efrro
+      : (STANDARD_REMINDER_RULES.efrro || []);
+
+    const efrroGroup: DocumentReminderGroup = isEfrroApp
+      ? this.calculateDocumentReminders({
+          documentType: "efrro",
+          documentTitle: "eFRRO / Residential Permit",
+          documentNumber: params.efrro?.number || "",
+          expiryDate: params.efrro?.expiryDate,
+          expectedGraduationDate: gradDate,
+          isUploaded: params.efrro?.isUploaded || false,
+          verificationStatus: params.efrro?.verificationStatus || "not_recorded",
+          existingNotifications: params.notifications,
+          customRules: params.customRules?.efrro,
+          todayISO: today
+        })
+      : {
+          documentType: "efrro",
+          documentTitle: "eFRRO / Residential Permit",
+          documentNumber: "Not Applicable",
+          expiryDate: null,
+          expiryDateFormatted: "Not Applicable",
+          isUploaded: false,
+          verificationStatus: "not_recorded",
+          daysRemaining: null,
+          isExpired: false,
+          isAfterGraduation: false,
+          graduationDate: null,
+          graduationDateFormatted: null,
+          graduationBoundaryStatus: "WITHIN_BOUNDARY",
+          graduationBoundaryReason: "eFRRO registration is not applicable for Indian nationals",
+          schedule: efrroRules.map(r => ({
+            ruleId: r.id,
+            ruleName: r.ruleName,
+            thresholdDays: r.thresholdDays,
+            channel: r.channel,
+            scheduledDate: null,
+            scheduledDateISO: null,
+            status: "NOT_APPLICABLE",
+            statusLabel: "Not Applicable",
+            statusReason: "eFRRO registration is not applicable for Indian nationals"
+          }))
+        };
 
     const allSchedules = [
       ...passportGroup.schedule,

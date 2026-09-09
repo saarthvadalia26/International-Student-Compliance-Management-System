@@ -9,6 +9,8 @@
  * without hardcoded lists or penalizing non-applicable conditional tracks.
  */
 
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+
 export type ProfileSectionId = "identity" | "academic" | "contact" | "family" | "emergency" | "bank" | "immigration" | "consular";
 
 export interface ProfileSectionEvaluation {
@@ -397,6 +399,7 @@ export const PROFILE_FIELDS_CONFIG: CompletenessFieldMetadata[] = [
     label: "eFRRO Number",
     sectionId: "immigration",
     sectionTitle: "Legal & Immigration",
+    isApplicable: (d) => isEfrroApplicable(d.nationalityCode),
     getValue: (d) => d.efrroNumber
   },
   {
@@ -404,6 +407,7 @@ export const PROFILE_FIELDS_CONFIG: CompletenessFieldMetadata[] = [
     label: "eFRRO Expiry Date",
     sectionId: "immigration",
     sectionTitle: "Legal & Immigration",
+    isApplicable: (d) => isEfrroApplicable(d.nationalityCode),
     getValue: (d) => d.efrroExpiry
   },
 

@@ -53,6 +53,7 @@ import { School } from "@/domain/schools/types";
 import { ScholarshipScheme } from "@/domain/scholarships/types";
 import { Campus } from "@/domain/campuses/types";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
@@ -108,7 +109,8 @@ export interface StudentDocument {
   versionNumber?: number | null;
   versionLabel?: string | null;
   renewalCount?: number;
-  verificationStatus: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
+  verificationStatus: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded" | "not_applicable";
+  isNotApplicable?: boolean;
   hasUploadedDocument: boolean;
   uploadedAt?: string | null;
   verifiedAt?: string | null;
@@ -743,9 +745,12 @@ function StudentDetailsContent({ params }: PageProps) {
     if (reminderSchedule) return reminderSchedule;
     if (!student) return null;
 
+    const isIndian = !isEfrroApplicable(student.nationalityCode);
+
     return ExpiryReminderEngine.calculateStudentReminders({
       studentId,
       expectedGraduationDate: student.expectedGraduation,
+      nationality: student.nationalityCode,
       passport: student.passport ? {
         number: student.passport.number,
         expiryDate: student.passport.expiryDate,
@@ -758,12 +763,12 @@ function StudentDetailsContent({ params }: PageProps) {
         isUploaded: student.visa.hasUploadedDocument,
         verificationStatus: student.visa.verificationStatus
       } : null,
-      efrro: student.efrro ? {
+      efrro: isIndian ? null : (student.efrro ? {
         number: student.efrro.number,
         expiryDate: student.efrro.expiryDate,
         isUploaded: student.efrro.hasUploadedDocument,
         verificationStatus: student.efrro.verificationStatus
-      } : null,
+      } : null),
       notifications: []
     });
   }, [reminderSchedule, student, studentId]);
@@ -771,9 +776,10 @@ function StudentDetailsContent({ params }: PageProps) {
   // Automatically select the first document tab that has an active expiry date if current tab has no expiry recorded
   React.useEffect(() => {
     if (effectiveSchedule) {
+      const isIndian = !isEfrroApplicable(student?.nationalityCode);
       const hasPassport = Boolean(effectiveSchedule.passport?.expiryDate);
       const hasVisa = Boolean(effectiveSchedule.visa?.expiryDate);
-      const hasEfrro = Boolean(effectiveSchedule.efrro?.expiryDate);
+      const hasEfrro = !isIndian && Boolean(effectiveSchedule.efrro?.expiryDate);
 
       if (selectedReminderDoc === "passport" && !hasPassport) {
         if (hasEfrro) {
@@ -781,9 +787,11 @@ function StudentDetailsContent({ params }: PageProps) {
         } else if (hasVisa) {
           setSelectedReminderDoc("visa");
         }
+      } else if (selectedReminderDoc === "efrro" && isIndian) {
+        setSelectedReminderDoc(hasPassport ? "passport" : "visa");
       }
     }
-  }, [effectiveSchedule, selectedReminderDoc]);
+  }, [effectiveSchedule, selectedReminderDoc, student?.nationalityCode]);
 
   React.useEffect(() => {
     loadStudentData();
@@ -2298,14 +2306,15 @@ function StudentDetailsContent({ params }: PageProps) {
                 {/* 3. eFRRO Card */}
                 {(() => {
                   const doc = student.efrro;
+                  const isIndian = !isEfrroApplicable(student.nationalityCode);
                   const hasDoc = isDocRecorded(doc);
                   const verLabel = doc?.versionLabel || (hasDoc ? (doc?.versionNumber ? (doc.versionNumber === 1 ? "Original" : `Renewal ${doc.versionNumber - 1}`) : "Original") : null);
                   const renewalCount = doc?.renewalCount ?? 0;
 
-                  let statusText = "Not Recorded";
-                  let statusClass = "text-muted-foreground";
+                  let statusText = isIndian ? "Not Applicable" : "Not Recorded";
+                  let statusClass = isIndian ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground";
 
-                  if (hasDoc && doc?.expiryDate) {
+                  if (!isIndian && hasDoc && doc?.expiryDate) {
                     const expDate = new Date(doc.expiryDate);
                     const now = new Date();
                     const diffDays = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -2329,7 +2338,11 @@ function StudentDetailsContent({ params }: PageProps) {
                             <ShieldCheck className="h-4 w-4 text-primary" />
                             eFRRO / Permit
                           </CardTitle>
-                          {hasDoc && verLabel ? (
+                          {isIndian ? (
+                            <Badge variant="outline" className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                              Not Applicable
+                            </Badge>
+                          ) : hasDoc && verLabel ? (
                             <Badge variant="outline" className="text-[10px] font-bold bg-primary/10 text-primary border-primary/30">
                               {verLabel}
                             </Badge>
@@ -2342,7 +2355,19 @@ function StudentDetailsContent({ params }: PageProps) {
                         <CardDescription className="text-[11px] text-muted-foreground">Residential Permit & Compliance</CardDescription>
                       </CardHeader>
                       
-                      {!hasDoc ? (
+                      {isIndian && !hasDoc ? (
+                        <CardContent className="p-6 text-center space-y-2 flex-1 flex flex-col items-center justify-center">
+                          <div className="p-3 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <ShieldCheck className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs text-foreground font-semibold">
+                            Not Applicable for Indian Nationals
+                          </p>
+                          <p className="text-[11px] text-muted-foreground max-w-xs">
+                            Indian citizens are exempt from Foreigners Regional Registration Office (eFRRO) registration.
+                          </p>
+                        </CardContent>
+                      ) : !hasDoc ? (
                         <CardContent className="p-6 text-center space-y-2 flex-1 flex flex-col items-center justify-center">
                           <div className="p-3 rounded-full bg-muted/40 text-muted-foreground">
                             <ShieldCheck className="h-5 w-5" />
@@ -2353,6 +2378,11 @@ function StudentDetailsContent({ params }: PageProps) {
                         </CardContent>
                       ) : (
                         <CardContent className="p-4 space-y-3.5 text-xs flex-1">
+                          {isIndian && (
+                            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-[11px]">
+                              Exempt: Document recorded for reference only. eFRRO is not required for Indian citizens.
+                            </div>
+                          )}
                           <div className="space-y-1 p-2.5 rounded-xl bg-muted/20 border border-border/40">
                             <span className="text-muted-foreground block text-[10px] font-medium uppercase tracking-wider">eFRRO Number</span>
                             <span className="font-semibold text-foreground block font-mono text-sm break-all">
@@ -2397,7 +2427,13 @@ function StudentDetailsContent({ params }: PageProps) {
                       )}
 
                       <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2 flex-wrap">
-                        {!hasDoc ? (
+                        {isIndian && !hasDoc ? (
+                          <div className="w-full text-center py-0.5">
+                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1.5">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Exempt from eFRRO Registration
+                            </span>
+                          </div>
+                        ) : !hasDoc ? (
                           <Button
                             variant="default"
                             size="sm"
@@ -2427,15 +2463,17 @@ function StudentDetailsContent({ params }: PageProps) {
                               <Edit3 className="h-3.5 w-3.5 text-muted-foreground" />
                               Edit Details
                             </Button>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => handleOpenRenewDialog("efrro")}
-                              className="h-8 text-xs flex-1 min-w-[100px] gap-1.5 font-semibold"
-                            >
-                              <RefreshCw className="h-3.5 w-3.5" />
-                              Renew eFRRO
-                            </Button>
+                            {!isIndian && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleOpenRenewDialog("efrro")}
+                                className="h-8 text-xs flex-1 min-w-[100px] gap-1.5 font-semibold"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                Renew eFRRO
+                              </Button>
+                            )}
                           </>
                         )}
                       </CardFooter>
@@ -3510,6 +3548,7 @@ function StudentDetailsContent({ params }: PageProps) {
 
                 {/* eFRRO Card */}
                 {(() => {
+                  const isIndian = !isEfrroApplicable(student?.nationalityCode);
                   const hasEfrro = isDocRecorded(student?.efrro);
                   return (
                     <div className="p-3 rounded-xl border border-border/60 bg-muted/10 space-y-2 flex flex-col justify-between">
@@ -3518,16 +3557,24 @@ function StudentDetailsContent({ params }: PageProps) {
                           <span className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
                             <ShieldCheck className="h-3.5 w-3.5 text-primary" /> eFRRO / Permit
                           </span>
-                          <Badge variant="outline" className="text-[9px]">
-                            {hasEfrro ? (student?.efrro?.versionLabel || "Original") : "Not Recorded"}
+                          <Badge variant="outline" className={`text-[9px] ${isIndian ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" : ""}`}>
+                            {isIndian ? "Not Applicable" : hasEfrro ? (student?.efrro?.versionLabel || "Original") : "Not Recorded"}
                           </Badge>
                         </div>
                         <p className="text-[11px] font-mono text-muted-foreground truncate">
-                          {hasEfrro ? `${student?.efrro?.number} (Exp: ${student?.efrro?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(student.efrro.expiryDate) : "—"})` : "No eFRRO details added"}
+                          {isIndian 
+                            ? "Exempt for Indian nationals" 
+                            : hasEfrro 
+                            ? `${student?.efrro?.number} (Exp: ${student?.efrro?.expiryDate ? AcademicProgressionEngine.formatDisplayDate(student.efrro.expiryDate) : "—"})` 
+                            : "No eFRRO details added"}
                         </p>
                       </div>
                       <div className="flex gap-1.5 pt-1">
-                        {!hasEfrro ? (
+                        {isIndian ? (
+                          <div className="w-full text-center py-1 text-[10px] text-muted-foreground italic bg-muted/20 rounded-md">
+                            Exempt from eFRRO registration
+                          </div>
+                        ) : !hasEfrro ? (
                           <Button
                             type="button"
                             variant="default"

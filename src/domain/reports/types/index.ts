@@ -1,4 +1,4 @@
-export type ComplianceStatus = "COMPLIANT" | "WARNING" | "EXPIRED" | "PENDING_VERIFICATION" | "REJECTED" | "MISSING";
+export type ComplianceStatus = "COMPLIANT" | "WARNING" | "EXPIRED" | "PENDING_VERIFICATION" | "REJECTED" | "MISSING" | "NOT_APPLICABLE";
 
 export type ComplianceDocumentType = "passport" | "visa" | "efrro";
 

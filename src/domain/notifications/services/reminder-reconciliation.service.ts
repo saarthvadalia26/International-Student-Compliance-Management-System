@@ -1,4 +1,5 @@
 import { ComplianceDocumentType } from "@/features/compliance/constants/constants";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 
 export interface ReminderEligibilityResult {
   isEligible: boolean;
@@ -108,6 +109,7 @@ export class ReminderReconciliationService {
         .select(`
           id,
           registration_number,
+          student_personal(nationality_code),
           student_academic(expected_graduation),
           student_snapshot(passport_expiry, visa_expiry, efrro_expiry),
           passport_versions(id, is_active, expiry_date, deleted_at),
@@ -139,7 +141,47 @@ export class ReminderReconciliationService {
 
       const docTypes: ComplianceDocumentType[] = ["passport", "visa", "efrro"];
 
+      const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
+      const isEfrroApp = isEfrroApplicable(personal?.nationality_code);
+
       for (const docType of docTypes) {
+        if (docType === "efrro" && !isEfrroApp) {
+          summary.evaluatedDocs.efrro = {
+            expiryDate: null,
+            isEligible: false,
+            reason: "NOT_APPLICABLE"
+          };
+
+          const { data: staleNotifs, error: qErr } = await supabase
+            .from("notifications")
+            .select("id, status, retry_count, notification_context")
+            .eq("student_id", studentId)
+            .eq("document_type", "efrro")
+            .in("status", ["queued", "sending", "processing", "failed"]);
+
+          if (staleNotifs && staleNotifs.length > 0) {
+            for (const notif of staleNotifs) {
+              const updatedContext = {
+                ...(notif.notification_context || {}),
+                cancellation_reason: "EFRRO_NOT_APPLICABLE_FOR_INDIAN_NATIONAL",
+                cancelled_at: new Date().toISOString(),
+                cancelled_by: actorId || "reconciliation_engine"
+              };
+              await supabase
+                .from("notifications")
+                .update({
+                  status: "cancelled",
+                  notification_context: updatedContext,
+                  updated_at: new Date().toISOString()
+                })
+                .eq("id", notif.id);
+
+              summary.cancelledCount++;
+            }
+          }
+          continue;
+        }
+
         const expiryDate = docExpiries[docType];
         const eligibility = this.isDocumentReminderEligible({
           expiryDate,

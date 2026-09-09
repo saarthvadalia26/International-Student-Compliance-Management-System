@@ -1,4 +1,5 @@
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 
 export type DocumentStatus = 
   | "MISSING" 
@@ -6,7 +7,8 @@ export type DocumentStatus =
   | "WARNING" 
   | "COMPLIANT" 
   | "REJECTED" 
-  | "PENDING_VERIFICATION";
+  | "PENDING_VERIFICATION"
+  | "NOT_APPLICABLE";
 
 export type OverallComplianceStatus = 
   | "COMPLIANT" 
@@ -30,6 +32,7 @@ export interface StudentComplianceEvaluationInput {
   isPassportRequired?: boolean;
   isVisaRequired?: boolean;
   isEfrroRequired?: boolean;
+  nationality?: string | null;
 }
 
 export interface DocumentEvaluationResult {
@@ -93,10 +96,22 @@ export class ComplianceCalculator {
     const docNum = input?.number ? String(input.number).trim() : "";
     const expiryISO = this.normalizeDate(input?.expiry);
 
+    // If not required (e.g. eFRRO for Indian nationals), document is NOT_APPLICABLE
+    if (!isRequired) {
+      return {
+        status: "NOT_APPLICABLE",
+        daysRemaining: null,
+        isExpired: false,
+        isCritical: false,
+        isWarning: false,
+        hasValidRecord: Boolean(docNum && expiryISO)
+      };
+    }
+
     // If number or expiry date is absent or empty:
     if (!docNum || !expiryISO) {
       return {
-        status: isRequired ? "MISSING" : "COMPLIANT",
+        status: "MISSING",
         daysRemaining: null,
         isExpired: false,
         isCritical: false,
@@ -153,7 +168,9 @@ export class ComplianceCalculator {
     const today = todayISO || CalendarDateEngine.getTodayISO();
     const isPassportRequired = input.isPassportRequired !== false;
     const isVisaRequired = input.isVisaRequired !== false;
-    const isEfrroRequired = input.isEfrroRequired !== false;
+    const isEfrroRequired = input.isEfrroRequired !== undefined
+      ? input.isEfrroRequired
+      : (input.nationality ? isEfrroApplicable(input.nationality) : true);
 
     const passportRes = this.evaluateDocument(input.passport, isPassportRequired, today);
     const visaRes = this.evaluateDocument(input.visa, isVisaRequired, today);
@@ -238,7 +255,7 @@ export class ComplianceCalculator {
       hasWarningDocument,
       hasPendingVerification,
       hasRejectedDocument,
-      daysUntilEfrroExpiry: efrroRes.daysRemaining
+      daysUntilEfrroExpiry: isEfrroRequired ? efrroRes.daysRemaining : null
     };
   }
 

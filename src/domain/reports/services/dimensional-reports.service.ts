@@ -1,6 +1,7 @@
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { getCountryByCode } from "@/utils/countries";
 import { parseDateOnlyString } from "@/lib/utils/date";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 import {
   DimensionalReportsData,
   DimensionReportFilters,
@@ -270,17 +271,18 @@ export class DimensionalReportsService {
       const status = rawStatus ? rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1) : "Active";
 
       // Compliance Engine Evaluation (Authoritative Positive Compliance Rule)
+      const isEfrroApp = isEfrroApplicable(natCode);
       const pDays = calcDays(snapshot?.passport_expiry);
       const vDays = calcDays(snapshot?.visa_expiry);
-      const eDays = calcDays(snapshot?.efrro_expiry);
+      const eDays = isEfrroApp ? calcDays(snapshot?.efrro_expiry) : null;
 
       const pNum = (snapshot?.passport_number || "").trim();
       const vNum = (snapshot?.visa_number || "").trim();
-      const eNum = (snapshot?.efrro_number || "").trim();
+      const eNum = isEfrroApp ? (snapshot?.efrro_number || "").trim() : "";
 
       const pHasValidData = Boolean(pNum && snapshot?.passport_expiry && pDays !== null);
       const vHasValidData = Boolean(vNum && snapshot?.visa_expiry && vDays !== null);
-      const eHasValidData = Boolean(eNum && snapshot?.efrro_expiry && eDays !== null);
+      const eHasValidData = isEfrroApp ? Boolean(eNum && snapshot?.efrro_expiry && eDays !== null) : true;
 
       let calculatedCompliance = "Action Required / Missing Document";
       const hasExpired = (pDays !== null && pDays < 0) || (vDays !== null && vDays < 0) || (eDays !== null && eDays < 0);
@@ -599,15 +601,18 @@ export class DimensionalReportsService {
         docStatusStats.visa.missing++;
       }
 
-      // eFRRO
-      if (s.efrroValid && s.efrroDays !== null) {
-        docStatusStats.efrro.totalWithDoc++;
-        if (s.efrroDays < 0) docStatusStats.efrro.expired++;
-        else if (s.efrroDays <= 15) docStatusStats.efrro.critical++;
-        else if (s.efrroDays <= 30) docStatusStats.efrro.expiring++;
-        else docStatusStats.efrro.valid++;
-      } else {
-        docStatusStats.efrro.missing++;
+      // eFRRO (only if applicable to student nationality)
+      const isEfrroApp = isEfrroApplicable(s.nationalityCode);
+      if (isEfrroApp) {
+        if (s.efrroValid && s.efrroDays !== null) {
+          docStatusStats.efrro.totalWithDoc++;
+          if (s.efrroDays < 0) docStatusStats.efrro.expired++;
+          else if (s.efrroDays <= 15) docStatusStats.efrro.critical++;
+          else if (s.efrroDays <= 30) docStatusStats.efrro.expiring++;
+          else docStatusStats.efrro.valid++;
+        } else {
+          docStatusStats.efrro.missing++;
+        }
       }
     });
 

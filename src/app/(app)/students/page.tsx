@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { AdmissionCategoryBadge } from "@/components/ui/admission-category-badge";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -365,12 +366,15 @@ export default function StudentListPage() {
       missing.push("Visa");
     }
 
+    const efrroApplicable = isEfrroApplicable(student.nationalityCode);
     const isEfrroMissing =
-      student.efrro?.status === "MISSING" ||
-      !student.efrro?.number ||
-      student.efrro.number.trim().toLowerCase() === "not provided" ||
-      student.efrro.number.trim() === "" ||
-      !student.efrro?.expiry;
+      efrroApplicable && (
+        student.efrro?.status === "MISSING" ||
+        !student.efrro?.number ||
+        student.efrro.number.trim().toLowerCase() === "not provided" ||
+        student.efrro.number.trim() === "" ||
+        !student.efrro?.expiry
+      );
     if (isEfrroMissing) {
       missing.push("eFRRO");
     }

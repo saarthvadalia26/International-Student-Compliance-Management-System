@@ -1,6 +1,7 @@
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { ExpiryReminderEngine, RawNotificationRecord, ReminderRuleConfig } from "./reminder-engine.service";
 import { DocumentReminderGroup } from "../types/reminder.types";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 
 /**
  * Server-only scheduler service to evaluate and queue due reminders into Supabase.
@@ -19,7 +20,7 @@ export class ReminderSchedulerServer {
         id,
         registration_number,
         status,
-        student_personal(full_name, preferred_language),
+        student_personal(full_name, preferred_language, nationality_code),
         student_contact(email, phone_home, phone_local),
         student_academic(program_code, expected_graduation),
         student_snapshot(
@@ -90,6 +91,7 @@ export class ReminderSchedulerServer {
     const scheduleResponse = ExpiryReminderEngine.calculateStudentReminders({
       studentId,
       expectedGraduationDate: expectedGraduation,
+      nationality: personal?.nationality_code,
       passport: {
         number: activePassport?.document_number || snapshot?.passport_number || "",
         expiryDate: passportExpiry,
@@ -133,6 +135,10 @@ export class ReminderSchedulerServer {
 
     // 5. Iterate over each document type and queue DUE reminders
     for (const doc of docGroups) {
+      if (doc.documentType === "efrro" && !isEfrroApplicable(personal?.nationality_code)) {
+        continue;
+      }
+
       if (doc.isAfterGraduation) {
         continue;
       }

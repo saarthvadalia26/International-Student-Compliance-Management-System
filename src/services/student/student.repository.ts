@@ -10,6 +10,7 @@ import { AcademicProgressionEngine, AcademicAdjustmentRecord } from "@/domain/ac
 import { AcademicProgramService } from "@/domain/academic-programs/academic-program.service";
 import { AcademicProgram } from "@/domain/academic-programs/types";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 import { parseDateToISO } from "@/lib/utils/date";
 import { ComplianceCalculator } from "@/domain/compliance/services/compliance-calculator";
 
@@ -314,15 +315,17 @@ export class SupabaseStudentRepository implements IStudentRepository {
       const visaNum = input.visaNumber?.trim() || null;
       const visaType = input.visaType?.trim() || "Student (S-1)";
 
-      const efrroExp = this.formatDate(input.efrroExpiry);
-      const efrroIssue = this.formatDate(input.efrroIssueDate);
-      const efrroNum = input.efrroNumber?.trim() || null;
+      const efrroApplicable = isEfrroApplicable(nationalityCode);
+      const efrroExp = efrroApplicable ? this.formatDate(input.efrroExpiry) : null;
+      const efrroIssue = efrroApplicable ? this.formatDate(input.efrroIssueDate) : null;
+      const efrroNum = efrroApplicable ? (input.efrroNumber?.trim() || null) : null;
 
       // 8. Calculate initial document and compliance statuses using authoritative ComplianceCalculator
       const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
         passport: { number: passportNum, expiry: passportExp },
         visa: { number: visaNum, expiry: visaExp },
-        efrro: { number: efrroNum, expiry: efrroExp }
+        efrro: efrroApplicable ? { number: efrroNum, expiry: efrroExp } : null,
+        nationality: nationalityCode
       });
 
       const passportStatus = complianceResult.passport.status;
@@ -333,7 +336,7 @@ export class SupabaseStudentRepository implements IStudentRepository {
       const daysUntilEfrro = complianceResult.daysUntilEfrroExpiry;
 
       // Insert student_snapshot row for instant compliance and directory queries
-      await supabase.from("student_snapshot").insert({
+      const snapshotPayload: Record<string, unknown> = {
         student_id: studentId,
         passport_status: passportStatus,
         passport_number: passportNum,
@@ -352,7 +355,18 @@ export class SupabaseStudentRepository implements IStudentRepository {
         days_until_efrro_expiry: daysUntilEfrro,
         compliance_score: complianceScore,
         compliance_status: overallCompliance
-      });
+      };
+
+      const { error: snapInsertErr } = await supabase.from("student_snapshot").insert(snapshotPayload);
+      if (snapInsertErr) {
+        // If DB check constraint chk_snapshot_efrro_status hasn't had migration 076 applied yet, fallback gracefully to NOT_UPLOADED in DB snapshot
+        if (snapInsertErr.code === "23514" && efrroStatus === "NOT_APPLICABLE") {
+          snapshotPayload.efrro_status = "NOT_UPLOADED";
+          await supabase.from("student_snapshot").insert(snapshotPayload);
+        } else {
+          throw new Error(`Failed to create student compliance snapshot: ${snapInsertErr.message}`);
+        }
+      }
 
       // 8.5. Insert into student_bank_details table if bank details provided
       let bankData: Record<string, unknown> | null = null;
@@ -796,6 +810,52 @@ export class SupabaseStudentRepository implements IStudentRepository {
       personalUpdates.updated_at = new Date().toISOString();
       personalUpdates.updated_by = actorId;
       await supabase.from("student_personal").update(personalUpdates).eq("student_id", id);
+
+      // If nationality was updated, dynamically re-evaluate compliance snapshot
+      if (personalUpdates.nationality_code !== undefined) {
+        try {
+          const { data: currentSnapshot } = await supabase
+            .from("student_snapshot")
+            .select("*")
+            .eq("student_id", id)
+            .maybeSingle();
+
+          if (currentSnapshot) {
+            const newNat = personalUpdates.nationality_code as string | null;
+            const newEfrroApp = isEfrroApplicable(newNat);
+
+            const compResult = ComplianceCalculator.evaluateStudentCompliance({
+              passport: { number: currentSnapshot.passport_number, expiry: currentSnapshot.passport_expiry },
+              visa: { number: currentSnapshot.visa_number, expiry: currentSnapshot.visa_expiry },
+              efrro: newEfrroApp ? { number: currentSnapshot.efrro_number, expiry: currentSnapshot.efrro_expiry } : null,
+              nationality: newNat
+            });
+
+            const snapshotUpdate: Record<string, unknown> = {
+              efrro_status: compResult.efrro.status,
+              days_until_efrro_expiry: compResult.daysUntilEfrroExpiry,
+              compliance_status: compResult.overallStatus,
+              compliance_score: compResult.complianceScore,
+              updated_at: new Date().toISOString()
+            };
+
+            const { error: snapUpdateErr } = await supabase
+              .from("student_snapshot")
+              .update(snapshotUpdate)
+              .eq("student_id", id);
+
+            if (snapUpdateErr && snapUpdateErr.code === "23514" && compResult.efrro.status === "NOT_APPLICABLE") {
+              snapshotUpdate.efrro_status = "NOT_UPLOADED";
+              await supabase.from("student_snapshot").update(snapshotUpdate).eq("student_id", id);
+            }
+
+            const { ReminderReconciliationService } = await import("@/domain/notifications/services/reminder-reconciliation.service");
+            await ReminderReconciliationService.reconcileStudentReminderSchedule(id, actorId || "nationality_update");
+          }
+        } catch (snapRecalcErr) {
+          console.warn("[STUDENT_REPOSITORY] Warning: Failed to recompute compliance snapshot on nationality change:", snapRecalcErr);
+        }
+      }
     }
 
     // 3. Update student_contact table if contact fields provided

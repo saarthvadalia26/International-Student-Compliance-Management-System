@@ -20,6 +20,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import { requireAdministrator } from "@/lib/auth/permissions";
 import { ComplianceCalculator } from "@/domain/compliance/services/compliance-calculator";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 
 interface DatabaseVersionRow {
   id?: string;
@@ -106,6 +107,7 @@ export class StudentExcelExportService {
     if (!status) return "INCOMPLETE";
     const upper = status.toUpperCase().trim();
     if (upper === "MISSING") return "INCOMPLETE";
+    if (upper === "NOT_APPLICABLE") return "NOT APPLICABLE";
     return upper;
   }
 
@@ -260,12 +262,27 @@ export class StudentExcelExportService {
         ? schoolsMap.get(academic.override_school_id.toLowerCase())!
         : progInfo.school;
 
+      const isEfrroApp = isEfrroApplicable(natCode || nationalityName);
+
       // Map raw compliance status to UI badge enum using authoritative ComplianceCalculator
-      const rawStatus = (snapshot?.compliance_status || "MISSING").toUpperCase();
+      let rawStatus = (snapshot?.compliance_status || "MISSING").toUpperCase();
+      if (!isEfrroApp && rawStatus !== "COMPLIANT") {
+        const pValid = snapshot?.passport_number && snapshot?.passport_expiry && (snapshot.passport_status === "VALID" || snapshot.passport_status === "COMPLIANT");
+        const vValid = snapshot?.visa_number && snapshot?.visa_expiry && (snapshot.visa_status === "VALID" || snapshot.visa_status === "COMPLIANT");
+        if (pValid && vValid) {
+          rawStatus = "COMPLIANT";
+        }
+      }
       const mappedCompliance = ComplianceCalculator.mapComplianceToBadge(rawStatus);
 
       const passportNumber = activePassport?.document_number || snapshot?.passport_number || "";
       const visaNumber = activeVisa?.document_number || snapshot?.visa_number || "";
+
+      const efrroNumber = !isEfrroApp ? "Not Applicable" : (activeEfrro?.document_number || snapshot?.efrro_number || "N/A");
+      const efrroIssueDate = !isEfrroApp ? null : (activeEfrro?.issue_date || snapshot?.efrro_issue_date || null);
+      const efrroExpiry = !isEfrroApp ? null : (activeEfrro?.expiry_date || snapshot?.efrro_expiry || null);
+      const efrroStatus = !isEfrroApp ? "NOT_APPLICABLE" : (snapshot?.efrro_status || "MISSING");
+      const efrroRenewalCount = !isEfrroApp ? 0 : Math.max(0, (r.efrro_versions || []).filter((e: DatabaseVersionRow) => !e.deleted_at).length - 1);
 
       return {
         id: r.id,
@@ -314,11 +331,11 @@ export class StudentExcelExportService {
         visaExpiry: activeVisa?.expiry_date || snapshot?.visa_expiry || null,
         visaStatus: snapshot?.visa_status || "MISSING",
         visaRenewalCount: Math.max(0, (r.visa_versions || []).filter((v: DatabaseVersionRow) => !v.deleted_at).length - 1),
-        efrroNumber: activeEfrro?.document_number || snapshot?.efrro_number || "N/A",
-        efrroIssueDate: activeEfrro?.issue_date || snapshot?.efrro_issue_date || null,
-        efrroExpiry: activeEfrro?.expiry_date || snapshot?.efrro_expiry || null,
-        efrroStatus: snapshot?.efrro_status || "MISSING",
-        efrroRenewalCount: Math.max(0, (r.efrro_versions || []).filter((e: DatabaseVersionRow) => !e.deleted_at).length - 1),
+        efrroNumber,
+        efrroIssueDate,
+        efrroExpiry,
+        efrroStatus,
+        efrroRenewalCount,
         rawPassportVersions: r.passport_versions || [],
         rawVisaVersions: r.visa_versions || [],
         rawEfrroVersions: r.efrro_versions || [],

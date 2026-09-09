@@ -38,6 +38,7 @@ import { AcademicProgram, getAcademicLevelLabel } from "@/domain/academic-progra
 import { ScholarshipScheme } from "@/domain/scholarships/types";
 import { Campus } from "@/domain/campuses/types";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 import { RegisterStudentValidationSchema } from "@/services/validation/student-validation";
 import { registerStudentAction } from "@/app/(app)/students/actions";
 import { RegisterStudentInput } from "@/services/student/student.types";
@@ -547,9 +548,9 @@ export default function StudentRegistrationPage() {
       visaIssueDate: sanitizedVisaIssue || undefined,
       visaExpiry: sanitizedVisaExp || undefined,
       visaType: formData.visaType.trim() || undefined,
-      efrroNumber: formData.efrroNumber.trim() || undefined,
-      efrroIssueDate: sanitizedEfrroIssue || undefined,
-      efrroExpiry: sanitizedEfrroExp || undefined,
+      efrroNumber: isEfrroApplicable(formData.nationality) ? (formData.efrroNumber.trim() || undefined) : undefined,
+      efrroIssueDate: isEfrroApplicable(formData.nationality) ? (sanitizedEfrroIssue || undefined) : undefined,
+      efrroExpiry: isEfrroApplicable(formData.nationality) ? (sanitizedEfrroExp || undefined) : undefined,
 
       // Bank Details (Optional)
       bankName: formData.bankName?.trim() || undefined,
@@ -2168,54 +2169,85 @@ export default function StudentRegistrationPage() {
                 <Separator />
 
                 {/* eFRRO Details */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">eFRRO / Residential Permit (Optional)</h3>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground" htmlFor="efrroNumber">
-                        Registration / RC Number
-                      </label>
-                      <Input
-                        id="efrroNumber"
-                        placeholder="e.g. FRRO/AHM/2026/899"
-                        value={formData.efrroNumber}
-                        onChange={handleInputChange}
-                        disabled={isSubmitting}
-                        className={`h-10 text-sm ${validationErrors.efrroNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                      />
-                    </div>
+                {(() => {
+                  const efrroApplicable = isEfrroApplicable(formData.nationality);
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                          eFRRO / Residential Permit (Optional)
+                        </h3>
+                        {!efrroApplicable && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            Not Applicable for Indian Nationals
+                          </span>
+                        )}
+                      </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground" htmlFor="efrroIssueDate">
-                        Registration Issue Date
-                      </label>
-                      <DatePicker
-                        id="efrroIssueDate"
-                        value={formData.efrroIssueDate}
-                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
-                        onValueChange={(v) => handleSelectChange("efrroIssueDate", v)}
-                        disabled={isSubmitting}
-                        placeholder="DD/MM/YYYY"
-                        error={validationErrors.efrroIssueDate}
-                      />
-                    </div>
+                      {!efrroApplicable ? (
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-start gap-3 animate-fade-in">
+                          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                            <FileCheck className="h-4 w-4" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground">
+                              Exempt from Foreigners Registration (eFRRO)
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              Because the student nationality is set to India, Foreigners Regional Registration Office (eFRRO) compliance requirements and residential permits do not apply. This section is automatically exempted.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground" htmlFor="efrroNumber">
+                              Registration / RC Number
+                            </label>
+                            <Input
+                              id="efrroNumber"
+                              placeholder="e.g. FRRO/AHM/2026/899"
+                              value={formData.efrroNumber}
+                              onChange={handleInputChange}
+                              disabled={isSubmitting}
+                              className={`h-10 text-sm ${validationErrors.efrroNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                            />
+                          </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground" htmlFor="efrroExpiry">
-                        Registration Valid Until
-                      </label>
-                      <DatePicker
-                        id="efrroExpiry"
-                        value={formData.efrroExpiry}
-                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
-                        onValueChange={(v) => handleSelectChange("efrroExpiry", v)}
-                        disabled={isSubmitting}
-                        placeholder="DD/MM/YYYY"
-                        error={validationErrors.efrroExpiry}
-                      />
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground" htmlFor="efrroIssueDate">
+                              Registration Issue Date
+                            </label>
+                            <DatePicker
+                              id="efrroIssueDate"
+                              value={formData.efrroIssueDate}
+                              onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                              onValueChange={(v) => handleSelectChange("efrroIssueDate", v)}
+                              disabled={isSubmitting}
+                              placeholder="DD/MM/YYYY"
+                              error={validationErrors.efrroIssueDate}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground" htmlFor="efrroExpiry">
+                              Registration Valid Until
+                            </label>
+                            <DatePicker
+                              id="efrroExpiry"
+                              value={formData.efrroExpiry}
+                              onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                              onValueChange={(v) => handleSelectChange("efrroExpiry", v)}
+                              disabled={isSubmitting}
+                              placeholder="DD/MM/YYYY"
+                              error={validationErrors.efrroExpiry}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 <Separator />
 

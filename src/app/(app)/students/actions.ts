@@ -19,6 +19,7 @@ import { StudentExportFilterCriteria } from "@/domain/students/utils/student-fil
 import { parseDateToISO, formatToDDMMYYYY } from "@/lib/utils/date";
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
 import { ComplianceCalculator } from "@/domain/compliance/services/compliance-calculator";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 
 const studentService = new StudentService();
 
@@ -59,7 +60,7 @@ export interface StudentListItem {
   efrro: {
     number: string | null;
     expiry: string | null;
-    status: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION";
+    status: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION" | "NOT_APPLICABLE";
     daysUntilExpiry: number | null;
   };
   email: string;
@@ -79,7 +80,8 @@ export interface StudentDocumentDetail {
   versionNumber?: number | null;
   versionLabel?: string | null;
   renewalCount?: number;
-  verificationStatus: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded";
+  verificationStatus: "not_recorded" | "pending" | "verified" | "rejected" | "not_uploaded" | "not_applicable";
+  isNotApplicable?: boolean;
   hasUploadedDocument: boolean;
   uploadedAt?: string | null;
   verifiedAt?: string | null;
@@ -552,13 +554,22 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         ? schoolsMap.get(academic.override_school_id.toLowerCase())!
         : progInfo.school;
 
-      // Map raw compliance status to UI badge enum using authoritative ComplianceCalculator
-      const rawStatus = (snapshot?.compliance_status || "MISSING").toUpperCase();
+      // Authoritative compliance evaluation respecting nationality-based eFRRO applicability
+      const efrroApplicable = isEfrroApplicable(natCode);
+      const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
+        passport: { number: snapshot?.passport_number, expiry: snapshot?.passport_expiry, status: snapshot?.passport_status },
+        visa: { number: snapshot?.visa_number, expiry: snapshot?.visa_expiry, status: snapshot?.visa_status },
+        efrro: { number: snapshot?.efrro_number, expiry: snapshot?.efrro_expiry, status: snapshot?.efrro_status },
+        isEfrroRequired: efrroApplicable,
+        nationality: natCode
+      });
+
+      const rawStatus = (complianceResult.overallStatus || "MISSING").toUpperCase();
       const mappedCompliance: StudentListItem["complianceStatus"] = ComplianceCalculator.mapComplianceToBadge(rawStatus);
 
-      const passportStatus = (snapshot?.passport_status || (snapshot?.passport_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
-      const visaStatus = (snapshot?.visa_status || (snapshot?.visa_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
-      const efrroStatus = (snapshot?.efrro_status || (snapshot?.efrro_number ? "COMPLIANT" : "MISSING")).toUpperCase() as any;
+      const passportStatus = complianceResult.passport.status;
+      const visaStatus = complianceResult.visa.status;
+      const efrroStatus = efrroApplicable ? complianceResult.efrro.status : ("NOT_APPLICABLE" as const);
 
       const missingDocuments: string[] = [];
       if (passportStatus === "MISSING" || !snapshot?.passport_number || snapshot.passport_number === "Not provided" || !snapshot?.passport_expiry) {
@@ -567,7 +578,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
       if (visaStatus === "MISSING" || !snapshot?.visa_number || snapshot.visa_number === "Not provided" || !snapshot?.visa_expiry) {
         missingDocuments.push("Visa");
       }
-      if (efrroStatus === "MISSING" || !snapshot?.efrro_number || snapshot.efrro_number === "Not provided" || !snapshot?.efrro_expiry) {
+      if (efrroApplicable && (efrroStatus === "MISSING" || !snapshot?.efrro_number || snapshot.efrro_number === "Not provided" || !snapshot?.efrro_expiry)) {
         missingDocuments.push("eFRRO");
       }
 
@@ -600,15 +611,15 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
           type: snapshot?.visa_type || null
         },
         efrro: {
-          number: snapshot?.efrro_number || null,
-          expiry: snapshot?.efrro_expiry || null,
+          number: efrroApplicable ? (snapshot?.efrro_number || null) : null,
+          expiry: efrroApplicable ? (snapshot?.efrro_expiry || null) : null,
           status: efrroStatus,
-          daysUntilExpiry: snapshot?.days_until_efrro_expiry ?? null
+          daysUntilExpiry: efrroApplicable ? (snapshot?.days_until_efrro_expiry ?? null) : null
         },
         email: contact?.email || "",
         complianceStatus: mappedCompliance,
         rawComplianceStatus: (rawStatus || "MISSING") as any,
-        complianceScore: snapshot?.compliance_score ?? (mappedCompliance === "compliant" ? 100 : 0),
+        complianceScore: complianceResult.complianceScore,
         academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing",
         missingDocuments,
         admissionCategory: academic?.admission_category || null,
@@ -858,7 +869,15 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       isCompleted: hasCourseConfig ? progression.isCompleted : false,
       isFinalSemester: hasCourseConfig ? progression.isFinalSemester : false,
       academicAdjustments: adjustments,
-      complianceStatus: ComplianceCalculator.mapComplianceToBadge(snapshot?.compliance_status),
+      complianceStatus: ComplianceCalculator.mapComplianceToBadge(
+        ComplianceCalculator.evaluateStudentCompliance({
+          passport: { number: activePassport?.document_number || snapshot?.passport_number, expiry: activePassport?.expiry_date || snapshot?.passport_expiry },
+          visa: { number: activeVisa?.document_number || snapshot?.visa_number, expiry: activeVisa?.expiry_date || snapshot?.visa_expiry },
+          efrro: { number: activeEfrro?.document_number || snapshot?.efrro_number, expiry: activeEfrro?.expiry_date || snapshot?.efrro_expiry },
+          isEfrroRequired: isEfrroApplicable(personal?.nationality_code),
+          nationality: personal?.nationality_code
+        }).overallStatus
+      ),
       passport: {
         number: activePassport?.document_number || snapshot?.passport_number || "Not provided",
         issueDate: activePassport?.issue_date || snapshot?.passport_issue_date || "",
@@ -898,13 +917,14 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         activeEarlyAuthorization: null
       },
       efrro: {
-        number: activeEfrro?.document_number || snapshot?.efrro_number || "Not provided",
+        number: activeEfrro?.document_number || snapshot?.efrro_number || (!isEfrroApplicable(personal?.nationality_code) ? "" : "Not provided"),
         issueDate: activeEfrro?.issue_date || snapshot?.efrro_issue_date || "",
         expiryDate: activeEfrro?.expiry_date || snapshot?.efrro_expiry || "",
         versionNumber: activeEfrro?.version_number ?? (efrroVersions.length > 0 ? 1 : null),
-        versionLabel: activeEfrro ? getVersionLabel(activeEfrro.version_number) : (efrroVersions.length > 0 ? "Original" : null),
+        versionLabel: !isEfrroApplicable(personal?.nationality_code) ? "Not Applicable" : (activeEfrro ? getVersionLabel(activeEfrro.version_number) : (efrroVersions.length > 0 ? "Original" : null)),
         renewalCount: efrroRenewalCount,
-        verificationStatus: activeEfrro ? (activeEfrro.verification_status || "verified") : "not_recorded",
+        verificationStatus: !isEfrroApplicable(personal?.nationality_code) ? "not_applicable" : (activeEfrro ? (activeEfrro.verification_status || "verified") : "not_recorded"),
+        isNotApplicable: !isEfrroApplicable(personal?.nationality_code),
         hasUploadedDocument: Boolean(activeEfrro?.file_path),
         uploadedAt: activeEfrro?.created_at || null,
         verifiedAt: activeEfrro?.verified_at || null,
@@ -2676,7 +2696,7 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
         id,
         registration_number,
         status,
-        student_personal(full_name, preferred_language),
+        student_personal(full_name, preferred_language, nationality_code),
         student_contact(email, phone_home, phone_local),
         student_academic(program_code, expected_graduation),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
@@ -2751,11 +2771,13 @@ export async function getStudentReminderScheduleAction(studentId: string): Promi
     const efrroExpiry = activeEfrro?.expiry_date || snapshot?.efrro_expiry || null;
     const expectedGraduation = academic?.expected_graduation || null;
 
+    const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
     const { ExpiryReminderEngine } = await import("@/domain/notifications/services/reminder-engine.service");
 
     const calculatedSchedule = ExpiryReminderEngine.calculateStudentReminders({
       studentId,
       expectedGraduationDate: expectedGraduation,
+      nationality: personal?.nationality_code,
       passport: {
         number: activePassport?.document_number || snapshot?.passport_number || "",
         expiryDate: passportExpiry,
@@ -2849,7 +2871,7 @@ export async function getReminderDispatchPreviewAction(
         id,
         registration_number,
         status,
-        student_personal(full_name, preferred_language),
+        student_personal(full_name, preferred_language, nationality_code),
         student_contact(email, phone_home, phone_local),
         student_academic(program_code, expected_graduation),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
@@ -2877,6 +2899,40 @@ export async function getReminderDispatchPreviewAction(
 
     let expiryDate: string | null = null;
     let docTitle = "Document";
+
+    if (docType === "efrro" && !isEfrroApplicable(personal?.nationality_code)) {
+      const { WhatsAppIntegrationService } = await import("@/domain/notifications/services/whatsapp-integration.service");
+      const integration = WhatsAppIntegrationService.getIntegrationStatus();
+      const rawPhone = contact?.phone_local || contact?.phone_home || null;
+      const cleanPhone = (rawPhone || "").replace(/[^\d+]/g, "").trim();
+      const hasValidPhone = Boolean(cleanPhone && cleanPhone.length >= 7);
+
+      return {
+        success: true,
+        preview: {
+          studentId,
+          studentName: personal?.full_name || "Student",
+          studentPhone: cleanPhone || null,
+          hasValidPhone,
+          documentType: "efrro",
+          documentTitle: "eFRRO / Residential Permit",
+          expiryDate: "",
+          expiryDateFormatted: "Not Applicable",
+          daysRemaining: 0,
+          thresholdDays,
+          ruleName: `${thresholdDays}-Day Reminder`,
+          templateCode: `EFRRO_EXPIRY_${thresholdDays}D`,
+          templateName: `efrro_${thresholdDays}_day_reminder`,
+          integrationStatus: integration.status,
+          integrationMessage: integration.message,
+          isDispatchable: false,
+          blockedReason: "NOT_APPLICABLE",
+          blockedMessage: "eFRRO compliance is not applicable for Indian nationals. Reminders are disabled.",
+          alreadyDispatched: false,
+          dispatchedAt: null
+        }
+      };
+    }
 
     if (docType === "passport") {
       expiryDate = activePassport?.expiry_date || snapshot?.passport_expiry || null;
@@ -3023,7 +3079,7 @@ export async function triggerReminderDispatchAction(
         id,
         registration_number,
         status,
-        student_personal(full_name, preferred_language),
+        student_personal(full_name, preferred_language, nationality_code),
         student_contact(email, phone_home, phone_local),
         student_academic(program_code, expected_graduation),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
@@ -3053,6 +3109,15 @@ export async function triggerReminderDispatchAction(
     const activePassport = (student.passport_versions || []).find((p: { is_active?: boolean; deleted_at?: string | null }) => p.is_active && !p.deleted_at);
     const activeVisa = (student.visa_versions || []).find((v: { is_active?: boolean; deleted_at?: string | null }) => v.is_active && !v.deleted_at);
     const activeEfrro = (student.efrro_versions || []).find((e: { is_active?: boolean; deleted_at?: string | null }) => e.is_active && !e.deleted_at);
+
+    if (docType === "efrro" && !isEfrroApplicable(personal?.nationality_code)) {
+      return {
+        success: false,
+        status: "BLOCKED",
+        reason: "not_applicable",
+        error: "Cannot dispatch reminder: eFRRO registration is not applicable for Indian nationals."
+      };
+    }
 
     let expiryDate: string | null = null;
     let docTitle = "Document";
