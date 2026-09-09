@@ -91,7 +91,7 @@ export const AsyncActionButton = React.forwardRef<HTMLButtonElement, AsyncAction
 
           {/* 2. Success Icon */}
           {displayState === "success" && (
-            <Check className="h-3.5 w-3.5 shrink-0 scale-105 transition-transform duration-150 ease-out text-current" />
+            <Check className="h-3.5 w-3.5 shrink-0 animate-check-pop transition-transform duration-150 ease-out text-current" />
           )}
 
           {/* 3. Error Icon */}

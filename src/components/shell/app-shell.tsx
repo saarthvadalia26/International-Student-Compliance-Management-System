@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { MobileSidebar } from "@/components/sidebar/mobile-sidebar";
@@ -16,6 +16,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = getBrowserSupabase();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
@@ -46,7 +47,7 @@ export function AppShell({ children }: AppShellProps) {
   if (isAuthenticated === null) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background text-foreground">
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-3 animate-fade-in">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <span className="text-sm text-muted-foreground font-small">Verifying authorization...</span>
         </div>
@@ -58,7 +59,7 @@ export function AppShell({ children }: AppShellProps) {
     <RealtimeProvider>
       <div className="flex h-screen w-full overflow-hidden bg-background text-foreground font-sans">
         {/* Desktop Sidebar */}
-        <Sidebar className="hidden md:flex animate-fade-in" />
+        <Sidebar className="hidden md:flex" />
 
         {/* Mobile Navigation Drawer */}
         <MobileSidebar
@@ -70,7 +71,7 @@ export function AppShell({ children }: AppShellProps) {
         <div className="flex flex-1 flex-col overflow-hidden">
           <Header onMenuOpen={() => setIsMobileSidebarOpen(true)} />
           <main className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/20 p-4 md:p-6 transition-all duration-200">
-            <div className="max-w-[1600px] w-full mx-auto min-w-0">
+            <div key={pathname} className="max-w-[1600px] w-full mx-auto min-w-0 animate-page-enter">
               {children}
             </div>
           </main>

@@ -57,6 +57,7 @@ import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1214,9 +1215,20 @@ function StudentDetailsContent({ params }: PageProps) {
 
   if (isLoadingStudent) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 space-y-4">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <h2 className="text-sm font-medium text-muted-foreground">Loading student profile...</h2>
+      <div className="space-y-6 animate-fade-in w-full max-w-full min-w-0">
+        <div className="flex items-center gap-4 border-b border-border/50 pb-5">
+          <Skeleton className="h-14 w-14 rounded-full shrink-0" />
+          <div className="space-y-2 flex-1 min-w-0">
+            <Skeleton className="h-6 w-56" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+          <Skeleton className="h-9 w-28 rounded-lg shrink-0 hidden sm:block" />
+        </div>
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -4217,16 +4229,16 @@ function StudentDetailsContent({ params }: PageProps) {
 
           <div className="py-3">
             {isLoadingHistory ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
+              <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs animate-fade-in">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 <span>Loading version history...</span>
               </div>
             ) : historyVersions.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-xs">
+              <div className="py-12 text-center text-muted-foreground text-xs animate-fade-in">
                 No recorded version history for this document yet.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 animate-fade-in">
                 {historyVersions.map((ver) => (
                   <div
                     key={ver.id}

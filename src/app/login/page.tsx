@@ -127,7 +127,7 @@ export default function LoginPage() {
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
               {error && (
-                <Alert variant="destructive" className="py-2.5 px-3">
+                <Alert variant="destructive" className="py-2.5 px-3 animate-in fade-in-50 slide-in-from-top-1 duration-150">
                   <ShieldAlert className="h-4 w-4" />
                   <AlertTitle className="text-xs font-semibold">Authentication Alert</AlertTitle>
                   <AlertDescription className="text-xs">{error}</AlertDescription>

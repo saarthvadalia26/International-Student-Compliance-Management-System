@@ -121,7 +121,7 @@ export function DashboardMetricsGrid({ metrics }: MetricsProps) {
           return (
             <Card
               key={i}
-              className="border border-border/50 bg-card hover:shadow-md hover:border-primary/30 transition-all shadow-sm cursor-pointer group relative overflow-hidden"
+              className="border border-border/50 bg-card hover:shadow-md hover:border-primary/30 transition-all duration-200 shadow-sm cursor-pointer group relative overflow-hidden animate-card-enter"
               onClick={() => {
                 if (card.drilldownCategory) {
                   setActiveDrilldown(card.drilldownCategory);

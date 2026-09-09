@@ -32,7 +32,7 @@ export function NotificationHealthMetrics({ summary, loading }: NotificationHeal
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
         {[1, 2, 3, 4].map(n => (
-          <Card key={n} className="border border-border/60 bg-card/65 animate-pulse h-24">
+          <Card key={n} className="border border-border/60 bg-card/65 animate-pulse-subtle h-24">
             <CardContent className="p-4" />
           </Card>
         ))}
@@ -41,7 +41,7 @@ export function NotificationHealthMetrics({ summary, loading }: NotificationHeal
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-fade-in">
       {/* Top 4 System Metrics */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-xs">
         <Card className="border border-border/60 bg-card/65 shadow-sm">
@@ -295,13 +295,13 @@ export function NotificationQueueTable(): React.JSX.Element {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground font-caption animate-pulse">
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground font-caption animate-pulse-subtle">
                   Loading communication logs...
                 </TableCell>
               </TableRow>
             ) : logs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground font-caption">
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground font-caption animate-fade-in">
                   No communication queue logs found matching filter criteria.
                 </TableCell>
               </TableRow>
