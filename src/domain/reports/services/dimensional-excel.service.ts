@@ -38,7 +38,7 @@ export class DimensionalExcelService {
 
     const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-    // Calculate dynamic column widths
+    // Calculate dynamic column widths with generous padding
     const colWidths = headers.map((h, colIdx) => {
       let maxLen = h.length;
       rows.forEach((r) => {
@@ -48,7 +48,7 @@ export class DimensionalExcelService {
       if (totalsRow && String(totalsRow[colIdx] ?? "").length > maxLen) {
         maxLen = String(totalsRow[colIdx]).length;
       }
-      return { wch: Math.min(Math.max(maxLen + 4, 12), 48) };
+      return { wch: Math.min(Math.max(maxLen + 6, 20), 60) };
     });
     ws["!cols"] = colWidths;
 
@@ -242,18 +242,23 @@ export class DimensionalExcelService {
       [`Generated at: ${timestamp}`],
       [`Applied Filters: ${filterStrings.length > 0 ? filterStrings.join(" | ") : "All Students (Unfiltered)"}`],
       [],
-      ["Key Performance Indicator", "Value", "Description"],
-      ["Total Active Students Represented", data.overview.totalStudents, "Total student cohort matching applied filters"],
-      ["Distinct Countries of Origin", data.overview.totalCountries, "Number of sovereign nationalities represented"],
-      ["NFSU Campuses Represented", data.overview.totalCampuses, "Number of university campuses hosting students"],
-      ["Academic Schools Represented", data.overview.totalSchools, "Number of academic schools enrolled"],
-      ["Academic Programs Represented", data.overview.totalPrograms, "Number of degree courses/programs"],
-      ["Fully Compliant Students", data.overview.totalFullyCompliant, "Positive compliance: all documents valid >30d"],
-      ["Total Document Renewals", data.overview.totalRenewals, "Positively verified renewal versions (>1)"],
+      ["Key Performance Indicator", "Value", "", "Description"],
+      ["Total Active Students Represented", data.overview.totalStudents, "", "Total student cohort matching applied filters"],
+      ["Distinct Sovereign Nationalities", data.overview.totalCountries, "", "Number of sovereign countries represented"],
+      ["NFSU Campuses Represented", data.overview.totalCampuses, "", "Number of university campuses hosting students"],
+      ["Academic Schools Represented", data.overview.totalSchools, "", "Number of academic schools enrolled"],
+      ["Academic Degree Programs Represented", data.overview.totalPrograms, "", "Number of degree courses/programs"],
+      ["Fully Compliant Students", data.overview.totalFullyCompliant, "", "Positive compliance: all documents valid >30d"],
+      ["Total Document Renewals Recorded", data.overview.totalRenewals, "", "Positively verified renewal versions (>1)"],
     ];
 
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-    wsSummary["!cols"] = [{ wch: 36 }, { wch: 18 }, { wch: 54 }];
+    wsSummary["!cols"] = [
+      { wch: 44 }, // Key Performance Indicator
+      { wch: 16 }, // Value
+      { wch: 4 },  // Blank spacer column gap
+      { wch: 64 }, // Description
+    ];
     XLSX.utils.book_append_sheet(wb, wsSummary, "Executive Summary");
 
     // ── SHEET 2: Country-wise ─────────────────────────────────────────────────
