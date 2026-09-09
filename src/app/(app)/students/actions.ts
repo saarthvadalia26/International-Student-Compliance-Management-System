@@ -40,6 +40,7 @@ export interface StudentListItem {
   overrideSchoolId?: string | null;
   schoolOverrideReason?: string | null;
   admissionCategory?: string | null;
+  admissionCategoryOther?: string | null;
   iccrApplicationNumber?: string | null;
   siiApplicationNumber?: string | null;
   nfsuCampus?: string | null;
@@ -611,6 +612,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         academicStatus: (academic?.academic_status as StudentListItem["academicStatus"]) || "good_standing",
         missingDocuments,
         admissionCategory: academic?.admission_category || null,
+        admissionCategoryOther: academic?.admission_category_other || null,
         iccrApplicationNumber: academic?.iccr_application_number || null,
         siiApplicationNumber: academic?.sii_application_number || null,
         nfsuCampus: academic?.nfsu_campus || null,

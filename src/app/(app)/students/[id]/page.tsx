@@ -60,6 +60,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionNavGroup, SectionNavCard } from "@/components/ui/section-nav";
 import { Badge } from "@/components/ui/badge";
+import { AdmissionCategoryBadge } from "@/components/ui/admission-category-badge";
 import { Button } from "@/components/ui/button";
 import { AsyncActionButton } from "@/components/ui/async-action-button";
 import { Separator } from "@/components/ui/separator";
@@ -1613,16 +1614,20 @@ function StudentDetailsContent({ params }: PageProps) {
                     </span>
                   </div>
 
-                  <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
+                  <div className="space-y-1.5 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">
                     <span className="text-muted-foreground block text-[11px] font-medium">Admission Category</span>
-                    <span className="font-semibold text-foreground block">
-                      {student.admissionCategory === "iccr" ? "ICCR (Indian Council for Cultural Relations)"
-                        : student.admissionCategory === "sii" ? "Study in India (SII)"
-                        : student.admissionCategory === "direct" ? "Direct Admission"
-                        : student.admissionCategory === "foreign_govt_sponsored" ? "Foreign Govt. Sponsored"
-                        : student.admissionCategory === "other" ? `Other (${student.admissionCategoryOther || "Custom Track"})`
-                        : "Not provided"}
-                    </span>
+                    <div className="pt-0.5">
+                      {student.admissionCategory ? (
+                        <AdmissionCategoryBadge 
+                          category={student.admissionCategory} 
+                          categoryOther={student.admissionCategoryOther} 
+                          showFullName={true} 
+                          size="md" 
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-xs font-medium">Not provided</span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1 p-3 rounded-xl bg-muted/20 border border-border/40 min-w-0">

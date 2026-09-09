@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { CountryFlag } from "@/components/ui/country-flag";
+import { AdmissionCategoryBadge } from "@/components/ui/admission-category-badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -889,9 +890,11 @@ export default function StudentListPage() {
                             </div>
                             <div className="flex items-center gap-1 flex-wrap pt-0.5">
                               {student.admissionCategory && (
-                                <Badge variant="outline" className="text-[9px] px-1 py-0 font-normal border-border/80 bg-muted/40">
-                                  {student.admissionCategory}
-                                </Badge>
+                                <AdmissionCategoryBadge 
+                                  category={student.admissionCategory} 
+                                  categoryOther={student.admissionCategoryOther}
+                                  size="xs" 
+                                />
                               )}
                             </div>
                           </div>
@@ -1079,9 +1082,11 @@ export default function StudentListPage() {
                     <div className="flex items-center gap-2">
                       {getAcademicStatusBadge(student.academicStatus)}
                       {student.admissionCategory && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                          {student.admissionCategory}
-                        </Badge>
+                        <AdmissionCategoryBadge 
+                          category={student.admissionCategory} 
+                          categoryOther={student.admissionCategoryOther}
+                          size="xs" 
+                        />
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">

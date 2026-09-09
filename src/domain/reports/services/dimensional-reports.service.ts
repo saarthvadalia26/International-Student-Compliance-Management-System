@@ -218,8 +218,11 @@ export class DimensionalReportsService {
       // Category
       const rawCat = (academic?.admission_category || "").trim().toLowerCase();
       let categoryDisplay = "Not Specified";
-      if (rawCat === "iccr") categoryDisplay = "ICCR Scholarship";
-      else if (rawCat === "sii") categoryDisplay = "Study in India (SII)";
+      if (rawCat === "iccr") categoryDisplay = "ICCR";
+      else if (rawCat === "sii") categoryDisplay = "SII";
+      else if (rawCat === "direct") categoryDisplay = "Direct";
+      else if (rawCat === "foreign_govt_sponsored" || rawCat === "foreign_govt" || rawCat === "govt_sponsored") categoryDisplay = "Foreign Govt. Sponsored";
+      else if (rawCat === "other") categoryDisplay = academic?.admission_category_other?.trim() ? `Other (${academic.admission_category_other.trim()})` : "Other";
       else if (rawCat === "self_financed" || rawCat === "self") categoryDisplay = "Self Financed";
       else if (rawCat) categoryDisplay = rawCat.toUpperCase();
 
