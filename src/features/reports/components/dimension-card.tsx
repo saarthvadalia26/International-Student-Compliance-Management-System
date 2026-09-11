@@ -135,28 +135,32 @@ export function DimensionCard({
 
   return (
     <Card className="flex flex-col border border-border/70 bg-card shadow-xs transition-shadow hover:shadow-sm overflow-hidden w-full">
-      <CardHeader className="pb-3 border-b border-border/40">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 min-w-0">
-          <div className="space-y-1 min-h-[44px] flex flex-col justify-center min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <CardTitle className="text-base font-semibold text-foreground tracking-tight leading-snug" title={title}>
-                {title}
-              </CardTitle>
-              <Badge variant="secondary" className="text-[11px] font-normal px-2 py-0.5 shrink-0">
-                {isRenewals
-                  ? `${itemCount} Renewals`
-                  : isDocStatus
-                  ? "3 Document Types"
-                  : `${itemCount} Categories`}
-              </Badge>
-            </div>
-            <CardDescription className="text-xs text-muted-foreground line-clamp-2">
-              {description}
-            </CardDescription>
-          </div>
+      <CardHeader className="pb-3 border-b border-border/40 space-y-2.5">
+        {/* Row 1: Full-Width Chart Title and Badge in a straight horizontal line */}
+        <div className="flex items-center gap-2.5 min-w-0 overflow-x-auto">
+          <CardTitle 
+            className="text-sm sm:text-base font-semibold text-foreground tracking-tight whitespace-nowrap" 
+            title={title}
+          >
+            {title}
+          </CardTitle>
+          <Badge variant="secondary" className="text-[11px] font-normal px-2 py-0.5 shrink-0">
+            {isRenewals
+              ? `${itemCount} Renewals`
+              : isDocStatus
+              ? "3 Document Types"
+              : `${itemCount} Categories`}
+          </Badge>
+        </div>
+
+        {/* Row 2: Chart Description & Action Toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
+          <CardDescription className="text-xs text-muted-foreground line-clamp-2 sm:line-clamp-1 flex-1 pr-2">
+            {description}
+          </CardDescription>
 
           {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-start lg:self-auto">
+          <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
             {/* View Mode Switch */}
             <div className="flex items-center rounded-md border border-border/60 bg-muted/40 p-0.5 shrink-0">
               <Button
