@@ -20,6 +20,7 @@ import { parseDateToISO, formatToDDMMYYYY } from "@/lib/utils/date";
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
 import { ComplianceCalculator } from "@/domain/compliance/services/compliance-calculator";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 
 const studentService = new StudentService();
 
@@ -54,7 +55,7 @@ export interface StudentListItem {
   visa: {
     number: string;
     expiry: string | null;
-    status: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION";
+    status: "COMPLIANT" | "WARNING" | "EXPIRED" | "MISSING" | "PENDING_VERIFICATION" | "NOT_APPLICABLE";
     type?: string | null;
   };
   efrro: {
@@ -554,28 +555,40 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         ? schoolsMap.get(academic.override_school_id.toLowerCase())!
         : progInfo.school;
 
-      // Authoritative compliance evaluation respecting nationality-based eFRRO applicability
+      // Authoritative compliance evaluation respecting nationality-based eFRRO and CIWGC Visa applicability
       const efrroApplicable = isEfrroApplicable(natCode);
+      const visaApplicable = isVisaApplicable({
+        nationality: natCode,
+        admissionCategory: academic?.admission_category,
+        admissionTrack: academic?.admission_category_other,
+        admissionCategoryOther: academic?.admission_category_other
+      });
+
       const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
         passport: { number: snapshot?.passport_number, expiry: snapshot?.passport_expiry, status: snapshot?.passport_status },
         visa: { number: snapshot?.visa_number, expiry: snapshot?.visa_expiry, status: snapshot?.visa_status },
         efrro: { number: snapshot?.efrro_number, expiry: snapshot?.efrro_expiry, status: snapshot?.efrro_status },
+        isPassportRequired: true,
+        isVisaRequired: visaApplicable,
         isEfrroRequired: efrroApplicable,
-        nationality: natCode
+        nationality: natCode,
+        admissionCategory: academic?.admission_category,
+        admissionTrack: academic?.admission_category_other,
+        admissionCategoryOther: academic?.admission_category_other
       });
 
       const rawStatus = (complianceResult.overallStatus || "MISSING").toUpperCase();
       const mappedCompliance: StudentListItem["complianceStatus"] = ComplianceCalculator.mapComplianceToBadge(rawStatus);
 
       const passportStatus = complianceResult.passport.status;
-      const visaStatus = complianceResult.visa.status;
+      const visaStatus = visaApplicable ? complianceResult.visa.status : ("NOT_APPLICABLE" as const);
       const efrroStatus = efrroApplicable ? complianceResult.efrro.status : ("NOT_APPLICABLE" as const);
 
       const missingDocuments: string[] = [];
       if (passportStatus === "MISSING" || !snapshot?.passport_number || snapshot.passport_number === "Not provided" || !snapshot?.passport_expiry) {
         missingDocuments.push("Passport");
       }
-      if (visaStatus === "MISSING" || !snapshot?.visa_number || snapshot.visa_number === "Not provided" || !snapshot?.visa_expiry) {
+      if (visaApplicable && (visaStatus === "MISSING" || !snapshot?.visa_number || snapshot.visa_number === "Not provided" || !snapshot?.visa_expiry)) {
         missingDocuments.push("Visa");
       }
       if (efrroApplicable && (efrroStatus === "MISSING" || !snapshot?.efrro_number || snapshot.efrro_number === "Not provided" || !snapshot?.efrro_expiry)) {
@@ -605,10 +618,10 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
           status: passportStatus
         },
         visa: {
-          number: snapshot?.visa_number || "Not provided",
-          expiry: snapshot?.visa_expiry || null,
+          number: visaApplicable ? (snapshot?.visa_number || "Not provided") : "Not Applicable",
+          expiry: visaApplicable ? (snapshot?.visa_expiry || null) : null,
           status: visaStatus,
-          type: snapshot?.visa_type || null
+          type: visaApplicable ? (snapshot?.visa_type || null) : null
         },
         efrro: {
           number: efrroApplicable ? (snapshot?.efrro_number || null) : null,
@@ -799,6 +812,13 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
       }
     } catch {}
 
+    const isVisaApp = isVisaApplicable({
+      nationality: personal?.nationality_code,
+      admissionCategory: academic?.admission_category,
+      admissionTrack: academic?.admission_category_other,
+      admissionCategoryOther: academic?.admission_category_other
+    });
+
     const studentProfile: StudentDetailProfile = {
       id: record.id,
       fullName: personal?.full_name || "Unknown Student",
@@ -874,8 +894,12 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
           passport: { number: activePassport?.document_number || snapshot?.passport_number, expiry: activePassport?.expiry_date || snapshot?.passport_expiry },
           visa: { number: activeVisa?.document_number || snapshot?.visa_number, expiry: activeVisa?.expiry_date || snapshot?.visa_expiry },
           efrro: { number: activeEfrro?.document_number || snapshot?.efrro_number, expiry: activeEfrro?.expiry_date || snapshot?.efrro_expiry },
+          isVisaRequired: isVisaApp,
           isEfrroRequired: isEfrroApplicable(personal?.nationality_code),
-          nationality: personal?.nationality_code
+          nationality: personal?.nationality_code,
+          admissionCategory: academic?.admission_category,
+          admissionTrack: academic?.admission_category_other,
+          admissionCategoryOther: academic?.admission_category_other
         }).overallStatus
       ),
       passport: {
@@ -898,14 +922,15 @@ export async function getStudentDetailsAction(studentId: string): Promise<{
         activeEarlyAuthorization: null
       },
       visa: {
-        number: activeVisa?.document_number || snapshot?.visa_number || "Not provided",
+        number: activeVisa?.document_number || snapshot?.visa_number || (!isVisaApp ? "" : "Not provided"),
         issueDate: activeVisa?.issue_date || snapshot?.visa_issue_date || "",
         expiryDate: activeVisa?.expiry_date || snapshot?.visa_expiry || "",
         visaType: activeVisa?.visa_type || snapshot?.visa_type || "Student (S-1)",
         versionNumber: activeVisa?.version_number ?? (visaVersions.length > 0 ? 1 : null),
-        versionLabel: activeVisa ? getVersionLabel(activeVisa.version_number) : (visaVersions.length > 0 ? "Original" : null),
-        renewalCount: visaRenewalCount,
-        verificationStatus: activeVisa ? (activeVisa.verification_status || "verified") : "not_recorded",
+        versionLabel: !isVisaApp ? "Not Applicable" : (activeVisa ? getVersionLabel(activeVisa.version_number) : (visaVersions.length > 0 ? "Original" : null)),
+        renewalCount: !isVisaApp ? 0 : visaRenewalCount,
+        verificationStatus: !isVisaApp ? "not_applicable" : (activeVisa ? (activeVisa.verification_status || "verified") : "not_recorded"),
+        isNotApplicable: !isVisaApp,
         hasUploadedDocument: Boolean(activeVisa?.file_path),
         uploadedAt: activeVisa?.created_at || null,
         verifiedAt: activeVisa?.verified_at || null,
@@ -1547,7 +1572,7 @@ export async function addOriginalDocumentAction(
       : "efrro_versions";
 
     // 1. Verify that NO original document already exists
-    const [{ data: existingVersions }, { data: snapshot }] = await Promise.all([
+    const [{ data: existingVersions }, { data: snapshot }, { data: studentRecord }] = await Promise.all([
       adminSupabase
         .from(tableName)
         .select("id, version_number, is_active, document_number")
@@ -1557,8 +1582,28 @@ export async function addOriginalDocumentAction(
         .from("student_snapshot")
         .select("passport_number, visa_number, efrro_number")
         .eq("student_id", studentId)
+        .maybeSingle(),
+      adminSupabase
+        .from("students")
+        .select("student_personal(nationality_code), student_academic(admission_category, admission_category_other)")
+        .eq("id", studentId)
         .maybeSingle()
     ]);
+
+    const pers = Array.isArray(studentRecord?.student_personal) ? studentRecord?.student_personal[0] : studentRecord?.student_personal;
+    const acad = Array.isArray(studentRecord?.student_academic) ? studentRecord?.student_academic[0] : studentRecord?.student_academic;
+
+    if (documentType === "visa" && !isVisaApplicable({
+      nationality: pers?.nationality_code,
+      admissionCategory: acad?.admission_category,
+      admissionTrack: acad?.admission_category_other,
+      admissionCategoryOther: acad?.admission_category_other
+    })) {
+      return {
+        success: false,
+        error: "Visa requirement is not applicable for Indian nationals under the CIWGC quota."
+      };
+    }
 
     const existingDocNum = documentType === "passport" ? snapshot?.passport_number :
       documentType === "visa" ? snapshot?.visa_number : snapshot?.efrro_number;
@@ -1655,7 +1700,11 @@ export async function addOriginalDocumentAction(
     const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
       passport: { number: pNum, expiry: pExp },
       visa: { number: vNum, expiry: vExp },
-      efrro: { number: eNum, expiry: eExp }
+      efrro: { number: eNum, expiry: eExp },
+      nationality: pers?.nationality_code,
+      admissionCategory: acad?.admission_category,
+      admissionTrack: acad?.admission_category_other,
+      admissionCategoryOther: acad?.admission_category_other
     });
 
     const snapshotUpdates: Record<string, unknown> = {
@@ -2072,8 +2121,8 @@ export async function renewDocumentAction(
       ? "visa_versions" 
       : "efrro_versions";
 
-    // 1. Fetch all existing versions and snapshot to verify original existence & sequence
-    const [{ data: existingVersions, error: fetchErr }, { data: snapshot }] = await Promise.all([
+    // 1. Fetch all existing versions, snapshot, and student record
+    const [{ data: existingVersions, error: fetchErr }, { data: snapshot }, { data: studentRecord }] = await Promise.all([
       adminSupabase
         .from(tableName)
         .select("id, version_number, is_active, document_number")
@@ -2084,11 +2133,31 @@ export async function renewDocumentAction(
         .from("student_snapshot")
         .select("passport_number, passport_expiry, passport_status, visa_number, visa_expiry, visa_status, efrro_number, efrro_expiry, efrro_status")
         .eq("student_id", studentId)
+        .maybeSingle(),
+      adminSupabase
+        .from("students")
+        .select("student_personal(nationality_code), student_academic(admission_category, admission_category_other)")
+        .eq("id", studentId)
         .maybeSingle()
     ]);
 
     if (fetchErr) {
       return { success: false, error: `Failed to query existing versions: ${fetchErr.message}` };
+    }
+
+    const pers = Array.isArray(studentRecord?.student_personal) ? studentRecord?.student_personal[0] : studentRecord?.student_personal;
+    const acad = Array.isArray(studentRecord?.student_academic) ? studentRecord?.student_academic[0] : studentRecord?.student_academic;
+
+    if (documentType === "visa" && !isVisaApplicable({
+      nationality: pers?.nationality_code,
+      admissionCategory: acad?.admission_category,
+      admissionTrack: acad?.admission_category_other,
+      admissionCategoryOther: acad?.admission_category_other
+    })) {
+      return {
+        success: false,
+        error: "Visa requirement is not applicable for Indian nationals under the CIWGC quota."
+      };
     }
 
     // STRICT BACKEND VALIDATION:
@@ -2198,7 +2267,11 @@ export async function renewDocumentAction(
     const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
       passport: { number: pNum, expiry: pExp },
       visa: { number: vNum, expiry: vExp },
-      efrro: { number: eNum, expiry: eExp }
+      efrro: { number: eNum, expiry: eExp },
+      nationality: pers?.nationality_code,
+      admissionCategory: acad?.admission_category,
+      admissionTrack: acad?.admission_category_other,
+      admissionCategoryOther: acad?.admission_category_other
     });
 
     const snapshotUpdates: Record<string, unknown> = {
@@ -2440,8 +2513,8 @@ export async function correctDocumentMetadataAction(
       ? "visa_versions" 
       : "efrro_versions";
 
-    // 1. Fetch current active version and snapshot
-    const [{ data: activeVersion }, { data: currentSnapshot }] = await Promise.all([
+    // 1. Fetch current active version, snapshot, and student record
+    const [{ data: activeVersion }, { data: currentSnapshot }, { data: studentRecord }] = await Promise.all([
       adminSupabase
         .from(tableName)
         .select("*")
@@ -2453,8 +2526,28 @@ export async function correctDocumentMetadataAction(
         .from("student_snapshot")
         .select("*")
         .eq("student_id", studentId)
+        .maybeSingle(),
+      adminSupabase
+        .from("students")
+        .select("student_personal(nationality_code), student_academic(admission_category, admission_category_other)")
+        .eq("id", studentId)
         .maybeSingle()
     ]);
+
+    const pers = Array.isArray(studentRecord?.student_personal) ? studentRecord?.student_personal[0] : studentRecord?.student_personal;
+    const acad = Array.isArray(studentRecord?.student_academic) ? studentRecord?.student_academic[0] : studentRecord?.student_academic;
+
+    if (documentType === "visa" && !isVisaApplicable({
+      nationality: pers?.nationality_code,
+      admissionCategory: acad?.admission_category,
+      admissionTrack: acad?.admission_category_other,
+      admissionCategoryOther: acad?.admission_category_other
+    })) {
+      return {
+        success: false,
+        error: "Visa requirement is not applicable for Indian nationals under the CIWGC quota."
+      };
+    }
 
     const previousValues = {
       documentNumber: activeVersion?.document_number || (
@@ -2513,7 +2606,11 @@ export async function correctDocumentMetadataAction(
     const complianceResult = ComplianceCalculator.evaluateStudentCompliance({
       passport: { number: pNum, expiry: pExp },
       visa: { number: vNum, expiry: vExp },
-      efrro: { number: eNum, expiry: eExp }
+      efrro: { number: eNum, expiry: eExp },
+      nationality: pers?.nationality_code,
+      admissionCategory: acad?.admission_category,
+      admissionTrack: acad?.admission_category_other,
+      admissionCategoryOther: acad?.admission_category_other
     });
 
     const snapshotUpdates: Record<string, unknown> = {
@@ -2873,7 +2970,7 @@ export async function getReminderDispatchPreviewAction(
         status,
         student_personal(full_name, preferred_language, nationality_code),
         student_contact(email, phone_home, phone_local),
-        student_academic(program_code, expected_graduation),
+        student_academic(program_code, expected_graduation, admission_category, admission_category_other),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
         passport_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
         visa_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
@@ -2928,6 +3025,45 @@ export async function getReminderDispatchPreviewAction(
           isDispatchable: false,
           blockedReason: "NOT_APPLICABLE",
           blockedMessage: "eFRRO compliance is not applicable for Indian nationals. Reminders are disabled.",
+          alreadyDispatched: false,
+          dispatchedAt: null
+        }
+      };
+    }
+
+    if (docType === "visa" && !isVisaApplicable({
+      nationality: personal?.nationality_code,
+      admissionCategory: academic?.admission_category,
+      admissionTrack: academic?.admission_category_other,
+      admissionCategoryOther: academic?.admission_category_other
+    })) {
+      const { WhatsAppIntegrationService } = await import("@/domain/notifications/services/whatsapp-integration.service");
+      const integration = WhatsAppIntegrationService.getIntegrationStatus();
+      const rawPhone = contact?.phone_local || contact?.phone_home || null;
+      const cleanPhone = (rawPhone || "").replace(/[^\d+]/g, "").trim();
+      const hasValidPhone = Boolean(cleanPhone && cleanPhone.length >= 7);
+
+      return {
+        success: true,
+        preview: {
+          studentId,
+          studentName: personal?.full_name || "Student",
+          studentPhone: cleanPhone || null,
+          hasValidPhone,
+          documentType: "visa",
+          documentTitle: "Student Visa",
+          expiryDate: "",
+          expiryDateFormatted: "Not Applicable",
+          daysRemaining: 0,
+          thresholdDays,
+          ruleName: `${thresholdDays}-Day Reminder`,
+          templateCode: `VISA_EXPIRY_${thresholdDays}D`,
+          templateName: `visa_${thresholdDays}_day_reminder`,
+          integrationStatus: integration.status,
+          integrationMessage: integration.message,
+          isDispatchable: false,
+          blockedReason: "NOT_APPLICABLE",
+          blockedMessage: "Visa compliance is not applicable for Indian nationals under the CIWGC quota. Reminders are disabled.",
           alreadyDispatched: false,
           dispatchedAt: null
         }
@@ -3081,7 +3217,7 @@ export async function triggerReminderDispatchAction(
         status,
         student_personal(full_name, preferred_language, nationality_code),
         student_contact(email, phone_home, phone_local),
-        student_academic(program_code, expected_graduation),
+        student_academic(program_code, expected_graduation, admission_category, admission_category_other),
         student_snapshot(passport_expiry, visa_expiry, efrro_expiry, passport_number, visa_number, efrro_number),
         passport_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
         visa_versions(id, is_active, document_number, expiry_date, verification_status, deleted_at),
@@ -3116,6 +3252,20 @@ export async function triggerReminderDispatchAction(
         status: "BLOCKED",
         reason: "not_applicable",
         error: "Cannot dispatch reminder: eFRRO registration is not applicable for Indian nationals."
+      };
+    }
+
+    if (docType === "visa" && !isVisaApplicable({
+      nationality: personal?.nationality_code,
+      admissionCategory: academic?.admission_category,
+      admissionTrack: academic?.admission_category_other,
+      admissionCategoryOther: academic?.admission_category_other
+    })) {
+      return {
+        success: false,
+        status: "BLOCKED",
+        reason: "not_applicable",
+        error: "Cannot dispatch reminder: Visa compliance is not applicable for Indian CIWGC students."
       };
     }
 

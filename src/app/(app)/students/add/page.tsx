@@ -39,6 +39,7 @@ import { ScholarshipScheme } from "@/domain/scholarships/types";
 import { Campus } from "@/domain/campuses/types";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 import { RegisterStudentValidationSchema } from "@/services/validation/student-validation";
 import { registerStudentAction } from "@/app/(app)/students/actions";
 import { RegisterStudentInput } from "@/services/student/student.types";
@@ -469,6 +470,13 @@ export default function StudentRegistrationPage() {
     else if (formData.physicalDisability === "no") physicalDisabilityVal = false;
     else if (formData.physicalDisability === "not_specified") physicalDisabilityVal = null;
 
+    const visaApplicable = isVisaApplicable({
+      nationality: formData.nationality,
+      admissionCategory: formData.admissionCategory,
+      admissionTrack: formData.admissionCategoryOther,
+      admissionCategoryOther: formData.admissionCategoryOther
+    });
+
     // Zod payload assembly for progressive student registration
     const validationPayload: RegisterStudentInput = {
       registrationNumber: formData.enrollmentNumber?.trim() || undefined,
@@ -544,10 +552,10 @@ export default function StudentRegistrationPage() {
       passportIssueDate: sanitizedPassIssue || undefined,
       passportExpiry: sanitizedPassExp || undefined,
       passportPlaceOfIssue: formData.passportPlaceOfIssue.trim() || undefined,
-      visaNumber: formData.visaNumber.trim() || undefined,
-      visaIssueDate: sanitizedVisaIssue || undefined,
-      visaExpiry: sanitizedVisaExp || undefined,
-      visaType: formData.visaType.trim() || undefined,
+      visaNumber: visaApplicable ? (formData.visaNumber.trim() || undefined) : undefined,
+      visaIssueDate: visaApplicable ? (sanitizedVisaIssue || undefined) : undefined,
+      visaExpiry: visaApplicable ? (sanitizedVisaExp || undefined) : undefined,
+      visaType: visaApplicable ? (formData.visaType.trim() || undefined) : undefined,
       efrroNumber: isEfrroApplicable(formData.nationality) ? (formData.efrroNumber.trim() || undefined) : undefined,
       efrroIssueDate: isEfrroApplicable(formData.nationality) ? (sanitizedEfrroIssue || undefined) : undefined,
       efrroExpiry: isEfrroApplicable(formData.nationality) ? (sanitizedEfrroExp || undefined) : undefined,
@@ -2083,88 +2091,122 @@ export default function StudentRegistrationPage() {
                 <Separator />
 
                 {/* Visa Details */}
-                <div className="space-y-3">
-                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Visa Details</h3>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground" htmlFor="visaNumber">
-                        Visa Number
-                      </label>
-                      <Input
-                        id="visaNumber"
-                        placeholder="e.g. V99887766"
-                        value={formData.visaNumber}
-                        onChange={handleInputChange}
-                        disabled={isSubmitting}
-                        className={`h-10 text-sm ${validationErrors.visaNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
-                      />
-                      {validationErrors.visaNumber && (
-                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                          {validationErrors.visaNumber}
-                        </p>
+                {(() => {
+                  const visaApplicable = isVisaApplicable({
+                    nationality: formData.nationality,
+                    admissionCategory: formData.admissionCategory,
+                    admissionTrack: formData.admissionCategoryOther,
+                    admissionCategoryOther: formData.admissionCategoryOther
+                  });
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Visa Details</h3>
+                        {!visaApplicable && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            Not Applicable for Indian CIWGC Students
+                          </span>
+                        )}
+                      </div>
+
+                      {!visaApplicable ? (
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-start gap-3 animate-fade-in">
+                          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                            <FileCheck className="h-4 w-4" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-foreground">
+                              Exempt from Student Visa Requirement
+                            </p>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              Because the student is an Indian national admitted under the CIWGC quota (Admission Category: Other, Track: CIWGC), Indian student visa requirements do not apply. This section is automatically exempted.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground" htmlFor="visaNumber">
+                              Visa Number
+                            </label>
+                            <Input
+                              id="visaNumber"
+                              placeholder="e.g. V99887766"
+                              value={formData.visaNumber}
+                              onChange={handleInputChange}
+                              disabled={isSubmitting}
+                              className={`h-10 text-sm ${validationErrors.visaNumber ? "border-rose-500 focus-visible:ring-rose-500" : ""}`}
+                            />
+                            {validationErrors.visaNumber && (
+                              <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                                {validationErrors.visaNumber}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground" htmlFor="visaType">
+                              Visa Classification
+                            </label>
+                            <Select 
+                              value={formData.visaType} 
+                              onValueChange={(v) => handleSelectChange("visaType", v || "")}
+                            >
+                              <SelectTrigger id="visaType" className="h-10 text-xs">
+                                <SelectValue placeholder="Select Visa Type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Student (S-1)">Student (S-1)</SelectItem>
+                                <SelectItem value="Student (S-2)">Student (S-2)</SelectItem>
+                                <SelectItem value="Student (S-3)">Student (S-3)</SelectItem>
+                                <SelectItem value="Student (S-4)">Student (S-4)</SelectItem>
+                                <SelectItem value="Student (S-5)">Student (S-5)</SelectItem>
+                                <SelectItem value="Research (R-1)">Research (R-1)</SelectItem>
+                                <SelectItem value="Intern (I-1)">Intern (I-1)</SelectItem>
+                                <SelectItem value="Other">Other Category</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground" htmlFor="visaIssueDate">
+                              Visa Issue Date
+                            </label>
+                            <DatePicker
+                              id="visaIssueDate"
+                              value={formData.visaIssueDate}
+                              onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                              onValueChange={(v) => handleSelectChange("visaIssueDate", v)}
+                              disabled={isSubmitting}
+                              placeholder="DD/MM/YYYY"
+                              error={validationErrors.visaIssueDate}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground" htmlFor="visaExpiry">
+                              Visa Expiration Date
+                            </label>
+                            <DatePicker
+                              id="visaExpiry"
+                              value={formData.visaExpiry}
+                              onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
+                              onValueChange={(v) => handleSelectChange("visaExpiry", v)}
+                              disabled={isSubmitting}
+                              placeholder="DD/MM/YYYY"
+                              error={validationErrors.visaExpiry}
+                            />
+                            {validationErrors.visaExpiry && (
+                              <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
+                                {validationErrors.visaExpiry}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground" htmlFor="visaType">
-                        Visa Classification
-                      </label>
-                      <Select 
-                        value={formData.visaType} 
-                        onValueChange={(v) => handleSelectChange("visaType", v || "")}
-                      >
-                        <SelectTrigger id="visaType" className="h-10 text-xs">
-                          <SelectValue placeholder="Select Visa Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Student (S-1)">Student (S-1)</SelectItem>
-                          <SelectItem value="Student (S-2)">Student (S-2)</SelectItem>
-                          <SelectItem value="Student (S-3)">Student (S-3)</SelectItem>
-                          <SelectItem value="Student (S-4)">Student (S-4)</SelectItem>
-                          <SelectItem value="Student (S-5)">Student (S-5)</SelectItem>
-                          <SelectItem value="Research (R-1)">Research (R-1)</SelectItem>
-                          <SelectItem value="Intern (I-1)">Intern (I-1)</SelectItem>
-                          <SelectItem value="Other">Other Category</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground" htmlFor="visaIssueDate">
-                        Visa Issue Date
-                      </label>
-                      <DatePicker
-                        id="visaIssueDate"
-                        value={formData.visaIssueDate}
-                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
-                        onValueChange={(v) => handleSelectChange("visaIssueDate", v)}
-                        disabled={isSubmitting}
-                        placeholder="DD/MM/YYYY"
-                        error={validationErrors.visaIssueDate}
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-foreground" htmlFor="visaExpiry">
-                        Visa Expiration Date
-                      </label>
-                      <DatePicker
-                        id="visaExpiry"
-                        value={formData.visaExpiry}
-                        onChange={(e) => handleInputChange(e as unknown as React.ChangeEvent<HTMLInputElement>)}
-                        onValueChange={(v) => handleSelectChange("visaExpiry", v)}
-                        disabled={isSubmitting}
-                        placeholder="DD/MM/YYYY"
-                        error={validationErrors.visaExpiry}
-                      />
-                      {validationErrors.visaExpiry && (
-                        <p className="text-[11px] text-rose-500 font-medium animate-in slide-in-from-top-1">
-                          {validationErrors.visaExpiry}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 <Separator />
 

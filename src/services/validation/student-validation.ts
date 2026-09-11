@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 import { parseDateToISO } from "@/lib/utils/date";
 
 export const RegisterStudentValidationSchema = z.object({
@@ -174,6 +175,14 @@ export const RegisterStudentValidationSchema = z.object({
   message: "Passport expiration date must be strictly after the issue date",
   path: ["passportExpiry"]
 }).refine((data) => {
+  if (!isVisaApplicable({
+    nationality: data.nationalityCode,
+    admissionCategory: data.admissionCategory,
+    admissionTrack: data.admissionCategoryOther,
+    admissionCategoryOther: data.admissionCategoryOther
+  })) {
+    return true;
+  }
   if (data.visaIssueDate && data.visaExpiry && data.visaIssueDate.trim() && data.visaExpiry.trim()) {
     const vi = parseDateToISO(data.visaIssueDate);
     const ve = parseDateToISO(data.visaExpiry);
@@ -185,6 +194,7 @@ export const RegisterStudentValidationSchema = z.object({
 }, {
   message: "Visa expiration date must be strictly after the issue date",
   path: ["visaExpiry"]
+
 }).refine((data) => {
   if (data.nationalityCode && !isEfrroApplicable(data.nationalityCode)) {
     return true;

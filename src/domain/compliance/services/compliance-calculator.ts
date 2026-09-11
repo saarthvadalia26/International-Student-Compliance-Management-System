@@ -1,5 +1,6 @@
 import { CalendarDateEngine } from "@/domain/notifications/services/calendar-date";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 
 export type DocumentStatus = 
   | "MISSING" 
@@ -33,6 +34,9 @@ export interface StudentComplianceEvaluationInput {
   isVisaRequired?: boolean;
   isEfrroRequired?: boolean;
   nationality?: string | null;
+  admissionCategory?: string | null;
+  admissionTrack?: string | null;
+  admissionCategoryOther?: string | null;
 }
 
 export interface DocumentEvaluationResult {
@@ -167,7 +171,14 @@ export class ComplianceCalculator {
   ): StudentComplianceEvaluationResult {
     const today = todayISO || CalendarDateEngine.getTodayISO();
     const isPassportRequired = input.isPassportRequired !== false;
-    const isVisaRequired = input.isVisaRequired !== false;
+    const isVisaRequired = input.isVisaRequired !== undefined
+      ? input.isVisaRequired
+      : isVisaApplicable({
+          nationality: input.nationality,
+          admissionCategory: input.admissionCategory,
+          admissionTrack: input.admissionTrack,
+          admissionCategoryOther: input.admissionCategoryOther
+        });
     const isEfrroRequired = input.isEfrroRequired !== undefined
       ? input.isEfrroRequired
       : (input.nationality ? isEfrroApplicable(input.nationality) : true);

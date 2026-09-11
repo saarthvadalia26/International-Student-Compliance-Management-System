@@ -222,6 +222,19 @@ export function DocumentReminderSchedule({
               <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
               <span>Loading reminder schedule...</span>
             </div>
+          ) : currentDoc?.verificationStatus === "not_applicable" || currentDoc?.documentNumber === "Not Applicable" ? (
+            /* Not Applicable State */
+            <div className="py-6 sm:py-8 text-center space-y-2 rounded-lg border border-emerald-500/20 p-4 bg-emerald-500/5 w-full min-w-0 box-border animate-fade-in">
+              <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8 text-emerald-600 dark:text-emerald-400 mx-auto" />
+              <p className="font-semibold text-xs text-foreground">
+                {docTitle} Not Applicable
+              </p>
+              <p className="text-[11px] text-muted-foreground max-w-xs mx-auto font-caption leading-relaxed">
+                {selectedDocType === "visa"
+                  ? "Because this student is an Indian national admitted under the CIWGC quota, student visa compliance and expiry reminders do not apply."
+                  : "Because this student is an Indian national, eFRRO registration and expiry reminders do not apply."}
+              </p>
+            </div>
           ) : !currentDoc?.expiryDate ? (
             /* Empty State: Expiry date not recorded */
             <div className="py-6 sm:py-8 text-center space-y-2 rounded-lg border border-dashed border-border/70 p-4 bg-muted/5 w-full min-w-0 box-border">

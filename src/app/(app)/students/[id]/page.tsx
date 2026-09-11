@@ -54,6 +54,7 @@ import { ScholarshipScheme } from "@/domain/scholarships/types";
 import { Campus } from "@/domain/campuses/types";
 import { normalizeCountryInputSync } from "@/domain/countries/country-utils";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 import { NationalitySelector } from "@/components/ui/nationality-selector";
 import { AcademicProgressionEngine } from "@/domain/academic/services/semester-progression.service";
 import { CountryFlag } from "@/components/ui/country-flag";
@@ -746,23 +747,32 @@ function StudentDetailsContent({ params }: PageProps) {
     if (!student) return null;
 
     const isIndian = !isEfrroApplicable(student.nationalityCode);
+    const isVisaExempt = !isVisaApplicable({
+      nationality: student.nationalityCode,
+      admissionCategory: student.admissionCategory,
+      admissionTrack: student.admissionCategoryOther,
+      admissionCategoryOther: student.admissionCategoryOther
+    });
 
     return ExpiryReminderEngine.calculateStudentReminders({
       studentId,
       expectedGraduationDate: student.expectedGraduation,
       nationality: student.nationalityCode,
+      admissionCategory: student.admissionCategory,
+      admissionTrack: student.admissionCategoryOther,
+      admissionCategoryOther: student.admissionCategoryOther,
       passport: student.passport ? {
         number: student.passport.number,
         expiryDate: student.passport.expiryDate,
         isUploaded: student.passport.hasUploadedDocument,
         verificationStatus: student.passport.verificationStatus
       } : null,
-      visa: student.visa ? {
+      visa: isVisaExempt ? null : (student.visa ? {
         number: student.visa.number,
         expiryDate: student.visa.expiryDate,
         isUploaded: student.visa.hasUploadedDocument,
         verificationStatus: student.visa.verificationStatus
-      } : null,
+      } : null),
       efrro: isIndian ? null : (student.efrro ? {
         number: student.efrro.number,
         expiryDate: student.efrro.expiryDate,
@@ -777,8 +787,14 @@ function StudentDetailsContent({ params }: PageProps) {
   React.useEffect(() => {
     if (effectiveSchedule) {
       const isIndian = !isEfrroApplicable(student?.nationalityCode);
+      const isVisaExempt = !isVisaApplicable({
+        nationality: student?.nationalityCode,
+        admissionCategory: student?.admissionCategory,
+        admissionTrack: student?.admissionCategoryOther,
+        admissionCategoryOther: student?.admissionCategoryOther
+      });
       const hasPassport = Boolean(effectiveSchedule.passport?.expiryDate);
-      const hasVisa = Boolean(effectiveSchedule.visa?.expiryDate);
+      const hasVisa = !isVisaExempt && Boolean(effectiveSchedule.visa?.expiryDate);
       const hasEfrro = !isIndian && Boolean(effectiveSchedule.efrro?.expiryDate);
 
       if (selectedReminderDoc === "passport" && !hasPassport) {
@@ -787,11 +803,13 @@ function StudentDetailsContent({ params }: PageProps) {
         } else if (hasVisa) {
           setSelectedReminderDoc("visa");
         }
+      } else if (selectedReminderDoc === "visa" && isVisaExempt) {
+        setSelectedReminderDoc(hasPassport ? "passport" : (hasEfrro ? "efrro" : "passport"));
       } else if (selectedReminderDoc === "efrro" && isIndian) {
-        setSelectedReminderDoc(hasPassport ? "passport" : "visa");
+        setSelectedReminderDoc(hasPassport ? "passport" : (hasVisa ? "visa" : "passport"));
       }
     }
-  }, [effectiveSchedule, selectedReminderDoc, student?.nationalityCode]);
+  }, [effectiveSchedule, selectedReminderDoc, student?.nationalityCode, student?.admissionCategory, student?.admissionCategoryOther]);
 
   React.useEffect(() => {
     loadStudentData();
@@ -2151,14 +2169,20 @@ function StudentDetailsContent({ params }: PageProps) {
                 {/* 2. Visa Card */}
                 {(() => {
                   const doc = student.visa;
+                  const isVisaNotApp = doc?.isNotApplicable ?? !isVisaApplicable({
+                    nationality: student.nationalityCode,
+                    admissionCategory: student.admissionCategory,
+                    admissionTrack: student.admissionCategoryOther,
+                    admissionCategoryOther: student.admissionCategoryOther
+                  });
                   const hasDoc = isDocRecorded(doc);
                   const verLabel = doc?.versionLabel || (hasDoc ? (doc?.versionNumber ? (doc.versionNumber === 1 ? "Original" : `Renewal ${doc.versionNumber - 1}`) : "Original") : null);
                   const renewalCount = doc?.renewalCount ?? 0;
 
-                  let statusText = "Not Recorded";
-                  let statusClass = "text-muted-foreground";
+                  let statusText = isVisaNotApp ? "Not Applicable" : "Not Recorded";
+                  let statusClass = isVisaNotApp ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground";
 
-                  if (hasDoc && doc?.expiryDate) {
+                  if (!isVisaNotApp && hasDoc && doc?.expiryDate) {
                     const expDate = new Date(doc.expiryDate);
                     const now = new Date();
                     const diffDays = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -2182,7 +2206,11 @@ function StudentDetailsContent({ params }: PageProps) {
                             <FileCheck2 className="h-4 w-4 text-primary" />
                             Student Visa
                           </CardTitle>
-                          {hasDoc && verLabel ? (
+                          {isVisaNotApp ? (
+                            <Badge variant="outline" className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                              Not Applicable
+                            </Badge>
+                          ) : hasDoc && verLabel ? (
                             <Badge variant="outline" className="text-[10px] font-bold bg-primary/10 text-primary border-primary/30">
                               {verLabel}
                             </Badge>
@@ -2195,7 +2223,19 @@ function StudentDetailsContent({ params }: PageProps) {
                         <CardDescription className="text-[11px] text-muted-foreground">Visa & Entry Clearance</CardDescription>
                       </CardHeader>
                       
-                      {!hasDoc ? (
+                      {isVisaNotApp && !hasDoc ? (
+                        <CardContent className="p-6 text-center space-y-2 flex-1 flex flex-col items-center justify-center">
+                          <div className="p-3 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <FileCheck2 className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs text-foreground font-semibold">
+                            Not Applicable for Indian CIWGC Students
+                          </p>
+                          <p className="text-[11px] text-muted-foreground max-w-xs">
+                            Indian nationals admitted under the CIWGC quota are exempt from Indian student visa requirements.
+                          </p>
+                        </CardContent>
+                      ) : !hasDoc ? (
                         <CardContent className="p-6 text-center space-y-2 flex-1 flex flex-col items-center justify-center">
                           <div className="p-3 rounded-full bg-muted/40 text-muted-foreground">
                             <FileCheck2 className="h-5 w-5" />
@@ -2257,7 +2297,13 @@ function StudentDetailsContent({ params }: PageProps) {
                       )}
 
                       <CardFooter className="p-3 border-t border-border/40 bg-muted/5 flex items-center justify-between gap-2 flex-wrap">
-                        {!hasDoc ? (
+                        {isVisaNotApp && !hasDoc ? (
+                          <div className="w-full py-1 text-center">
+                            <span className="text-[11px] font-medium text-muted-foreground italic">
+                              Visa requirement is not applicable for this student
+                            </span>
+                          </div>
+                        ) : !hasDoc ? (
                           <Button
                             variant="default"
                             size="sm"
@@ -2287,15 +2333,17 @@ function StudentDetailsContent({ params }: PageProps) {
                               <Edit3 className="h-3.5 w-3.5 text-muted-foreground" />
                               Edit Details
                             </Button>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => handleOpenRenewDialog("visa")}
-                              className="h-8 text-xs flex-1 min-w-[100px] gap-1.5 font-semibold"
-                            >
-                              <RefreshCw className="h-3.5 w-3.5" />
-                              Renew Visa
-                            </Button>
+                            {!isVisaNotApp && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleOpenRenewDialog("visa")}
+                                className="h-8 text-xs flex-1 min-w-[100px] gap-1.5 font-semibold"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                Renew Visa
+                              </Button>
+                            )}
                           </>
                         )}
                       </CardFooter>

@@ -1,5 +1,6 @@
 import { ComplianceDocumentType } from "@/features/compliance/constants/constants";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 
 export interface ReminderEligibilityResult {
   isEligible: boolean;
@@ -110,7 +111,7 @@ export class ReminderReconciliationService {
           id,
           registration_number,
           student_personal(nationality_code),
-          student_academic(expected_graduation),
+          student_academic(expected_graduation, admission_category, admission_category_other),
           student_snapshot(passport_expiry, visa_expiry, efrro_expiry),
           passport_versions(id, is_active, expiry_date, deleted_at),
           visa_versions(id, is_active, expiry_date, deleted_at),
@@ -143,6 +144,12 @@ export class ReminderReconciliationService {
 
       const personal = Array.isArray(student.student_personal) ? student.student_personal[0] : student.student_personal;
       const isEfrroApp = isEfrroApplicable(personal?.nationality_code);
+      const isVisaApp = isVisaApplicable({
+        nationality: personal?.nationality_code,
+        admissionCategory: academic?.admission_category,
+        admissionTrack: academic?.admission_category_other,
+        admissionCategoryOther: academic?.admission_category_other
+      });
 
       for (const docType of docTypes) {
         if (docType === "efrro" && !isEfrroApp) {
@@ -164,6 +171,43 @@ export class ReminderReconciliationService {
               const updatedContext = {
                 ...(notif.notification_context || {}),
                 cancellation_reason: "EFRRO_NOT_APPLICABLE_FOR_INDIAN_NATIONAL",
+                cancelled_at: new Date().toISOString(),
+                cancelled_by: actorId || "reconciliation_engine"
+              };
+              await supabase
+                .from("notifications")
+                .update({
+                  status: "cancelled",
+                  notification_context: updatedContext,
+                  updated_at: new Date().toISOString()
+                })
+                .eq("id", notif.id);
+
+              summary.cancelledCount++;
+            }
+          }
+          continue;
+        }
+
+        if (docType === "visa" && !isVisaApp) {
+          summary.evaluatedDocs.visa = {
+            expiryDate: null,
+            isEligible: false,
+            reason: "NOT_APPLICABLE"
+          };
+
+          const { data: staleNotifs, error: qErr } = await supabase
+            .from("notifications")
+            .select("id, status, retry_count, notification_context")
+            .eq("student_id", studentId)
+            .eq("document_type", "visa")
+            .in("status", ["queued", "sending", "processing", "failed"]);
+
+          if (staleNotifs && staleNotifs.length > 0) {
+            for (const notif of staleNotifs) {
+              const updatedContext = {
+                ...(notif.notification_context || {}),
+                cancellation_reason: "VISA_NOT_APPLICABLE_FOR_INDIAN_CIWGC",
                 cancelled_at: new Date().toISOString(),
                 cancelled_by: actorId || "reconciliation_engine"
               };

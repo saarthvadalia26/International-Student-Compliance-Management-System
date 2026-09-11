@@ -5,6 +5,7 @@ import {
 } from "../types/reminder.types";
 import { formatDate } from "@/lib/utils/date";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 
 export interface ReminderRuleConfig {
   id: string;
@@ -382,6 +383,9 @@ export class ExpiryReminderEngine {
     studentId: string;
     expectedGraduationDate?: string | null;
     nationality?: string | null;
+    admissionCategory?: string | null;
+    admissionTrack?: string | null;
+    admissionCategoryOther?: string | null;
     passport?: DocumentInfoParam | null;
     visa?: DocumentInfoParam | null;
     efrro?: DocumentInfoParam | null;
@@ -409,18 +413,56 @@ export class ExpiryReminderEngine {
       todayISO: today
     });
 
-    const visaGroup = this.calculateDocumentReminders({
-      documentType: "visa",
-      documentTitle: "Student Visa",
-      documentNumber: params.visa?.number || "",
-      expiryDate: params.visa?.expiryDate,
-      expectedGraduationDate: gradDate,
-      isUploaded: params.visa?.isUploaded || false,
-      verificationStatus: params.visa?.verificationStatus || "not_recorded",
-      existingNotifications: params.notifications,
-      customRules: params.customRules?.visa,
-      todayISO: today
+    const isVisaApp = isVisaApplicable({
+      nationality: params.nationality,
+      admissionCategory: params.admissionCategory,
+      admissionTrack: params.admissionTrack || params.admissionCategoryOther,
+      admissionCategoryOther: params.admissionCategoryOther || params.admissionTrack
     });
+    const visaRules = (params.customRules?.visa && params.customRules.visa.length > 0)
+      ? params.customRules.visa
+      : (STANDARD_REMINDER_RULES.visa || []);
+
+    const visaGroup: DocumentReminderGroup = isVisaApp
+      ? this.calculateDocumentReminders({
+          documentType: "visa",
+          documentTitle: "Student Visa",
+          documentNumber: params.visa?.number || "",
+          expiryDate: params.visa?.expiryDate,
+          expectedGraduationDate: gradDate,
+          isUploaded: params.visa?.isUploaded || false,
+          verificationStatus: params.visa?.verificationStatus || "not_recorded",
+          existingNotifications: params.notifications,
+          customRules: params.customRules?.visa,
+          todayISO: today
+        })
+      : {
+          documentType: "visa",
+          documentTitle: "Student Visa",
+          documentNumber: "Not Applicable",
+          expiryDate: null,
+          expiryDateFormatted: "Not Applicable",
+          isUploaded: false,
+          verificationStatus: "not_applicable",
+          daysRemaining: null,
+          isExpired: false,
+          isAfterGraduation: false,
+          graduationDate: null,
+          graduationDateFormatted: null,
+          graduationBoundaryStatus: "WITHIN_BOUNDARY",
+          graduationBoundaryReason: "Student Visa is not applicable for Indian CIWGC students",
+          schedule: visaRules.map(r => ({
+            ruleId: r.id,
+            ruleName: r.ruleName,
+            thresholdDays: r.thresholdDays,
+            channel: r.channel,
+            scheduledDate: null,
+            scheduledDateISO: null,
+            status: "NOT_APPLICABLE",
+            statusLabel: "Not Applicable",
+            statusReason: "Student Visa is not applicable for Indian CIWGC students"
+          }))
+        };
 
     const isEfrroApp = isEfrroApplicable(params.nationality);
     const efrroRules = (params.customRules?.efrro && params.customRules.efrro.length > 0)

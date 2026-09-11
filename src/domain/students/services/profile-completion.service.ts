@@ -10,6 +10,7 @@
  */
 
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 
 export type ProfileSectionId = "identity" | "academic" | "contact" | "family" | "emergency" | "bank" | "immigration" | "consular";
 
@@ -385,6 +386,7 @@ export const PROFILE_FIELDS_CONFIG: CompletenessFieldMetadata[] = [
     label: "Visa Number",
     sectionId: "immigration",
     sectionTitle: "Legal & Immigration",
+    isApplicable: (d) => isVisaApplicable({ nationality: d.nationalityCode, admissionCategory: d.admissionCategory, admissionTrack: d.admissionCategoryOther }),
     getValue: (d) => d.visaNumber
   },
   {
@@ -392,6 +394,7 @@ export const PROFILE_FIELDS_CONFIG: CompletenessFieldMetadata[] = [
     label: "Visa Expiry Date",
     sectionId: "immigration",
     sectionTitle: "Legal & Immigration",
+    isApplicable: (d) => isVisaApplicable({ nationality: d.nationalityCode, admissionCategory: d.admissionCategory, admissionTrack: d.admissionCategoryOther }),
     getValue: (d) => d.visaExpiry
   },
   {
@@ -556,11 +559,18 @@ export class ProfileCompletionEngine {
       statusColor = "text-blue-600 bg-blue-500/10 border-blue-500/30";
     }
 
+    const visaApp = isVisaApplicable({
+      nationality: data.nationalityCode,
+      admissionCategory: data.admissionCategory,
+      admissionTrack: data.admissionCategoryOther,
+      admissionCategoryOther: data.admissionCategoryOther
+    });
+
     const isReadyForComplianceReview = (
       this.isPresent(data.fullName) &&
       this.isPresent(data.nationalityCode) &&
       this.isPresent(data.passportNumber) &&
-      this.isPresent(data.visaNumber)
+      (!visaApp || this.isPresent(data.visaNumber))
     );
 
     return {

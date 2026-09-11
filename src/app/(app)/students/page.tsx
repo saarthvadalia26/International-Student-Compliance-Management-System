@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { CountryFlag } from "@/components/ui/country-flag";
 import { AdmissionCategoryBadge } from "@/components/ui/admission-category-badge";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -356,12 +357,20 @@ export default function StudentListPage() {
       missing.push("Passport");
     }
 
+    const visaApplicable = isVisaApplicable({
+      nationality: student.nationalityCode,
+      admissionCategory: student.admissionCategory,
+      admissionTrack: student.admissionCategoryOther,
+      admissionCategoryOther: student.admissionCategoryOther
+    });
     const isVisaMissing =
-      student.visa?.status === "MISSING" ||
-      !student.visa?.number ||
-      student.visa.number.trim().toLowerCase() === "not provided" ||
-      student.visa.number.trim() === "" ||
-      !student.visa?.expiry;
+      visaApplicable && (
+        student.visa?.status === "MISSING" ||
+        !student.visa?.number ||
+        student.visa.number.trim().toLowerCase() === "not provided" ||
+        student.visa.number.trim() === "" ||
+        !student.visa?.expiry
+      );
     if (isVisaMissing) {
       missing.push("Visa");
     }

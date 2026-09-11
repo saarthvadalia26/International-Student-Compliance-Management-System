@@ -2,6 +2,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { getCountryByCode } from "@/utils/countries";
 import { parseDateOnlyString } from "@/lib/utils/date";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 import {
   DimensionalReportsData,
   DimensionReportFilters,
@@ -45,6 +46,7 @@ export class DimensionalReportsService {
             program_id,
             program_code,
             admission_category,
+            admission_category_other,
             admission_academic_year,
             admission_date,
             fee_payment_category,
@@ -169,6 +171,9 @@ export class DimensionalReportsService {
       visaValid: boolean;
       efrroDays: number | null;
       efrroValid: boolean;
+      admissionCategory?: string | null;
+      admissionTrack?: string | null;
+      isVisaApplicable?: boolean;
     }
 
     function parseScholarshipScheme(rawScheme?: string | null): { code: string; subLabel: string } {
@@ -272,16 +277,23 @@ export class DimensionalReportsService {
 
       // Compliance Engine Evaluation (Authoritative Positive Compliance Rule)
       const isEfrroApp = isEfrroApplicable(natCode);
+      const isVisaApp = isVisaApplicable({
+        nationality: natCode,
+        admissionCategory: academic?.admission_category,
+        admissionTrack: academic?.admission_category_other,
+        admissionCategoryOther: academic?.admission_category_other
+      });
+
       const pDays = calcDays(snapshot?.passport_expiry);
-      const vDays = calcDays(snapshot?.visa_expiry);
+      const vDays = isVisaApp ? calcDays(snapshot?.visa_expiry) : null;
       const eDays = isEfrroApp ? calcDays(snapshot?.efrro_expiry) : null;
 
       const pNum = (snapshot?.passport_number || "").trim();
-      const vNum = (snapshot?.visa_number || "").trim();
+      const vNum = isVisaApp ? (snapshot?.visa_number || "").trim() : "";
       const eNum = isEfrroApp ? (snapshot?.efrro_number || "").trim() : "";
 
       const pHasValidData = Boolean(pNum && snapshot?.passport_expiry && pDays !== null);
-      const vHasValidData = Boolean(vNum && snapshot?.visa_expiry && vDays !== null);
+      const vHasValidData = isVisaApp ? Boolean(vNum && snapshot?.visa_expiry && vDays !== null) : true;
       const eHasValidData = isEfrroApp ? Boolean(eNum && snapshot?.efrro_expiry && eDays !== null) : true;
 
       let calculatedCompliance = "Action Required / Missing Document";
@@ -327,6 +339,9 @@ export class DimensionalReportsService {
         visaValid: vHasValidData,
         efrroDays: eDays,
         efrroValid: eHasValidData,
+        admissionCategory: academic?.admission_category,
+        admissionTrack: academic?.admission_category_other,
+        isVisaApplicable: isVisaApp,
       };
     });
 
@@ -590,15 +605,17 @@ export class DimensionalReportsService {
         docStatusStats.passport.missing++;
       }
 
-      // Visa
-      if (s.visaValid && s.visaDays !== null) {
-        docStatusStats.visa.totalWithDoc++;
-        if (s.visaDays < 0) docStatusStats.visa.expired++;
-        else if (s.visaDays <= 15) docStatusStats.visa.critical++;
-        else if (s.visaDays <= 30) docStatusStats.visa.expiring++;
-        else docStatusStats.visa.valid++;
-      } else {
-        docStatusStats.visa.missing++;
+      // Visa (only if applicable to student)
+      if (s.isVisaApplicable) {
+        if (s.visaValid && s.visaDays !== null) {
+          docStatusStats.visa.totalWithDoc++;
+          if (s.visaDays < 0) docStatusStats.visa.expired++;
+          else if (s.visaDays <= 15) docStatusStats.visa.critical++;
+          else if (s.visaDays <= 30) docStatusStats.visa.expiring++;
+          else docStatusStats.visa.valid++;
+        } else {
+          docStatusStats.visa.missing++;
+        }
       }
 
       // eFRRO (only if applicable to student nationality)

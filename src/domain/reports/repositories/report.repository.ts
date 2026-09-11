@@ -18,6 +18,7 @@ import { LEGACY_PROGRAM_ALIASES, DEFAULT_FALLBACK_PROGRAMS } from "@/domain/acad
 import { parseDateOnlyString } from "@/lib/utils/date";
 import { getCountryByCode } from "@/utils/countries";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 
 // =========================================================================
 // Reusable Select Fragments (Canonical Table Hierarchy: students as Root)
@@ -126,8 +127,8 @@ export class SupabaseReportRepository implements IReportRepository {
         students!inner(
           id,
           status,
-          deleted_at,
-          student_personal(nationality_code)
+          student_personal(nationality_code),
+          student_academic(admission_category, admission_category_other)
         )
       `)
         .is("students.deleted_at", null)
@@ -190,19 +191,28 @@ export class SupabaseReportRepository implements IReportRepository {
       const pers = Array.isArray(s.students?.student_personal)
         ? s.students?.student_personal[0]
         : s.students?.student_personal;
+      const acad = Array.isArray(s.students?.student_academic)
+        ? s.students?.student_academic[0]
+        : s.students?.student_academic;
       const nationalityCode = pers?.nationality_code || null;
       const isEfrroApp = isEfrroApplicable(nationalityCode);
+      const isVisaApp = isVisaApplicable({
+        nationality: nationalityCode,
+        admissionCategory: acad?.admission_category,
+        admissionTrack: acad?.admission_category_other,
+        admissionCategoryOther: acad?.admission_category_other
+      });
 
       const pDays = calcDays(s.passport_expiry);
-      const vDays = calcDays(s.visa_expiry);
+      const vDays = isVisaApp ? calcDays(s.visa_expiry) : null;
       const eDays = isEfrroApp ? calcDays(s.efrro_expiry) : null;
 
       const pNum = (s.passport_number || "").trim();
-      const vNum = (s.visa_number || "").trim();
+      const vNum = isVisaApp ? (s.visa_number || "").trim() : "";
       const eNum = isEfrroApp ? (s.efrro_number || "").trim() : "";
 
       const pHasValidData = Boolean(pNum && s.passport_expiry && pDays !== null);
-      const vHasValidData = Boolean(vNum && s.visa_expiry && vDays !== null);
+      const vHasValidData = isVisaApp ? Boolean(vNum && s.visa_expiry && vDays !== null) : true;
       const eHasValidData = isEfrroApp ? Boolean(eNum && s.efrro_expiry && eDays !== null) : true;
 
       let sHasExpired = false;
@@ -232,7 +242,7 @@ export class SupabaseReportRepository implements IReportRepository {
       }
 
       // Visa evaluation
-      if (vDays !== null) {
+      if (isVisaApp && vDays !== null) {
         if (vDays < 0) {
           sHasExpired = true;
           expiredDocs++;
@@ -545,7 +555,7 @@ export class SupabaseReportRepository implements IReportRepository {
             registration_number,
             status,
             student_personal(full_name, nationality_code),
-            student_academic(program_id, program_code),
+            student_academic(program_id, program_code, admission_category, admission_category_other),
             student_snapshot(
               passport_number,
               passport_expiry,
@@ -597,17 +607,23 @@ export class SupabaseReportRepository implements IReportRepository {
 
         const natCode = p?.nationality_code || null;
         const isEfrroApp = isEfrroApplicable(natCode);
+        const isVisaApp = isVisaApplicable({
+          nationality: natCode,
+          admissionCategory: a?.admission_category,
+          admissionTrack: a?.admission_category_other,
+          admissionCategoryOther: a?.admission_category_other
+        });
 
         const missingDocs: string[] = [];
         if (snap?.passport_status === "MISSING" || !snap?.passport_number) missingDocs.push("Passport");
-        if (snap?.visa_status === "MISSING" || !snap?.visa_number) missingDocs.push("Visa");
+        if (isVisaApp && (snap?.visa_status === "MISSING" || !snap?.visa_number)) missingDocs.push("Visa");
         if (isEfrroApp && (snap?.efrro_status === "MISSING" || !snap?.efrro_number)) missingDocs.push("eFRRO");
 
         // Positive compliance calculation respecting nationality:
         let compStatus = snap?.compliance_status || "NON_COMPLIANT";
-        if (!isEfrroApp) {
+        if (!isEfrroApp || !isVisaApp) {
           const pValid = snap?.passport_number && snap?.passport_expiry && (snap.passport_status === "VALID" || snap.passport_status === "COMPLIANT");
-          const vValid = snap?.visa_number && snap?.visa_expiry && (snap.visa_status === "VALID" || snap.visa_status === "COMPLIANT");
+          const vValid = !isVisaApp || (snap?.visa_number && snap?.visa_expiry && (snap.visa_status === "VALID" || snap.visa_status === "COMPLIANT"));
           if (pValid && vValid && missingDocs.length === 0) {
             compStatus = "COMPLIANT";
           }
@@ -675,6 +691,7 @@ export class SupabaseReportRepository implements IReportRepository {
         id,
         registration_number,
         student_personal(full_name, nationality_code),
+        student_academic(admission_category, admission_category_other),
         student_snapshot(
           passport_number,
           passport_expiry,
@@ -741,8 +758,18 @@ export class SupabaseReportRepository implements IReportRepository {
         }
       };
 
+      const a = Array.isArray(st.student_academic) ? st.student_academic[0] : st.student_academic;
+      const isVisaApp = isVisaApplicable({
+        nationality: natCode,
+        admissionCategory: a?.admission_category,
+        admissionTrack: a?.admission_category_other,
+        admissionCategoryOther: a?.admission_category_other
+      });
+
       checkAndAdd("passport", snap.passport_number, snap.passport_expiry);
-      checkAndAdd("visa", snap.visa_number, snap.visa_expiry);
+      if (isVisaApp) {
+        checkAndAdd("visa", snap.visa_number, snap.visa_expiry);
+      }
       if (isEfrroApplicable(natCode)) {
         checkAndAdd("efrro", snap.efrro_number, snap.efrro_expiry);
       }
