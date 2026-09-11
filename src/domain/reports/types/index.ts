@@ -29,9 +29,9 @@ export interface DashboardMetrics {
     efrro: number;
   };
   expiringByDocType?: {
-    passport: { critical15: number; expiring30: number; expired: number; valid: number };
-    visa: { critical15: number; expiring30: number; expired: number; valid: number };
-    efrro: { critical15: number; expiring30: number; expired: number; valid: number };
+    passport: { critical15: number; expiring30: number; expired: number; valid: number; applicable?: number; exempt?: number; missing?: number };
+    visa: { critical15: number; expiring30: number; expired: number; valid: number; applicable?: number; exempt?: number; missing?: number };
+    efrro: { critical15: number; expiring30: number; expired: number; valid: number; applicable?: number; exempt?: number; missing?: number };
   };
 }
 

@@ -182,9 +182,9 @@ export class SupabaseReportRepository implements IReportRepository {
     let expiredDocs = 0;
 
     const expiringByDocType = {
-      passport: { critical15: 0, expiring30: 0, expired: 0, valid: 0 },
-      visa: { critical15: 0, expiring30: 0, expired: 0, valid: 0 },
-      efrro: { critical15: 0, expiring30: 0, expired: 0, valid: 0 }
+      passport: { critical15: 0, expiring30: 0, expired: 0, valid: 0, applicable: 0, exempt: 0, missing: 0 },
+      visa: { critical15: 0, expiring30: 0, expired: 0, valid: 0, applicable: 0, exempt: 0, missing: 0 },
+      efrro: { critical15: 0, expiring30: 0, expired: 0, valid: 0, applicable: 0, exempt: 0, missing: 0 }
     };
 
     snapshots.forEach((s: any) => {
@@ -220,6 +220,7 @@ export class SupabaseReportRepository implements IReportRepository {
       let sHas30 = false;
 
       // Passport evaluation
+      expiringByDocType.passport.applicable++;
       if (pDays !== null) {
         if (pDays < 0) {
           sHasExpired = true;
@@ -240,49 +241,68 @@ export class SupabaseReportRepository implements IReportRepository {
           expiringByDocType.passport.valid++;
         }
       }
+      if (!pHasValidData) {
+        expiringByDocType.passport.missing++;
+      }
 
       // Visa evaluation
-      if (isVisaApp && vDays !== null) {
-        if (vDays < 0) {
-          sHasExpired = true;
-          expiredDocs++;
-          expiringByDocType.visa.expired++;
-        } else if (vDays <= 15) {
-          sHasCritical = true;
-          sHas30 = true;
-          critical15Docs++;
-          expiring30Docs++;
-          expiringByDocType.visa.critical15++;
-          expiringByDocType.visa.expiring30++;
-        } else if (vDays <= 30) {
-          sHas30 = true;
-          expiring30Docs++;
-          expiringByDocType.visa.expiring30++;
-        } else {
-          expiringByDocType.visa.valid++;
+      if (isVisaApp) {
+        expiringByDocType.visa.applicable++;
+        if (vDays !== null) {
+          if (vDays < 0) {
+            sHasExpired = true;
+            expiredDocs++;
+            expiringByDocType.visa.expired++;
+          } else if (vDays <= 15) {
+            sHasCritical = true;
+            sHas30 = true;
+            critical15Docs++;
+            expiring30Docs++;
+            expiringByDocType.visa.critical15++;
+            expiringByDocType.visa.expiring30++;
+          } else if (vDays <= 30) {
+            sHas30 = true;
+            expiring30Docs++;
+            expiringByDocType.visa.expiring30++;
+          } else {
+            expiringByDocType.visa.valid++;
+          }
         }
+        if (!vHasValidData) {
+          expiringByDocType.visa.missing++;
+        }
+      } else {
+        expiringByDocType.visa.exempt++;
       }
 
       // eFRRO evaluation (only if applicable to nationality)
-      if (isEfrroApp && eDays !== null) {
-        if (eDays < 0) {
-          sHasExpired = true;
-          expiredDocs++;
-          expiringByDocType.efrro.expired++;
-        } else if (eDays <= 15) {
-          sHasCritical = true;
-          sHas30 = true;
-          critical15Docs++;
-          expiring30Docs++;
-          expiringByDocType.efrro.critical15++;
-          expiringByDocType.efrro.expiring30++;
-        } else if (eDays <= 30) {
-          sHas30 = true;
-          expiring30Docs++;
-          expiringByDocType.efrro.expiring30++;
-        } else {
-          expiringByDocType.efrro.valid++;
+      if (isEfrroApp) {
+        expiringByDocType.efrro.applicable++;
+        if (eDays !== null) {
+          if (eDays < 0) {
+            sHasExpired = true;
+            expiredDocs++;
+            expiringByDocType.efrro.expired++;
+          } else if (eDays <= 15) {
+            sHasCritical = true;
+            sHas30 = true;
+            critical15Docs++;
+            expiring30Docs++;
+            expiringByDocType.efrro.critical15++;
+            expiringByDocType.efrro.expiring30++;
+          } else if (eDays <= 30) {
+            sHas30 = true;
+            expiring30Docs++;
+            expiringByDocType.efrro.expiring30++;
+          } else {
+            expiringByDocType.efrro.valid++;
+          }
         }
+        if (!eHasValidData) {
+          expiringByDocType.efrro.missing++;
+        }
+      } else {
+        expiringByDocType.efrro.exempt++;
       }
 
       if (sHasExpired) studentExpiredCount++;

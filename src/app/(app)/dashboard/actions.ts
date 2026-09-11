@@ -11,6 +11,8 @@ import {
   aggregateMonthlyAdmissions, 
   aggregateEfrroExpiryTimeline 
 } from "@/domain/reports/utils/admissions-distribution";
+import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
+import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
 
 const reportRepo = new SupabaseReportRepository();
 
@@ -102,7 +104,7 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
         created_at,
         status,
         student_personal(nationality_code, full_name),
-        student_academic(program_id, program_code, admission_date, nfsu_campus, override_school_id)
+        student_academic(program_id, program_code, admission_date, nfsu_campus, override_school_id, admission_category, admission_category_other)
       `)
       .is("deleted_at", null)
       .eq("status", "active")
@@ -110,7 +112,25 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
     // 2. Group by compliance and document expiries (active, non-deleted students only)
     supabase
       .from("student_snapshot")
-      .select("compliance_status, passport_number, passport_expiry, visa_number, visa_expiry, efrro_number, efrro_expiry, passport_status, visa_status, efrro_status, students!inner(id, status, deleted_at)")
+      .select(`
+        compliance_status,
+        passport_number,
+        passport_expiry,
+        passport_status,
+        visa_number,
+        visa_expiry,
+        visa_status,
+        efrro_number,
+        efrro_expiry,
+        efrro_status,
+        students!inner(
+          id,
+          status,
+          deleted_at,
+          student_personal(nationality_code),
+          student_academic(admission_category, admission_category_other)
+        )
+      `)
       .is("students.deleted_at", null)
       .eq("students.status", "active"),
     // 3. Group by notification statuses
@@ -480,9 +500,9 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
 
   // Unified Upcoming Expiry by Document Type
   const upcomingExpiryByDocType = {
-    passport: { critical15: 0, expiring30: 0, safe: 0, expired: 0 },
-    visa: { critical15: 0, expiring30: 0, safe: 0, expired: 0 },
-    efrro: { critical15: 0, expiring30: 0, safe: 0, expired: 0 },
+    passport: { critical15: 0, expiring30: 0, safe: 0, expired: 0, applicable: 0, exempt: 0, missing: 0 },
+    visa: { critical15: 0, expiring30: 0, safe: 0, expired: 0, applicable: 0, exempt: 0, missing: 0 },
+    efrro: { critical15: 0, expiring30: 0, safe: 0, expired: 0, applicable: 0, exempt: 0, missing: 0 },
     totalStudents: totalActiveStudents
   };
 
@@ -495,36 +515,97 @@ export async function _fetchAnalyticsChartsInternal(): Promise<import("@/feature
   };
 
   (snapshotRes.data || []).forEach((row: any) => {
+    const pers = Array.isArray(row.students?.student_personal)
+      ? row.students?.student_personal[0]
+      : row.students?.student_personal;
+    const acad = Array.isArray(row.students?.student_academic)
+      ? row.students?.student_academic[0]
+      : row.students?.student_academic;
+    const nationalityCode = pers?.nationality_code || null;
+    const isEfrroApp = isEfrroApplicable(nationalityCode);
+    const isVisaApp = isVisaApplicable({
+      nationality: nationalityCode,
+      admissionCategory: acad?.admission_category,
+      admissionTrack: acad?.admission_category_other,
+      admissionCategoryOther: acad?.admission_category_other
+    });
+
     const pDays = calcDays(row.passport_expiry);
-    const vDays = calcDays(row.visa_expiry);
-    const eDays = calcDays(row.efrro_expiry);
+    const vDays = isVisaApp ? calcDays(row.visa_expiry) : null;
+    const eDays = isEfrroApp ? calcDays(row.efrro_expiry) : null;
 
     const pNum = (row.passport_number || "").trim();
-    const vNum = (row.visa_number || "").trim();
-    const eNum = (row.efrro_number || "").trim();
+    const vNum = isVisaApp ? (row.visa_number || "").trim() : "";
+    const eNum = isEfrroApp ? (row.efrro_number || "").trim() : "";
 
     const pHasValidData = Boolean(pNum && row.passport_expiry && pDays !== null);
-    const vHasValidData = Boolean(vNum && row.visa_expiry && vDays !== null);
-    const eHasValidData = Boolean(eNum && row.efrro_expiry && eDays !== null);
+    const vHasValidData = isVisaApp ? Boolean(vNum && row.visa_expiry && vDays !== null) : true;
+    const eHasValidData = isEfrroApp ? Boolean(eNum && row.efrro_expiry && eDays !== null) : true;
     const hasAllRequiredData = pHasValidData && vHasValidData && eHasValidData;
 
-    // Document breakdown
-    const evalDoc = (days: number | null, key: "passport" | "visa" | "efrro") => {
-      if (days === null) return;
-      if (days < 0) upcomingExpiryByDocType[key].expired++;
-      else if (days <= 15) upcomingExpiryByDocType[key].critical15++;
-      else if (days <= 30) upcomingExpiryByDocType[key].expiring30++;
-      else upcomingExpiryByDocType[key].safe++;
-    };
+    // Document breakdown: Passport (always applicable)
+    upcomingExpiryByDocType.passport.applicable++;
+    if (pDays !== null) {
+      if (pDays < 0) upcomingExpiryByDocType.passport.expired++;
+      else if (pDays <= 15) {
+        upcomingExpiryByDocType.passport.critical15++;
+        upcomingExpiryByDocType.passport.expiring30++;
+      } else if (pDays <= 30) {
+        upcomingExpiryByDocType.passport.expiring30++;
+      } else {
+        upcomingExpiryByDocType.passport.safe++;
+      }
+    }
+    if (!pHasValidData) {
+      upcomingExpiryByDocType.passport.missing++;
+    }
 
-    evalDoc(pDays, "passport");
-    evalDoc(vDays, "visa");
-    evalDoc(eDays, "efrro");
+    // Document breakdown: Visa (conditional on nationality & admission track)
+    if (isVisaApp) {
+      upcomingExpiryByDocType.visa.applicable++;
+      if (vDays !== null) {
+        if (vDays < 0) upcomingExpiryByDocType.visa.expired++;
+        else if (vDays <= 15) {
+          upcomingExpiryByDocType.visa.critical15++;
+          upcomingExpiryByDocType.visa.expiring30++;
+        } else if (vDays <= 30) {
+          upcomingExpiryByDocType.visa.expiring30++;
+        } else {
+          upcomingExpiryByDocType.visa.safe++;
+        }
+      }
+      if (!vHasValidData) {
+        upcomingExpiryByDocType.visa.missing++;
+      }
+    } else {
+      upcomingExpiryByDocType.visa.exempt++;
+    }
+
+    // Document breakdown: eFRRO (conditional on nationality)
+    if (isEfrroApp) {
+      upcomingExpiryByDocType.efrro.applicable++;
+      if (eDays !== null) {
+        if (eDays < 0) upcomingExpiryByDocType.efrro.expired++;
+        else if (eDays <= 15) {
+          upcomingExpiryByDocType.efrro.critical15++;
+          upcomingExpiryByDocType.efrro.expiring30++;
+        } else if (eDays <= 30) {
+          upcomingExpiryByDocType.efrro.expiring30++;
+        } else {
+          upcomingExpiryByDocType.efrro.safe++;
+        }
+      }
+      if (!eHasValidData) {
+        upcomingExpiryByDocType.efrro.missing++;
+      }
+    } else {
+      upcomingExpiryByDocType.efrro.exempt++;
+    }
 
     // Student compliance status categorization with strict positive compliance requirement
-    const sHasExpired = (pDays !== null && pDays < 0) || (vDays !== null && vDays < 0) || (eDays !== null && eDays < 0);
-    const sHasCritical = (pDays !== null && pDays >= 0 && pDays <= 15) || (vDays !== null && vDays >= 0 && vDays <= 15) || (eDays !== null && eDays >= 0 && eDays <= 15);
-    const sHasWarning = (pDays !== null && pDays > 15 && pDays <= 30) || (vDays !== null && vDays > 15 && vDays <= 30) || (eDays !== null && eDays > 15 && eDays <= 30);
+    const sHasExpired = (pDays !== null && pDays < 0) || (isVisaApp && vDays !== null && vDays < 0) || (isEfrroApp && eDays !== null && eDays < 0);
+    const sHasCritical = (pDays !== null && pDays >= 0 && pDays <= 15) || (isVisaApp && vDays !== null && vDays >= 0 && vDays <= 15) || (isEfrroApp && eDays !== null && eDays >= 0 && eDays <= 15);
+    const sHasWarning = (pDays !== null && pDays > 15 && pDays <= 30) || (isVisaApp && vDays !== null && vDays > 15 && vDays <= 30) || (isEfrroApp && eDays !== null && eDays > 15 && eDays <= 30);
 
     if (sHasExpired) {
       complianceCategoryCounts["Expired Documents"]++;

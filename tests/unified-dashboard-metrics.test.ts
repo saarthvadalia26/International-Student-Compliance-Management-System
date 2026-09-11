@@ -233,6 +233,42 @@ async function runTests() {
     });
   });
 
+  // TEST 15 — Exact Reconciliation: Overall Document Compliance Distribution vs KPI Card
+  await test("TEST 15: 'Fully Compliant' in complianceDistribution exactly matches KPI card fullyCompliantStudents", async () => {
+    const chartsData = await _fetchAnalyticsChartsInternal();
+    const compliantEntry = chartsData.complianceDistribution.find(
+      d => d.name.toUpperCase() === "FULLY COMPLIANT" || d.name.toUpperCase() === "COMPLIANT"
+    );
+    assert(compliantEntry, "Must contain 'Fully Compliant' entry");
+    assert.equal(
+      compliantEntry.value, 
+      metrics.fullyCompliantStudents,
+      `complianceDistribution (${compliantEntry.value}) must match metrics.fullyCompliantStudents (${metrics.fullyCompliantStudents})`
+    );
+  });
+
+  // TEST 16 — Upcoming Expiry by Document Type: Cohort Reconciliation (Applicable + Exempt = Total)
+  await test("TEST 16: Upcoming Expiry by Document Type accurately accounts for applicable and exempt cohorts", async () => {
+    const chartsData = await _fetchAnalyticsChartsInternal();
+    assert(chartsData.upcomingExpiryByDocType, "upcomingExpiryByDocType must be present");
+    const { passport, visa, efrro } = chartsData.upcomingExpiryByDocType;
+
+    // Passport: Everyone requires a passport
+    assert.equal(passport.applicable, metrics.totalStudents);
+    assert.equal(passport.exempt, 0);
+    assert.equal((passport.safe || 0) + (passport.missing || 0), passport.applicable);
+
+    // Visa: Indian CIWGC students are exempt (applicable + exempt === total)
+    assert.equal((visa.applicable || 0) + (visa.exempt || 0), metrics.totalStudents);
+    assert((visa.exempt || 0) > 0, "Exempt visas should be positive for Indian CIWGC");
+    assert.equal((visa.safe || 0) + (visa.missing || 0), visa.applicable);
+
+    // eFRRO: Indian CIWGC + Nepalese students are exempt (applicable + exempt === total)
+    assert.equal((efrro.applicable || 0) + (efrro.exempt || 0), metrics.totalStudents);
+    assert((efrro.exempt || 0) > 0, "Exempt eFRRO should be positive for exempt students");
+    assert.equal((efrro.safe || 0) + (efrro.missing || 0), efrro.applicable);
+  });
+
   console.log("\n============================================================");
   console.log(` RESULTS: ${passed} passed, ${failed} failed`);
   console.log("============================================================\n");

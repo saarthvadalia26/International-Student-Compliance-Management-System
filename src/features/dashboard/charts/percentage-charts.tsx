@@ -57,10 +57,20 @@ export interface AcademicHierarchySchoolNode {
   levels: AcademicHierarchyLevelNode[];
 }
 
+export interface DocTypeExpiryStats {
+  critical15: number;
+  expiring30: number;
+  safe: number;
+  expired: number;
+  applicable?: number;
+  exempt?: number;
+  missing?: number;
+}
+
 export interface UpcomingExpiryByDocTypeData {
-  passport: { critical15: number; expiring30: number; safe: number; expired: number };
-  visa: { critical15: number; expiring30: number; safe: number; expired: number };
-  efrro: { critical15: number; expiring30: number; safe: number; expired: number };
+  passport: DocTypeExpiryStats;
+  visa: DocTypeExpiryStats;
+  efrro: DocTypeExpiryStats;
   totalStudents?: number;
 }
 
@@ -1513,7 +1523,8 @@ export function UpcomingExpiryByDocTypeCard({
   const effectiveTotalStudents = totalStudents ?? data?.totalStudents ?? 0;
 
   const totalDocuments = docConfigs.reduce((sum, d) => {
-    return sum + d.stats.critical15 + d.stats.expiring30 + d.stats.safe + d.stats.expired;
+    const upcoming30 = Math.max(0, d.stats.expiring30 - d.stats.critical15);
+    return sum + d.stats.critical15 + upcoming30 + d.stats.safe + d.stats.expired;
   }, 0);
 
   if (totalDocuments === 0 && effectiveTotalStudents === 0) {
@@ -1528,10 +1539,12 @@ export function UpcomingExpiryByDocTypeCard({
   return (
     <div className="space-y-3.5 w-full">
       {docConfigs.map((doc) => {
-        const totalForDoc = doc.stats.critical15 + doc.stats.expiring30 + doc.stats.safe + doc.stats.expired;
-        const denominator = effectiveTotalStudents > 0 ? effectiveTotalStudents : totalForDoc;
         const upcoming30Only = Math.max(0, doc.stats.expiring30 - doc.stats.critical15);
-        const missingCount = Math.max(0, denominator - totalForDoc);
+        const totalForDoc = doc.stats.critical15 + upcoming30Only + doc.stats.safe + doc.stats.expired;
+        const applicableCount = doc.stats.applicable ?? effectiveTotalStudents;
+        const exemptCount = doc.stats.exempt ?? Math.max(0, effectiveTotalStudents - applicableCount);
+        const missingCount = doc.stats.missing ?? Math.max(0, applicableCount - totalForDoc);
+        const denominator = applicableCount > 0 ? applicableCount : (effectiveTotalStudents > 0 ? effectiveTotalStudents : totalForDoc);
 
         const critPct = denominator > 0 ? (doc.stats.critical15 / denominator) * 100 : 0;
         const warnPct = denominator > 0 ? (upcoming30Only / denominator) * 100 : 0;
@@ -1553,8 +1566,8 @@ export function UpcomingExpiryByDocTypeCard({
                   {doc.label}
                 </span>
                 <span className="text-xs text-muted-foreground font-mono truncate">
-                  {effectiveTotalStudents > 0
-                    ? `${totalForDoc.toLocaleString()} / ${effectiveTotalStudents.toLocaleString()} (${calculatePercentage(totalForDoc, effectiveTotalStudents)})`
+                  {applicableCount > 0
+                    ? `${totalForDoc.toLocaleString()} / ${applicableCount.toLocaleString()} (${calculatePercentage(totalForDoc, applicableCount)})`
                     : `${totalForDoc.toLocaleString()} managed`}
                 </span>
               </div>
@@ -1564,6 +1577,11 @@ export function UpcomingExpiryByDocTypeCard({
                 {missingCount > 0 && (
                   <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border border-zinc-500/30 font-medium whitespace-nowrap min-w-[64px] text-center">
                     {missingCount} missing
+                  </span>
+                )}
+                {exemptCount > 0 && (
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/25 font-medium whitespace-nowrap min-w-[64px] text-center" title={`${exemptCount} students legally exempt / not applicable`}>
+                    {exemptCount} exempt
                   </span>
                 )}
                 {doc.stats.expired > 0 && (
