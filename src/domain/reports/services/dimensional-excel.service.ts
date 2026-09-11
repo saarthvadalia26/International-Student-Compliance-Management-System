@@ -123,18 +123,18 @@ export class DimensionalExcelService {
         title = "Academic School-wise Student Distribution Report";
         sheetName = "School-wise";
         fileName = `iscms-academic-school-wise-${dateStr}.xlsx`;
-        headers = ["Academic School", "Student Count", "Share (%)"];
-        rows = data.reports.school.map((r) => [r.label, r.studentCount, `${r.percentage.toFixed(2)}%`]);
-        totalsRow = ["Total Represented", totalStudents, "100.00%"];
+        headers = ["School Code", "School Name", "Student Count", "Share (%)"];
+        rows = data.reports.school.map((r) => [r.label, r.subLabel || r.label, r.studentCount, `${r.percentage.toFixed(2)}%`]);
+        totalsRow = ["Total Represented", "", totalStudents, "100.00%"];
         break;
 
       case "program":
         title = "Academic Degree Program & Course-wise Enrollment Report";
         sheetName = "Program-wise";
         fileName = `iscms-academic-program-wise-${dateStr}.xlsx`;
-        headers = ["Academic Degree Program", "Program Code / Level", "Student Count", "Share (%)"];
-        rows = data.reports.program.map((r) => [r.label, r.subLabel || "—", r.studentCount, `${r.percentage.toFixed(2)}%`]);
-        totalsRow = ["Total Represented", "—", totalStudents, "100.00%"];
+        headers = ["Program Code", "Academic Degree Program", "Student Count", "Share (%)"];
+        rows = data.reports.program.map((r) => [r.label, r.subLabel || r.label, r.studentCount, `${r.percentage.toFixed(2)}%`]);
+        totalsRow = ["Total Represented", "", totalStudents, "100.00%"];
         break;
 
       case "funding":
@@ -285,9 +285,9 @@ export class DimensionalExcelService {
     const wsSchool = this.createReportWorksheet(
       "Academic School-wise Distribution",
       filterStrings,
-      ["Academic School", "Student Count", "Share (%)"],
-      data.reports.school.map((r) => [r.label, r.studentCount, `${r.percentage.toFixed(2)}%`]),
-      ["Total Represented", totalStudents, "100.00%"]
+      ["School Code", "School Name", "Student Count", "Share (%)"],
+      data.reports.school.map((r) => [r.label, r.subLabel || r.label, r.studentCount, `${r.percentage.toFixed(2)}%`]),
+      ["Total Represented", "", totalStudents, "100.00%"]
     );
     XLSX.utils.book_append_sheet(wb, wsSchool, "School-wise");
 
@@ -295,9 +295,9 @@ export class DimensionalExcelService {
     const wsProgram = this.createReportWorksheet(
       "Academic Degree Program & Course-wise Enrollment",
       filterStrings,
-      ["Academic Degree Program", "Program Code / Level", "Student Count", "Share (%)"],
-      data.reports.program.map((r) => [r.label, r.subLabel || "—", r.studentCount, `${r.percentage.toFixed(2)}%`]),
-      ["Total Represented", "—", totalStudents, "100.00%"]
+      ["Program Code", "Academic Degree Program", "Student Count", "Share (%)"],
+      data.reports.program.map((r) => [r.label, r.subLabel || r.label, r.studentCount, `${r.percentage.toFixed(2)}%`]),
+      ["Total Represented", "", totalStudents, "100.00%"]
     );
     XLSX.utils.book_append_sheet(wb, wsProgram, "Program-wise");
 

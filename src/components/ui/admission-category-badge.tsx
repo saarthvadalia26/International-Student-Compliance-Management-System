@@ -90,7 +90,7 @@ export function AdmissionCategoryBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center font-semibold tracking-wide rounded-full border transition-all select-none shadow-xs",
+        "inline-flex items-center font-semibold tracking-wide rounded-full border transition-all select-none shadow-xs max-w-full min-w-0 overflow-hidden",
         config.className,
         sizeClasses[size],
         className
@@ -99,7 +99,7 @@ export function AdmissionCategoryBadge({
       {...props}
     >
       <span className={cn("size-1.5 rounded-full shrink-0", config.dotColor)} />
-      <span className="truncate">{showFullName ? config.fullLabel : config.label}</span>
+      <span className="truncate min-w-0">{showFullName ? config.fullLabel : config.label}</span>
     </span>
   );
 }

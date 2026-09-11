@@ -55,6 +55,7 @@ import { useUserRole } from "@/hooks/use-user-role";
 import { getStudentsListAction, exportStudentsExcelAction, StudentListItem } from "@/app/(app)/students/actions";
 import { getActiveCampusesAction } from "@/app/(app)/settings/campus-actions";
 import { Campus } from "@/domain/campuses/types";
+import { DuplicateStudentsBanner } from "@/components/alerts/duplicate-students-banner";
 
 export type Student = StudentListItem;
 
@@ -68,7 +69,8 @@ export default function StudentListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAdministrator } = useUserRole();
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const initialSearch = searchParams.get("search") || searchParams.get("q") || "";
+  const [searchQuery, setSearchQuery] = React.useState(initialSearch);
 
   const initialCompliance = (searchParams.get("compliance") || searchParams.get("status") || "all").toLowerCase();
   const [complianceFilter, setComplianceFilter] = React.useState<string>(
@@ -79,6 +81,11 @@ export default function StudentListPage() {
     const p = (searchParams.get("compliance") || searchParams.get("status") || "").toLowerCase();
     if (p && ["compliant", "warning", "critical", "expired", "missing"].includes(p)) {
       setComplianceFilter(p);
+    }
+    const q = searchParams.get("search") || searchParams.get("q") || "";
+    if (q) {
+      setSearchQuery(q);
+      setCurrentPage(1);
     }
   }, [searchParams]);
   const [academicFilter, setAcademicFilter] = React.useState<string>("all");
@@ -578,6 +585,15 @@ export default function StudentListPage() {
         </div>
       </div>
 
+      {/* Actionable Error Alert: Duplicate Student Records Detection */}
+      <DuplicateStudentsBanner 
+        onDifferentStudentsConfirmed={() => {
+          setSearchQuery("");
+          setCurrentPage(1);
+          loadStudents();
+        }}
+      />
+
       {/* Filters and Search Controls Card */}
       <Card className="border border-border/70 shadow-sm bg-card rounded-xl">
         <CardContent className="p-4 flex flex-col gap-3.5">
@@ -883,13 +899,25 @@ export default function StudentListPage() {
                             {student.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                           </div>
                           <div className="space-y-1 min-w-0 max-w-[210px]">
-                            <Link 
-                              href={`/students/${student.id}`} 
-                              className="text-xs font-bold text-foreground hover:text-primary transition-colors block truncate group-hover:text-primary leading-tight"
-                              title={student.fullName}
-                            >
-                              {student.fullName}
-                            </Link>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Link 
+                                href={`/students/${student.id}`} 
+                                className="text-xs font-bold text-foreground hover:text-primary transition-colors block truncate group-hover:text-primary leading-tight"
+                                title={student.fullName}
+                              >
+                                {student.fullName}
+                              </Link>
+                              {student.isPotentialDuplicate && (
+                                <Badge 
+                                  variant="outline" 
+                                  className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[9px] px-1.5 py-0 font-medium shrink-0 flex items-center gap-0.5"
+                                  title={student.duplicateReason || "Potential duplicate student record"}
+                                >
+                                  <AlertTriangle className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400" />
+                                  Duplicate
+                                </Badge>
+                              )}
+                            </div>
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[11px] text-muted-foreground font-mono font-medium">
                                 {student.registrationNumber && student.registrationNumber !== "Not provided" ? student.registrationNumber : "Pending Reg ID"}
@@ -901,12 +929,13 @@ export default function StudentListPage() {
                               )}
                               <span className="truncate">{student.nationalityName || "International"}</span>
                             </div>
-                            <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                            <div className="flex items-center gap-1 flex-wrap pt-0.5 min-w-0 max-w-full">
                               {student.admissionCategory && (
                                 <AdmissionCategoryBadge 
                                   category={student.admissionCategory} 
                                   categoryOther={student.admissionCategoryOther}
                                   size="xs" 
+                                  className="max-w-[195px]"
                                 />
                               )}
                             </div>
@@ -1041,12 +1070,24 @@ export default function StudentListPage() {
                         {student.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1 space-y-0.5">
-                        <Link 
-                          href={`/students/${student.id}`} 
-                          className="text-sm font-bold text-foreground hover:text-primary transition-colors block break-words"
-                        >
-                          {student.fullName}
-                        </Link>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Link 
+                            href={`/students/${student.id}`} 
+                            className="text-sm font-bold text-foreground hover:text-primary transition-colors block break-words"
+                          >
+                            {student.fullName}
+                          </Link>
+                          {student.isPotentialDuplicate && (
+                            <Badge 
+                              variant="outline" 
+                              className="border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300 text-[9px] px-1.5 py-0 font-medium shrink-0 flex items-center gap-0.5"
+                              title={student.duplicateReason || "Potential duplicate student record"}
+                            >
+                              <AlertTriangle className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400" />
+                              Duplicate
+                            </Badge>
+                          )}
+                        </div>
                         <div className="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
                           <span className="font-mono">{student.registrationNumber || "No ID"}</span>
                           <span>•</span>
@@ -1092,13 +1133,14 @@ export default function StudentListPage() {
 
                   {/* Bottom Row: Standing & View Button */}
                   <div className="flex items-center justify-between gap-2 pt-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       {getAcademicStatusBadge(student.academicStatus)}
                       {student.admissionCategory && (
                         <AdmissionCategoryBadge 
                           category={student.admissionCategory} 
                           categoryOther={student.admissionCategoryOther}
                           size="xs" 
+                          className="max-w-[180px] sm:max-w-[240px]"
                         />
                       )}
                     </div>

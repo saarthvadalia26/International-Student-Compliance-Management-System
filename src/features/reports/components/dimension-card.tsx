@@ -62,6 +62,23 @@ const BAR_COLORS = [
   "#64748b", // Slate
 ];
 
+const SCHOOL_CODE_FALLBACKS: Record<string, string> = {
+  "school of pharmacy": "SOP",
+  "school of pharmacy & emerging sciences": "SOP",
+  "school of forensic science": "SFS",
+  "school of forensic sciences": "SFS",
+  "school of cyber security & digital forensics": "SCSDF",
+  "school of police science & security studies": "SPSSS",
+  "school of management studies": "SMS",
+  "school of behavioral forensics": "SBF",
+  "school of criminology & behavioral sciences": "SBF",
+  "school of engineering & technology": "SET",
+  "school of medico-legal studies": "SMLS",
+  "school of law, forensic justice and policy studies": "SLFJPS",
+  "school of doctoral studies and research": "SDSR",
+  "doctoral research programme": "SDSR",
+};
+
 export function DimensionCard({
   dimension,
   title,
@@ -122,7 +139,7 @@ export function DimensionCard({
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 min-w-0">
           <div className="space-y-1 min-h-[44px] flex flex-col justify-center min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <CardTitle className="text-base font-semibold text-foreground tracking-tight truncate">
+              <CardTitle className="text-base font-semibold text-foreground tracking-tight leading-snug" title={title}>
                 {title}
               </CardTitle>
               <Badge variant="secondary" className="text-[11px] font-normal px-2 py-0.5 shrink-0">
@@ -236,12 +253,16 @@ export function DimensionCard({
                           <YAxis
                             type="category"
                             dataKey="label"
-                            width={160}
+                            width={dimension === "school" || dimension === "program" ? 80 : 160}
                             tick={{ fontSize: 11 }}
                             interval={0}
-                            tickFormatter={(val) =>
-                              val && val.length > 22 ? `${val.slice(0, 21)}…` : val
-                            }
+                            tickFormatter={(val) => {
+                              if (dimension === "school") {
+                                const norm = (val || "").toLowerCase().trim();
+                                return SCHOOL_CODE_FALLBACKS[norm] || val;
+                              }
+                              return val && val.length > 22 ? `${val.slice(0, 21)}…` : val;
+                            }}
                           />
                           <Tooltip
                             cursor={{ fill: "rgba(255, 255, 255, 0.04)" }}

@@ -768,7 +768,7 @@ export class SupabaseReportRepository implements IReportRepository {
             documentType: docType,
             documentNumber: docNum || "—",
             expiryDate: expStr,
-            daysRemaining: days >= 0 ? days : null,
+            daysRemaining: days,
             daysExpired: days < 0 ? Math.abs(days) : null,
             status: days < 0 ? "EXPIRED" : days <= 15 ? "CRITICAL" : "WARNING",
             nationality,

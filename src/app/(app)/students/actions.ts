@@ -21,12 +21,24 @@ import { CalendarDateEngine } from "@/domain/notifications/services/calendar-dat
 import { ComplianceCalculator } from "@/domain/compliance/services/compliance-calculator";
 import { isEfrroApplicable } from "@/domain/compliance/utils/efrro-applicability";
 import { isVisaApplicable } from "@/domain/compliance/utils/visa-applicability";
+import { 
+  findDuplicateStudentGroups, 
+  DuplicateStudentGroup, 
+  CandidateStudent,
+  generatePairKey,
+  getAllPairKeys
+} from "@/domain/students/utils/duplicate-student-detection.util";
 
 const studentService = new StudentService();
 
 export interface StudentListItem {
   id: string;
   fullName: string;
+  dateOfBirth?: string | null;
+  createdAt?: string | null;
+  isPotentialDuplicate?: boolean;
+  duplicateReason?: string;
+  duplicateGroupKey?: string;
   registrationNumber: string;
   nationalityCode: string;
   nationalityName: string;
@@ -383,7 +395,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         registration_number,
         status,
         created_at,
-        student_personal(full_name, nationality_code),
+        student_personal(full_name, nationality_code, date_of_birth),
         student_contact(email, phone_home),
         student_academic(*),
         student_snapshot(*)
@@ -415,7 +427,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
           registration_number,
           status,
           created_at,
-          student_personal(full_name, nationality_code),
+          student_personal(full_name, nationality_code, date_of_birth),
           student_contact(email, phone_home),
           student_academic(program_id, program_code, academic_status, admission_category, sii_application_number, iccr_application_number, nfsu_campus, admission_academic_year, admission_date),
           student_snapshot(compliance_status, compliance_score, passport_number, passport_expiry, passport_status, visa_number, visa_expiry, visa_status, visa_type, efrro_number, efrro_expiry, efrro_status, days_until_efrro_expiry)
@@ -440,7 +452,7 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
             registration_number,
             status,
             created_at,
-            student_personal(full_name, nationality_code),
+            student_personal(full_name, nationality_code, date_of_birth),
             student_contact(email),
             student_academic(program_code),
             student_snapshot(compliance_status, passport_number, visa_number, efrro_number)
@@ -640,8 +652,39 @@ export async function getStudentsListAction(filters: StudentFilterOptions = {}):
         iccrApplicationNumber: academic?.iccr_application_number || null,
         siiApplicationNumber: academic?.sii_application_number || null,
         nfsuCampus: academic?.nfsu_campus || null,
-        feePaymentCategory: academic?.fee_payment_category || null
+        feePaymentCategory: academic?.fee_payment_category || null,
+        dateOfBirth: personal?.date_of_birth || null,
+        createdAt: r.created_at || null
       };
+    });
+
+    // Detect and annotate any potential duplicate student profiles
+    const candidateList: CandidateStudent[] = students.map(s => ({
+      id: s.id,
+      fullName: s.fullName,
+      nationalityCode: s.nationalityCode,
+      dateOfBirth: s.dateOfBirth,
+      passportNumber: s.passport?.number,
+      registrationNumber: s.registrationNumber,
+      programCode: s.programCode,
+      createdAt: s.createdAt
+    }));
+    const { dismissedPairKeys, dismissedGroupKeys } = await getDismissedDuplicatePairs();
+    const duplicateGroups = findDuplicateStudentGroups(candidateList, dismissedPairKeys, dismissedGroupKeys);
+    const dupMap = new Map<string, { reason: string; groupKey: string }>();
+    duplicateGroups.forEach(g => {
+      g.studentIds.forEach(id => {
+        dupMap.set(id, { reason: g.reason, groupKey: g.groupKey });
+      });
+    });
+
+    students.forEach(s => {
+      const dup = dupMap.get(s.id);
+      if (dup) {
+        s.isPotentialDuplicate = true;
+        s.duplicateReason = dup.reason;
+        s.duplicateGroupKey = dup.groupKey;
+      }
     });
 
     return {
@@ -3673,6 +3716,189 @@ export async function exportStudentsExcelAction(criteria: StudentExportFilterCri
     return {
       success: false,
       error: sanitized.message || "Failed to generate Excel export."
+    };
+  }
+}
+
+/**
+ * Retrieves the set of student pairs and duplicate group keys that have been confirmed
+ * by administrators/staff as different students.
+ */
+export async function getDismissedDuplicatePairs(): Promise<{
+  dismissedPairKeys: Set<string>;
+  dismissedGroupKeys: Set<string>;
+}> {
+  try {
+    const adminSupabase = getAdminSupabase();
+    const { data: logs, error } = await adminSupabase
+      .from("audit_log")
+      .select("details")
+      .eq("action", "MARK_DIFFERENT_STUDENTS");
+
+    const dismissedPairKeys = new Set<string>();
+    const dismissedGroupKeys = new Set<string>();
+
+    if (error || !logs) {
+      return { dismissedPairKeys, dismissedGroupKeys };
+    }
+
+    for (const log of logs) {
+      const details = log.details as any;
+      if (!details) continue;
+      if (details.groupKey) {
+        dismissedGroupKeys.add(details.groupKey);
+      }
+      if (Array.isArray(details.pairKeys)) {
+        details.pairKeys.forEach((pk: string) => dismissedPairKeys.add(pk));
+      }
+      if (Array.isArray(details.studentIds) && details.studentIds.length >= 2) {
+        const pks = getAllPairKeys(details.studentIds);
+        pks.forEach(pk => dismissedPairKeys.add(pk));
+      }
+    }
+
+    return { dismissedPairKeys, dismissedGroupKeys };
+  } catch (err) {
+    console.warn("[GET_DISMISSED_DUPLICATE_PAIRS] Failed to fetch dismissed duplicates:", err);
+    return { dismissedPairKeys: new Set(), dismissedGroupKeys: new Set() };
+  }
+}
+
+/**
+ * Server Action: Check for duplicate active student profiles across the system
+ */
+export async function checkDuplicateStudentsAction(): Promise<{
+  success: boolean;
+  duplicateGroups: DuplicateStudentGroup[];
+  totalDuplicates: number;
+  error?: string;
+}> {
+  try {
+    const adminSupabase = getAdminSupabase();
+
+    const { data: records, error } = await adminSupabase
+      .from("students")
+      .select(`
+        id,
+        registration_number,
+        created_at,
+        student_personal(full_name, nationality_code, date_of_birth),
+        student_academic(program_code),
+        student_snapshot(passport_number)
+      `)
+      .is("deleted_at", null)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[CHECK_DUPLICATE_STUDENTS_ERROR]", error);
+      return { success: false, duplicateGroups: [], totalDuplicates: 0, error: error.message };
+    }
+
+    const candidates: CandidateStudent[] = (records || []).map((r: any) => {
+      const p = Array.isArray(r.student_personal) ? r.student_personal[0] : r.student_personal;
+      const a = Array.isArray(r.student_academic) ? r.student_academic[0] : r.student_academic;
+      const snap = Array.isArray(r.student_snapshot) ? r.student_snapshot[0] : r.student_snapshot;
+      return {
+        id: r.id,
+        fullName: p?.full_name || "",
+        nationalityCode: p?.nationality_code || null,
+        dateOfBirth: p?.date_of_birth || null,
+        passportNumber: snap?.passport_number || null,
+        registrationNumber: r.registration_number || null,
+        programCode: a?.program_code || null,
+        createdAt: r.created_at
+      };
+    });
+
+    const { dismissedPairKeys, dismissedGroupKeys } = await getDismissedDuplicatePairs();
+    const duplicateGroups = findDuplicateStudentGroups(candidates, dismissedPairKeys, dismissedGroupKeys);
+    const totalDuplicates = duplicateGroups.reduce((acc, g) => acc + g.students.length, 0);
+
+    return {
+      success: true,
+      duplicateGroups,
+      totalDuplicates
+    };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "checkDuplicateStudentsAction", route: "/students" });
+    return {
+      success: false,
+      duplicateGroups: [],
+      totalDuplicates: 0,
+      error: sanitized.message
+    };
+  }
+}
+
+/**
+ * Server Action: Mark students in a duplicate group as distinct individuals.
+ * This dismisses the duplicate error query across the entire website and treats both students differently.
+ */
+export async function markStudentsAsDifferentAction(params: {
+  groupKey: string;
+  studentIds: string[];
+  reason?: string;
+}): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  try {
+    const supabase = await getServerSupabase();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to mark students as distinct." };
+    }
+
+    const adminSupabase = getAdminSupabase();
+    const { data: profile } = await adminSupabase
+      .from("user_profiles")
+      .select("role, email, full_name")
+      .eq("id", user.id)
+      .single();
+
+    const role = profile?.role || (user.user_metadata?.role as string) || "";
+    if (role !== "administrator" && role !== "staff") {
+      return { success: false, error: "Unauthorized. Only administrators and staff can resolve student duplicates." };
+    }
+
+    const pairKeys = getAllPairKeys(params.studentIds);
+
+    const { error: insertError } = await adminSupabase.from("audit_log").insert({
+      actor_id: user.id,
+      actor_email: profile?.email || user.email || "system",
+      actor_name: profile?.full_name || user.user_metadata?.full_name || null,
+      action: "MARK_DIFFERENT_STUDENTS",
+      resource: `students/duplicate_groups/${params.groupKey}`,
+      category: "student_compliance",
+      severity: "info",
+      details: {
+        groupKey: params.groupKey,
+        studentIds: params.studentIds,
+        pairKeys,
+        reason: params.reason || "Administrator confirmed both are different students",
+        confirmedAt: new Date().toISOString()
+      }
+    });
+
+    if (insertError) {
+      console.error("[MARK_DIFFERENT_STUDENTS_ERROR]", insertError);
+      return { success: false, error: "Failed to persist distinct student confirmation." };
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/students");
+
+    return {
+      success: true,
+      message: "Students successfully confirmed as distinct individuals."
+    };
+  } catch (err: unknown) {
+    const sanitized = sanitizeError(err, { action: "markStudentsAsDifferentAction", route: "/students" });
+    return {
+      success: false,
+      error: sanitized.message
     };
   }
 }

@@ -12,6 +12,23 @@ import {
   RenewalMetricRow,
 } from "../types/dimensional-reports";
 
+export const KNOWN_SCHOOL_CODES: Record<string, string> = {
+  "school of pharmacy": "SOP",
+  "school of pharmacy & emerging sciences": "SOP",
+  "school of forensic science": "SFS",
+  "school of forensic sciences": "SFS",
+  "school of cyber security & digital forensics": "SCSDF",
+  "school of police science & security studies": "SPSSS",
+  "school of management studies": "SMS",
+  "school of behavioral forensics": "SBF",
+  "school of criminology & behavioral sciences": "SBF",
+  "school of engineering & technology": "SET",
+  "school of medico-legal studies": "SMLS",
+  "school of law, forensic justice and policy studies": "SLFJPS",
+  "school of doctoral studies and research": "SDSR",
+  "doctoral research programme": "SDSR",
+};
+
 export class DimensionalReportsService {
   /**
    * Retrieves unified multi-dimensional student analytics and reporting data
@@ -45,6 +62,7 @@ export class DimensionalReportsService {
           student_academic (
             program_id,
             program_code,
+            override_school_id,
             admission_category,
             admission_category_other,
             admission_academic_year,
@@ -124,7 +142,14 @@ export class DimensionalReportsService {
     const schoolMap = new Map<string, any>();
     schools.forEach((s) => {
       schoolMap.set(s.id, s);
-      if (s.name) schoolMap.set(s.name, s);
+      if (s.name) {
+        schoolMap.set(s.name, s);
+        schoolMap.set(s.name.toLowerCase().trim(), s);
+      }
+      if (s.code) {
+        schoolMap.set(s.code, s);
+        schoolMap.set(s.code.toLowerCase().trim(), s);
+      }
     });
 
     const now = new Date();
@@ -160,6 +185,7 @@ export class DimensionalReportsService {
       degreeLevel: string;
       schoolId: string;
       schoolName: string;
+      schoolCode: string;
       fundingType: string;
       fundingDisplay: string;
       fundingSubLabel?: string;
@@ -237,8 +263,16 @@ export class DimensionalReportsService {
       const programName = prog?.program_name || academic?.program_code || "Not Specified";
       const programCode = prog?.program_code || academic?.program_code || "";
       const degreeLevel = prog?.academic_level || "Not Specified";
-      const schoolName = prog?.school_name || "Not Specified";
-      const schoolId = prog?.school_id || "";
+
+      const sch = 
+        (academic?.override_school_id ? schoolMap.get(academic.override_school_id) : null) ||
+        (prog?.school_id ? schoolMap.get(prog.school_id) : null) ||
+        (prog?.school_name ? schoolMap.get(prog.school_name) || schoolMap.get(prog.school_name.toLowerCase().trim()) : null);
+
+      const schoolName = sch?.name || prog?.school_name || "Not Specified";
+      const schoolId = sch?.id || prog?.school_id || "";
+      const normalizedSchoolName = schoolName.toLowerCase().trim();
+      const schoolCode = sch?.code || KNOWN_SCHOOL_CODES[normalizedSchoolName] || (schoolName === "Not Specified" ? "Not Specified" : schoolName);
 
       // Funding
       const rawFunding = (academic?.fee_payment_category || "").trim().toLowerCase();
@@ -328,6 +362,7 @@ export class DimensionalReportsService {
         degreeLevel,
         schoolId,
         schoolName,
+        schoolCode,
         fundingType: rawFunding,
         fundingDisplay,
         fundingSubLabel,
@@ -402,8 +437,8 @@ export class DimensionalReportsService {
       if (filters.academicYear && s.academicYear !== filters.academicYear) return false;
       if (filters.campus && s.campus !== filters.campus) return false;
       if (filters.category && s.categoryDisplay !== filters.category) return false;
-      if (filters.schoolId && s.schoolId !== filters.schoolId && s.schoolName !== filters.schoolId) return false;
-      if (filters.programId && s.programId !== filters.programId && s.programName !== filters.programId) return false;
+      if (filters.schoolId && s.schoolId !== filters.schoolId && s.schoolName !== filters.schoolId && s.schoolCode !== filters.schoolId) return false;
+      if (filters.programId && s.programId !== filters.programId && s.programName !== filters.programId && s.programCode !== filters.programId) return false;
       if (filters.fundingType && s.fundingDisplay !== filters.fundingType) return false;
       if (filters.studentStatus && s.status !== filters.studentStatus) return false;
       if (filters.countryCode && s.nationalityCode !== filters.countryCode) return false;
@@ -420,10 +455,10 @@ export class DimensionalReportsService {
     };
 
     // 5. Aggregate Dimension 1: Country-wise
-    const countryMap = new Map<string, { label: string; code: string; count: number }>();
+    const countryMap = new Map<string, { count: number; code: string }>();
     filteredStudents.forEach((s) => {
       const key = s.countryName;
-      const existing = countryMap.get(key) || { label: key, code: s.nationalityCode, count: 0 };
+      const existing = countryMap.get(key) || { count: 0, code: s.nationalityCode };
       existing.count++;
       countryMap.set(key, existing);
     });
@@ -431,7 +466,7 @@ export class DimensionalReportsService {
     const countryReport: DimensionRow[] = Array.from(countryMap.entries())
       .map(([key, data]) => ({
         key,
-        label: data.label,
+        label: key,
         subLabel: data.code,
         studentCount: data.count,
         percentage: calcPct(data.count),
@@ -455,28 +490,39 @@ export class DimensionalReportsService {
       .sort((a, b) => b.studentCount - a.studentCount);
 
     // 7. Aggregate Dimension 3: Academic School-wise
-    const schoolAggMap = new Map<string, number>();
+    const schoolAggMap = new Map<string, { name: string; code: string; count: number }>();
     filteredStudents.forEach((s) => {
-      const key = s.schoolName;
-      schoolAggMap.set(key, (schoolAggMap.get(key) || 0) + 1);
+      const code = s.schoolCode?.trim() || (s.schoolName === "Not Specified" ? "Not Specified" : s.schoolName);
+      const name = s.schoolName || code;
+      const key = code;
+
+      const existing = schoolAggMap.get(key) || { name, code, count: 0 };
+      existing.count += 1;
+      if (name !== "Not Specified" && existing.name === "Not Specified") {
+        existing.name = name;
+      }
+      schoolAggMap.set(key, existing);
     });
 
     const schoolReport: DimensionRow[] = Array.from(schoolAggMap.entries())
-      .map(([key, count]) => ({
+      .map(([key, data]) => ({
         key,
-        label: key,
-        studentCount: count,
-        percentage: calcPct(count),
+        label: data.code,
+        subLabel: data.name !== data.code && data.name !== "Not Specified" ? data.name : undefined,
+        studentCount: data.count,
+        percentage: calcPct(data.count),
       }))
       .sort((a, b) => b.studentCount - a.studentCount);
 
     // 8. Aggregate Dimension 4: Academic Program-wise
     const programAggMap = new Map<string, { label: string; code: string; level: string; count: number }>();
     filteredStudents.forEach((s) => {
-      const key = s.programName;
+      const code = s.programCode?.trim() || (s.programName === "Not Specified" ? "Not Specified" : s.programName);
+      const name = s.programName || code;
+      const key = code;
       const existing = programAggMap.get(key) || {
-        label: key,
-        code: s.programCode,
+        label: name,
+        code: code,
         level: s.degreeLevel,
         count: 0,
       };
@@ -487,8 +533,10 @@ export class DimensionalReportsService {
     const programReport: DimensionRow[] = Array.from(programAggMap.entries())
       .map(([key, data]) => ({
         key,
-        label: data.label,
-        subLabel: data.code ? `${data.code} (${data.level})` : data.level,
+        label: data.code,
+        subLabel: data.label !== data.code && data.label !== "Not Specified"
+          ? (data.level && data.level !== "Not Specified" ? `${data.label} (${data.level})` : data.label)
+          : (data.level && data.level !== "Not Specified" ? data.level : undefined),
         studentCount: data.count,
         percentage: calcPct(data.count),
       }))

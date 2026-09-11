@@ -1649,6 +1649,7 @@ function StudentDetailsContent({ params }: PageProps) {
                           categoryOther={student.admissionCategoryOther} 
                           showFullName={true} 
                           size="md" 
+                          className="max-w-full"
                         />
                       ) : (
                         <span className="text-muted-foreground text-xs font-medium">Not provided</span>

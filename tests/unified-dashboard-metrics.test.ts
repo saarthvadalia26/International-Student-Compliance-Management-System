@@ -256,17 +256,17 @@ async function runTests() {
     // Passport: Everyone requires a passport
     assert.equal(passport.applicable, metrics.totalStudents);
     assert.equal(passport.exempt, 0);
-    assert.equal((passport.safe || 0) + (passport.missing || 0), passport.applicable);
+    assert.equal((passport.safe || 0) + (passport.missing || 0) + (passport.expired || 0), passport.applicable);
 
     // Visa: Indian CIWGC students are exempt (applicable + exempt === total)
     assert.equal((visa.applicable || 0) + (visa.exempt || 0), metrics.totalStudents);
     assert((visa.exempt || 0) > 0, "Exempt visas should be positive for Indian CIWGC");
-    assert.equal((visa.safe || 0) + (visa.missing || 0), visa.applicable);
+    assert.equal((visa.safe || 0) + (visa.missing || 0) + (visa.expired || 0), visa.applicable);
 
     // eFRRO: Indian CIWGC + Nepalese students are exempt (applicable + exempt === total)
     assert.equal((efrro.applicable || 0) + (efrro.exempt || 0), metrics.totalStudents);
     assert((efrro.exempt || 0) > 0, "Exempt eFRRO should be positive for exempt students");
-    assert.equal((efrro.safe || 0) + (efrro.missing || 0), efrro.applicable);
+    assert.equal((efrro.safe || 0) + (efrro.missing || 0) + (efrro.expired || 0), efrro.applicable);
   });
 
   console.log("\n============================================================");

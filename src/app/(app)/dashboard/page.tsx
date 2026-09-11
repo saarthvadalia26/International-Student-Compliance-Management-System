@@ -6,6 +6,7 @@ import { Branding } from "@/config/branding";
 import MetricsWrapper from "@/features/dashboard/metrics/metrics-wrapper";
 import ChartsWrapper from "@/features/dashboard/charts/charts-wrapper";
 import { RealtimeDashboardListener } from "@/features/dashboard/components/realtime-dashboard-listener";
+import { DuplicateStudentsBanner } from "@/components/alerts/duplicate-students-banner";
 
 /**
  * Dashboard Page — Streaming Architecture
@@ -50,6 +51,9 @@ export default function DashboardPage() {
           {Branding.shortName} International Student Cell administrative tracking overview. Authoritative compliance status across Passport, Visa, and eFRRO permits.
         </p>
       </div>
+
+      {/* Actionable Error Alert: Duplicate Student Records Detection */}
+      <DuplicateStudentsBanner />
 
       {/* KPI Cards Grid — streams in asynchronously */}
       <Suspense fallback={<MetricsSkeleton />}>

@@ -313,7 +313,7 @@ export function ReportsWorkspace({ initialData }: ReportsWorkspaceProps) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            All Dimensions (10)
+            All Dimensions (11)
           </button>
           <button
             type="button"
