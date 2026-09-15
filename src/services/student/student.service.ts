@@ -14,7 +14,8 @@ export interface IStudentService {
   getStudentById(id: string): Promise<FullStudentProfile | null>;
   updateStudent(id: string, input: UpdateStudentInput, actorId: string | null): Promise<FullStudentProfile>;
   listStudents(filters: StudentFilterOptions): Promise<FullStudentProfile[]>;
-  archiveStudent(id: string, actorId: string | null): Promise<boolean>;
+  deleteStudent(id: string, actorId?: string | null): Promise<boolean>;
+  archiveStudent(id: string, actorId?: string | null): Promise<boolean>;
   recordAcademicAdjustment(
     studentId: string,
     input: {
@@ -107,11 +108,18 @@ export class StudentService implements IStudentService {
     return this.repository.listStudents(filters);
   }
 
-  async archiveStudent(id: string, actorId: string | null): Promise<boolean> {
+  async deleteStudent(id: string, _actorId?: string | null): Promise<boolean> {
     if (!id || !id.trim()) {
       throw new Error("Invalid student ID.");
     }
-    return this.repository.softDeleteStudent(id.trim(), actorId);
+    return this.repository.deleteStudent(id.trim());
+  }
+
+  /**
+   * @deprecated In v0.3.0, archiving is replaced by permanent deleteStudent.
+   */
+  async archiveStudent(id: string, actorId?: string | null): Promise<boolean> {
+    return this.deleteStudent(id, actorId);
   }
 
   async recordAcademicAdjustment(

@@ -21,7 +21,8 @@ export interface IStudentRepository {
   getStudentByRegistrationNumber(regNum: string): Promise<FullStudentProfile | null>;
   updateStudent(id: string, input: UpdateStudentInput, actorId: string | null): Promise<FullStudentProfile>;
   listStudents(filters: StudentFilterOptions): Promise<FullStudentProfile[]>;
-  softDeleteStudent(id: string, actorId: string | null): Promise<boolean>;
+  deleteStudent(id: string): Promise<boolean>;
+  softDeleteStudent(id: string, actorId?: string | null): Promise<boolean>;
   recordAcademicAdjustment(
     studentId: string,
     input: {
@@ -1395,45 +1396,31 @@ export class SupabaseStudentRepository implements IStudentRepository {
     return profiles;
   }
 
-  async softDeleteStudent(id: string, actorId: string | null): Promise<boolean> {
+  /**
+   * Permanently delete student and all associated records from the database.
+   * Leverages PostgreSQL ON DELETE CASCADE foreign keys across all 22 child tables.
+   */
+  async deleteStudent(id: string): Promise<boolean> {
     const supabase = getAdminSupabase();
-    const now = new Date().toISOString();
 
     const { error } = await supabase
       .from("students")
-      .update({
-        deleted_at: now,
-        updated_at: now,
-        updated_by: actorId
-      })
+      .delete()
       .eq("id", id);
 
     if (error) {
-      console.error("[STUDENT_REPOSITORY] Soft delete student error:", error);
+      console.error("[STUDENT_REPOSITORY] Permanent delete student error:", error);
       return false;
     }
 
-    // Soft delete associated child records
-    await Promise.all([
-      supabase.from("student_personal").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
-      supabase.from("student_contact").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
-      supabase.from("student_academic").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
-      supabase.from("student_relationships").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
-      supabase.from("student_embassy").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
-      supabase.from("student_bank_details").update({ deleted_at: now, updated_at: now }).eq("student_id", id),
-      supabase.from("passport_versions").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
-      supabase.from("visa_versions").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id),
-      supabase.from("efrro_versions").update({ deleted_at: now, updated_at: now, updated_by: actorId }).eq("student_id", id)
-    ]);
-
-    // Record audit log
-    await supabase.from("audit_log").insert({
-      actor_id: actorId,
-      action: "DELETE_STUDENT",
-      resource: `students/${id}`
-    });
-
     return true;
+  }
+
+  /**
+   * @deprecated In v0.3.0, soft-delete is replaced by permanent deleteStudent.
+   */
+  async softDeleteStudent(id: string, _actorId?: string | null): Promise<boolean> {
+    return this.deleteStudent(id);
   }
 
   /**

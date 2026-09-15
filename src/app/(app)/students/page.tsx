@@ -47,12 +47,20 @@ import {
   DropdownMenuLabel, 
   DropdownMenuSeparator 
 } from "@/components/ui/dropdown-menu";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter 
+} from "@/components/ui/dialog";
 import { ACADEMIC_LEVEL_OPTIONS, normalizeAcademicLevel } from "@/domain/academic-programs/academic-level";
 import { matchStudentFilters, StudentExportFilterCriteria } from "@/domain/students/utils/student-filter.util";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 import { useUserRole } from "@/hooks/use-user-role";
-import { getStudentsListAction, exportStudentsExcelAction, StudentListItem } from "@/app/(app)/students/actions";
+import { getStudentsListAction, exportStudentsExcelAction, deleteStudentAction, StudentListItem } from "@/app/(app)/students/actions";
 import { getActiveCampusesAction } from "@/app/(app)/settings/campus-actions";
 import { Campus } from "@/domain/campuses/types";
 import { DuplicateStudentsBanner } from "@/components/alerts/duplicate-students-banner";
@@ -77,6 +85,14 @@ export default function StudentListPage() {
     ["compliant", "warning", "critical", "expired", "missing"].includes(initialCompliance) ? initialCompliance : "all"
   );
 
+  const [academicFilter, setAcademicFilter] = React.useState<string>("all");
+  const [academicLevelFilter, setAcademicLevelFilter] = React.useState<string>("all");
+  const [campusFilter, setCampusFilter] = React.useState<string>("all");
+  const [admissionYearFilter, setAdmissionYearFilter] = React.useState<string>("all");
+  const [feePaymentCategoryFilter, setFeePaymentCategoryFilter] = React.useState<string>("all");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 10;
+
   React.useEffect(() => {
     const p = (searchParams.get("compliance") || searchParams.get("status") || "").toLowerCase();
     if (p && ["compliant", "warning", "critical", "expired", "missing"].includes(p)) {
@@ -88,13 +104,6 @@ export default function StudentListPage() {
       setCurrentPage(1);
     }
   }, [searchParams]);
-  const [academicFilter, setAcademicFilter] = React.useState<string>("all");
-  const [academicLevelFilter, setAcademicLevelFilter] = React.useState<string>("all");
-  const [campusFilter, setCampusFilter] = React.useState<string>("all");
-  const [admissionYearFilter, setAdmissionYearFilter] = React.useState<string>("all");
-  const [feePaymentCategoryFilter, setFeePaymentCategoryFilter] = React.useState<string>("all");
-  const [currentPage, setCurrentPage] = React.useState(1);
-  const itemsPerPage = 10;
   
   const [students, setStudents] = React.useState<Student[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -118,6 +127,59 @@ export default function StudentListPage() {
       setIsLoading(false);
     }
   }, []);
+
+  // Delete Student Dialog State
+  const [studentToDelete, setStudentToDelete] = React.useState<Student | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
+  const [isDeletingStudent, setIsDeletingStudent] = React.useState(false);
+  const [deleteStudentError, setDeleteStudentError] = React.useState<string | null>(null);
+
+  const handleOpenDeleteModal = (student: Student) => {
+    setStudentToDelete(student);
+    setDeleteConfirmText("");
+    setDeleteStudentError(null);
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (isDeletingStudent) return;
+    setStudentToDelete(null);
+    setDeleteConfirmText("");
+    setDeleteStudentError(null);
+  };
+
+  const handleConfirmDeleteStudent = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!studentToDelete) return;
+    if (deleteConfirmText.trim() !== "DELETE") {
+      setDeleteStudentError("Please type DELETE in all capital letters to confirm permanent deletion.");
+      return;
+    }
+
+    try {
+      setIsDeletingStudent(true);
+      setDeleteStudentError(null);
+      const res = await deleteStudentAction(studentToDelete.id);
+      if (!res.success) {
+        setDeleteStudentError(res.error || "Unable to delete this student. No changes were made. Please try again.");
+        return;
+      }
+
+      // Optimistically remove from state
+      setStudents((prev) => prev.filter((s) => s.id !== studentToDelete.id));
+      toast.success("Student permanently deleted", {
+        description: `${studentToDelete.fullName} and all associated records and documents have been permanently removed from the database and storage.`
+      });
+
+      handleCloseDeleteModal();
+      // Silently refresh list from server
+      loadStudents();
+    } catch (err: unknown) {
+      console.error("[DELETE_STUDENT_ERROR]", err);
+      setDeleteStudentError("An unexpected error occurred while deleting the student record.");
+    } finally {
+      setIsDeletingStudent(false);
+    }
+  };
 
   React.useEffect(() => {
     loadStudents();
@@ -1046,8 +1108,11 @@ export default function StudentListPage() {
                                 <FileSpreadsheet className="mr-2 h-3.5 w-3.5 text-emerald-600" /> Renew Documents
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-xs cursor-pointer text-destructive focus:text-destructive">
-                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Archive Student
+                              <DropdownMenuItem
+                                className="text-xs cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                                onClick={() => handleOpenDeleteModal(student)}
+                              >
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete Student
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1177,8 +1242,11 @@ export default function StudentListPage() {
                             <FileSpreadsheet className="mr-2 h-3.5 w-3.5 text-emerald-600" /> Renew Documents
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-xs cursor-pointer text-destructive focus:text-destructive">
-                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Archive Student
+                          <DropdownMenuItem
+                            className="text-xs cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                            onClick={() => handleOpenDeleteModal(student)}
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete Student
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1224,6 +1292,141 @@ export default function StudentListPage() {
           </div>
         )}
       </Card>
+
+      {/* Permanent Delete Student Confirmation Dialog */}
+      <Dialog
+        open={!!studentToDelete}
+        onOpenChange={(open) => {
+          if (!open) handleCloseDeleteModal();
+        }}
+      >
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold text-foreground">
+                  Permanent Delete Student?
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground">
+                  This action is irreversible and permanently erases all student data.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {studentToDelete && (
+            <div className="space-y-4 pt-1">
+              {/* Target Student Identity Card */}
+              <div className="rounded-xl border border-border/70 bg-muted/30 p-3.5 flex items-center justify-between gap-3">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <CountryFlag countryCode={studentToDelete.nationalityCode} size="sm" />
+                    <span className="font-semibold text-sm text-foreground truncate">
+                      {studentToDelete.fullName}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                    <span>{studentToDelete.registrationNumber || "No Reg Number"}</span>
+                    <span>•</span>
+                    <span className="truncate">{studentToDelete.programName || "No Program"}</span>
+                  </div>
+                </div>
+                <AdmissionCategoryBadge category={studentToDelete.admissionCategory} />
+              </div>
+
+              {/* High-visibility Warning Notice */}
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-600 dark:text-rose-400 space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-rose-700 dark:text-rose-300">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>Permanent Database & Cloud Storage Erasure</span>
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground text-[11px] leading-relaxed">
+                  <li>
+                    <strong className="text-foreground">Database Records:</strong> Personal, academic, contact, family, bank, and compliance snapshot records will be permanently removed.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Cloudflare R2 Storage:</strong> All physical uploaded document files (passports, visas, eFRRO) in <code className="font-mono text-foreground">iscms-documents</code> will be permanently destroyed.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Reminder Engine:</strong> All scheduled reminder notifications and queues for this student will be eradicated.
+                  </li>
+                  <li>
+                    <strong className="text-foreground">Security Audit:</strong> A permanent <code className="font-mono text-foreground">DELETE_STUDENT</code> audit event will be recorded for compliance traceability.
+                  </li>
+                </ul>
+              </div>
+
+              {/* Error Alert if any */}
+              {deleteStudentError && (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span className="flex-1">{deleteStudentError}</span>
+                </div>
+              )}
+
+              {/* Form with typed DELETE confirmation */}
+              <form onSubmit={handleConfirmDeleteStudent} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground block">
+                    To confirm permanent deletion, please type{" "}
+                    <span className="font-mono font-bold text-rose-600 dark:text-rose-400 select-all">
+                      DELETE
+                    </span>{" "}
+                    below:
+                  </label>
+                  <Input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => {
+                      setDeleteConfirmText(e.target.value);
+                      if (deleteStudentError) setDeleteStudentError(null);
+                    }}
+                    placeholder="Type DELETE to confirm"
+                    className="h-9 text-xs font-mono border-rose-500/40 focus-visible:ring-rose-500/30"
+                    autoFocus
+                    disabled={isDeletingStudent}
+                  />
+                </div>
+
+                <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCloseDeleteModal}
+                    disabled={isDeletingStudent}
+                    className="h-9 text-xs rounded-xl"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="destructive"
+                    size="sm"
+                    disabled={deleteConfirmText.trim() !== "DELETE" || isDeletingStudent}
+                    className="h-9 text-xs rounded-xl gap-1.5 font-semibold bg-rose-600 hover:bg-rose-700 text-white"
+                  >
+                    {isDeletingStudent ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Deleting Student...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Permanently Delete Student
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

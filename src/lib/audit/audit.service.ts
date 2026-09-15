@@ -113,7 +113,47 @@ export interface SchoolDeletionAuditEntry {
   userAgent?: string;
 }
 
+export interface StudentDeletionAuditEntry {
+  adminId: string;
+  adminEmail: string;
+  adminName?: string;
+  studentId: string;
+  studentName: string;
+  registrationNumber?: string | null;
+  deletedCounts?: {
+    documents?: number;
+    r2Objects?: number;
+  };
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 const auditService = {
+  /**
+   * Log Permanent Student Deletion event (Real database and storage removal)
+   */
+  async logStudentDeletion(entry: StudentDeletionAuditEntry): Promise<void> {
+    const admin = getAdminSupabase();
+    await admin.from("audit_log").insert({
+      actor_id: entry.adminId,
+      actor_email: entry.adminEmail,
+      actor_name: entry.adminName ?? null,
+      action: "DELETE_STUDENT",
+      resource: "students",
+      category: "student",
+      severity: "critical",
+      ip_address: entry.ipAddress ?? null,
+      user_agent: entry.userAgent ?? null,
+      details: {
+        student_id: entry.studentId,
+        student_name: entry.studentName,
+        registration_number: entry.registrationNumber ?? null,
+        deleted_counts: entry.deletedCounts ?? {},
+        deleted_at: new Date().toISOString(),
+      },
+    });
+  },
+
   /**
    * Log Academic Program Deletion event (Administrator permanently removing a program)
    */
@@ -322,3 +362,4 @@ const auditService = {
 };
 
 export { auditService };
+export default auditService;

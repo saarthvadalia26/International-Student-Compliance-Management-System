@@ -1094,9 +1094,10 @@ export async function updateStudentAction(
 }
 
 /**
- * Server Action: Soft delete / archive student profile
+ * Server Action: Permanently delete student profile, all associated records,
+ * and physical document objects from Cloudflare R2 / secure storage.
  */
-export async function archiveStudentAction(studentId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteStudentAction(studentId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await getServerSupabase();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -1104,7 +1105,7 @@ export async function archiveStudentAction(studentId: string): Promise<{ success
     if (authError || !user) {
       return {
         success: false,
-        error: "Authentication required to archive student profile."
+        error: "Authentication required to delete student profile."
       };
     }
 
@@ -1112,26 +1113,122 @@ export async function archiveStudentAction(studentId: string): Promise<{ success
     if (!isInternalUser(user)) {
       return {
         success: false,
-        error: "Forbidden: Staff or Administrator privileges are required to archive student profiles."
+        error: "Forbidden: Staff or Administrator privileges are required to delete student profiles."
       };
     }
 
-    const archived = await studentService.archiveStudent(studentId, user.id);
-    if (!archived) {
-      return { success: false, error: "Failed to archive student record." };
+    // 1. Fetch student details before deletion for audit trail and storage cleanup
+    const student = await studentService.getStudentById(studentId);
+    if (!student) {
+      return {
+        success: false,
+        error: "Student profile not found."
+      };
     }
 
+    // 2. Identify all physical document objects belonging to this student in Cloudflare R2 / storage
+    const adminSupabase = getAdminSupabase();
+    const filePathsToDelete: string[] = [];
+
+    // Collect recorded file paths from document version tables
+    const [{ data: passports }, { data: visas }, { data: efrros }] = await Promise.all([
+      adminSupabase.from("passport_versions").select("file_path").eq("student_id", studentId),
+      adminSupabase.from("visa_versions").select("file_path").eq("student_id", studentId),
+      adminSupabase.from("efrro_versions").select("file_path").eq("student_id", studentId),
+    ]);
+
+    const lists = [passports, visas, efrros];
+    for (const list of lists) {
+      if (list) {
+        for (const doc of list) {
+          if (doc.file_path && typeof doc.file_path === "string" && doc.file_path.startsWith(`students/${studentId}/`)) {
+            filePathsToDelete.push(doc.file_path);
+          }
+        }
+      }
+    }
+
+    // Also inspect storage folder structures for any uploaded files under students/{studentId}/
+    const docTypes = ["passport", "visa", "efrro"];
+    for (const dt of docTypes) {
+      try {
+        const { data: files } = await adminSupabase.storage
+          .from("iscms-documents")
+          .list(`students/${studentId}/${dt}/v1`);
+        if (files && Array.isArray(files)) {
+          for (const f of files) {
+            if (f.name && f.name !== ".emptyFolderPlaceholder") {
+              filePathsToDelete.push(`students/${studentId}/${dt}/v1/${f.name}`);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[STORAGE_CLEANUP] Could not inspect storage subfolder students/${studentId}/${dt}:`, err);
+      }
+    }
+
+    // Deduplicate and delete storage objects
+    const uniqueStoragePaths = Array.from(new Set(filePathsToDelete));
+    if (uniqueStoragePaths.length > 0) {
+      try {
+        console.log(`[STORAGE_CLEANUP] Removing ${uniqueStoragePaths.length} physical files for student ${studentId} from iscms-documents`);
+        const { error: storageError } = await adminSupabase.storage
+          .from("iscms-documents")
+          .remove(uniqueStoragePaths);
+        if (storageError) {
+          console.error(`[STORAGE_CLEANUP_WARNING] Failed to remove storage files: ${storageError.message}`);
+        }
+      } catch (err) {
+        console.warn(`[STORAGE_CLEANUP] Storage remove error:`, err);
+      }
+    }
+
+    // 3. Permanently delete student from database
+    // Cascades across all 22 child tables (personal, contact, academic, versions, snapshot, notifications, tokens, etc.)
+    const deleted = await studentService.deleteStudent(studentId, user.id);
+    if (!deleted) {
+      return { success: false, error: "Failed to permanently delete student record from database." };
+    }
+
+    // 4. Log security audit event for permanent student deletion
+    const { auditService } = await import("@/lib/audit/audit.service");
+    await auditService.logStudentDeletion({
+      adminId: user.id,
+      adminEmail: user.email || "unknown@university.edu",
+      adminName: (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || user.email || "Administrator",
+      studentId,
+      studentName: student.personal?.fullName || "Student",
+      registrationNumber: student.student?.registrationNumber || null,
+      deletedCounts: {
+        documents: (passports?.length || 0) + (visas?.length || 0) + (efrros?.length || 0),
+        r2Objects: uniqueStoragePaths.length,
+      }
+    });
+
+    // 5. Invalidate server caches
     revalidatePath("/students");
+    revalidatePath(`/students/${studentId}`);
     revalidatePath("/dashboard");
+    revalidatePath("/reports");
+    revalidatePath("/reports/students");
+    revalidatePath("/reports/audit");
+    revalidatePath("/reminders");
 
     return { success: true };
   } catch (err: unknown) {
-    const sanitized = sanitizeError(err, { action: "archiveStudentAction", route: `/students/${studentId}` });
+    const sanitized = sanitizeError(err, { action: "deleteStudentAction", route: `/students/${studentId}` });
     return {
       success: false,
       error: sanitized.message
     };
   }
+}
+
+/**
+ * @deprecated In v0.3.0, archiving is replaced by permanent deleteStudentAction.
+ */
+export async function archiveStudentAction(studentId: string): Promise<{ success: boolean; error?: string }> {
+  return deleteStudentAction(studentId);
 }
 
 /**
